@@ -6,39 +6,46 @@ t1 = time.time()
 file = "/home/zeevvladimir/ML_orbit_infall_project/np_arrays/"
 save_location = "/home/zeevvladimir/ML_orbit_infall_project/np_arrays/"
 
-snapshot = 190
-
 #load halo info
 halo_n = np.load(file + "halo_n.npy")
-print(halo_n.shape)
 halo_position = np.load(file + "halo_position.npy")
-print(halo_position.shape)
 halo_velocity = np.load(file + "halo_velocity.npy")
-print(halo_velocity.shape)
-
-#load particle id
+halo_last_snap = np.load(file + "halo_last_snap.npy")
+#load particle info
 particle_id = np.load(file + "tracer_id.npy")
-#particle_id, halo_pos_1, halo_pos_2, halo_pos_3, halo_velocity_1, halo_velocity_2, halo_velocity_3
-particle_info = np.zeros((particle_id.size,1,1,1,1,1,1), dtype='float32')
 
-particle_count_start = 0
-# loop through all halos
-for halo_count in range(halo_n.size):
-    #determine the end and beginning particles and then add these particles to the array with the corresponding halo data
-    particle_count_end = particle_count_start + halo_n[halo_count]
-    np.append(particle_info,(particle_id[particle_count_start:particle_count_end], halo_position[halo_count, snapshot, 0],  halo_position[halo_count, snapshot, 1],
-         halo_position[halo_count, snapshot, 2], halo_velocity[halo_count, snapshot, 0], halo_velocity[halo_count, snapshot, 1],
-         halo_velocity[halo_count, snapshot, 2]))
-    particle_count_start = particle_count_end
 
-    #keep track of how long it takes to go through 100 halos and extrapolate for the entrie process
-    if halo_count % 100 == 0:
-        print(halo_count)
-        t2 = time.time()
-        t = t2 - t1
-        t1 = t2
-        print("time: %f" % t)
-        batches = halo_n.size
-        print("estimated " + str((((batches - halo_count) * (t/100))/60)) + " minutes reamining")
 
-np.save(save_location + "particle_info", particle_info)
+snapshot = 190
+
+# loop through all halos to find how many particles there are after 190
+max_size = 0
+for i in range(halo_n.size):
+    if halo_last_snap[i] >= snapshot:
+        max_size += halo_n[i]
+particle_with_halo = np.zeros((max_size,7))
+
+
+start_particle = 0
+final_particle = 0
+count = 0
+difference = 0
+#loop through halos 
+for halo in range(halo_n.size):
+    final_particle += halo_n[halo]
+    #if it is a halo we want
+    if halo_last_snap[halo] >= snapshot:
+        difference = final_particle - start_particle
+        for particle in range(difference): 
+            particle_with_halo[count][0] = particle_id[particle]
+            particle_with_halo[count][1] = halo_position[halo][snapshot][0]
+            particle_with_halo[count][2] = halo_position[halo][snapshot][1]
+            particle_with_halo[count][3] = halo_position[halo][snapshot][2]
+            particle_with_halo[count][4] = halo_velocity[halo][snapshot][0] 
+            particle_with_halo[count][5] = halo_velocity[halo][snapshot][1]
+            particle_with_halo[count][6] = halo_velocity[halo][snapshot][2]
+            count += 1
+        
+    start_particle = final_particle
+print(particle_with_halo)
+np.save(save_location + "particle_with_halo", particle_with_halo)
