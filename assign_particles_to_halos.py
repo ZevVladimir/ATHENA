@@ -11,6 +11,7 @@ halo_n = np.load(file + "halo_n.npy")
 halo_position = np.load(file + "halo_position.npy")
 halo_velocity = np.load(file + "halo_velocity.npy")
 halo_last_snap = np.load(file + "halo_last_snap.npy")
+halo_r200 = np.load(file + "halo_R200m.npy")
 #load particle info
 particle_id = np.load(file + "tracer_id.npy")
 
@@ -23,7 +24,7 @@ max_size = 0
 for i in range(halo_n.size):
     if halo_last_snap[i] >= snapshot:
         max_size += halo_n[i]
-particle_with_halo = np.zeros((max_size,7))
+particle_with_halo = np.zeros((max_size,8))
 
 
 start_particle = 0
@@ -44,6 +45,7 @@ for halo in range(halo_n.size):
             particle_with_halo[count][4] = halo_velocity[halo][snapshot][0] 
             particle_with_halo[count][5] = halo_velocity[halo][snapshot][1]
             particle_with_halo[count][6] = halo_velocity[halo][snapshot][2]
+            particle_with_halo[count][7] = halo_r200[halo][snapshot]
             count += 1
         
     start_particle = final_particle
