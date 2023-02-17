@@ -28,10 +28,10 @@ original_data_file = h5py.File(original_data_file_location)
 # print(allkeys(original_data_file))
 
 
-with h5py.File(original_data_file_location, "r") as f: 
-    halo_last_snap = np.empty(f["/halos/last_snap"].shape, f["/halos/last_snap"].dtype)
-    halo_last_snap = np.array(list(f["/halos/last_snap"]))
-    np.save(save_location + "halo_last_snap", halo_last_snap)
+#with h5py.File(original_data_file_location, "r") as f: 
+    # halo_last_snap = np.empty(f["/halos/last_snap"].shape, f["/halos/last_snap"].dtype)
+    # halo_last_snap = np.array(list(f["/halos/last_snap"]))
+    # np.save(save_location + "halo_last_snap", halo_last_snap)
 
 #     #save halo R200, velocity, position as .np files
 #     halo_R200m = np.empty(f["/halos/R200m"].shape, f["/halos/R200m"].dtype)
@@ -73,16 +73,17 @@ with h5py.File(original_data_file_location, "r") as f:
 
 #save info from all snapshots
 
-particles_pos = readsnap(snapshot_path, 'pos', 'dm')
-np.save(save_location + "particle_pos", particles_pos)
+# particles_pos = readsnap(snapshot_path, 'pos', 'dm')
+# np.save(save_location + "particle_pos", particles_pos)
 
-particles_vel = readsnap(snapshot_path, 'vel', 'dm')
-np.save(save_location + "particle_vel", particles_vel)
+# particles_vel = readsnap(snapshot_path, 'vel', 'dm')
+# np.save(save_location + "particle_vel", particles_vel)
 
-particles_pid = readsnap(snapshot_path, 'pid', 'dm')
-np.save(save_location + "particle_pid", particles_pid)
+# particles_pid = readsnap(snapshot_path, 'pid', 'dm')
+# np.save(save_location + "particle_pid", particles_pid)
 
-
+# particle_mass = readsnap(snapshot_path, 'mass', 'dm')
+# np.save(save_location + "all_particle_mass", particle_mass)
 
 
 
