@@ -17,32 +17,36 @@ rho_m = cosmol.rho_m(red_shift)
 
 #Shape particle_with_halo: pid, halo_pos_x, halo_pos_y, halo_pos_z, halo_vel_x, halo_vel_y, halo_vel_z, halo_number, halo_r200
 particle_with_halo = np.load(file + "particle_with_halo.npy")
-particle_with_halo[:,1:3] = particle_with_halo[:,1:3] #in units of kpc/h
+
+
 particles_pid = np.load(file + "particle_pid.npy")
 particles_vel = np.load(file + "particle_vel.npy")
 particles_pos = np.load(file + "particle_pos.npy") 
-particles_pos = particles_pos #units kpc/h
 particles_mass = np.load(file + "all_particle_mass.npy")
-mass = particles_mass[0]  #units M_sun/h
+mass = particles_mass[0] * 10**10 #units M_sun/h
 
+scale_factor = 1/(1+red_shift)
 
 match_indices = np.intersect1d(particle_with_halo[:,0], particles_pid, return_indices=True)
 #match_indices: sorted pids, indices for matches in particle_with_halo, indices for matches in particles_pid
 matched_particles_with_halo = particle_with_halo[match_indices[1]]
 
+
 #only take pos and vel that are matched
 matched_particles_pid = particles_pid[match_indices[2]]
 matched_particles_pos = particles_pos[match_indices[2]]
-matched_particles_pos_x = matched_particles_pos[:,0]
-matched_particles_pos_y = matched_particles_pos[:,1]
-matched_particles_pos_z = matched_particles_pos[:,2]
+matched_particles_pos_x = matched_particles_pos[:,0] * 10**3 * scale_factor
+matched_particles_pos_y = matched_particles_pos[:,1] * 10**3 * scale_factor
+matched_particles_pos_z = matched_particles_pos[:,2] * 10**3 * scale_factor
 matched_particles_vel = particles_vel[match_indices[2]]
 
-matched_halo_pos_x = matched_particles_with_halo[:,1]
-matched_halo_pos_y = matched_particles_with_halo[:,2]
-matched_halo_pos_z = matched_particles_with_halo[:,3]
+matched_halo_pos_x = matched_particles_with_halo[:,1] * 10**3 * scale_factor
+matched_halo_pos_y = matched_particles_with_halo[:,2] * 10**3 * scale_factor
+matched_halo_pos_z = matched_particles_with_halo[:,3] * 10**3 * scale_factor
 
-box_size = readheader(snapshot_path, 'boxsize') #units kpc/h
+box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
+box_size = box_size * 10**3 * scale_factor #convert to Kpc/h physical
+
 
 #calculate distance of particle from halo
 def calculate_distance(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z):
@@ -52,8 +56,9 @@ def calculate_distance(halo_x, halo_y, halo_z, particle_x, particle_y, particle_
     return distance 
 
 radius = calculate_distance(matched_halo_pos_x, matched_halo_pos_y, matched_halo_pos_z, matched_particles_pos_x, matched_particles_pos_y, matched_particles_pos_z)
-
-
+print("distances")
+print(np.sort(radius))
+print(box_size/2)
 for i in range(radius.size):
     #if the radius is too large
     if radius[i] > box_size/2:
@@ -92,7 +97,10 @@ start_particle = 0
 final_particle = 0
 current_particle = 0
 calculated_R200 = np.zeros(halo_splitting_point.size - 1)
-count = 0
+actual_calculated_indices = np.zeros(halo_splitting_point.size - 1)
+actual_count = 0
+halo_count = 0
+miss = 0
 t1 = time.time()
 array_two_r200 = np.zeros(2,)
 
@@ -103,7 +111,7 @@ for index in range(1, 10000):
     #add the difference between the new and old so only get new particles
     new_particles = halo_splitting_point[index] - halo_splitting_point[index-1]
     final_particle = final_particle + new_particles
-
+    
     #create array for each halos particles with their PIDs, the particles distances, and the mass
     current_halo_particles = np.zeros((int(halo_splitting_point[index]),3))
     current_halo_particles[0:new_particles,0] = matched_particles_with_halo[start_particle:final_particle,0] #add PIDs
@@ -121,20 +129,30 @@ for index in range(1, 10000):
 
     #density = mass of particles within radius/((4/3)*pi*particle radius^3)
     # print("mass: ")
-    #print(current_halo_particles[0:new_particles,2])
+    # print(current_halo_particles[0:new_particles,2])
     # print("volume: ")
     # print((4/3)*np.pi*(np.power(current_halo_particles[0:new_particles,1],3)))
+    # print(current_halo_particles[0:new_particles,1])
+    # print(np.power(current_halo_particles[0:new_particles,1],3))
     calculated_density = np.divide((current_halo_particles[0:new_particles,2]),((4/3)*np.pi*(np.power(current_halo_particles[0:new_particles,1],3))))
     indices_density_reached = np.where(calculated_density >= (200*rho_c))
-    
+    # print(np.max(calculated_density))
+    # print(200*rho_c)
 
 
     if(indices_density_reached[0].size > 1):
         array_two_r200[0] = current_halo_particles[indices_density_reached[0][0],1]
         array_two_r200[1] = current_halo_particles[indices_density_reached[0][1],1]
-        calculated_R200[count] = np.mean(array_two_r200)
-    count += 1
-     
+        calculated_R200[actual_count] = np.mean(array_two_r200)
+        actual_calculated_indices[actual_count] = halo_count #keep track of which halos actaully got an R200
+        actual_count += 1
+    elif(indices_density_reached[0].size == 1):
+        calculated_R200[actual_count] = current_halo_particles[indices_density_reached[0][0],1]
+        actual_calculated_indices[actual_count] = halo_count
+        actual_count += 1
+        
+    
+    halo_count += 1
     
     if (index % 100000 == 0 and index != 0):
         print(index)
@@ -143,18 +161,29 @@ for index in range(1, 10000):
     start_particle = final_particle
 print("calculated R200")
 
-zeros_R200 = np.where(calculated_R200 != 0)
-no_zero_calculated_R200 = calculated_R200[zeros_R200]
-print(np.max(no_zero_calculated_R200))
-print(no_zero_calculated_R200)
+print(calculated_R200[:10])
+# print(np.max(calculated_R200))
+# print(np.min(calculated_R200))
 
 print("actual R200")
+
+r200_indices_split = np.where(matched_particles_with_halo[:,8][:-1] != matched_particles_with_halo[:,8][1:])[0]
+r200_indices_split = r200_indices_split + 1 #so the values stored here are the starting values for each halo
+r200_splitting_point = np.zeros((r200_indices_split.size + 1), dtype=int)
+r200_splitting_point[0] = 0
+r200_splitting_point[1:] = r200_indices_split
+
+actual_calculated_indices = actual_calculated_indices[actual_calculated_indices != 0]
+actual_calculated_indices = (np.rint(actual_calculated_indices)).astype(int)
 actual_R200 = matched_particles_with_halo[:,8]
-actual_R200 = actual_R200[indices_split]
-no_zero_actual_R200 = actual_R200[zeros_R200]
+actual_R200 = actual_R200[r200_splitting_point]
+actual_R200 = actual_R200[actual_calculated_indices]
 
 
-print(actual_R200)
+
+print(actual_R200[:10])
+print(np.max(actual_R200))
+print(np.min(actual_R200))
 
 # #subtract velocitions
 # matched_particles_vel[:,0] = matched_particles_vel[:,0] - matched_particles_with_halo[:,1]
