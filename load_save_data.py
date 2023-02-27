@@ -28,12 +28,12 @@ original_data_file = h5py.File(original_data_file_location)
 # print(allkeys(original_data_file))
 
 
-#with h5py.File(original_data_file_location, "r") as f: 
+with h5py.File(original_data_file_location, "r") as f: 
     # halo_last_snap = np.empty(f["/halos/last_snap"].shape, f["/halos/last_snap"].dtype)
     # halo_last_snap = np.array(list(f["/halos/last_snap"]))
     # np.save(save_location + "halo_last_snap", halo_last_snap)
 
-#     #save halo R200, velocity, position as .np files
+#     #save halo R200, velocity, position, halo_id as .np files
 #     halo_R200m = np.empty(f["/halos/R200m"].shape, f["/halos/R200m"].dtype)
 #     halo_R200m = np.array(list(f["/halos/R200m"]))
 #     np.save(save_location + "halo_R200m", halo_R200m)
@@ -42,34 +42,30 @@ original_data_file = h5py.File(original_data_file_location)
 #     halo_velocity = np.array(list(f["/halos/velocity"]))
 #     np.save(save_location + "halo_velocity", halo_velocity)
 
-#     #save info from res_oct
+#     
 #     halo_position = np.empty(f["/halos/position"].shape, f["/halos/position"].dtype)
 #     halo_position = np.array(list(f["/halos/position"]))
 #     np.save(save_location + "halo_position", halo_position)
 
-#     halo_first = np.empty(f["/tcr_ptl/res_oct/halo_first"].shape, f["/tcr_ptl/res_oct/halo_first"].dtype)
-#     halo_first = np.array(list(f["/tcr_ptl/res_oct/halo_first"]))
-#     np.save(save_location + "halo_first", halo_first)
+    halo_id = np.empty(f["/halos/id"].shape, f["/halos/id"].dtype)
+    halo_id = np.array(list(f["/halos/id"]))
+    np.save(save_location + "halo_id", halo_id)
 
-#     halo_n = np.empty(f["/tcr_ptl/res_oct/halo_n"].shape, f["/tcr_ptl/res_oct/halo_n"].dtype)
-#     halo_n = np.array(list(f["/tcr_ptl/res_oct/halo_n"]))
-#     np.save(save_location + "halo_n", halo_n)
+# save info from res_ifl
 
-#     last_pericenter_snap = np.empty(f["/tcr_ptl/res_oct/last_pericenter_snap"].shape, f["/tcr_ptl/res_oct/last_pericenter_snap"].dtype)
-#     last_pericenter_snap = np.array(list(f["/tcr_ptl/res_oct/last_pericenter_snap"]))
-#     np.save(save_location + "last_pericenter_snap", last_pericenter_snap)
-    
-#     n_is_lower_limit = np.empty(f["/tcr_ptl/res_oct/n_is_lower_limit"].shape, f["/tcr_ptl/res_oct/n_is_lower_limit"].dtype)
-#     n_is_lower_limit = np.array(list(f["/tcr_ptl/res_oct/n_is_lower_limit"]))
-#     np.save(save_location + "n_is_lower_limit", n_is_lower_limit)
-    
-#     n_pericenter = np.empty(f["/tcr_ptl/res_oct/n_pericenter"].shape, f["/tcr_ptl/res_oct/n_pericenter"].dtype)
-#     n_pericenter = np.array(list(f["/tcr_ptl/res_oct/n_pericenter"]))
-#     np.save(save_location + "n_pericenter", n_pericenter)
+    halo_first = np.empty(f["/tcr_ptl/res_ifl/halo_first"].shape, f["/tcr_ptl/res_ifl/halo_first"].dtype)
+    halo_first = np.array(list(f["/tcr_ptl/res_ifl/halo_first"]))
+    np.save(save_location + "halo_first", halo_first)
 
-#     tracer_id = np.empty(f["/tcr_ptl/res_oct/tracer_id"].shape, f["/tcr_ptl/res_oct/tracer_id"].dtype)
-#     tracer_id = np.array(list(f["/ tcr_ptl/res_oct/tracer_id"]))
-#     np.save(save_location + "tracer_id", tracer_id)
+    halo_n = np.empty(f["/tcr_ptl/res_ifl/halo_n"].shape, f["/tcr_ptl/res_ifl/halo_n"].dtype)
+    halo_n = np.array(list(f["/tcr_ptl/res_ifl/halo_n"]))
+    np.save(save_location + "halo_n", halo_n)
+
+    tracer_id = np.empty(f["/tcr_ptl/res_ifl/tracer_id"].shape, f["/tcr_ptl/res_ifl/tracer_id"].dtype)
+    tracer_id = np.array(list(f["/tcr_ptl/res_ifl/tracer_id"]))
+    np.save(save_location + "tracer_id", tracer_id)
+
+
 
 #save info from all snapshots
 

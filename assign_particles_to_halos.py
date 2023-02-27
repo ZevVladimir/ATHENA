@@ -5,15 +5,22 @@ file = "/home/zeevvladimir/ML_orbit_infall_project/np_arrays/"
 save_location = "/home/zeevvladimir/ML_orbit_infall_project/np_arrays/"
 
 #load halo info
-halo_n = np.load(file + "halo_n.npy")
+
 halo_position = np.load(file + "halo_position.npy")
 halo_velocity = np.load(file + "halo_velocity.npy")
 halo_last_snap = np.load(file + "halo_last_snap.npy")
 halo_r200 = np.load(file + "halo_R200m.npy")
+
+halo_id = np.load(file + "halo_id.npy")
+halo_first = np.load(file + "halo_first.npy")
+halo_n = np.load(file + "halo_n.npy")
+
 #load particle info
 particle_id = np.load(file + "tracer_id.npy")
 
-
+print(halo_id.shape)
+print(halo_first.shape)
+print(halo_n)
 
 snapshot = 190
 
@@ -23,6 +30,8 @@ for i in range(halo_n.size):
     if halo_last_snap[i] >= snapshot:
         max_size += halo_n[i]
 particle_with_halo = np.zeros((max_size,9))
+print(np.sum(halo_n))
+print(max_size)
 
 
 start_particle = 0
@@ -52,5 +61,7 @@ for halo in range(halo_n.size):
         print(halo)
         t2 = time.time()
         print(t2 - t1)
+
+
 print(particle_with_halo)
 np.save(save_location + "particle_with_halo", particle_with_halo)
