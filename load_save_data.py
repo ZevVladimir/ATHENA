@@ -47,9 +47,9 @@ with h5py.File(original_data_file_location, "r") as f:
 #     halo_position = np.array(list(f["/halos/position"]))
 #     np.save(save_location + "halo_position", halo_position)
 
-    halo_id = np.empty(f["/halos/id"].shape, f["/halos/id"].dtype)
-    halo_id = np.array(list(f["/halos/id"]))
-    np.save(save_location + "halo_id", halo_id)
+    # halo_id = np.empty(f["/halos/id"].shape, f["/halos/id"].dtype)
+    # halo_id = np.array(list(f["/halos/id"]))
+    # np.save(save_location + "halo_id", halo_id)
 
 # save info from res_ifl
 
@@ -60,10 +60,6 @@ with h5py.File(original_data_file_location, "r") as f:
     halo_n = np.empty(f["/tcr_ptl/res_ifl/halo_n"].shape, f["/tcr_ptl/res_ifl/halo_n"].dtype)
     halo_n = np.array(list(f["/tcr_ptl/res_ifl/halo_n"]))
     np.save(save_location + "halo_n", halo_n)
-
-    tracer_id = np.empty(f["/tcr_ptl/res_ifl/tracer_id"].shape, f["/tcr_ptl/res_ifl/tracer_id"].dtype)
-    tracer_id = np.array(list(f["/tcr_ptl/res_ifl/tracer_id"]))
-    np.save(save_location + "tracer_id", tracer_id)
 
 
 
