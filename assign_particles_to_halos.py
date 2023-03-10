@@ -5,17 +5,21 @@ from scipy.spatial import cKDTree
 from scipy import constants
 from colossus.cosmology import cosmology
 import matplotlib.pyplot as plt
+from colossus.halo import mass_so
+
 
 
 file = "/home/zvladimi/ML_orbit_infall_project/np_arrays/"
 save_location =  "/home/zvladimi/ML_orbit_infall_project/np_arrays/"
 snapshot_path = "/home/zvladimi/ML_orbit_infall_project/particle_data/snapshot_190/snapshot_0190"
 
+# get constants from pygadgetreader
 snapshot = 190
 red_shift = readheader(snapshot_path, 'redshift')
 scale_factor = 1/(1+red_shift)
 cosmol = cosmology.setCosmology("bolshoi")
-rho_c = cosmol.rho_c(red_shift)
+rho_c = cosmol.rho_c(red_shift) 
+h = readheader(snapshot_path, 'h')
 
 
 box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
@@ -28,7 +32,7 @@ particles_vel = np.load(file + "particle_vel.npy")
 particles_pos = np.load(file + "particle_pos.npy") 
 particles_pos = particles_pos * 10**3 * scale_factor
 particles_mass = np.load(file + "all_particle_mass.npy")
-mass = particles_mass[0] * 10e10 #units M_sun/h
+mass = particles_mass[0] * 1e10 #units M_sun/h
 
 #load halo info
 halos_pos = np.load(file + "halo_position.npy")
@@ -50,14 +54,12 @@ halos_pos = halos_pos[indices_keep]
 halos_vel = halos_vel[indices_keep]
 halos_r200 = halos_r200[indices_keep]
 new_num_halos = halos_r200.size
-        
-# print("halo pos shape", halos_pos.shape)
-# print("halo x", np.max(halos_pos[:,0]))
-# print("particle pos shape", particles_pos.shape)
-# print("particle x", np.max(particles_pos[:,0]))
+ 
+ 
+#print(mass_so.R_to_M(halos_r200, red_shift, "200c")) 
 
 particle_tree = cKDTree(data = particles_pos, leafsize = 16, balanced_tree = False)
-print("trees built")
+
 
 #calculate distance of particle from halo
 def calculate_distance(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_particles):
@@ -92,11 +94,13 @@ def calculate_distance(halo_x, halo_y, halo_z, particle_x, particle_y, particle_
     
     return distance
     
+#calculates density within sphere of given radius with given mass 
 def calculate_density(masses, radius):
     volume = (4/3) * np.pi * np.power(radius,3)
     print("volume ", volume)
     return masses/volume
 
+#returns indices where density goes below overdensity value
 def check_where_r200(my_density):
     print("200* rho critical: ", 200 * rho_c)
     return np.where(my_density < (200 * rho_c))
@@ -105,11 +109,11 @@ calculated_r200 = np.zeros(halos_r200.size)
 t1 = time.time()
 count = 1
 #for i in range(len(indices)):
-for i in range(1):
+for i in range(2):
     #find the indices of the particles within the radius
-    indices = particle_tree.query_ball_point(halos_pos[i,:], r = 1.3 * halos_r200[i])
+    indices = particle_tree.query_ball_point(halos_pos[i,:], r = 1.5 * halos_r200[i])
     
-    print(halos_r200[i])
+    print(1.5 * halos_r200[i])
     #new particles being added
     num_new_particles = len(indices)
 
@@ -119,7 +123,7 @@ for i in range(1):
     
     #for how many new particles create an array of how much mass there should be
     use_mass = np.arange(1, num_new_particles + 1, 1) * mass
-    
+    # print(use_mass)
     #Only take the positions that where found with the tree
     current_particles_pos = particles_pos[indices,:]
     
