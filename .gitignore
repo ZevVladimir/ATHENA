@@ -1,3 +1,7 @@
 #ignore np arrays
 /np_arrays/
 /Original_Data/
+/particle_data/
+/SPARTA_data/
+/.vscode/
+/Random figures/
