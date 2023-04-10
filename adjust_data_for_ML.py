@@ -163,14 +163,13 @@ for i in range(num_halos):
     current_particles_pos = current_particles_pos[arrsortrad[::1]]
     coord_dist = coord_dist[arrsortrad[::1]]
     
-    particle_halo_assign[start:start+num_new_particles,2] = radius
+    # divide radius by halo_r200 to scale
+    # also save the coord_dist to use later to calculate unit vectors
+    particle_halo_assign[start:start+num_new_particles,2] = radius/halos_r200[i]
     particle_halo_assign[start:start+num_new_particles,3] = coord_dist[:,0]
     particle_halo_assign[start:start+num_new_particles,4] = coord_dist[:,1]
     particle_halo_assign[start:start+num_new_particles,5] = coord_dist[:,2]
-    particle_halo_assign[start:start+num_new_particles,6] = np.array(indices, dtype = int)
-    #print(particle_halo_assign[start:start+num_new_particles,6])
-    
-    
+    particle_halo_assign[start:start+num_new_particles,6] = np.array(indices, dtype = int)  
     
     #calculate the density at each particle
     calculated_densities = np.zeros(num_new_particles)
@@ -220,7 +219,6 @@ indices_change = np.where(particle_halo_assign[:-1,1] != particle_halo_assign[1:
 use_particle_vel = np.zeros((num_particles_identified,3))
 particle_indices = particle_halo_assign[:,6].astype(int)
 use_particle_vel = particles_vel[particle_indices,:]
-
 root_a = np.sqrt(scale_factor)
 use_particle_vel = use_particle_vel * root_a
 
@@ -233,14 +231,13 @@ for i in range(indices_change.size):
     particles_vel_pec[start:finish,:] = use_particle_vel[start:finish,:] - halos_vel[i,:]  
     start = finish
 
-def calc_rhat(radius, x_dist, y_dist, z_dist, num_part):
-    # radius is the magnitude (distance formula)
-    rhat = np.zeros((num_part,3))
-
+def calc_rhat(x_dist, y_dist, z_dist):
+    rhat = np.zeros((x_dist.size,3))
     # get unit vector by dividing components by magnitude
-    rhat[:,0] = x_dist/radius
-    rhat[:,1] = y_dist/radius
-    rhat[:,2] = z_dist/radius
+    magnitude = np.sqrt(np.square(x_dist) + np.square(y_dist) + np.square(z_dist))
+    rhat[:,0] = x_dist/magnitude
+    rhat[:,1] = y_dist/magnitude
+    rhat[:,2] = z_dist/magnitude
 
     return rhat
 
@@ -254,74 +251,85 @@ particles_vel_tan = np.zeros((particles_vel_pec.shape[0],3))
 # convert peculiar velocity to physical velocity
 for i in range(particles_vel_pec.shape[0]):
     particles_vel_phys[i,:] = particles_vel_pec[i,:] + scale_factor * h * particle_halo_assign[i,2]
- 
+
+
 # calculate tangent velocity which is v_physical * the unit vector for that particle/halo
 start = 0   
 for i in range(particles_per_halo.size):
     finish = start + particles_per_halo[i]
 
-    all_rhat[start:finish,:] = calc_rhat(particle_halo_assign[start:finish,2], particle_halo_assign[start:finish,3], particle_halo_assign[start:finish,4],
-                         particle_halo_assign[start:finish,5], particles_per_halo[i])
+    # calclulate all of the direction (unit) vectors
+    all_rhat[start:finish,:] = calc_rhat(particle_halo_assign[start:finish,3], particle_halo_assign[start:finish,4],
+                         particle_halo_assign[start:finish,5])
     
     particles_vel_tan[start:finish,:] = particles_vel_phys[start:finish,:] * all_rhat[start:finish,:]
     
     start = finish
+# calculate radial velocity by projecting the physical velocity onto the corresponding unit vector
+# (because unit vector don't bother dividing by the magnitude of the unit vector)
+particles_vel_rad = (particles_vel_phys * all_rhat) * all_rhat
 
-# calculate radial velocity by pythagorean theorem
-particles_vel_rad = np.sqrt(np.square(particles_vel_phys) - np.square(particles_vel_tan))
 use_radius = particle_halo_assign[:,2]
 
-print(np.min(np.sqrt(np.sum(np.square(particles_vel_rad), axis = 1))))
-print(np.max(np.sqrt(np.sum(np.square(particles_vel_rad), axis = 1))))
 #MAKE SURE TO BIN LOGARITHMICALLY
 def make_bins(num_bins, radius, vel_rad):
+    # remove the blank parts of the radius
     radius = radius[radius != 0]
     
+    # sort the radius and radial velocity based off the radius
     arrsortrad = radius.argsort()
     radius = radius[arrsortrad[::1]]
     vel_rad = vel_rad[arrsortrad[::1]]
 
     min_dist = radius[0]
     max_dist = radius[-1]
-    #bin_size = (max_dist - min_dist)/num_bins
-    bins = np.logspace(np.log10(min_dist), np.log10(max_dist), num_bins)
-    #bins = np.logspace(min_dist, max_dist, num_bins)
-    print("min dist: ", min_dist)
-    print("max dist: ", max_dist)
+    hist = np.histogram(radius, num_bins,range = (min_dist,max_dist))
+    bins = hist[1]
     start = 0
-    average_val = np.zeros((num_bins,2))
+    average_val = np.zeros((num_bins,4))
     for i in range(num_bins - 1):
         bin_size = bins[i + 1] - bins[i]
         finish = start + bin_size
 
+        # make sure there are points within the bins
         indices = np.where((radius >= start) & (radius <= finish))
         if indices[0].size != 0:
             start_index = indices[0][0]
             end_index = indices[0][-1]
-            average_val[i,0] = np.mean(radius[start_index:end_index], dtype=np.float64)
-            average_val[i,1] = np.nanmean(np.sqrt(np.sum(np.square(vel_rad[start_index:end_index,:]), axis = 1)),dtype=np.float64)
-        
-        
+
+            # if there is only one point that meets the criteria just use that point
+            if start_index == end_index:
+                average_val[i,0] = np.mean(radius[start_index], dtype=np.float64)
+                average_val[i,1] = vel_rad[start_index,0]
+                average_val[i,2] = vel_rad[start_index,1]
+                average_val[i,3] = vel_rad[start_index,2]
+            # otherwise find the mean
+            else:
+                average_val[i,0] = np.mean(radius[start_index:end_index], dtype=np.float64)
+                average_val[i,1] = np.nanmean(vel_rad[start_index:end_index,0]) 
+                average_val[i,2] = np.nanmean(vel_rad[start_index:end_index,1])
+                average_val[i,3] = np.nanmean(vel_rad[start_index:end_index,2])
+                
         start = finish
 
     return average_val
 
+
 num_bins = 100
 avg_vel_rad = make_bins(num_bins, use_radius, particles_vel_rad)
 
-graph1, (plot1, plot2) = plt.subplots(1,2)
+graph1, (plot1) = plt.subplots(1,1)
 
-plot1.set_title("average radial velocity vs position without exponential")
+plot1.set_title("average radial velocity vs position")
 plot1.set_xlabel("position")
 plot1.set_ylabel("average rad vel")
 plot1.set_xscale("log")
 
-plot1.plot(avg_vel_rad[:num_bins - 23,0], avg_vel_rad[:num_bins - 23,1], color = 'b')
 
-plot2.set_title("average radial velocity vs position with exponential")
-plot2.set_xlabel("position")
-plot2.set_ylabel("average rad vel")
-plot2.set_xscale("log")
-
-plot2.plot(avg_vel_rad[:,0], avg_vel_rad[:,1], color = 'r')
+total_avg_vel = np.sqrt(np.square(avg_vel_rad[:,1]) + np.square(avg_vel_rad[:,2]) + np.square(avg_vel_rad[:,2]))
+plot1.scatter(avg_vel_rad[:,0], avg_vel_rad[:,1], color = 'r', label = "x comp")
+plot1.scatter(avg_vel_rad[:,0], avg_vel_rad[:,2], color = 'b', label = "y comp")
+plot1.scatter(avg_vel_rad[:,0], avg_vel_rad[:,3], color = 'g', label = "z comp")
+plot1.scatter(avg_vel_rad[:,0], total_avg_vel, color = 'c', label = "magnitude")
+plot1.legend()
 plt.show()
