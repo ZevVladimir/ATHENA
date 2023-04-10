@@ -4,6 +4,7 @@ from scipy.spatial import cKDTree
 from colossus.cosmology import cosmology
 import matplotlib.pyplot as plt
 from colossus.halo import mass_so
+from matplotlib.pyplot import cm
 
 file = "/home/zvladimi/ML_orbit_infall_project/np_arrays/"
 save_location =  "/home/zvladimi/ML_orbit_infall_project/np_arrays/"
@@ -132,7 +133,7 @@ start = 0
 for i in range(num_halos):
     #find the indices of the particles within the expected r200 radius multiplied by 1.4 
     #value of 1.4 determined by guessing if just r200 value or 1.1 miss a couple halo r200 values but 1.4 gets them all
-    indices = particle_tree.query_ball_point(halos_pos[i,:], r = 1.1 * halos_r200[i])
+    indices = particle_tree.query_ball_point(halos_pos[i,:], r = 1.3 * halos_r200[i])
 
     # how many new particles being added
     num_new_particles = len(indices)
@@ -207,13 +208,18 @@ for i in range(num_halos):
 difference_r200 = halos_r200 - calculated_r200
 
 print("finish position")
+#################################################
+
+
 
 # remove rows with zeros
 particle_halo_assign = particle_halo_assign[~np.all(particle_halo_assign == 0, axis=1)]
+use_radius = particle_halo_assign[:,2]
 # how many particles are we workin with
 num_particles_identified = particle_halo_assign.shape[0]
 # where are the separations between halos
 indices_change = np.where(particle_halo_assign[:-1,1] != particle_halo_assign[1:,1])[0]  
+indices_change = np.append(indices_change, particle_halo_assign.shape[0])
 
 # take indices from search and use to get velocities
 use_particle_vel = np.zeros((num_particles_identified,3))
@@ -227,7 +233,7 @@ start = 0
 
 # calculate peculiar velocity by subtracting halo velocity from particle velocity
 for i in range(indices_change.size):
-    finish = start + indices_change[i]
+    finish = indices_change[i]
     particles_vel_pec[start:finish,:] = use_particle_vel[start:finish,:] - halos_vel[i,:]  
     start = finish
 
@@ -269,56 +275,48 @@ for i in range(particles_per_halo.size):
 # (because unit vector don't bother dividing by the magnitude of the unit vector)
 particles_vel_rad = (particles_vel_phys * all_rhat) * all_rhat
 
-use_radius = particle_halo_assign[:,2]
-
 #MAKE SURE TO BIN LOGARITHMICALLY
 def make_bins(num_bins, radius, vel_rad):
     # remove the blank parts of the radius
     radius = radius[radius != 0]
-    
-    # sort the radius and radial velocity based off the radius
-    arrsortrad = radius.argsort()
-    radius = radius[arrsortrad[::1]]
-    vel_rad = vel_rad[arrsortrad[::1]]
 
     min_dist = radius[0]
     max_dist = radius[-1]
     hist = np.histogram(radius, num_bins,range = (min_dist,max_dist))
     bins = hist[1]
-    start = 0
+    bin_start = 0
     average_val = np.zeros((num_bins,4))
     for i in range(num_bins - 1):
         bin_size = bins[i + 1] - bins[i]
-        finish = start + bin_size
+        bin_finish = bin_start + bin_size
 
         # make sure there are points within the bins
-        indices = np.where((radius >= start) & (radius <= finish))
+        indices = np.where((radius >= bin_start) & (radius <= bin_finish))
         if indices[0].size != 0:
             start_index = indices[0][0]
             end_index = indices[0][-1]
 
             # if there is only one point that meets the criteria just use that point
             if start_index == end_index:
-                average_val[i,0] = np.mean(radius[start_index], dtype=np.float64)
+                average_val[i,0] = np.mean(use_radius[start_index], dtype=np.float64)
                 average_val[i,1] = vel_rad[start_index,0]
                 average_val[i,2] = vel_rad[start_index,1]
                 average_val[i,3] = vel_rad[start_index,2]
             # otherwise find the mean
             else:
-                average_val[i,0] = np.mean(radius[start_index:end_index], dtype=np.float64)
+                average_val[i,0] = np.mean(use_radius[start_index:end_index], dtype=np.float64)
                 average_val[i,1] = np.nanmean(vel_rad[start_index:end_index,0]) 
                 average_val[i,2] = np.nanmean(vel_rad[start_index:end_index,1])
                 average_val[i,3] = np.nanmean(vel_rad[start_index:end_index,2])
-                
-        start = finish
+            
+        bin_start = bin_finish
 
     return average_val
 
 
-num_bins = 100
-avg_vel_rad = make_bins(num_bins, use_radius, particles_vel_rad)
+num_bins = 200
 
-graph1, (plot1) = plt.subplots(1,1)
+graph1, ((plot1, plot2), (plot3,plot4)) = plt.subplots(2,2)
 
 plot1.set_title("average radial velocity vs position")
 plot1.set_xlabel("position")
@@ -326,10 +324,72 @@ plot1.set_ylabel("average rad vel")
 plot1.set_xscale("log")
 
 
-total_avg_vel = np.sqrt(np.square(avg_vel_rad[:,1]) + np.square(avg_vel_rad[:,2]) + np.square(avg_vel_rad[:,2]))
-plot1.scatter(avg_vel_rad[:,0], avg_vel_rad[:,1], color = 'r', label = "x comp")
-plot1.scatter(avg_vel_rad[:,0], avg_vel_rad[:,2], color = 'b', label = "y comp")
-plot1.scatter(avg_vel_rad[:,0], avg_vel_rad[:,3], color = 'g', label = "z comp")
-plot1.scatter(avg_vel_rad[:,0], total_avg_vel, color = 'c', label = "magnitude")
+color = cm.rainbow(np.linspace(0, 1, 12))    
+
+start = 0
+finish = indices_change[0] + 1
+avg_vel_rad = make_bins(num_bins, use_radius[start:finish], particles_vel_rad[start:finish])
+total_avg_vel = np.sqrt(np.square(avg_vel_rad[:,1]) + np.square(avg_vel_rad[:,2]) 
+                        + np.square(avg_vel_rad[:,2]))
+plot1.scatter(avg_vel_rad[:,0], avg_vel_rad[:,1], color = color[0], label = "x comp")
+plot1.scatter(avg_vel_rad[:,0], avg_vel_rad[:,2], color = color[1], label = "y comp")
+plot1.scatter(avg_vel_rad[:,0], avg_vel_rad[:,3], color = color[2], label = "z comp")
+plot1.scatter(avg_vel_rad[:,0], total_avg_vel, color = "purple", label = "magnitude")
+plot1.axhline(y = (h * halos_r200[0]), color = "black")
 plot1.legend()
+
+
+start = indices_change[0] + 1
+finish = indices_change[1] + 1
+avg_vel_rad = make_bins(num_bins, use_radius[start:finish], particles_vel_rad[start:finish])
+total_avg_vel = np.sqrt(np.square(avg_vel_rad[:,1]) + np.square(avg_vel_rad[:,2]) 
+                        + np.square(avg_vel_rad[:,2]))
+
+plot2.scatter(avg_vel_rad[:,0], avg_vel_rad[:,1], color = color[3], label = "x comp")
+plot2.scatter(avg_vel_rad[:,0], avg_vel_rad[:,2], color = color[4], label = "y comp")
+plot2.scatter(avg_vel_rad[:,0], avg_vel_rad[:,3], color = color[5], label = "z comp")
+plot2.scatter(avg_vel_rad[:,0], total_avg_vel, color = "purple", label = "magnitude")
+plot2.axhline(y = (h * halos_r200[1]), color = "black")
+plot2.legend()
+plot2.set_title("average radial velocity vs position")
+plot2.set_xlabel("position")
+plot2.set_ylabel("average rad vel")
+plot2.set_xscale("log")
+
+start = indices_change[9] + 1
+finish = indices_change[10] + 1
+avg_vel_rad = make_bins(num_bins, use_radius[start:finish], particles_vel_rad[start:finish])
+
+total_avg_vel = np.sqrt(np.square(avg_vel_rad[:,1]) + np.square(avg_vel_rad[:,2]) 
+                        + np.square(avg_vel_rad[:,2]))
+plot3.scatter(avg_vel_rad[:,0], avg_vel_rad[:,1], color = color[6], label = "x comp")
+plot3.scatter(avg_vel_rad[:,0], avg_vel_rad[:,2], color = color[7], label = "y comp")
+plot3.scatter(avg_vel_rad[:,0], avg_vel_rad[:,3], color = color[8], label = "z comp")
+plot3.scatter(avg_vel_rad[:,0], total_avg_vel, color = "purple", label = "magnitude")
+plot3.axhline(y = (h * halos_r200[10]), color = "black")
+plot3.legend()
+plot3.set_title("average radial velocity vs position")
+plot3.set_xlabel("position")
+plot3.set_ylabel("average rad vel")
+plot3.set_xscale("log")
+
+start = indices_change[19] + 1
+finish = indices_change[20] + 1
+
+avg_vel_rad = make_bins(num_bins, use_radius[start:finish], particles_vel_rad[start:finish])
+total_avg_vel = np.sqrt(np.square(avg_vel_rad[:,1]) + np.square(avg_vel_rad[:,2]) 
+                        + np.square(avg_vel_rad[:,2]))
+plot4.scatter(avg_vel_rad[:,0], avg_vel_rad[:,1], color = color[9], label = "x comp")
+plot4.scatter(avg_vel_rad[:,0], avg_vel_rad[:,2], color = color[10], label = "y comp")
+plot4.scatter(avg_vel_rad[:,0], avg_vel_rad[:,3], color = color[11], label = "z comp")
+plot4.scatter(avg_vel_rad[:,0], total_avg_vel, color = "purple", label = "magnitude")
+plot4.axhline(y = (h * halos_r200[20]), color = "black")
+plot4.legend()
+plot4.set_title("average radial velocity vs position")
+plot4.set_xlabel("position")
+plot4.set_ylabel("average rad vel")
+plot4.set_xscale("log")
+
+
+    
 plt.show()
