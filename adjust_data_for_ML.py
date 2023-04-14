@@ -18,8 +18,8 @@ red_shift = readheader(snapshot_path, 'redshift')
 scale_factor = 1/(1+red_shift)
 cosmol = cosmology.setCosmology("bolshoi")
 rho_m = cosmol.rho_m(red_shift)
-hubble_constant = readheader(snapshot_path, 'h')
-hubble_constant = hubble_constant * 0.001
+h = readheader(snapshot_path, 'h') 
+hubble_constant = cosmol.Hz(red_shift) * 0.001 # convert to units km/s/kpc
 G = constants.G
 
 box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
@@ -147,7 +147,7 @@ print("start particle assign")
 for i in range(num_halos):
     #find the indices of the particles within the expected r200 radius multiplied by 1.4 
     #value of 1.4 determined by guessing if just r200 value or 1.1 miss a couple halo r200 values but 1.4 gets them all
-    indices = particle_tree.query_ball_point(halos_pos[i,:], r = 3 * halos_r200[i])
+    indices = particle_tree.query_ball_point(halos_pos[i,:], r = 6 * halos_r200[i])
 
     # how many new particles being added
     num_new_particles = len(indices)
@@ -248,8 +248,6 @@ indices_change = np.where(particle_halo_assign_id[:-1,1] != particle_halo_assign
 indices_change = np.append(indices_change, particle_halo_assign_id.shape[0])
 mass_hist = np.histogram(all_halo_mass, 1000)
 halos_mass_indices = np.where((all_halo_mass > mass_hist[1][5]) & (all_halo_mass < mass_hist[1][6]))[0]
-print(mass_hist[0])
-print(halos_mass_indices.size)
 halos_use_indices_finish = indices_change[(halos_mass_indices + 1)]
 halos_use_indices_start = indices_change[(halos_mass_indices)]
 halos_use_indices = np.column_stack((halos_use_indices_start,halos_use_indices_finish))
@@ -273,7 +271,7 @@ start_vel_pec = 0
 for i in range(indices_change.size):
     finish_vel_pec = indices_change[i]
     particles_vel_pec[start_vel_pec:finish_vel_pec,:] = use_particle_vel[start_vel_pec:finish_vel_pec,:] - halos_vel[i,:] 
-    radius_div_r200[start_vel_pec:finish_vel_pec] = particle_distances[start_vel_pec:finish_vel_pec]/halos_r200[i]
+    #radius_div_r200[start_vel_pec:finish_vel_pec] = particle_distances[start_vel_pec:finish_vel_pec]/halos_r200[i]
     start_vel_pec = finish_vel_pec
 print(1)
 def calc_rhat(x_dist, y_dist, z_dist):
@@ -297,7 +295,7 @@ particles_vel_rad = np.zeros((particles_vel_pec.shape[0]), dtype = np.float32)
 start_vel_phys = 0
 for i in range(indices_change.size):
     finish_vel_phys = indices_change[i]
-    particles_vel_phys[start_vel_phys:finish_vel_phys,:] = particles_vel_pec[start_vel_phys:finish_vel_phys,:] + np.reshape((scale_factor * hubble_constant * particle_distances[start_vel_phys:finish_vel_phys]),((finish_vel_phys - start_vel_phys),1))
+    particles_vel_phys[start_vel_phys:finish_vel_phys,:] = particles_vel_pec[start_vel_phys:finish_vel_phys,:] + np.reshape((hubble_constant * particle_distances[start_vel_phys:finish_vel_phys]),((finish_vel_phys - start_vel_phys),1))
     # print(particles_vel_pec[start_vel_phys:finish_vel_phys,:])
     # print(np.reshape((scale_factor * h * particle_distances[start_vel_phys:finish_vel_phys]),((finish_vel_phys - start_vel_phys),1)))
     start_vel_phys = finish_vel_phys
@@ -329,13 +327,13 @@ for i in range(indices_change.size):
     start_vel_rad = finish_vel_rad
 print(3)
 #MAKE SURE TO BIN LOGARITHMICALLY
-def make_bins(num_bins, radius_div_r200, vel_rad):
+def make_bins(num_bins, radius, vel_rad):
     # remove the blank parts of the radius
-    radius_div_r200 = radius_div_r200[radius_div_r200 != 0]
-    sorted_radius_div_r200 = np.sort(radius_div_r200)
-    min_dist = sorted_radius_div_r200[0]
-    max_dist = sorted_radius_div_r200[-1]
-    hist = np.histogram(sorted_radius_div_r200, num_bins,range = (min_dist,max_dist))
+    radius = radius[radius != 0]
+    sorted_radius = np.sort(radius)
+    min_dist = sorted_radius[0]
+    max_dist = sorted_radius[-1]
+    hist = np.histogram(sorted_radius, num_bins,range = (min_dist,max_dist))
     bins = hist[1]
     bin_start = 0
     average_val = np.zeros((num_bins,2))
@@ -345,7 +343,7 @@ def make_bins(num_bins, radius_div_r200, vel_rad):
         bin_finish = bin_start + bin_size
 
         # make sure there are points within the bins
-        indices = np.where((radius_div_r200 >= bin_start) & (radius_div_r200 <= bin_finish))
+        indices = np.where((radius >= bin_start) & (radius <= bin_finish))
         if indices[0].size != 0:
             use_vel_rad = vel_rad[indices]
             average_val[i,0] = np.mean(np.array([bin_start,bin_finish]))
@@ -354,38 +352,32 @@ def make_bins(num_bins, radius_div_r200, vel_rad):
         bin_start = bin_finish
     return average_val
 
-
-num_bins = 500
-color = cm.rainbow(np.linspace(0, 1, 4))
-graph1, (plot1) = plt.subplots(1,1)
-
-plot1.set_title("average radial velocity vs position")
-plot1.set_xlabel("position $r/R_{200m}$")
-plot1.set_ylabel("average rad vel $km/s$")
-plot1.set_xscale("log")    
-
 print("start binning")
-mass_bin_radius_div_r200 = np.zeros(particle_distances.size)
+num_bins = 1000
+mass_bin_radius = np.zeros(particle_distances.size)
 mass_bin_vel_rad = np.zeros(particles_vel_rad.size)
-mass_bin_radius = np.zeros(num_bins)
-
 
 
 start_mass_bin = 0
 finish_mass_bin = 0
-for i in range(halos_use_indices.shape[0]):
-    finish_mass_bin += (halos_use_indices[i][1] - halos_use_indices[i][0])
-    mass_bin_radius_div_r200[start_mass_bin:finish_mass_bin] = radius_div_r200[halos_use_indices[i][0]:halos_use_indices[i][1]]
-    mass_bin_vel_rad[start_mass_bin:finish_mass_bin] = particles_vel_rad[halos_use_indices[i][0]:halos_use_indices[i][1]]
-    start_mass_bin = finish_mass_bin
-    #mass_bin_radius[i] = np.average(particle_distances[start_mass_bin:finish_mass_bin])
-    start_mass_bin = finish_mass_bin
-    
-avg_vel_rad = make_bins(num_bins, mass_bin_radius_div_r200, mass_bin_vel_rad)
-avg_vel_rad = avg_vel_rad[~np.all(avg_vel_rad == 0, axis=1)]
-#plot1.plot(avg_vel_rad[:,0], hubble_constant * mass_bin_radius, color = "blue", label = "hubble flow")
-plot1.plot(avg_vel_rad[:,0], avg_vel_rad[:,1], color = "purple", label = "particles")
+# for i in range(halos_use_indices.shape[0]):
+#     finish_mass_bin += (halos_use_indices[i][1] - halos_use_indices[i][0])
+#     mass_bin_radius[start_mass_bin:finish_mass_bin] = particle_distances[halos_use_indices[i][0]:halos_use_indices[i][1]]
+#     mass_bin_vel_rad[start_mass_bin:finish_mass_bin] = particles_vel_rad[halos_use_indices[i][0]:halos_use_indices[i][1]]
+#     start_mass_bin = finish_mass_bin
 
+mass_bin_radius = mass_bin_radius[mass_bin_radius != 0]
+#avg_vel_rad = make_bins(num_bins, mass_bin_radius, mass_bin_vel_rad)
+avg_vel_rad = make_bins(num_bins, particle_distances, particles_vel_rad)
+avg_vel_rad = avg_vel_rad[~np.all(avg_vel_rad == 0, axis=1)]
+
+graph1, (plot1) = plt.subplots(1,1)
+plot1.plot(avg_vel_rad[:,0], hubble_constant * avg_vel_rad[:,0], color = "blue", label = "hubble flow")
+plot1.plot(avg_vel_rad[:,0], avg_vel_rad[:,1], color = "purple", label = "particles")
+plot1.set_title("average radial velocity vs position all particles")
+plot1.set_xlabel("position $kpc$")
+plot1.set_ylabel("average rad vel $km/s$")
+plot1.set_xscale("log")    
 #plot1.set_ylim([-.3,.3])
 plot1.legend()
 t3 = time.time()
