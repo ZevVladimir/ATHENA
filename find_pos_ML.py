@@ -4,6 +4,9 @@ from scipy.spatial import cKDTree
 from colossus.cosmology import cosmology
 import matplotlib.pyplot as plt
 from colossus.halo import mass_so
+from colossus.utils import constants
+from matplotlib.pyplot import cm
+import time
 
 file = "/home/zvladimi/ML_orbit_infall_project/np_arrays/"
 save_location =  "/home/zvladimi/ML_orbit_infall_project/np_arrays/"
@@ -15,7 +18,9 @@ red_shift = readheader(snapshot_path, 'redshift')
 scale_factor = 1/(1+red_shift)
 cosmol = cosmology.setCosmology("bolshoi")
 rho_m = cosmol.rho_m(red_shift)
-h = readheader(snapshot_path, 'h')
+h = readheader(snapshot_path, 'h') 
+hubble_constant = cosmol.Hz(red_shift) * 0.001 # convert to units km/s/kpc
+G = constants.G
 
 box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
 box_size = box_size * 10**3 * scale_factor #convert to Kpc/h physical
@@ -56,11 +61,18 @@ num_halos = halos_r200.size #num of halos remaining
 #construct a search tree iwth all of the particle positions
 particle_tree = cKDTree(data = particles_pos, leafsize = 3, balanced_tree = False, boxsize = box_size)
 
+halo_dict = {}
+
 #calculate distance of particle from halo
 def calculate_distance(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_particles):
     x_dist = particle_x - halo_x
     y_dist = particle_y - halo_y
     z_dist = particle_z - halo_z
+    
+    coord_diff = np.zeros((new_particles, 3))
+    coord_diff[:,0] = x_dist
+    coord_diff[:,1] = y_dist
+    coord_diff[:,2] = z_dist
 
     half_box_size = box_size/2
     
@@ -68,28 +80,37 @@ def calculate_distance(halo_x, halo_y, halo_z, particle_x, particle_y, particle_
     #be within half a box size of the halo
     #do this for x, y, and z coords
     x_within_plus = np.where((x_dist + box_size) < half_box_size)
-    x_within_minus = np.where((x_dist + box_size) < -half_box_size)
+    x_within_minus = np.where((x_dist - box_size) > -half_box_size)
     
     particle_x[x_within_plus] = particle_x[x_within_plus] + box_size
     particle_x[x_within_minus] = particle_x[x_within_minus] - box_size
     
+    coord_diff[x_within_plus,0] = x_dist[x_within_plus] + box_size
+    coord_diff[x_within_minus,0] = x_dist[x_within_minus] - box_size
+    
     y_within_plus = np.where((y_dist + box_size) < half_box_size)
-    y_within_minus = np.where((y_dist + box_size) < -half_box_size)
+    y_within_minus = np.where((y_dist - box_size) > -half_box_size)
     
     particle_y[y_within_plus] = particle_y[y_within_plus] + box_size
     particle_y[y_within_minus] = particle_y[y_within_minus] - box_size
     
+    coord_diff[y_within_plus,0] = y_dist[y_within_plus] + box_size
+    coord_diff[y_within_minus,0] = y_dist[y_within_minus] - box_size
+    
     z_within_plus = np.where((z_dist + box_size) < half_box_size)
-    z_within_minus = np.where((z_dist + box_size) < -half_box_size)
+    z_within_minus = np.where((z_dist - box_size) > -half_box_size)
     
     particle_z[z_within_plus] = particle_z[z_within_plus] + box_size
     particle_z[z_within_minus] = particle_z[z_within_minus] - box_size
+    
+    coord_diff[z_within_plus,0] = z_dist[z_within_plus] + box_size
+    coord_diff[z_within_minus,0] = z_dist[z_within_minus] - box_size
 
     #calculate distance with standard sqrt((x_1-x_2)^2 + (y_1 - y_2)^2 + (z_1 - z_2)^2)
     distance = np.zeros((new_particles,1))
     distance = np.sqrt(np.square((halo_x - particle_x)) + np.square((halo_y - particle_y)) + np.square((halo_z - particle_z)))
     
-    return distance
+    return distance, coord_diff
 
 #calculates density within sphere of given radius with given mass and calculating volume at each particle's radius
 def calculate_density(masses, radius):
@@ -109,15 +130,29 @@ def brute_force(curr_particles_pos, r200, halo_x, halo_y, halo_z):
     #only return the particles that are within the r200 radius
     return within_box[np.where(brute_radii <= r200)]
 
-calculated_r200 = np.zeros(halos_r200.size)
+def calc_v200(mass, radius):
+    return np.sqrt((G * mass)/radius)
 
+calculated_r200 = np.zeros(halos_r200.size)
+# particle_halo_assign: pid, halo_id, radius, x_dist, y_dist, z_dist, indices
+particle_halo_assign_id = np.zeros((num_particles * 5, 3), dtype = np.int32)
+particle_halo_radius_comp = np.zeros((num_particles * 5, 5), dtype = np.float32)
+halos_v200 = np.zeros(num_halos, dtype = np.float32)
+all_halo_mass = np.zeros(num_halos, dtype = np.float32)
+particles_per_halo = np.zeros(num_halos, dtype = np.int32)
+start = 0
+
+t1 = time.time()
+print("start particle assign")
 for i in range(num_halos):
     #find the indices of the particles within the expected r200 radius multiplied by 1.4 
     #value of 1.4 determined by guessing if just r200 value or 1.1 miss a couple halo r200 values but 1.4 gets them all
-    indices = particle_tree.query_ball_point(halos_pos[i,:], r = 1.4 * halos_r200[i])
+    indices = particle_tree.query_ball_point(halos_pos[i,:], r = 5 * halos_r200[i])
 
     # how many new particles being added
     num_new_particles = len(indices)
+
+    particles_per_halo[i] = num_new_particles
 
     # sort the particles
     new_particles = np.sort(indices)
@@ -127,17 +162,40 @@ for i in range(num_halos):
 
     #Only take the particle positions that where found with the tree
     current_particles_pos = particles_pos[indices,:]
+    current_particles_vel = particles_vel[indices,:]
+    current_particles_pid = particles_pid[indices]
     current_halos_pos = halos_pos[i,:]
     
+    #assign particles to their corresponding halos
+    particle_halo_assign_id[start:start+num_new_particles,0] = current_particles_pid
+    particle_halo_assign_id[start:start+num_new_particles,1] = i
+    particle_halo_assign_id[start:start+num_new_particles,2] = np.array(indices, dtype = np.int32) 
+        
     #calculate the radii of each particle based on the distance formula
-    radius = calculate_distance(current_halos_pos[0], current_halos_pos[1], current_halos_pos[2], current_particles_pos[:,0],
+    radius, coord_dist = calculate_distance(current_halos_pos[0], current_halos_pos[1], current_halos_pos[2], current_particles_pos[:,0],
                                 current_particles_pos[:,1], current_particles_pos[:,2], num_new_particles)
 
     #sort the radii and positions to allow for creation of plots and to correctly assign how much mass there is
     arrsortrad = radius.argsort()
     radius = radius[arrsortrad[::1]]
     current_particles_pos = current_particles_pos[arrsortrad[::1]]
+    current_particles_vel = current_particles_vel[arrsortrad[::1]]
+    coord_dist = coord_dist[arrsortrad[::1]]
     
+    halo_v200 = calc_v200(use_mass[-1], halos_r200[i])
+
+    # divide radius by halo_r200 to scale
+    # also save the coord_dist to use later to calculate unit vectors
+    particle_halo_radius_comp[start:start+num_new_particles,0] = radius
+    particle_halo_radius_comp[start:start+num_new_particles,1] = radius/halos_r200[i]
+    particle_halo_radius_comp[start:start+num_new_particles,2] = coord_dist[:,0]
+    particle_halo_radius_comp[start:start+num_new_particles,3] = coord_dist[:,1]
+    particle_halo_radius_comp[start:start+num_new_particles,4] = coord_dist[:,2]
+     
+    halos_v200[i] = halo_v200
+    
+
+    all_halo_mass[i] = use_mass[-1]
     #calculate the density at each particle
     calculated_densities = np.zeros(num_new_particles)
     calculated_densities = calculate_density(use_mass, radius)
@@ -170,9 +228,18 @@ for i in range(num_halos):
     else:
         calculated_r200[i] = (radius[indices_r200_met[0][0]] + radius[indices_r200_met[0][1]])/2
     
+    start += num_new_particles
+    
 difference_r200 = halos_r200 - calculated_r200
-print(np.where(calculated_r200 == 0))
-print("largest difference: ", np.max(difference_r200))
-print("smallest difference: ", np.min(difference_r200))
-print("median difference: ", np.median(difference_r200))
-print("average difference: ", np.average(difference_r200))
+t2 = time.time()
+print("finish particle assign: ", (t2 - t1), " seconds")
+
+# remove rows with zeros
+particle_halo_assign_id = particle_halo_assign_id[~np.all(particle_halo_assign_id == 0, axis=1)]
+particle_halo_radius_comp = particle_halo_radius_comp[~np.all(particle_halo_radius_comp == 0, axis=1)]
+
+np.save(save_location + "particle_halo_assign_id", particle_halo_assign_id)
+np.save(save_location + "particle_halo_radius_comp", particle_halo_radius_comp)
+np.save(save_location + "all_halo_mass", all_halo_mass)
+np.save(save_location + "particles_per_halo", particles_per_halo)
+
