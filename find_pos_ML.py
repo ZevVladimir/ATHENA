@@ -136,7 +136,7 @@ def calc_v200(mass, radius):
 calculated_r200 = np.zeros(halos_r200.size)
 # particle_halo_assign: pid, halo_id, radius, x_dist, y_dist, z_dist, indices
 particle_halo_assign_id = np.zeros((num_particles * 5, 3), dtype = np.int32)
-particle_halo_radius_comp = np.zeros((num_particles * 5, 4), dtype = np.float32)
+particle_halo_radius_comp = np.zeros((num_particles * 5, 5), dtype = np.float32)
 halos_v200 = np.zeros(num_halos, dtype = np.float32)
 all_halo_mass = np.zeros(num_halos, dtype = np.float32)
 particles_per_halo = np.zeros(num_halos, dtype = np.int32)
@@ -147,7 +147,7 @@ print("start particle assign")
 for i in range(num_halos):
     #find the indices of the particles within the expected r200 radius multiplied by 1.4 
     #value of 1.4 determined by guessing if just r200 value or 1.1 miss a couple halo r200 values but 1.4 gets them all
-    indices = particle_tree.query_ball_point(halos_pos[i,:], r = 6 * halos_r200[i])
+    indices = particle_tree.query_ball_point(halos_pos[i,:], r = 5 * halos_r200[i])
 
     # how many new particles being added
     num_new_particles = len(indices)
@@ -187,9 +187,10 @@ for i in range(num_halos):
     # divide radius by halo_r200 to scale
     # also save the coord_dist to use later to calculate unit vectors
     particle_halo_radius_comp[start:start+num_new_particles,0] = radius
-    particle_halo_radius_comp[start:start+num_new_particles,1] = coord_dist[:,0]
-    particle_halo_radius_comp[start:start+num_new_particles,2] = coord_dist[:,1]
-    particle_halo_radius_comp[start:start+num_new_particles,3] = coord_dist[:,2]
+    particle_halo_radius_comp[start:start+num_new_particles,1] = radius/halos_r200[i]
+    particle_halo_radius_comp[start:start+num_new_particles,2] = coord_dist[:,0]
+    particle_halo_radius_comp[start:start+num_new_particles,3] = coord_dist[:,1]
+    particle_halo_radius_comp[start:start+num_new_particles,4] = coord_dist[:,2]
      
     halos_v200[i] = halo_v200
     
@@ -232,155 +233,13 @@ for i in range(num_halos):
 difference_r200 = halos_r200 - calculated_r200
 t2 = time.time()
 print("finish particle assign: ", (t2 - t1), " seconds")
-###########################################################################################################
-
-###########################################################################################################
 
 # remove rows with zeros
 particle_halo_assign_id = particle_halo_assign_id[~np.all(particle_halo_assign_id == 0, axis=1)]
 particle_halo_radius_comp = particle_halo_radius_comp[~np.all(particle_halo_radius_comp == 0, axis=1)]
-particle_distances = particle_halo_radius_comp[:,0]
 
-# how many particles are we workin with
-num_particles_identified = particle_halo_assign_id.shape[0]
-# where are the separations between halos
-indices_change = np.where(particle_halo_assign_id[:-1,1] != particle_halo_assign_id[1:,1])[0]  
-indices_change = np.append(indices_change, particle_halo_assign_id.shape[0])
-mass_hist = np.histogram(all_halo_mass, 1000)
-halos_mass_indices = np.where((all_halo_mass > mass_hist[1][5]) & (all_halo_mass < mass_hist[1][6]))[0]
-halos_use_indices_finish = indices_change[(halos_mass_indices + 1)]
-halos_use_indices_start = indices_change[(halos_mass_indices)]
-halos_use_indices = np.column_stack((halos_use_indices_start,halos_use_indices_finish))
+np.save(save_location + "particle_halo_assign_id", particle_halo_assign_id)
+np.save(save_location + "particle_halo_radius_comp", particle_halo_radius_comp)
+np.save(save_location + "all_halo_mass", all_halo_mass)
+np.save(save_location + "particles_per_halo", particles_per_halo)
 
-
-
-# take indices from search and use to get velocities
-use_particle_vel = np.zeros((num_particles_identified,3))
-particle_indices = particle_halo_assign_id[:,2].astype(int)
-use_particle_vel = particles_vel[particle_indices,:] 
-root_a = np.sqrt(scale_factor)
-use_particle_vel = use_particle_vel * root_a
-
-particles_vel_pec = np.zeros((num_particles_identified,3))
-
-
-# calculate peculiar velocity by subtracting halo velocity from particle velocity
-# TODO rename start/finish to reflect radius too
-radius_div_r200 = np.zeros((particle_distances.size))
-start_vel_pec = 0
-for i in range(indices_change.size):
-    finish_vel_pec = indices_change[i]
-    particles_vel_pec[start_vel_pec:finish_vel_pec,:] = use_particle_vel[start_vel_pec:finish_vel_pec,:] - halos_vel[i,:] 
-    #radius_div_r200[start_vel_pec:finish_vel_pec] = particle_distances[start_vel_pec:finish_vel_pec]/halos_r200[i]
-    start_vel_pec = finish_vel_pec
-print(1)
-def calc_rhat(x_dist, y_dist, z_dist):
-    rhat = np.zeros((x_dist.size,3))
-    # get unit vector by dividing components by magnitude
-    magnitude = np.sqrt(np.square(x_dist) + np.square(y_dist) + np.square(z_dist))
-    rhat[:,0] = x_dist/magnitude
-    rhat[:,1] = y_dist/magnitude
-    rhat[:,2] = z_dist/magnitude
-
-    return rhat
-
-particles_per_halo = particles_per_halo.astype(int)
-all_rhat = np.zeros((particles_vel_pec.shape[0],3), dtype = np.float32)
-particles_vel_phys = np.zeros((particles_vel_pec.shape[0],3), dtype = np.float32)
-particles_vel_tan = np.zeros((particles_vel_pec.shape[0],3), dtype = np.float32)
-particles_vel_rad = np.zeros((particles_vel_pec.shape[0]), dtype = np.float32)
-
-
-# convert peculiar velocity to physical velocity by adding scale factor * h * dist from particle to halo
-start_vel_phys = 0
-for i in range(indices_change.size):
-    finish_vel_phys = indices_change[i]
-    particles_vel_phys[start_vel_phys:finish_vel_phys,:] = particles_vel_pec[start_vel_phys:finish_vel_phys,:] + np.reshape((hubble_constant * particle_distances[start_vel_phys:finish_vel_phys]),((finish_vel_phys - start_vel_phys),1))
-    # print(particles_vel_pec[start_vel_phys:finish_vel_phys,:])
-    # print(np.reshape((scale_factor * h * particle_distances[start_vel_phys:finish_vel_phys]),((finish_vel_phys - start_vel_phys),1)))
-    start_vel_phys = finish_vel_phys
-# calculate tangent velocity which is v_physical * the unit vector for that particle/halo
-print(2)
-# start_vel_tan = 0   
-# for i in range(particles_per_halo.size):
-#     finish_vel_tan = start_vel_tan + particles_per_halo[i]
-
-#     # calclulate all of the direction (unit) vectors
-#     all_rhat[start_vel_tan:finish_vel_tan,:] = calc_rhat(particle_halo_assign[start_vel_tan:finish_vel_tan,3], particle_halo_assign[start_vel_tan:finish_vel_tan,4],
-#                          particle_halo_assign[start_vel_tan:finish,5])
-    
-#     particles_vel_tan[start_vel_tan:finish_vel_tan,:] = particles_vel_phys[start_vel_tan:finish_vel_tan,:] * all_rhat[start_vel_tan:finish_vel_tan,:]
-    
-#     start_vel_tan = finish_vel_tan
-
-all_rhat = calc_rhat(particle_halo_radius_comp[:,1], particle_halo_radius_comp[:,2],particle_halo_radius_comp[:,3])
-
-# calculate radial velocity by projecting the physical velocity onto the corresponding unit vector
-start_vel_rad = 0
-
-for i in range(indices_change.size):
-    finish_vel_rad = indices_change[i]
-    #curr_halo_v200 = np.ones((finish_vel_rad - start_vel_rad)) * halos_v200[i]
-    
-    particles_vel_rad[start_vel_rad:finish_vel_rad] = np.sum((particles_vel_phys[start_vel_rad:finish_vel_rad] * all_rhat[start_vel_rad:finish_vel_rad]), axis = 1) 
-    #/ curr_halo_v200
-    start_vel_rad = finish_vel_rad
-print(3)
-#MAKE SURE TO BIN LOGARITHMICALLY
-def make_bins(num_bins, radius, vel_rad):
-    # remove the blank parts of the radius
-    radius = radius[radius != 0]
-    sorted_radius = np.sort(radius)
-    min_dist = sorted_radius[0]
-    max_dist = sorted_radius[-1]
-    hist = np.histogram(sorted_radius, num_bins,range = (min_dist,max_dist))
-    bins = hist[1]
-    bin_start = 0
-    average_val = np.zeros((num_bins,2))
-    
-    for i in range(num_bins - 1):
-        bin_size = bins[i + 1] - bins[i]
-        bin_finish = bin_start + bin_size
-
-        # make sure there are points within the bins
-        indices = np.where((radius >= bin_start) & (radius <= bin_finish))
-        if indices[0].size != 0:
-            use_vel_rad = vel_rad[indices]
-            average_val[i,0] = np.mean(np.array([bin_start,bin_finish]))
-            average_val[i,1] = np.nanmean(use_vel_rad) 
-
-        bin_start = bin_finish
-    return average_val
-
-print("start binning")
-num_bins = 1000
-mass_bin_radius = np.zeros(particle_distances.size)
-mass_bin_vel_rad = np.zeros(particles_vel_rad.size)
-
-
-start_mass_bin = 0
-finish_mass_bin = 0
-# for i in range(halos_use_indices.shape[0]):
-#     finish_mass_bin += (halos_use_indices[i][1] - halos_use_indices[i][0])
-#     mass_bin_radius[start_mass_bin:finish_mass_bin] = particle_distances[halos_use_indices[i][0]:halos_use_indices[i][1]]
-#     mass_bin_vel_rad[start_mass_bin:finish_mass_bin] = particles_vel_rad[halos_use_indices[i][0]:halos_use_indices[i][1]]
-#     start_mass_bin = finish_mass_bin
-
-mass_bin_radius = mass_bin_radius[mass_bin_radius != 0]
-#avg_vel_rad = make_bins(num_bins, mass_bin_radius, mass_bin_vel_rad)
-avg_vel_rad = make_bins(num_bins, particle_distances, particles_vel_rad)
-avg_vel_rad = avg_vel_rad[~np.all(avg_vel_rad == 0, axis=1)]
-
-graph1, (plot1) = plt.subplots(1,1)
-plot1.plot(avg_vel_rad[:,0], hubble_constant * avg_vel_rad[:,0], color = "blue", label = "hubble flow")
-plot1.plot(avg_vel_rad[:,0], avg_vel_rad[:,1], color = "purple", label = "particles")
-plot1.set_title("average radial velocity vs position all particles")
-plot1.set_xlabel("position $kpc$")
-plot1.set_ylabel("average rad vel $km/s$")
-plot1.set_xscale("log")    
-#plot1.set_ylim([-.3,.3])
-plot1.legend()
-t3 = time.time()
-print("velocity finished: ", (t3 - t2)," seconds")
-print("total time: ", (t3-t1), " seconds")
-plt.show()
