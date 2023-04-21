@@ -135,8 +135,9 @@ def calc_v200(mass, radius):
 
 calculated_r200 = np.zeros(halos_r200.size)
 # particle_halo_assign: pid, halo_id, radius, x_dist, y_dist, z_dist, indices
-particle_halo_assign_id = np.zeros((num_particles * 5, 3), dtype = np.int32)
-particle_halo_radius_comp = np.zeros((num_particles * 5, 5), dtype = np.float32)
+particle_halo_assign_id = np.zeros((num_particles * 10, 3), dtype = np.int32)
+particle_halo_radius_comp = np.zeros((num_particles * 10, 4), dtype = np.float32)
+correspond_halo_prop = np.zeros((num_particles*5,2),dtype=np.float32)
 halos_v200 = np.zeros(num_halos, dtype = np.float32)
 all_halo_mass = np.zeros(num_halos, dtype = np.float32)
 particles_per_halo = np.zeros(num_halos, dtype = np.int32)
@@ -147,7 +148,7 @@ print("start particle assign")
 for i in range(num_halos):
     #find the indices of the particles within the expected r200 radius multiplied by 1.4 
     #value of 1.4 determined by guessing if just r200 value or 1.1 miss a couple halo r200 values but 1.4 gets them all
-    indices = particle_tree.query_ball_point(halos_pos[i,:], r = 5 * halos_r200[i])
+    indices = particle_tree.query_ball_point(halos_pos[i,:], r = 7 * halos_r200[i])
 
     # how many new particles being added
     num_new_particles = len(indices)
@@ -183,16 +184,16 @@ for i in range(num_halos):
     coord_dist = coord_dist[arrsortrad[::1]]
     
     halo_v200 = calc_v200(use_mass[-1], halos_r200[i])
-
+    halos_v200[i] = halo_v200
     # divide radius by halo_r200 to scale
     # also save the coord_dist to use later to calculate unit vectors
     particle_halo_radius_comp[start:start+num_new_particles,0] = radius
-    particle_halo_radius_comp[start:start+num_new_particles,1] = radius/halos_r200[i]
-    particle_halo_radius_comp[start:start+num_new_particles,2] = coord_dist[:,0]
-    particle_halo_radius_comp[start:start+num_new_particles,3] = coord_dist[:,1]
-    particle_halo_radius_comp[start:start+num_new_particles,4] = coord_dist[:,2]
+    particle_halo_radius_comp[start:start+num_new_particles,1] = coord_dist[:,0]
+    particle_halo_radius_comp[start:start+num_new_particles,2] = coord_dist[:,1]
+    particle_halo_radius_comp[start:start+num_new_particles,3] = coord_dist[:,2]
      
-    halos_v200[i] = halo_v200
+    correspond_halo_prop[start:start+num_new_particles,0] = halos_r200[i]
+    correspond_halo_prop[start:start+num_new_particles,1] = halo_v200
     
 
     all_halo_mass[i] = use_mass[-1]
@@ -237,9 +238,11 @@ print("finish particle assign: ", (t2 - t1), " seconds")
 # remove rows with zeros
 particle_halo_assign_id = particle_halo_assign_id[~np.all(particle_halo_assign_id == 0, axis=1)]
 particle_halo_radius_comp = particle_halo_radius_comp[~np.all(particle_halo_radius_comp == 0, axis=1)]
+correspond_halo_prop = correspond_halo_prop[~np.all(correspond_halo_prop == 0, axis=1)]
 
 np.save(save_location + "particle_halo_assign_id", particle_halo_assign_id)
 np.save(save_location + "particle_halo_radius_comp", particle_halo_radius_comp)
 np.save(save_location + "all_halo_mass", all_halo_mass)
 np.save(save_location + "particles_per_halo", particles_per_halo)
-
+np.save(save_location + "halos_v200", halos_v200)
+np.save(save_location + "correspond_halo_prop", correspond_halo_prop)
