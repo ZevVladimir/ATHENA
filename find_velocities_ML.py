@@ -1,11 +1,10 @@
 import numpy as np
-from pygadgetreader import *
+from pygadgetreader import readsnap, readheader
 from scipy.spatial import cKDTree
 from colossus.cosmology import cosmology
 import matplotlib.pyplot as plt
 from colossus.halo import mass_so
 from colossus.utils import constants
-from matplotlib.pyplot import cm
 import time
 
 save_location =  "/home/zvladimi/ML_orbit_infall_project/np_arrays/"
@@ -56,16 +55,18 @@ indices_change = np.append(indices_change, particle_halo_assign_id.shape[0])
 
 # choose a halo mass bin
 mass_hist = np.histogram(all_halo_mass, 1000)
-use_mass_start = 30
-use_mass_finish = 31
+use_mass_start = 20
+use_mass_finish = use_mass_start + 3
 print("mass range:", mass_hist[1][use_mass_start], "to", mass_hist[1][use_mass_finish], "solar masses")
 
+# get all the indices where the halo masses are within the selected bounds
 halos_mass_indices = np.where((all_halo_mass > mass_hist[1][use_mass_start]) & (all_halo_mass < mass_hist[1][use_mass_finish]))[0]
-#print(np.where(mass_hist[0] != 0))
+
+# Record the particle incdices that the halo starts at until the next halo starts
 halos_use_indices_finish = indices_change[(halos_mass_indices + 1)]
 halos_use_indices_start = indices_change[(halos_mass_indices)]
-
 halos_use_indices = np.column_stack((halos_use_indices_start,halos_use_indices_finish))
+
 
 # take indices from search and use to get velocities
 use_particle_vel = np.zeros((num_particles_identified,3))
@@ -149,8 +150,6 @@ def make_bins(num_bins, radius, radius_r200, vel_rad):
     
     min_rad = np.min(radius_r200)
     max_rad = np.max(radius_r200)
-    print(min_rad)
-    print(max_rad)
     bins = np.logspace(np.log10(min_rad), np.log10(max_rad), num_bins)
 
     bin_start = 0
@@ -165,26 +164,29 @@ def make_bins(num_bins, radius, radius_r200, vel_rad):
         indices = np.where((radius_r200 >= bin_start) & (radius_r200 <= bin_finish))
 
         if indices[0].size != 0:
-
             use_vel_rad = vel_rad[indices[0]]
-            average_val_part[i,0] = np.mean(np.array([bin_start,bin_finish]))
-            average_val_part[i,1] = np.mean(use_vel_rad) 
+            average_val_part[i,0] = np.median(np.array([bin_start,bin_finish]))
+            average_val_part[i,1] = np.median(use_vel_rad) 
+            print(i)
 
-            average_r200 = np.mean(correspond_halo_prop[indices,0])
-            average_radius = np.mean(radius[indices])
-            print("r200", average_r200)
-            print("radius", average_radius)
-            print("r/r200", average_radius/average_r200)
-            print("hub vel", average_radius * hubble_constant)
-            print("v/v200", average_radius * hubble_constant/np.mean(np.unique(correspond_halo_prop[indices,1])[0]) )
+            print(np.median(use_vel_rad[np.where(use_vel_rad<0)[0]]))
+            print(np.median(use_vel_rad[np.where(use_vel_rad>0)[0]]))
+            
+            average_r200 = np.median(correspond_halo_prop[indices,0])
+            average_radius = np.median(radius[indices])
+            # print("r200", average_r200)
+            #print("radius", average_radius)
+            # print("r/r200", average_radius/average_r200)
+            # print("hub vel", average_radius * hubble_constant)
+            # print("v/v200", average_radius * hubble_constant/np.mean(np.unique(correspond_halo_prop[indices,1])[0]) )
             average_val_hubble[i,0] = average_radius/average_r200
-            average_val_hubble[i,1] = average_radius * hubble_constant/np.mean(np.unique(correspond_halo_prop[indices,1])[0]) 
+            average_val_hubble[i,1] = (average_radius * hubble_constant)/np.median(np.unique(correspond_halo_prop[indices,1])[0]) 
 
         bin_start = bin_finish
     return average_val_part, average_val_hubble
 
 print("start binning")
-num_bins = 100
+num_bins = 50
 mass_bin_radius = np.zeros(particle_distances.size)
 mass_bin_radius_div_r200 = np.zeros(particle_distances.size)
 mass_bin_vel_rad = np.zeros(particles_vel_rad.size)
@@ -205,6 +207,10 @@ avg_vel_rad_part, avg_vel_rad_hub = make_bins(num_bins, mass_bin_radius, mass_bi
 
 avg_vel_rad_part = avg_vel_rad_part[~np.all(avg_vel_rad_part == 0, axis=1)]
 avg_vel_rad_hub = avg_vel_rad_hub[~np.all(avg_vel_rad_hub == 0, axis=1)]
+
+arr1inds = avg_vel_rad_hub[:,0].argsort()
+avg_vel_rad_hub[:,0] = avg_vel_rad_hub[arr1inds[:],0]
+avg_vel_rad_hub[:,1] = avg_vel_rad_hub[arr1inds[:],1]
 
 graph1, (plot1) = plt.subplots(1,1)
 plot1.plot(avg_vel_rad_hub[:,0], avg_vel_rad_hub[:,1], color = "purple", label = "hubble flow")

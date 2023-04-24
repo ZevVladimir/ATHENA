@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import h5py
 import math
-from pygadgetreader import *
+from pygadgetreader import readsnap
 
 
 original_data_file_location = "/home/zvladimi/ML_orbit_infall_project/SPARTA_data/sparta_cbol_l0063_n0256_strd1_v2.hdf5"
@@ -28,7 +28,7 @@ original_data_file = h5py.File(original_data_file_location)
 # print(allkeys(original_data_file))
 
 
-with h5py.File(original_data_file_location, "r") as f: 
+# with h5py.File(original_data_file_location, "r") as f: 
 #     halo_last_snap = np.empty(f["/halos/last_snap"].shape, f["/halos/last_snap"].dtype)
 #     halo_last_snap = np.array(list(f["/halos/last_snap"]))
 #     np.save(save_location + "halo_last_snap", halo_last_snap)
@@ -50,9 +50,9 @@ with h5py.File(original_data_file_location, "r") as f:
 #     halo_id = np.empty(f["/halos/id"].shape, f["/halos/id"].dtype)
 #     halo_id = np.array(list(f["/halos/id"]))
 #     np.save(save_location + "halo_id", halo_id)
-    halo_status = np.empty(f["/halos/status"].shape, f["/halos/status"].dtype)
-    halo_status = np.array(list(f["/halos/status"]))
-    np.save(save_location + "halo_status", halo_status)
+    # halo_status = np.empty(f["/halos/status"].shape, f["/halos/status"].dtype)
+    # halo_status = np.array(list(f["/halos/status"]))
+    # np.save(save_location + "halo_status", halo_status)
 # # save info from res_ifl
 
 #     halo_first = np.empty(f["/tcr_ptl/res_ifl/halo_first"].shape, f["/tcr_ptl/res_ifl/halo_first"].dtype)
@@ -79,7 +79,4 @@ with h5py.File(original_data_file_location, "r") as f:
 
 # particle_mass = readsnap(snapshot_path, 'mass', 'dm')
 # np.save(save_location + "all_particle_mass_192", particle_mass)
-
-
-
 
