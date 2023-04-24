@@ -3,7 +3,6 @@ from pygadgetreader import readsnap, readheader
 from scipy.spatial import cKDTree
 from colossus.cosmology import cosmology
 import matplotlib.pyplot as plt
-from colossus.halo import mass_so
 from colossus.utils import constants
 import time
 

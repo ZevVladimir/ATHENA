@@ -7,6 +7,8 @@ from colossus.halo import mass_so
 from colossus.utils import constants
 import time
 
+G = constants.G
+
 save_location =  "/home/zvladimi/ML_orbit_infall_project/np_arrays/"
 snapshot_path = "/home/zvladimi/ML_orbit_infall_project/particle_data/snapshot_192/snapshot_0192"
 
@@ -97,6 +99,8 @@ def calc_rhat(x_dist, y_dist, z_dist):
     rhat[:,2] = z_dist/magnitude
 
     return rhat
+def calc_v200(mass, radius):
+    return np.sqrt((G * mass)/radius)
 
 # set arrays
 particles_per_halo = particles_per_halo.astype(int)
@@ -167,26 +171,22 @@ def make_bins(num_bins, radius, radius_r200, vel_rad):
             use_vel_rad = vel_rad[indices[0]]
             average_val_part[i,0] = np.median(np.array([bin_start,bin_finish]))
             average_val_part[i,1] = np.median(use_vel_rad) 
-            print(i)
-
-            print(np.median(use_vel_rad[np.where(use_vel_rad<0)[0]]))
-            print(np.median(use_vel_rad[np.where(use_vel_rad>0)[0]]))
             
-            average_r200 = np.median(correspond_halo_prop[indices,0])
-            average_radius = np.median(radius[indices])
-            # print("r200", average_r200)
-            #print("radius", average_radius)
-            # print("r/r200", average_radius/average_r200)
-            # print("hub vel", average_radius * hubble_constant)
-            # print("v/v200", average_radius * hubble_constant/np.mean(np.unique(correspond_halo_prop[indices,1])[0]) )
-            average_val_hubble[i,0] = average_radius/average_r200
-            average_val_hubble[i,1] = (average_radius * hubble_constant)/np.median(np.unique(correspond_halo_prop[indices,1])[0]) 
+            # get median radius and r200 value for this bin
+            med_r200 = np.median(correspond_halo_prop[indices,0])
+            med_radius = np.median(radius[indices])
+            average_val_hubble[i,0] = med_radius/med_r200
+            
+            # calculate the corresponding m200m and then use that to calculate v200
+            corresponding_m200m = mass_so.R_to_M(med_r200, red_shift, "200c")
+            
+            average_val_hubble[i,1] = (med_radius * hubble_constant)/calc_v200(corresponding_m200m,med_r200)
 
         bin_start = bin_finish
     return average_val_part, average_val_hubble
 
 print("start binning")
-num_bins = 50
+num_bins = 100
 mass_bin_radius = np.zeros(particle_distances.size)
 mass_bin_radius_div_r200 = np.zeros(particle_distances.size)
 mass_bin_vel_rad = np.zeros(particles_vel_rad.size)
