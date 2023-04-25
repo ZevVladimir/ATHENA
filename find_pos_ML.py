@@ -146,7 +146,7 @@ print("start particle assign")
 for i in range(num_halos):
     #find the indices of the particles within the expected r200 radius multiplied by 1.4 
     #value of 1.4 determined by guessing if just r200 value or 1.1 miss a couple halo r200 values but 1.4 gets them all
-    indices = particle_tree.query_ball_point(halos_pos[i,:], r = 6 * halos_r200[i])
+    indices = particle_tree.query_ball_point(halos_pos[i,:], r = 7 * halos_r200[i])
 
     # how many new particles being added
     num_new_particles = len(indices)
