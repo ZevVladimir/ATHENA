@@ -83,8 +83,7 @@ def calculate_distance(halo_x, halo_y, halo_z, particle_x, particle_y, particle_
     particle_x[x_within_plus] = particle_x[x_within_plus] + box_size
     particle_x[x_within_minus] = particle_x[x_within_minus] - box_size
     
-    coord_diff[x_within_plus,0] = x_dist[x_within_plus] + box_size
-    coord_diff[x_within_minus,0] = x_dist[x_within_minus] - box_size
+    coord_diff[:,0] = particle_x - halo_x
     
     y_within_plus = np.where((y_dist + box_size) < half_box_size)
     y_within_minus = np.where((y_dist - box_size) > -half_box_size)
@@ -92,8 +91,7 @@ def calculate_distance(halo_x, halo_y, halo_z, particle_x, particle_y, particle_
     particle_y[y_within_plus] = particle_y[y_within_plus] + box_size
     particle_y[y_within_minus] = particle_y[y_within_minus] - box_size
     
-    coord_diff[y_within_plus,0] = y_dist[y_within_plus] + box_size
-    coord_diff[y_within_minus,0] = y_dist[y_within_minus] - box_size
+    coord_diff[:,1] = particle_y - halo_y
     
     z_within_plus = np.where((z_dist + box_size) < half_box_size)
     z_within_minus = np.where((z_dist - box_size) > -half_box_size)
@@ -101,8 +99,7 @@ def calculate_distance(halo_x, halo_y, halo_z, particle_x, particle_y, particle_
     particle_z[z_within_plus] = particle_z[z_within_plus] + box_size
     particle_z[z_within_minus] = particle_z[z_within_minus] - box_size
     
-    coord_diff[z_within_plus,0] = z_dist[z_within_plus] + box_size
-    coord_diff[z_within_minus,0] = z_dist[z_within_minus] - box_size
+    coord_diff[:,2] = particle_z - halo_z
 
     #calculate distance with standard sqrt((x_1-x_2)^2 + (y_1 - y_2)^2 + (z_1 - z_2)^2)
     distance = np.zeros((new_particles,1))
@@ -181,8 +178,7 @@ for i in range(num_halos):
     current_particles_vel = current_particles_vel[arrsortrad[::1]]
     coord_dist = coord_dist[arrsortrad[::1]]
     
-    halo_v200 = calc_v200(use_mass[-1], halos_r200[i])
-    halos_v200[i] = halo_v200
+    
     # divide radius by halo_r200 to scale
     # also save the coord_dist to use later to calculate unit vectors
     particle_halo_radius_comp[start:start+num_new_particles,0] = radius
@@ -191,7 +187,7 @@ for i in range(num_halos):
     particle_halo_radius_comp[start:start+num_new_particles,3] = coord_dist[:,2]
      
     correspond_halo_prop[start:start+num_new_particles,0] = halos_r200[i]
-    correspond_halo_prop[start:start+num_new_particles,1] = halo_v200
+    
     
 
     all_halo_mass[i] = use_mass[-1]
@@ -218,14 +214,23 @@ for i in range(num_halos):
     # plt.show()
     
     #if only one index is less than 200 * rho_c then that is the r200 radius
+    halo_v200 = 0
     if indices_r200_met[0].size == 1:
+        halo_v200 = calc_v200(use_mass[indices_r200_met[0][0]], halos_r200[i])
+        halos_v200[i] = halo_v200
         calculated_r200[i] = radius[indices_r200_met[0][0]]
     #if there are none then the radius is 0
     elif indices_r200_met[0].size == 0:
+        halo_v200 = 0
+        halos_v200[i] = halo_v200
         calculated_r200[i] = 0
     #if multiple indices choose the first two and average them
     else:
+        halo_v200 = calc_v200(((use_mass[indices_r200_met[0][0]] + use_mass[indices_r200_met[0][1]])/2), halos_r200[i])
+        halos_v200[i] = halo_v200
         calculated_r200[i] = (radius[indices_r200_met[0][0]] + radius[indices_r200_met[0][1]])/2
+    
+    correspond_halo_prop[start:start+num_new_particles,1] = halo_v200
     
     start += num_new_particles
     

@@ -58,7 +58,6 @@ num_particles_identified = particle_halo_assign_id.shape[0]
 indices_change = np.where(particle_halo_assign_id[:-1,1] != particle_halo_assign_id[1:,1])[0] + 1
 indices_change = np.append(indices_change, particle_halo_assign_id.shape[0]) #add last index
 
-
 # take indices from search and use to get velocities
 use_particle_vel = np.zeros((num_particles_identified,3), dtype = np.float32)
 particle_indices = particle_halo_assign_id[:,2].astype(int)
@@ -73,8 +72,17 @@ radius_div_r200 = np.zeros((particle_distances.size), dtype = np.float32)
 start_vel_pec = 0
 for i in range(indices_change.size):
     finish_vel_pec = indices_change[i]
+    
     particles_vel_pec[start_vel_pec:finish_vel_pec,:] = use_particle_vel[start_vel_pec:finish_vel_pec,:] - halos_vel[i,:]
+    # if i == 15:
+    #     for j in range(finish_vel_pec - start_vel_pec):
+    #         if j % 200 == 0:
+    #             print(j)
+    #             print(use_particle_vel[start_vel_pec+j,:])
+    #             print(halos_vel[i,:])
+    #             print(particles_vel_pec[start_vel_pec + j,:])
     # get the corresponding r/r200 values for each particle
+
     radius_div_r200[start_vel_pec:finish_vel_pec] = particle_distances[start_vel_pec:finish_vel_pec] / halos_r200[i]
     start_vel_pec = finish_vel_pec
 
@@ -106,27 +114,41 @@ all_rhat = calc_rhat(particle_halo_radius_comp[:,1], particle_halo_radius_comp[:
 start_vel_phys = 0
 
 # loop through each halo's particles
+
 for i in range(indices_change.size):
+#for i in range(1):
+
     finish_vel_phys = indices_change[i]
     # calculate the hubble flow velocity at the distances of each particle
     v_hubble = np.zeros((finish_vel_phys - start_vel_phys))
     v_hubble = np.reshape((hubble_constant * particle_distances[start_vel_phys:finish_vel_phys]),((finish_vel_phys - start_vel_phys),1))
-    # print(i)
-    # print(v_hubble * all_rhat[start_vel_phys:finish_vel_phys,:])
-    # print(particles_vel_pec[start_vel_phys:finish_vel_phys,:])
+    
+    
     # calculate physical velocity by adding the hubble velocity in the radial direction
 
     particles_vel_phys[start_vel_phys:finish_vel_phys,:] = (particles_vel_pec[start_vel_phys:finish_vel_phys,:] + 
                                                             (v_hubble * all_rhat[start_vel_phys:finish_vel_phys]))/halos_v200[i]
     
-    # calculate radial velocity by just taking the radial compenent of the physical velocity
-    particles_vel_rad[start_vel_phys:finish_vel_phys] = np.sum((particles_vel_phys[start_vel_phys:finish_vel_phys] * 
-                                                                all_rhat[start_vel_phys:finish_vel_phys]), axis = 1) 
+    # calculate radial velocity by just taking the radial compenent of the physical 
+    
+    particles_vel_rad[start_vel_phys:finish_vel_phys] = np.sum((particles_vel_phys[start_vel_phys:finish_vel_phys,:] * all_rhat[start_vel_phys:finish_vel_phys]), axis = 1)
+
     
     # calculating radial velocity with the radial part of the peculiar velocity with the hubble flow added
-    second_particles_vel_rad[start_vel_phys:finish_vel_phys] = ((np.sum((particles_vel_pec[start_vel_phys:finish_vel_phys] * 
+    second_particles_vel_rad[start_vel_phys:finish_vel_phys] = ((np.sum((particles_vel_pec[start_vel_phys:finish_vel_phys,:] * 
                                                                          all_rhat[start_vel_phys:finish_vel_phys]), axis = 1) + 
                                                                  np.reshape(v_hubble,(v_hubble.size))))
+    
+    
+    
+    # for j in range(finish_vel_phys - start_vel_phys):
+    #     if radius_div_r200[j] > 1:
+    #         print(j)
+    #         print(radius_div_r200[j])
+    #         print(np.sum((particles_vel_pec[start_vel_phys+j,:] * all_rhat[start_vel_phys+j])))
+    #         print(v_hubble[j])
+    #         print(second_particles_vel_rad[start_vel_phys + j])
+            
     
     # check that the two methods of calculation are equal
     # if (np.allclose(particles_vel_rad, second_particles_vel_rad, rtol = 1e-4, atol = 1e-4)) is False:
@@ -135,8 +157,11 @@ for i in range(indices_change.size):
     #     print(np.round(second_particles_vel_rad[finish_vel_phys-5:finish_vel_phys],4))
     
     start_vel_phys = finish_vel_phys
-    
-def make_bins(num_bins, radius, radius_r200, vel_rad):    
+print(hubble_constant)
+
+def make_bins(num_bins, radius, radius_r200, vel_rad): 
+    count = 0
+
     min_rad = np.min(radius_r200)
     max_rad = np.max(radius_r200)
     bins = np.logspace(np.log10(min_rad), np.log10(max_rad), num_bins)
@@ -150,12 +175,13 @@ def make_bins(num_bins, radius, radius_r200, vel_rad):
         bin_finish = bin_start + bin_size
         # make sure there are points within the bins
         indices = np.where((radius_r200 >= bin_start) & (radius_r200 <= bin_finish))
-    
+
         if indices[0].size != 0:
             
             use_vel_rad = vel_rad[indices[0]]
             average_val_part[i,0] = np.average(np.array([bin_start,bin_finish]))
             average_val_part[i,1] = np.average(use_vel_rad) 
+            #print(average_val_part[i])
             
             # get median radius and r200 value for this bin
             med_r200 = np.median(correspond_halo_prop[indices,0])
@@ -164,10 +190,11 @@ def make_bins(num_bins, radius, radius_r200, vel_rad):
             
             # calculate the corresponding m200m and then use that to calculate v200
             corresponding_m200m = mass_so.R_to_M(med_r200, red_shift, "200c")
-            
+
             average_val_hubble[i,1] = (med_radius * hubble_constant)/calc_v200(corresponding_m200m,med_r200)
 
         bin_start = bin_finish
+        
     return average_val_part, average_val_hubble
 
 print("start binning")
@@ -199,10 +226,6 @@ def split_by_mass(start_nu, finish_nu, num_bins):
         mass_bin_vel_rad[start_mass_bin:finish_mass_bin] = particles_vel_rad[halos_use_indices[i][0]:halos_use_indices[i][1]]
         
         start_mass_bin = finish_mass_bin
-        
-    # mass_bin_radius = mass_bin_radius[mass_bin_radius != 0]
-    # mass_bin_radius_div_r200 = mass_bin_radius_div_r200[mass_bin_radius_div_r200 != 0]
-    # mass_bin_vel_rad = mass_bin_vel_rad[mass_bin_vel_rad != 0]
     
     avg_vel_rad_part, avg_vel_rad_hub = make_bins(num_bins, mass_bin_radius, mass_bin_radius_div_r200, mass_bin_vel_rad)
     avg_vel_rad_part = avg_vel_rad_part[~np.all(avg_vel_rad_part == 0, axis=1)]
@@ -234,7 +257,7 @@ plt.title("average radial velocity vs position all particles")
 plt.xlabel("position $r/R_{200m}$")
 plt.ylabel("average rad vel $v_r/v_{200m}$")
 plt.xscale("log")    
-plt.ylim([-.5,.5])
+# plt.ylim([-.5,.5])
 plt.xlim([0.01,10])
 plt.legend()
 t2 = time.time()
