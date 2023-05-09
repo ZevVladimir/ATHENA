@@ -50,9 +50,9 @@ num_particles_identified = particle_halo_assign_id.shape[0]
 
 # indices where halo starts
 indices_change = np.where(particle_halo_assign_id[:-1,1] != particle_halo_assign_id[1:,1])[0] + 1
-indices_change = np.append(indices_change, particle_halo_assign_id.shape[0]) #add last index
 indices_change = np.hstack((0, indices_change)) #add zero to start
-num_halos = indices_change.size
+indices_change = np.append(indices_change, particle_halo_assign_id.shape[0]) #add last index
+num_halos = indices_change.size - 1
 
 # take indices from search and use to get velocities
 use_particle_vel = np.zeros((num_particles_identified,3), dtype = np.float32)
@@ -72,7 +72,7 @@ def calc_vel_pec(part_vel, halo_vel, part_dist):
     particles_vel_pec = np.zeros((num_particles_identified,3), dtype = np.float32)
     radius_div_r200 = np.zeros((particle_distances.size), dtype = np.float32)
     
-    for i in range(num_halos - 1):
+    for i in range(num_halos):
         start_vel_pec = indices_change[i]
         finish_vel_pec = indices_change[i + 1]
         
@@ -117,7 +117,7 @@ def calc_vel_rad(part_dist, part_vel_pec, comps):
    
     
     # loop through each halo's particles
-    for i in range(num_halos - 1):
+    for i in range(num_halos):
     #for i in range(1):
         start_vel_phys = indices_change[i]
         finish_vel_phys = indices_change[i + 1]
@@ -231,7 +231,7 @@ def split_by_mass(start_nu, finish_nu, num_bins):
 plt.rcParams['text.usetex'] = True
 num_bins = 50
 start_nu = 1
-num_iter = 5
+num_iter = 2
 color = iter(cm.rainbow(np.linspace(0, 1, num_iter)))
 
 for i in range(num_iter):
@@ -239,10 +239,9 @@ for i in range(num_iter):
     c = next(color)
     finish_nu = start_nu + .5
     avg_vel_rad_part, avg_vel_rad_hub = split_by_mass(start_nu, finish_nu, num_bins)
-    
+    print(avg_vel_rad_part[:,0], avg_vel_rad_part[:,1])
     plt.plot(avg_vel_rad_part[:,0], avg_vel_rad_part[:,1], color = c, label = r"${0} < \nu < {1}$".format(str(start_nu), str(finish_nu)))
     start_nu += .5
-    
 
 plt.plot(avg_vel_rad_hub[:,0], avg_vel_rad_hub[:,1], color = "purple", label = "hubble flow")
 plt.title("average radial velocity vs position all particles")
