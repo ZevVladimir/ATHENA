@@ -25,28 +25,22 @@ hubble_constant = cosmol.Hz(red_shift) * 0.001 # convert to units km/s/kpc
 particle_halo_assign_id = np.load(save_location + "particle_halo_assign_id.npy")
 particle_halo_radius_comp = np.load(save_location + "particle_halo_radius_comp.npy")
 particles_vel = np.load(save_location + "particle_vel_192.npy")
-particles_per_halo = np.load(save_location + "particles_per_halo.npy")
-correspond_halo_prop = np.load(save_location + "correspond_halo_prop.npy")
 
 #get halo info
 halos_vel = np.load(save_location + "halo_velocity.npy")
 halos_vel = halos_vel[:,snapshot,:]
-all_halo_mass = np.load(save_location + "all_halo_mass.npy")
 halos_v200 = np.load(save_location + "halos_v200.npy")
 halos_r200 = np.load(save_location + "halo_R200m.npy")
 halos_r200 = halos_r200[:,snapshot]
 halos_last_snap = np.load(save_location + "halo_last_snap.npy")
-halos_id = np.load(save_location + "halo_id.npy")
-halos_id = halos_id[:,snapshot]
 halos_status = np.load(save_location + "halo_status.npy")
 halos_status = halos_status[:,snapshot]
 
-indices_keep = np.zeros((halos_id.size),dtype = np.int32)
+indices_keep = np.zeros((halos_last_snap.size),dtype = np.int32)
 indices_keep = np.where((halos_last_snap >= snapshot) & (halos_status == 10))
 
 halos_vel = halos_vel[indices_keep]
 halos_r200 = halos_r200[indices_keep]
-halos_id = halos_id[indices_keep]
 
 t1 = time.time()
 
@@ -57,6 +51,8 @@ num_particles_identified = particle_halo_assign_id.shape[0]
 # indices where halo starts
 indices_change = np.where(particle_halo_assign_id[:-1,1] != particle_halo_assign_id[1:,1])[0] + 1
 indices_change = np.append(indices_change, particle_halo_assign_id.shape[0]) #add last index
+indices_change = np.hstack((0, indices_change)) #add zero to start
+num_halos = indices_change.size
 
 # take indices from search and use to get velocities
 use_particle_vel = np.zeros((num_particles_identified,3), dtype = np.float32)
@@ -65,34 +61,40 @@ use_particle_vel = particles_vel[particle_indices,:]
 root_a = np.sqrt(scale_factor)
 use_particle_vel = use_particle_vel * root_a
 
-particles_vel_pec = np.zeros((num_particles_identified,3), dtype = np.float32)
+# free memory
+del particle_halo_assign_id 
+del particles_vel
+del halos_last_snap 
+del halos_status
 
 # calculate peculiar velocity by subtracting halo velocity from particle velocity
-radius_div_r200 = np.zeros((particle_distances.size), dtype = np.float32)
-start_vel_pec = 0
-for i in range(indices_change.size):
-    finish_vel_pec = indices_change[i]
+def calc_vel_pec(part_vel, halo_vel, part_dist):
+    particles_vel_pec = np.zeros((num_particles_identified,3), dtype = np.float32)
+    radius_div_r200 = np.zeros((particle_distances.size), dtype = np.float32)
     
-    particles_vel_pec[start_vel_pec:finish_vel_pec,:] = use_particle_vel[start_vel_pec:finish_vel_pec,:] - halos_vel[i,:]
-    # if i == 15:
-    #     for j in range(finish_vel_pec - start_vel_pec):
-    #         if j % 200 == 0:
-    #             print(j)
-    #             print(use_particle_vel[start_vel_pec+j,:])
-    #             print(halos_vel[i,:])
-    #             print(particles_vel_pec[start_vel_pec + j,:])
-    # get the corresponding r/r200 values for each particle
+    for i in range(num_halos - 1):
+        start_vel_pec = indices_change[i]
+        finish_vel_pec = indices_change[i + 1]
+        
+        particles_vel_pec[start_vel_pec:finish_vel_pec,:] = part_vel[start_vel_pec:finish_vel_pec,:] - halo_vel[i,:]
 
-    radius_div_r200[start_vel_pec:finish_vel_pec] = particle_distances[start_vel_pec:finish_vel_pec] / halos_r200[i]
-    start_vel_pec = finish_vel_pec
+        radius_div_r200[start_vel_pec:finish_vel_pec] = part_dist[start_vel_pec:finish_vel_pec] / halos_r200[i]
+        
+    return particles_vel_pec, radius_div_r200
+
+particles_vel_pec, radius_div_r200 = calc_vel_pec(use_particle_vel, halos_vel, particle_distances)
+
+del halos_vel # free memory
+del halos_r200 # free memory
 
 def calc_rhat(x_dist, y_dist, z_dist):
     rhat = np.zeros((x_dist.size,3), dtype = np.float32)
+    
     # get unit vector by dividing components by magnitude
-    magnitude = np.sqrt(np.square(x_dist) + np.square(y_dist) + np.square(z_dist))
-    rhat[:,0] = x_dist/magnitude
-    rhat[:,1] = y_dist/magnitude
-    rhat[:,2] = z_dist/magnitude
+    magnitude = np.sqrt(np.add(np.add(np.square(x_dist),np.square(y_dist)),np.square(z_dist)), dtype = np.float32)
+    rhat[:,0] = np.divide(x_dist,magnitude)
+    rhat[:,1] = np.divide(y_dist,magnitude)
+    rhat[:,2] = np.divide(z_dist,magnitude)
 
     return rhat
 
@@ -101,63 +103,52 @@ def calc_v200(mass, radius):
     return np.sqrt((G * mass)/radius)
 
 # set arrays
-all_rhat = np.zeros((particles_vel_pec.shape[0],3), dtype = np.float32)
-particles_vel_phys = np.zeros((particles_vel_pec.shape[0],3), dtype = np.float32)
+
 particles_vel_tan = np.zeros((particles_vel_pec.shape[0],3), dtype = np.float32)
-particles_vel_rad = np.zeros((particles_vel_pec.shape[0]), dtype = np.float32)
-second_particles_vel_rad = np.zeros((particles_vel_pec.shape[0]), dtype = np.float32)
 
-# find the unit direction vectors of all halos to particles
-all_rhat = calc_rhat(particle_halo_radius_comp[:,1], particle_halo_radius_comp[:,2],particle_halo_radius_comp[:,3])
+def calc_vel_rad(part_dist, part_vel_pec, comps):
+    all_rhat = np.zeros((particles_vel_pec.shape[0],3), dtype = np.float32)
+    particles_vel_phys = np.zeros((particles_vel_pec.shape[0],3), dtype = np.float32)
+    particles_vel_rad = np.zeros((particles_vel_pec.shape[0]), dtype = np.float32)
+    #second_particles_vel_rad = np.zeros((particles_vel_pec.shape[0]), dtype = np.float32)
+    
+    # find the unit direction vectors of all halos to particles
+    all_rhat = calc_rhat(particle_halo_radius_comp[:,1], particle_halo_radius_comp[:,2],particle_halo_radius_comp[:,3])
+   
+    
+    # loop through each halo's particles
+    for i in range(num_halos - 1):
+    #for i in range(1):
+        start_vel_phys = indices_change[i]
+        finish_vel_phys = indices_change[i + 1]
+        # calculate the hubble flow velocity at the distances of each particle
+        v_hubble = np.zeros((finish_vel_phys - start_vel_phys))
+        v_hubble = np.reshape((np.multiply(hubble_constant, part_dist[start_vel_phys:finish_vel_phys])),((finish_vel_phys - start_vel_phys),1))
+        
+        
+        # calculate physical velocity by adding the hubble velocity in the radial direction
 
-# convert peculiar velocity to physical velocity by adding scale factor * h * dist from particle to halo
-start_vel_phys = 0
+        particles_vel_phys[start_vel_phys:finish_vel_phys,:] = np.divide(np.add(part_vel_pec[start_vel_phys:finish_vel_phys,:], (np.multiply(v_hubble, all_rhat[start_vel_phys:finish_vel_phys]))), halos_v200[i])
+        
+        # calculate radial velocity by just taking the radial compenent of the physical 
+        
+        particles_vel_rad[start_vel_phys:finish_vel_phys] = np.sum((np.multiply(particles_vel_phys[start_vel_phys:finish_vel_phys,:], all_rhat[start_vel_phys:finish_vel_phys])), axis = 1)
 
-# loop through each halo's particles
+        
+        # calculating radial velocity with the radial part of the peculiar velocity with the hubble flow added
+        # second_particles_vel_rad[start_vel_phys:finish_vel_phys] = ((np.sum((np.multiply(particles_vel_pec[start_vel_phys:finish_vel_phys,:], all_rhat[start_vel_phys:finish_vel_phys])), axis = 1) + 
+        #                                                              np.reshape(v_hubble,(v_hubble.size))))
+    
+    return particles_vel_rad
 
-for i in range(indices_change.size):
-#for i in range(1):
+particles_vel_rad = calc_vel_rad(particle_distances, particles_vel_pec, particle_halo_radius_comp)
 
-    finish_vel_phys = indices_change[i]
-    # calculate the hubble flow velocity at the distances of each particle
-    v_hubble = np.zeros((finish_vel_phys - start_vel_phys))
-    v_hubble = np.reshape((hubble_constant * particle_distances[start_vel_phys:finish_vel_phys]),((finish_vel_phys - start_vel_phys),1))
-    
-    
-    # calculate physical velocity by adding the hubble velocity in the radial direction
+# free memory
+del halos_v200 
+del particles_vel_pec
+del particle_halo_radius_comp # free memory
 
-    particles_vel_phys[start_vel_phys:finish_vel_phys,:] = (particles_vel_pec[start_vel_phys:finish_vel_phys,:] + 
-                                                            (v_hubble * all_rhat[start_vel_phys:finish_vel_phys]))/halos_v200[i]
-    
-    # calculate radial velocity by just taking the radial compenent of the physical 
-    
-    particles_vel_rad[start_vel_phys:finish_vel_phys] = np.sum((particles_vel_phys[start_vel_phys:finish_vel_phys,:] * all_rhat[start_vel_phys:finish_vel_phys]), axis = 1)
-
-    
-    # calculating radial velocity with the radial part of the peculiar velocity with the hubble flow added
-    second_particles_vel_rad[start_vel_phys:finish_vel_phys] = ((np.sum((particles_vel_pec[start_vel_phys:finish_vel_phys,:] * 
-                                                                         all_rhat[start_vel_phys:finish_vel_phys]), axis = 1) + 
-                                                                 np.reshape(v_hubble,(v_hubble.size))))
-    
-    
-    
-    # for j in range(finish_vel_phys - start_vel_phys):
-    #     if radius_div_r200[j] > 1:
-    #         print(j)
-    #         print(radius_div_r200[j])
-    #         print(np.sum((particles_vel_pec[start_vel_phys+j,:] * all_rhat[start_vel_phys+j])))
-    #         print(v_hubble[j])
-    #         print(second_particles_vel_rad[start_vel_phys + j])
-            
-    
-    # check that the two methods of calculation are equal
-    # if (np.allclose(particles_vel_rad, second_particles_vel_rad, rtol = 1e-4, atol = 1e-4)) is False:
-    #     print(i)
-    #     print(np.round(particles_vel_rad[finish_vel_phys-5:finish_vel_phys],4))
-    #     print(np.round(second_particles_vel_rad[finish_vel_phys-5:finish_vel_phys],4))
-    
-    start_vel_phys = finish_vel_phys
-print(hubble_constant)
+correspond_halo_prop = np.load(save_location + "correspond_halo_prop.npy")
 
 def make_bins(num_bins, radius, radius_r200, vel_rad): 
     count = 0
@@ -181,7 +172,6 @@ def make_bins(num_bins, radius, radius_r200, vel_rad):
             use_vel_rad = vel_rad[indices[0]]
             average_val_part[i,0] = np.average(np.array([bin_start,bin_finish]))
             average_val_part[i,1] = np.average(use_vel_rad) 
-            #print(average_val_part[i])
             
             # get median radius and r200 value for this bin
             med_r200 = np.median(correspond_halo_prop[indices,0])
@@ -198,6 +188,7 @@ def make_bins(num_bins, radius, radius_r200, vel_rad):
     return average_val_part, average_val_hubble
 
 print("start binning")
+all_halo_mass = np.load(save_location + "all_halo_mass.npy")
 peak_heights = peaks.peakHeight(all_halo_mass, red_shift,)
 mass_hist = np.histogram(peak_heights, 50)
 
@@ -205,9 +196,8 @@ def split_by_mass(start_nu, finish_nu, num_bins):
     
     # get all the indices where the halo masses are within the selected bounds
     halos_mass_indices = np.where((peak_heights > start_nu) & (peak_heights < finish_nu))[0]
-    print(halos_mass_indices.shape)
     # Record the particle indices that the halo starts at until the next halo starts
-    halos_use_indices_start = indices_change[(halos_mass_indices)]
+    halos_use_indices_start = indices_change[halos_mass_indices]
     halos_use_indices_finish = indices_change[(halos_mass_indices + 1)]
     halos_use_indices = np.column_stack((halos_use_indices_start,halos_use_indices_finish))
 
@@ -243,7 +233,9 @@ num_bins = 50
 start_nu = 1
 num_iter = 5
 color = iter(cm.rainbow(np.linspace(0, 1, num_iter)))
+
 for i in range(num_iter):
+    print(i)
     c = next(color)
     finish_nu = start_nu + .5
     avg_vel_rad_part, avg_vel_rad_hub = split_by_mass(start_nu, finish_nu, num_bins)

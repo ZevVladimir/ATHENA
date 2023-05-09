@@ -130,9 +130,9 @@ def calc_v200(mass, radius):
 
 calculated_r200 = np.zeros(halos_r200.size)
 # particle_halo_assign: pid, halo_id, radius, x_dist, y_dist, z_dist, indices
-particle_halo_assign_id = np.zeros((num_particles * 10, 3), dtype = np.int32)
-particle_halo_radius_comp = np.zeros((num_particles * 10, 4), dtype = np.float32)
-correspond_halo_prop = np.zeros((num_particles*5,2),dtype=np.float32)
+particle_halo_assign_id = np.zeros((num_particles * 15, 3), dtype = np.int32)
+particle_halo_radius_comp = np.zeros((num_particles * 15, 4), dtype = np.float32)
+correspond_halo_prop = np.zeros((num_particles*10,2),dtype=np.float32)
 halos_v200 = np.zeros(num_halos, dtype = np.float32)
 all_halo_mass = np.zeros(num_halos, dtype = np.float32)
 particles_per_halo = np.zeros(num_halos, dtype = np.int32)
@@ -143,7 +143,7 @@ print("start particle assign")
 for i in range(num_halos):
     #find the indices of the particles within the expected r200 radius multiplied by 1.4 
     #value of 1.4 determined by guessing if just r200 value or 1.1 miss a couple halo r200 values but 1.4 gets them all
-    indices = particle_tree.query_ball_point(halos_pos[i,:], r = 10 * halos_r200[i])
+    indices = particle_tree.query_ball_point(halos_pos[i,:], r = 13 * halos_r200[i])
 
     # how many new particles being added
     num_new_particles = len(indices)
