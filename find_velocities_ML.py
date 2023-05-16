@@ -45,6 +45,7 @@ halos_r200 = halos_r200[indices_keep]
 t1 = time.time()
 
 particle_distances = particle_halo_radius_comp[:,0]
+
 # how many particles are we workin with
 num_particles_identified = particle_halo_assign_id.shape[0]
 
@@ -122,13 +123,28 @@ def calc_vel_rad(part_dist, part_vel_pec, comps):
         start_vel_phys = indices_change[i]
         finish_vel_phys = indices_change[i + 1]
         # calculate the hubble flow velocity at the distances of each particle
+
         v_hubble = np.zeros((finish_vel_phys - start_vel_phys))
         v_hubble = np.reshape((np.multiply(hubble_constant, part_dist[start_vel_phys:finish_vel_phys])),((finish_vel_phys - start_vel_phys),1))
         
         
         # calculate physical velocity by adding the hubble velocity in the radial direction
+        v_hub_rad_comp = np.multiply(v_hubble, all_rhat[start_vel_phys:finish_vel_phys])
+        if i == 20:
+            print(v_hubble)
+            print(all_rhat[start_vel_phys:finish_vel_phys])
+            print(v_hub_rad_comp)
+        # if i == 20:
+        #     for j in range(25):
+        #         print("V hubble: ",v_hub_rad_comp[-j:-j+1], "vel pec:", part_vel_pec[-j:-j+1])
+        part_vel_phys_x = part_vel_pec[start_vel_phys:finish_vel_phys, 0] + v_hub_rad_comp[:,0]
+        part_vel_phys_y = part_vel_pec[start_vel_phys:finish_vel_phys, 1] + v_hub_rad_comp[:,1]
+        part_vel_phys_z = part_vel_pec[start_vel_phys:finish_vel_phys, 2] + v_hub_rad_comp[:,2]
+        particles_vel_phys[start_vel_phys:finish_vel_phys, 0] = part_vel_phys_x
+        particles_vel_phys[start_vel_phys:finish_vel_phys, 1] = part_vel_phys_y
+        particles_vel_phys[start_vel_phys:finish_vel_phys, 2] = part_vel_phys_z
 
-        particles_vel_phys[start_vel_phys:finish_vel_phys,:] = np.divide(np.add(part_vel_pec[start_vel_phys:finish_vel_phys,:], (np.multiply(v_hubble, all_rhat[start_vel_phys:finish_vel_phys]))), halos_v200[i])
+        particles_vel_phys[start_vel_phys:finish_vel_phys,:] = np.divide(particles_vel_phys[start_vel_phys:finish_vel_phys,:], halos_v200[i])
         
         # calculate radial velocity by just taking the radial compenent of the physical 
         
@@ -150,9 +166,7 @@ del particle_halo_radius_comp # free memory
 
 correspond_halo_prop = np.load(save_location + "correspond_halo_prop.npy")
 
-def make_bins(num_bins, radius, radius_r200, vel_rad): 
-    count = 0
-
+def make_bins(num_bins, radius, radius_r200, vel_rad, curr_halo_prop): 
     min_rad = np.min(radius_r200)
     max_rad = np.max(radius_r200)
     bins = np.logspace(np.log10(min_rad), np.log10(max_rad), num_bins)
@@ -174,7 +188,7 @@ def make_bins(num_bins, radius, radius_r200, vel_rad):
             average_val_part[i,1] = np.average(use_vel_rad) 
             
             # get median radius and r200 value for this bin
-            med_r200 = np.median(correspond_halo_prop[indices,0])
+            med_r200 = np.median(curr_halo_prop[indices])
             med_radius = np.median(radius[indices])
             average_val_hubble[i,0] = med_radius/med_r200
             
@@ -195,7 +209,7 @@ mass_hist = np.histogram(peak_heights, 50)
 def split_by_mass(start_nu, finish_nu, num_bins):
     
     # get all the indices where the halo masses are within the selected bounds
-    halos_mass_indices = np.where((peak_heights > start_nu) & (peak_heights < finish_nu))[0]
+    halos_mass_indices = np.where((peak_heights >= start_nu) & (peak_heights <= finish_nu))[0] 
     # Record the particle indices that the halo starts at until the next halo starts
     halos_use_indices_start = indices_change[halos_mass_indices]
     halos_use_indices_finish = indices_change[(halos_mass_indices + 1)]
@@ -205,19 +219,21 @@ def split_by_mass(start_nu, finish_nu, num_bins):
     mass_bin_radius = np.zeros(total_part_use, dtype = np.float32)
     mass_bin_radius_div_r200 = np.zeros(total_part_use, dtype = np.float32)
     mass_bin_vel_rad = np.zeros(total_part_use, dtype = np.float32)
+    correspond_halo_r200 = np.zeros((total_part_use), dtype = np.float32)
     
     start_mass_bin = 0
     finish_mass_bin = 0
+
     for i in range(halos_use_indices.shape[0]):
         finish_mass_bin += (halos_use_indices[i][1] - halos_use_indices[i][0])
         
         mass_bin_radius[start_mass_bin:finish_mass_bin] = particle_distances[halos_use_indices[i][0]:halos_use_indices[i][1]]
         mass_bin_radius_div_r200[start_mass_bin:finish_mass_bin] = radius_div_r200[halos_use_indices[i][0]:halos_use_indices[i][1]]
         mass_bin_vel_rad[start_mass_bin:finish_mass_bin] = particles_vel_rad[halos_use_indices[i][0]:halos_use_indices[i][1]]
-        
+        correspond_halo_r200[start_mass_bin:finish_mass_bin] = correspond_halo_prop[halos_use_indices[i][0]:halos_use_indices[i][1],0]
         start_mass_bin = finish_mass_bin
     
-    avg_vel_rad_part, avg_vel_rad_hub = make_bins(num_bins, mass_bin_radius, mass_bin_radius_div_r200, mass_bin_vel_rad)
+    avg_vel_rad_part, avg_vel_rad_hub = make_bins(num_bins, mass_bin_radius, mass_bin_radius_div_r200, mass_bin_vel_rad, correspond_halo_r200)
     avg_vel_rad_part = avg_vel_rad_part[~np.all(avg_vel_rad_part == 0, axis=1)]
     avg_vel_rad_hub = avg_vel_rad_hub[~np.all(avg_vel_rad_hub == 0, axis=1)]
     
@@ -228,28 +244,26 @@ def split_by_mass(start_nu, finish_nu, num_bins):
     return avg_vel_rad_part, avg_vel_rad_hub
 
 # start and finish track where we are in the array
-plt.rcParams['text.usetex'] = True
+#plt.rcParams['text.usetex'] = True
 num_bins = 50
 start_nu = 1
-num_iter = 2
+num_iter = 5
 color = iter(cm.rainbow(np.linspace(0, 1, num_iter)))
 
 for i in range(num_iter):
-    print(i)
     c = next(color)
     finish_nu = start_nu + .5
-    avg_vel_rad_part, avg_vel_rad_hub = split_by_mass(start_nu, finish_nu, num_bins)
-    print(avg_vel_rad_part[:,0], avg_vel_rad_part[:,1])
+    avg_vel_rad_part, avg_vel_rad_hub = split_by_mass(start_nu, finish_nu, num_bins)  
     plt.plot(avg_vel_rad_part[:,0], avg_vel_rad_part[:,1], color = c, label = r"${0} < \nu < {1}$".format(str(start_nu), str(finish_nu)))
     start_nu += .5
-
+    
 plt.plot(avg_vel_rad_hub[:,0], avg_vel_rad_hub[:,1], color = "purple", label = "hubble flow")
 plt.title("average radial velocity vs position all particles")
 plt.xlabel("position $r/R_{200m}$")
 plt.ylabel("average rad vel $v_r/v_{200m}$")
 plt.xscale("log")    
-# plt.ylim([-.5,.5])
-plt.xlim([0.01,10])
+#plt.ylim([-.5,1])
+plt.xlim([0.01,15])
 plt.legend()
 t2 = time.time()
 print("velocity finished: ", (t2 - t1)," seconds")

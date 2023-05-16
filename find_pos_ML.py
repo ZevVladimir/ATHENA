@@ -129,25 +129,38 @@ def calc_v200(mass, radius):
     return np.sqrt((G * mass)/radius)
 
 calculated_r200 = np.zeros(halos_r200.size)
+
+
+t1 = time.time()
+print("start particle assign")
+
+times_r200 = 13
+total_particles = 0
+for i in range(num_halos):
+    #find how many particles we are finding
+    indices = particle_tree.query_ball_point(halos_pos[i,:], r = times_r200 * halos_r200[i])
+
+    # how many new particles being added
+    num_new_particles = len(indices)
+    total_particles += num_new_particles
+    
+
 # particle_halo_assign: pid, halo_id, radius, x_dist, y_dist, z_dist, indices
-particle_halo_assign_id = np.zeros((num_particles * 15, 3), dtype = np.int32)
-particle_halo_radius_comp = np.zeros((num_particles * 15, 4), dtype = np.float32)
-correspond_halo_prop = np.zeros((num_particles*10,2),dtype=np.float32)
+particle_halo_assign_id = np.zeros((total_particles, 3), dtype = np.int32)
+particle_halo_radius_comp = np.zeros((total_particles, 4), dtype = np.float32)
+correspond_halo_prop = np.zeros((total_particles, 2),dtype=np.float32)
 halos_v200 = np.zeros(num_halos, dtype = np.float32)
 all_halo_mass = np.zeros(num_halos, dtype = np.float32)
 particles_per_halo = np.zeros(num_halos, dtype = np.int32)
 start = 0
 
-t1 = time.time()
-print("start particle assign")
 for i in range(num_halos):
     #find the indices of the particles within the expected r200 radius multiplied by 1.4 
     #value of 1.4 determined by guessing if just r200 value or 1.1 miss a couple halo r200 values but 1.4 gets them all
-    indices = particle_tree.query_ball_point(halos_pos[i,:], r = 13 * halos_r200[i])
+    indices = particle_tree.query_ball_point(halos_pos[i,:], r = times_r200 * halos_r200[i])
 
     # how many new particles being added
     num_new_particles = len(indices)
-
     particles_per_halo[i] = num_new_particles
 
     # sort the particles
@@ -237,11 +250,6 @@ for i in range(num_halos):
 difference_r200 = halos_r200 - calculated_r200
 t2 = time.time()
 print("finish particle assign: ", (t2 - t1), " seconds")
-
-# remove rows with zeros
-particle_halo_assign_id = particle_halo_assign_id[~np.all(particle_halo_assign_id == 0, axis=1)]
-particle_halo_radius_comp = particle_halo_radius_comp[~np.all(particle_halo_radius_comp == 0, axis=1)]
-correspond_halo_prop = correspond_halo_prop[~np.all(correspond_halo_prop == 0, axis=1)]
 
 np.save(save_location + "particle_halo_assign_id", particle_halo_assign_id)
 np.save(save_location + "particle_halo_radius_comp", particle_halo_radius_comp)
