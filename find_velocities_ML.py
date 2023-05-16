@@ -130,13 +130,16 @@ def calc_vel_rad(part_dist, part_vel_pec, comps):
         
         # calculate physical velocity by adding the hubble velocity in the radial direction
         v_hub_rad_comp = np.multiply(v_hubble, all_rhat[start_vel_phys:finish_vel_phys])
+
+            
         if i == 20:
-            print(v_hubble)
-            print(all_rhat[start_vel_phys:finish_vel_phys])
-            print(v_hub_rad_comp)
-        # if i == 20:
-        #     for j in range(25):
-        #         print("V hubble: ",v_hub_rad_comp[-j:-j+1], "vel pec:", part_vel_pec[-j:-j+1])
+            for j in range(25):
+        
+                # print(part_dist[-j])
+                # print(v_hubble[-j])
+                # print(all_rhat[-j])
+                # print(v_hub_rad_comp[-j])
+                print("V hubble: ",v_hub_rad_comp[-j], "vel pec:", part_vel_pec[-j])
         part_vel_phys_x = part_vel_pec[start_vel_phys:finish_vel_phys, 0] + v_hub_rad_comp[:,0]
         part_vel_phys_y = part_vel_pec[start_vel_phys:finish_vel_phys, 1] + v_hub_rad_comp[:,1]
         part_vel_phys_z = part_vel_pec[start_vel_phys:finish_vel_phys, 2] + v_hub_rad_comp[:,2]
