@@ -134,7 +134,7 @@ calculated_r200 = np.zeros(halos_r200.size)
 t1 = time.time()
 print("start particle assign")
 
-times_r200 = 13
+times_r200 = 7
 total_particles = 0
 for i in range(num_halos):
     #find how many particles we are finding
@@ -155,7 +155,7 @@ particles_per_halo = np.zeros(num_halos, dtype = np.int32)
 start = 0
 
 for i in range(num_halos):
-    #find the indices of the particles within the expected r200 radius multiplied by 1.4 
+    #find the indices of the particles within the expected r200 radius multiplied by times_r200 
     #value of 1.4 determined by guessing if just r200 value or 1.1 miss a couple halo r200 values but 1.4 gets them all
     indices = particle_tree.query_ball_point(halos_pos[i,:], r = times_r200 * halos_r200[i])
 
@@ -183,7 +183,8 @@ for i in range(num_halos):
     #calculate the radii of each particle based on the distance formula
     radius, coord_dist = calculate_distance(current_halos_pos[0], current_halos_pos[1], current_halos_pos[2], current_particles_pos[:,0],
                                 current_particles_pos[:,1], current_particles_pos[:,2], num_new_particles)
-
+    
+        
     #sort the radii and positions to allow for creation of plots and to correctly assign how much mass there is
     arrsortrad = radius.argsort()
     radius = radius[arrsortrad[::1]]
