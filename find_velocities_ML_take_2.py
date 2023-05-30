@@ -22,7 +22,7 @@ cosmol = cosmology.setCosmology("bolshoi")
 snapshot = 192 #set to what snapshot is being loaded in
 red_shift = readheader(snapshot_path, 'redshift')
 scale_factor = 1/(1+red_shift)
-little_h = readheader(snapshot_path, 'h') 
+little_h = cosmol.h
 hubble_constant = cosmol.Hz(red_shift) * 0.001 # convert to units km/s/kpc
 
 
@@ -102,7 +102,7 @@ def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, start_indices, finish_i
         # Get the corresponding components, distances, and halo v200m for every particle
         use_coord_sep[start:finish] = coord_sep[start_indices[i]:finish_indices[i]]
         use_part_dist[start:finish] = particle_dist[start_indices[i]:finish_indices[i]]
-        corresponding_hubble_m200m = mass_so.R_to_M(halo_r200[i], red_shift, "200c")
+        corresponding_hubble_m200m = mass_so.R_to_M(halo_r200[i], red_shift, "200c") * little_h # convert to M⊙
         curr_v200m = calc_v200m(corresponding_hubble_m200m, halo_r200[i])
         corresponding_v200m[start:finish] = curr_v200m
         
@@ -161,7 +161,7 @@ def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r20
             
             # Calculate the v200m value for the corresponding R200m value found
             average_val_hubble[i,0] = median_scaled_hubble
-            corresponding_hubble_m200m = mass_so.R_to_M(median_hubble_r200, red_shift, "200c")
+            corresponding_hubble_m200m = mass_so.R_to_M(median_hubble_r200, red_shift, "200c") * little_h # convert to M⊙
             average_val_hubble[i,1] = (median_hubble_radius * hubble_constant)/calc_v200m(corresponding_hubble_m200m, median_hubble_r200)
             
         bin_start = bin_end
@@ -171,17 +171,17 @@ def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r20
 def split_halo_by_mass(num_bins, start_nu, num_iter, particle_velocities, halo_masses, halo_r200, halo_velocities, halo_start_indices, halo_prop_per_part):
     color = iter(cm.rainbow(np.linspace(0, 1, num_iter)))
     # convert masses to peaks
-    peak_heights = peaks.peakHeight(halo_masses, red_shift)
+    scaled_halo_mass = halo_masses/little_h # units M⊙/h
+    peak_heights = peaks.peakHeight(scaled_halo_mass, red_shift)
     
     # For how many graphs
     for i in range(num_iter):
-        print("Start split: ", i)
         c = next(color)
         end_nu = start_nu + 0.5
-        
+        print("Start split:", start_nu, "to", end_nu)
         # Get the indices of the halos that are within the desired peaks
         halos_within_range = np.where((peak_heights >= start_nu) & (peak_heights < end_nu))[0]
-
+        
         # Get the halo r200m and velocities that are within the range
         halo_r200_within_range = halo_r200[halos_within_range]
         halo_vel_within_range = halo_velocities[halos_within_range]
@@ -227,7 +227,7 @@ all_halo_r200 = all_halo_r200[indices_keep] * little_h # convert to kpc
 
 correspond_halo_prop = np.load(save_location + "correspond_halo_prop.npy")     
 
-num_bins = 20       
+num_bins = 50        
 start_nu = 1
 num_iter = 5
 hubble_vel = split_halo_by_mass(num_bins, start_nu, num_iter, use_part_vel, all_halo_masses, all_halo_r200, all_halo_vel, indices_change, correspond_halo_prop)
@@ -240,7 +240,7 @@ plt.title("average radial velocity vs position all particles")
 plt.xlabel("position $r/R_{200m}$")
 plt.ylabel("average rad vel $v_r/v_{200m}$")
 plt.xscale("log")    
-#plt.ylim([-.5,1])
+plt.ylim([-.5,1])
 plt.xlim([0.01,15])
 plt.legend()
 

@@ -16,10 +16,9 @@ red_shift = readheader(snapshot_path, 'redshift')
 scale_factor = 1/(1+red_shift)
 cosmol = cosmology.setCosmology("bolshoi")
 rho_m = cosmol.rho_m(red_shift)
-little_h = readheader(snapshot_path, 'h') 
+little_h = cosmol.h 
 hubble_constant = cosmol.Hz(red_shift) * 0.001 # convert to units km/s/kpc
-print("little h:", little_h)
-print("hubble constant: ", hubble_constant)
+
 G = constants.G
 
 box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
