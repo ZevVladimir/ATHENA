@@ -16,29 +16,31 @@ red_shift = readheader(snapshot_path, 'redshift')
 scale_factor = 1/(1+red_shift)
 cosmol = cosmology.setCosmology("bolshoi")
 rho_m = cosmol.rho_m(red_shift)
-h = readheader(snapshot_path, 'h') 
+little_h = readheader(snapshot_path, 'h') 
 hubble_constant = cosmol.Hz(red_shift) * 0.001 # convert to units km/s/kpc
+print("little h:", little_h)
+print("hubble constant: ", hubble_constant)
 G = constants.G
 
 box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
-box_size = box_size * 10**3 * scale_factor #convert to Kpc/h physical
+box_size = box_size * 10**3 * scale_factor * little_h #convert to Kpc physical
 
 #load particle info
 particles_pid = np.load(file + "particle_pid_192.npy")
 particles_vel = np.load(file + "particle_vel_192.npy")
 particles_pos = np.load(file + "particle_pos_192.npy") 
-particles_pos = particles_pos * 10**3 * scale_factor #convert to kpc and physical
+particles_pos = particles_pos * 10**3 * scale_factor * little_h #convert to kpc and physical
 particles_mass = np.load(file + "all_particle_mass_192.npy")
-mass = particles_mass[0] * 10**10 #units M_sun/h
+mass = particles_mass[0] * 10**10 * little_h #units M_sun
 
 #load all halo info at snapshot
 halos_pos = np.load(file + "halo_position.npy")
-halos_pos = halos_pos[:,snapshot,:] * 10**3 * scale_factor #convert to kpc and physical
+halos_pos = halos_pos[:,snapshot,:] * 10**3 * scale_factor * little_h #convert to kpc and physical
 halos_vel = np.load(file + "halo_velocity.npy")
 halos_vel = halos_vel[:,snapshot,:]
 halos_last_snap = np.load(file + "halo_last_snap.npy")
 halos_r200 = np.load(file + "halo_R200m.npy")
-halos_r200 = halos_r200[:,snapshot]
+halos_r200 = halos_r200[:,snapshot] * little_h # convert to kpc
 halos_id = np.load(file + "halo_id.npy")
 halos_id = halos_id[:,snapshot]
 halos_status = np.load(file + "halo_status.npy")
@@ -152,11 +154,12 @@ correspond_halo_prop = np.zeros((total_particles, 2),dtype=np.float32)
 halos_v200 = np.zeros(num_halos, dtype = np.float32)
 all_halo_mass = np.zeros(num_halos, dtype = np.float32)
 particles_per_halo = np.zeros(num_halos, dtype = np.int32)
+all_part_vel = np.zeros((total_particles,3), dtype = np.float32)
 start = 0
 
 for i in range(num_halos):
-    #find the indices of the particles within the expected r200 radius multiplied by times_r200 
-    #value of 1.4 determined by guessing if just r200 value or 1.1 miss a couple halo r200 values but 1.4 gets them all
+    # find the indices of the particles within the expected r200 radius multiplied by times_r200 
+    # value of 1.4 determined by guessing if just r200 value or 1.1 miss a couple halo r200 values but 1.4 gets them all
     indices = particle_tree.query_ball_point(halos_pos[i,:], r = times_r200 * halos_r200[i])
 
     # how many new particles being added
@@ -175,6 +178,8 @@ for i in range(num_halos):
     current_particles_pid = particles_pid[indices]
     current_halos_pos = halos_pos[i,:]
     
+    all_part_vel[start:start+num_new_particles] = current_particles_vel
+    
     #assign particles to their corresponding halos
     particle_halo_assign_id[start:start+num_new_particles,0] = current_particles_pid
     particle_halo_assign_id[start:start+num_new_particles,1] = i
@@ -187,10 +192,10 @@ for i in range(num_halos):
         
     #sort the radii and positions to allow for creation of plots and to correctly assign how much mass there is
     arrsortrad = radius.argsort()
-    radius = radius[arrsortrad[::1]]
-    current_particles_pos = current_particles_pos[arrsortrad[::1]]
-    current_particles_vel = current_particles_vel[arrsortrad[::1]]
-    coord_dist = coord_dist[arrsortrad[::1]]
+    radius = radius[arrsortrad]
+    current_particles_pos = current_particles_pos[arrsortrad]
+    current_particles_vel = current_particles_vel[arrsortrad]
+    coord_dist = coord_dist[arrsortrad]
     
     
     # divide radius by halo_r200 to scale
@@ -258,3 +263,4 @@ np.save(save_location + "all_halo_mass", all_halo_mass)
 np.save(save_location + "particles_per_halo", particles_per_halo)
 np.save(save_location + "halos_v200", halos_v200)
 np.save(save_location + "correspond_halo_prop", correspond_halo_prop)
+np.save(save_location + "all_part_vel", all_part_vel)
