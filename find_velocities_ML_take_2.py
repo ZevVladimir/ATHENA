@@ -22,6 +22,7 @@ cosmol = cosmology.setCosmology("bolshoi")
 snapshot = 192 #set to what snapshot is being loaded in
 red_shift = readheader(snapshot_path, 'redshift')
 scale_factor = 1/(1+red_shift)
+print(red_shift)
 little_h = cosmol.h
 hubble_constant = cosmol.Hz(red_shift) * 0.001 # convert to units km/s/kpc
 
@@ -112,7 +113,6 @@ def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, start_indices, finish_i
     rhat = calc_rhat(use_coord_sep[:,0], use_coord_sep[:,1], use_coord_sep[:,2])
     
     # Hubble velocity is the hubble constant times the distance the particle is from the halo
-    
     v_hubble = hubble_constant * use_part_dist   
     
     # Dot the velocity with rhat to get the radial component
@@ -122,7 +122,6 @@ def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, start_indices, finish_i
     radial_vel = radial_component_vel + v_hubble
 
     # scale all the radial velocities by v200m of the halo
-    
     return radial_vel/corresponding_v200m
 
 def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r200_per_part):
