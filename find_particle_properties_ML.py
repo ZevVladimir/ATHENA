@@ -58,12 +58,10 @@ halos_pos = halos_pos[indices_keep]
 halos_vel = halos_vel[indices_keep]
 halos_r200 = halos_r200[indices_keep]
 halos_id = halos_id[indices_keep]
-num_halos = halos_r200.size #num of halos remaining
+total_num_halos = halos_r200.size #num of halos remaining
 
 #construct a search tree iwth all of the particle positions
 particle_tree = cKDTree(data = particles_pos, leafsize = 3, balanced_tree = False, boxsize = box_size)
-
-halo_dict = {}
 
 #calculate distance of particle from halo
 def calculate_distance(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_particles):
@@ -145,7 +143,7 @@ def calc_v200m(mass, radius):
 def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200):
     
     # Get the corresponding components, distances, and halo v200m for every particle
-    
+    v_hubble = np.zeros(particle_dist.size, dtype = np.float32)
     corresponding_hubble_m200m = mass_so.R_to_M(halo_r200, red_shift, "200c") * little_h # convert to M⊙
     curr_v200m = calc_v200m(corresponding_hubble_m200m, halo_r200)
         
@@ -155,133 +153,119 @@ def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200):
     # Hubble velocity is the hubble constant times the distance the particle is from the halo
     v_hubble = hubble_constant * particle_dist   
     
+    v_hubble = rhat * v_hubble[:, np.newaxis] 
+    
+    physical_vel = peculiar_vel + v_hubble    
+    
+    radial_vel = np.sum((physical_vel * rhat), axis = 1)
     # Dot the velocity with rhat to get the radial component
-    radial_component_vel = np.sum(np.multiply(peculiar_vel, rhat), axis = 1)
+    #radial_component_vel = np.sum(np.multiply(peculiar_vel, rhat), axis = 1)
     
     # Add radial component and v_hubble since both are now in radial direction
-    radial_vel = radial_component_vel + v_hubble
+    #radial_vel = radial_component_vel + v_hubble
 
     # scale all the radial velocities by v200m of the halo
-    return radial_vel/curr_v200m
+    return (radial_vel/curr_v200m), physical_vel, rhat
 
-
-t1 = time.time()
-print("start particle assign")
-
-times_r200 = 10
-total_particles = 0
-for i in range(num_halos):
-    #find how many particles we are finding
-    indices = particle_tree.query_ball_point(halos_pos[i,:], r = times_r200 * halos_r200[i])
-
-    # how many new particles being added
-    num_new_particles = len(indices)
-    total_particles += num_new_particles
+def calc_tang_vel(radial_vel, physical_vel, rhat):
+    component_rad_vel = radial_vel * rhat
+    tangential_vel = physical_vel - component_rad_vel
     
+    return tangential_vel
 
-# particle_halo_assign: pid, halo_id, radius, x_dist, y_dist, z_dist, indices
-# particle_halo_assign_id = np.zeros((total_particles, 3), dtype = np.int32)
-# particle_halo_radius_comp = np.zeros((total_particles, 4), dtype = np.float32)
-# correspond_halo_prop = np.zeros((total_particles, 2),dtype=np.float32)
-# halos_v200 = np.zeros(num_halos, dtype = np.float32)
-all_halo_mass = np.zeros(num_halos, dtype = np.float32)
-halo_indices = np.zeros((num_halos,2), dtype = np.int32)
-all_part_vel = np.zeros((total_particles,3), dtype = np.float32)
-
-calculated_r200 = np.zeros(halos_r200.size)
-calculated_radial_velocities = np.zeros((total_particles), dtype = np.float32)
-all_radii = np.zeros((total_particles), dtype = np.float32)
-
-start = 0
-
-for i in range(num_halos):
-    # find the indices of the particles within the expected r200 radius multiplied by times_r200 
-    # value of 1.4 determined by guessing if just r200 value or 1.1 miss a couple halo r200 values but 1.4 gets them all
-    indices = particle_tree.query_ball_point(halos_pos[i,:], r = times_r200 * halos_r200[i])
-
-    # how many new particles being added
-    num_new_particles = len(indices)
-    halo_indices[i,0] = start
-    halo_indices[i,1] = start + num_new_particles
-
-    # sort the particles
-    new_particles = np.sort(indices)
-
-    #for how many new particles create an array of how much mass there should be within that particle radius
-    use_mass = np.arange(1, num_new_particles + 1, 1) * mass
-
-    #Only take the particle positions that where found with the tree
-    current_particles_pos = particles_pos[indices,:]
-    current_particles_vel = particles_vel[indices,:]
-    current_particles_pid = particles_pid[indices]
-    current_halos_pos = halos_pos[i,:]
+def initial_search(halo_positions, search_radius, halo_r200m):
+    num_halos = halo_positions.shape[0]
+    particles_per_halo = np.zeros(num_halos, dtype = np.int32)
+    all_halo_mass = np.zeros(num_halos, dtype = np.float32)
     
-    all_part_vel[start:start+num_new_particles] = current_particles_vel
+    for i in range(num_halos):
+        #find how many particles we are finding
+        indices = particle_tree.query_ball_point(halo_positions[i,:], r = search_radius * halo_r200m[i])
+
+        # how many new particles being added and correspondingly how massive the halo is
+        num_new_particles = len(indices)
+        all_halo_mass[i] = num_new_particles * mass
+        particles_per_halo[i] = num_new_particles
+
+    print("num particles: ", np.sum(particles_per_halo))
+    print("num halos: ", num_halos)
     
-    #assign particles to their corresponding halos
-    # particle_halo_assign_id[start:start+num_new_particles,0] = current_particles_pid
-    # particle_halo_assign_id[start:start+num_new_particles,1] = i
-    # particle_halo_assign_id[start:start+num_new_particles,2] = np.array(indices, dtype = np.int32) 
+    return particles_per_halo, all_halo_mass
+
+def search_halos(halo_positions, halo_r200m, search_radius, total_particles):
+    num_halos = halo_positions.shape[0]
+    halo_indices = np.zeros((num_halos,2), dtype = np.int32)
+    all_part_vel = np.zeros((total_particles,3), dtype = np.float32)
+
+    calculated_r200m = np.zeros(halo_r200m.size)
+    calculated_radial_velocities = np.zeros((total_particles), dtype = np.float32)
+    calculated_tangential_velocities = np.zeros((total_particles), dtype = np.float32)
+    all_radii = np.zeros((total_particles), dtype = np.float32)
+    all_scaled_radii = np.zeros(total_particles, dtype = np.float32)
+    r200m_per_part = np.zeros(total_particles, dtype = np.float32)
+
+    start = 0
+    for i in range(num_halos):
+        # find the indices of the particles within the expected r200 radius multiplied by times_r200 
+        # value of 1.4 determined by guessing if just r200 value or 1.1 miss a couple halo r200 values but 1.4 gets them all
+        indices = particle_tree.query_ball_point(halo_positions[i,:], r = search_radius * halo_r200m[i])
+
+        # how many new particles being added
+        num_new_particles = len(indices)
+        halo_indices[i,0] = start
+        halo_indices[i,1] = start + num_new_particles
+
+        #for how many new particles create an array of how much mass there should be within that particle radius
+        use_mass = np.arange(1, num_new_particles + 1, 1) * mass
+
+        #Only take the particle positions that where found with the tree
+        current_particles_pos = particles_pos[indices,:]
+        current_particles_vel = particles_vel[indices,:]
+        current_halos_pos = halo_positions[i,:]
         
-    #calculate the radii of each particle based on the distance formula
-    unsorted_particle_radii, unsorted_coord_dist = calculate_distance(current_halos_pos[0], current_halos_pos[1], current_halos_pos[2], current_particles_pos[:,0],
-                                current_particles_pos[:,1], current_particles_pos[:,2], num_new_particles)
-    
+        all_part_vel[start:start+num_new_particles] = current_particles_vel
+            
+        #calculate the radii of each particle based on the distance formula
+        unsorted_particle_radii, unsorted_coord_dist = calculate_distance(current_halos_pos[0], current_halos_pos[1], current_halos_pos[2], current_particles_pos[:,0],
+                                    current_particles_pos[:,1], current_particles_pos[:,2], num_new_particles)
         
-    #sort the radii and positions to allow for creation of plots and to correctly assign how much mass there is
-    arrsortrad = unsorted_particle_radii.argsort()
-    particle_radii = unsorted_particle_radii[arrsortrad]
-    current_particles_pos = current_particles_pos[arrsortrad]
-    current_particles_vel = current_particles_vel[arrsortrad]
-    coord_dist = unsorted_coord_dist[arrsortrad]
-    
-    
-    # divide radius by halo_r200 to scale
-    # also save the coord_dist to use later to calculate unit vectors
-    # particle_halo_radius_comp[start:start+num_new_particles,0] = radius
-    # particle_halo_radius_comp[start:start+num_new_particles,1] = coord_dist[:,0]
-    # particle_halo_radius_comp[start:start+num_new_particles,2] = coord_dist[:,1]
-    # particle_halo_radius_comp[start:start+num_new_particles,3] = coord_dist[:,2]
-     
-    # correspond_halo_prop[start:start+num_new_particles,0] = halos_r200[i]
-    
-    
-
-    all_halo_mass[i] = use_mass[-1]
-    #calculate the density at each particle
-    calculated_densities = np.zeros(num_new_particles)
-    calculated_densities = calculate_density(use_mass, particle_radii)
-    
-    #determine indices of particles where the expected r200 value is 
-    indices_r200_met = check_where_r200(calculated_densities)
-    
-    #if only one index is less than 200 * rho_c then that is the r200 radius
-    #halo_v200 = 0
-    if indices_r200_met[0].size == 1:
-        # halo_v200 = calc_v200m(use_mass[indices_r200_met[0][0]], halos_r200[i])
-        # halos_v200[i] = halo_v200
-        calculated_r200[i] = particle_radii[indices_r200_met[0][0]]
-    #if there are none then the radius is 0
-    elif indices_r200_met[0].size == 0:
-        # halo_v200 = 0
-        # halos_v200[i] = halo_v200
-        calculated_r200[i] = 0
-    #if multiple indices choose the first two and average them
-    else:
-        # halo_v200 = calc_v200m(((use_mass[indices_r200_met[0][0]] + use_mass[indices_r200_met[0][1]])/2), halos_r200[i])
-        # halos_v200[i] = halo_v200
-        calculated_r200[i] = (particle_radii[indices_r200_met[0][0]] + particle_radii[indices_r200_met[0][1]])/2
-    
-    #correspond_halo_prop[start:start+num_new_particles,1] = halo_v200
-    
-    peculiar_velocity = calc_pec_vel(current_particles_vel, halos_vel[i])
-    calculated_radial_velocities[start:start+num_new_particles] = calc_rad_vel(peculiar_velocity, particle_radii, unsorted_coord_dist, halos_r200[i])
-    all_radii[start:start+num_new_particles] = unsorted_particle_radii
-    
-    
-    start += num_new_particles
-t2 = time.time()
-print("finish particle assign: ", (t2 - t1), " seconds")    
+            
+        #sort the radii, positions, velocities, coord separations to allow for creation of plots and to correctly assign how much mass there is
+        arrsortrad = unsorted_particle_radii.argsort()
+        particle_radii = unsorted_particle_radii[arrsortrad]
+        current_particles_pos = current_particles_pos[arrsortrad]
+        current_particles_vel = current_particles_vel[arrsortrad]
+        coord_dist = unsorted_coord_dist[arrsortrad]
+        
+        #calculate the density at each particle
+        calculated_densities = np.zeros(num_new_particles)
+        calculated_densities = calculate_density(use_mass, particle_radii)
+        
+        #determine indices of particles where the expected r200 value is 
+        indices_r200_met = check_where_r200(calculated_densities)
+        
+        #if only one index is less than 200 * rho_c then that is the r200 radius
+        if indices_r200_met[0].size == 1:
+            calculated_r200m[i] = particle_radii[indices_r200_met[0][0]]
+        #if there are none then the radius is 0
+        elif indices_r200_met[0].size == 0:
+            calculated_r200m[i] = 0
+        #if multiple indices choose the first two and average them
+        else:
+            calculated_r200m[i] = (particle_radii[indices_r200_met[0][0]] + particle_radii[indices_r200_met[0][1]])/2
+        
+        #correspond_halo_prop[start:start+num_new_particles,1] = halo_v200
+        
+        peculiar_velocity = calc_pec_vel(current_particles_vel, halos_vel[i])
+        calculated_radial_velocities[start:start+num_new_particles], physical_vel, rhat = calc_rad_vel(peculiar_velocity, particle_radii, coord_dist, halo_r200m[i])
+        calculated_tangential_velocities[start:start+num_new_particles] = calc_tang_vel(calculated_radial_velocities[start:start+num_new_particles], physical_vel, rhat)
+        all_radii[start:start+num_new_particles] = particle_radii
+        all_scaled_radii[start:start+num_new_particles] = particle_radii/halo_r200m[i]
+        r200m_per_part[start:start+num_new_particles] = halo_r200m[i]
+        
+        start += num_new_particles
+        
+    return calculated_radial_velocities, all_radii, all_scaled_radii, r200m_per_part, calculated_tangential_velocities
     
 def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r200_per_part):
     start_bin_val = 0.001
@@ -326,10 +310,10 @@ def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r20
     
     return average_val_part, average_val_hubble    
     
-    
-    
-def split_halo_by_mass(num_bins, start_nu, num_iter, radial_velocities, radii, halo_masses, halo_r200m, halo_indices):
+def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m):
     color = iter(cm.rainbow(np.linspace(0, 1, num_iter)))
+    # get the halo_masses and number of particles
+    num_particles_per_halo, halo_masses = initial_search(halos_pos, times_r200m, halo_r200m)
     # convert masses to peaks
     scaled_halo_mass = halo_masses/little_h # units M⊙/h
     peak_heights = peaks.peakHeight(scaled_halo_mass, red_shift)
@@ -340,36 +324,17 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, radial_velocities, radii, h
         end_nu = start_nu + 0.5
         print("Start split:", start_nu, "to", end_nu)
         # Get the indices of the halos that are within the desired peaks
+        
         halos_within_range = np.where((peak_heights >= start_nu) & (peak_heights < end_nu))[0]
         
-        # Get the range of particle indices for each halo
-        use_halo_indices = halo_indices[halos_within_range, :]
+        use_halo_pos = halos_pos[halos_within_range]
+        use_halo_r200m = halo_r200m[halos_within_range]
+        use_num_particles = num_particles_per_halo[halos_within_range]
+        total_num_particles = np.sum(use_num_particles)
         
-        total_particles_in_range = np.sum(use_halo_indices[:,1] - use_halo_indices[:,0])
-        
-        use_radial_vel = np.zeros(total_particles_in_range, dtype = np.float32)
-        use_radii = np.zeros(total_particles_in_range, dtype = np.float32)
-        r200m_per_part = np.zeros(total_particles_in_range, dtype = np.float32)
-        use_r200m = halo_r200m[halos_within_range]
-        
-        track_start = 0
-        track_end = 0
-        for i in range(halos_within_range.size):
-            part_start = use_halo_indices[i,0]
-            part_finish = use_halo_indices[i,1]
-            
-            track_end += part_finish - part_start
-            
-            use_radial_vel[track_start:track_end] = radial_velocities[part_start:part_finish]
-            use_radii[track_start:track_end] = radii[part_start:part_finish]
-            r200m_per_part[track_start:track_end] = use_r200m[i]
-            
-        
-            track_start = track_end
-        
-        scaled_radii = use_radii / r200m_per_part
-        
-        graph_rad_vel, graph_val_hubble = split_into_bins(num_bins, use_radial_vel, scaled_radii, use_radii, r200m_per_part)
+        radial_velocities, radii, scaled_radii, r200m_per_part, tangential_velocities = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_particles)
+
+        graph_rad_vel, graph_val_hubble = split_into_bins(num_bins, radial_velocities, scaled_radii, radii, r200m_per_part)
         graph_rad_vel = graph_rad_vel[~np.all(graph_rad_vel == 0, axis=1)]
         graph_val_hubble = graph_val_hubble[~np.all(graph_val_hubble == 0, axis=1)]
 
@@ -382,9 +347,13 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, radial_velocities, radii, h
 num_bins = 50        
 start_nu = 1
 num_iter = 5
-hubble_vel = split_halo_by_mass(num_bins, start_nu, num_iter, calculated_radial_velocities, all_radii, all_halo_mass, halos_r200, halo_indices)    
+t1 = time.time()
+print("start particle assign")
+
+times_r200 = 14
+hubble_vel = split_halo_by_mass(num_bins, start_nu, num_iter, times_r200, halos_r200)    
     
-    
+
 arr1inds = hubble_vel[:,0].argsort()
 hubble_vel[:,0] = hubble_vel[arr1inds,0]
 hubble_vel[:,1] = hubble_vel[arr1inds,1]
@@ -397,14 +366,6 @@ plt.ylim([-.5,1])
 plt.xlim([0.01,15])
 plt.legend()
     
-t3 = time.time()
-print("finish binning: ", (t3 - t2), " seconds")
+t2 = time.time()
+print("finish binning: ", (t2- t1), " seconds")
 plt.show()
-
-#np.save(save_location + "particle_halo_assign_id", particle_halo_assign_id)
-#np.save(save_location + "particle_halo_radius_comp", particle_halo_radius_comp)
-np.save(save_location + "all_halo_mass", all_halo_mass)
-np.save(save_location + "particles_per_halo", halo_indices)
-#np.save(save_location + "halos_v200", halos_v200)
-#np.save(save_location + "correspond_halo_prop", correspond_halo_prop)
-np.save(save_location + "all_part_vel", all_part_vel)
