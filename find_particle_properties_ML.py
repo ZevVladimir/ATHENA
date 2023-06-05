@@ -156,8 +156,10 @@ def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200):
     v_hubble = rhat * v_hubble[:, np.newaxis] 
     
     physical_vel = peculiar_vel + v_hubble    
+
+    radial_vel_comp = physical_vel * rhat
+    radial_vel = np.sum(radial_vel_comp, axis = 1)
     
-    radial_vel = np.sum((physical_vel * rhat), axis = 1)
     # Dot the velocity with rhat to get the radial component
     #radial_component_vel = np.sum(np.multiply(peculiar_vel, rhat), axis = 1)
     
@@ -165,10 +167,10 @@ def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200):
     #radial_vel = radial_component_vel + v_hubble
 
     # scale all the radial velocities by v200m of the halo
-    return (radial_vel/curr_v200m), physical_vel, rhat
+    return radial_vel, radial_vel_comp, curr_v200m, physical_vel, rhat
 
 def calc_tang_vel(radial_vel, physical_vel, rhat):
-    component_rad_vel = radial_vel * rhat
+    component_rad_vel = rhat * radial_vel[:, np.newaxis] 
     tangential_vel = physical_vel - component_rad_vel
     
     return tangential_vel
@@ -187,8 +189,8 @@ def initial_search(halo_positions, search_radius, halo_r200m):
         all_halo_mass[i] = num_new_particles * mass
         particles_per_halo[i] = num_new_particles
 
-    print("num particles: ", np.sum(particles_per_halo))
-    print("num halos: ", num_halos)
+    print("Total num particles: ", np.sum(particles_per_halo))
+    print("Total num halos: ", num_halos)
     
     return particles_per_halo, all_halo_mass
 
@@ -199,7 +201,8 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles):
 
     calculated_r200m = np.zeros(halo_r200m.size)
     calculated_radial_velocities = np.zeros((total_particles), dtype = np.float32)
-    calculated_tangential_velocities = np.zeros((total_particles), dtype = np.float32)
+    calculated_radial_velocities_comp = np.zeros((total_particles,3), dtype = np.float32)
+    calculated_tangential_velocities_comp = np.zeros((total_particles,3), dtype = np.float32)
     all_radii = np.zeros((total_particles), dtype = np.float32)
     all_scaled_radii = np.zeros(total_particles, dtype = np.float32)
     r200m_per_part = np.zeros(total_particles, dtype = np.float32)
@@ -257,15 +260,17 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles):
         #correspond_halo_prop[start:start+num_new_particles,1] = halo_v200
         
         peculiar_velocity = calc_pec_vel(current_particles_vel, halos_vel[i])
-        calculated_radial_velocities[start:start+num_new_particles], physical_vel, rhat = calc_rad_vel(peculiar_velocity, particle_radii, coord_dist, halo_r200m[i])
-        calculated_tangential_velocities[start:start+num_new_particles] = calc_tang_vel(calculated_radial_velocities[start:start+num_new_particles], physical_vel, rhat)
+        calculated_radial_velocities[start:start+num_new_particles], calculated_radial_velocities_comp[start:start+num_new_particles], curr_v200m, physical_vel, rhat = calc_rad_vel(peculiar_velocity, particle_radii, coord_dist, halo_r200m[i])
+        calculated_tangential_velocities_comp[start:start+num_new_particles] = calc_tang_vel(calculated_radial_velocities[start:start+num_new_particles], physical_vel, rhat)/curr_v200m
+        calculated_radial_velocities[start:start+num_new_particles] = calculated_radial_velocities[start:start+num_new_particles]/curr_v200m
+        calculated_radial_velocities_comp[start:start+num_new_particles] = calculated_radial_velocities_comp[start:start+num_new_particles]/curr_v200m
         all_radii[start:start+num_new_particles] = particle_radii
         all_scaled_radii[start:start+num_new_particles] = particle_radii/halo_r200m[i]
         r200m_per_part[start:start+num_new_particles] = halo_r200m[i]
         
         start += num_new_particles
         
-    return calculated_radial_velocities, all_radii, all_scaled_radii, r200m_per_part, calculated_tangential_velocities
+    return calculated_radial_velocities, all_radii, all_scaled_radii, r200m_per_part, calculated_radial_velocities_comp, calculated_tangential_velocities_comp
     
 def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r200_per_part):
     start_bin_val = 0.001
@@ -312,46 +317,57 @@ def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r20
     
 def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m):
     color = iter(cm.rainbow(np.linspace(0, 1, num_iter)))
+        
     # get the halo_masses and number of particles
     num_particles_per_halo, halo_masses = initial_search(halos_pos, times_r200m, halo_r200m)
+    
     # convert masses to peaks
     scaled_halo_mass = halo_masses/little_h # units M⊙/h
     peak_heights = peaks.peakHeight(scaled_halo_mass, red_shift)
     
     # For how many graphs
-    for i in range(num_iter):
+    for j in range(num_iter):
         c = next(color)
         end_nu = start_nu + 0.5
         print("Start split:", start_nu, "to", end_nu)
         # Get the indices of the halos that are within the desired peaks
-        
+    
         halos_within_range = np.where((peak_heights >= start_nu) & (peak_heights < end_nu))[0]
-        
-        use_halo_pos = halos_pos[halos_within_range]
-        use_halo_r200m = halo_r200m[halos_within_range]
-        use_num_particles = num_particles_per_halo[halos_within_range]
-        total_num_particles = np.sum(use_num_particles)
-        
-        radial_velocities, radii, scaled_radii, r200m_per_part, tangential_velocities = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_particles)
+        print("Num halos: ", halos_within_range.shape[0])
+        if halos_within_range.shape[0] > 0:
+            use_halo_pos = halos_pos[halos_within_range]
+            use_halo_r200m = halo_r200m[halos_within_range]
+            use_num_particles = num_particles_per_halo[halos_within_range]
+            total_num_particles = np.sum(use_num_particles)
+            
+            print("Num particles: ", total_num_particles)
+            all_part_prop = np.zeros((total_num_particles,7), dtype = np.float32)
 
-        graph_rad_vel, graph_val_hubble = split_into_bins(num_bins, radial_velocities, scaled_radii, radii, r200m_per_part)
-        graph_rad_vel = graph_rad_vel[~np.all(graph_rad_vel == 0, axis=1)]
-        graph_val_hubble = graph_val_hubble[~np.all(graph_val_hubble == 0, axis=1)]
+            radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_particles)
+            all_part_prop[:, 0] = scaled_radii
+            all_part_prop[:, 1:4] = radial_velocities_comp
+            all_part_prop[:, 4:] = tangential_velocities_comp
+            
+            np.save(save_location + "all_part_prop_" + str(start_nu) + "_to_" + str(end_nu), all_part_prop)
+            
+            graph_rad_vel, graph_val_hubble = split_into_bins(num_bins, radial_velocities, scaled_radii, radii, r200m_per_part)
+            graph_rad_vel = graph_rad_vel[~np.all(graph_rad_vel == 0, axis=1)]
+            graph_val_hubble = graph_val_hubble[~np.all(graph_val_hubble == 0, axis=1)]
 
-        plt.plot(graph_rad_vel[:,0], graph_rad_vel[:,1], color = c, alpha = 0.7, label = r"${0} < \nu < {1}$".format(str(start_nu), str(end_nu)))
+            plt.plot(graph_rad_vel[:,0], graph_rad_vel[:,1], color = c, alpha = 0.7, label = r"${0} < \nu < {1}$".format(str(start_nu), str(end_nu)))
         start_nu = end_nu
         
-    return graph_val_hubble    
+    return graph_val_hubble
     
     
 num_bins = 50        
-start_nu = 1
-num_iter = 5
+start_nu = 0
+num_iter = 7
 t1 = time.time()
 print("start particle assign")
 
 times_r200 = 14
-hubble_vel = split_halo_by_mass(num_bins, start_nu, num_iter, times_r200, halos_r200)    
+hubble_vel, all_part_prop = split_halo_by_mass(num_bins, start_nu, num_iter, times_r200, halos_r200)    
     
 
 arr1inds = hubble_vel[:,0].argsort()
@@ -369,3 +385,4 @@ plt.legend()
 t2 = time.time()
 print("finish binning: ", (t2- t1), " seconds")
 plt.show()
+
