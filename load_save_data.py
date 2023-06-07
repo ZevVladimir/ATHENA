@@ -6,7 +6,7 @@ from pygadgetreader import readsnap
 
 
 original_data_file_location = "/home/zvladimi/ML_orbit_infall_project/SPARTA_data/sparta_cbol_l0063_n0256_strd1_v2.hdf5"
-save_location = "/home/zvladimi/ML_orbit_infall_project/np_arrays/"
+save_location = "/home/zvladimi/ML_orbit_infall_project/calculated_info/"
 
 snapshot_path = "/home/zvladimi/ML_orbit_infall_project/particle_data/snapshot_192/snapshot_0192"
 

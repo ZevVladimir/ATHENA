@@ -8,10 +8,12 @@ from colossus.halo import mass_so
 from colossus.lss import peaks
 from matplotlib.pyplot import cm
 import time
+import h5py
 
-file = "/home/zvladimi/ML_orbit_infall_project/np_arrays/"
-save_location =  "/home/zvladimi/ML_orbit_infall_project/np_arrays/"
-snapshot_path = "/home/zvladimi/ML_orbit_infall_project/particle_data/snapshot_192/snapshot_0192"
+curr_snapshot = "190"
+file = "/home/zvladimi/ML_orbit_infall_project/calculated_info/"
+save_location =  "/home/zvladimi/ML_orbit_infall_project/calculated_info/"
+snapshot_path = "/home/zvladimi/ML_orbit_infall_project/particle_data/snapshot_" + curr_snapshot +"/snapshot_0" + curr_snapshot
 
 # get constants from pygadgetreader
 snapshot = 192 #set to what snapshot is being loaded in
@@ -315,7 +317,7 @@ def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r20
     
     return average_val_part, average_val_hubble    
     
-def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m):
+def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, file):
     color = iter(cm.rainbow(np.linspace(0, 1, num_iter)))
         
     # get the halo_masses and number of particles
@@ -324,7 +326,7 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m):
     # convert masses to peaks
     scaled_halo_mass = halo_masses/little_h # units M⊙/h
     peak_heights = peaks.peakHeight(scaled_halo_mass, red_shift)
-    
+        
     # For how many graphs
     for j in range(num_iter):
         c = next(color)
@@ -341,14 +343,23 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m):
             total_num_particles = np.sum(use_num_particles)
             
             print("Num particles: ", total_num_particles)
-            all_part_prop = np.zeros((total_num_particles,7), dtype = np.float32)
 
-            radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_particles)
-            all_part_prop[:, 0] = scaled_radii
-            all_part_prop[:, 1:4] = radial_velocities_comp
-            all_part_prop[:, 4:] = tangential_velocities_comp
-            
-            np.save(save_location + "all_part_prop_" + str(start_nu) + "_to_" + str(end_nu), all_part_prop)
+            radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_particles)   
+
+            if len(file.keys()) < 3:
+                file.create_dataset("Scaled_radii", maxshape=(None), data = scaled_radii, chunks = True)
+                file.create_dataset("Radial_vel", maxshape=(None, 3), data = radial_velocities_comp, chunks = True)
+                file.create_dataset("Tangential_vel", maxshape=(None, 3), data = tangential_velocities_comp, chunks = True)
+            else:
+                print(file.keys())
+                file["Scaled_radii"].resize((file["Scaled_radii"].shape[0] + scaled_radii.shape[0]), axis = 0)
+                file["Scaled_radii"][-scaled_radii.shape[0]:] = scaled_radii
+                
+                file["Radial_vel"].resize((file["Radial_vel"].shape[0] + radial_velocities_comp.shape[0]), axis = 0)
+                file["Radial_vel"][-radial_velocities_comp.shape[0]:] = radial_velocities_comp
+                
+                file["Tangential_vel"].resize((file["Tangential_vel"].shape[0] + tangential_velocities_comp.shape[0]), axis = 0)
+                file["Tangential_vel"][-tangential_velocities_comp.shape[0]:] = tangential_velocities_comp
             
             graph_rad_vel, graph_val_hubble = split_into_bins(num_bins, radial_velocities, scaled_radii, radii, r200m_per_part)
             graph_rad_vel = graph_rad_vel[~np.all(graph_rad_vel == 0, axis=1)]
@@ -357,8 +368,7 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m):
             plt.plot(graph_rad_vel[:,0], graph_rad_vel[:,1], color = c, alpha = 0.7, label = r"${0} < \nu < {1}$".format(str(start_nu), str(end_nu)))
         start_nu = end_nu
         
-    return graph_val_hubble
-    
+    return graph_val_hubble     
     
 num_bins = 50        
 start_nu = 0
@@ -367,7 +377,8 @@ t1 = time.time()
 print("start particle assign")
 
 times_r200 = 14
-hubble_vel, all_part_prop = split_halo_by_mass(num_bins, start_nu, num_iter, times_r200, halos_r200)    
+with h5py.File((save_location + "all_particle_properties" + curr_snapshot + ".hdf5"), 'a') as all_particle_properties:
+    hubble_vel = split_halo_by_mass(num_bins, start_nu, num_iter, times_r200, halos_r200, all_particle_properties)    
     
 
 arr1inds = hubble_vel[:,0].argsort()

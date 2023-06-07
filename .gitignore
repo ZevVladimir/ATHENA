@@ -1,8 +1,9 @@
 #ignore np arrays
-/np_arrays/
+/calculated_info/
 /Original_Data/
 /particle_data/
 /SPARTA_data/
 /.vscode/
 /Random_figures/
 test.py
+/sparta/
