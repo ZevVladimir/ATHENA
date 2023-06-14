@@ -4,30 +4,49 @@ import matplotlib.pyplot as plt
 import plotly.express as px
 import sklearn
 import seaborn as sns
+import h5py
 
 save_location = "/home/zvladimi/ML_orbit_infall_project/calculated_info/"
-#halo properties: scaled radius, scaled radial vel x, scaled radial vel y, scaled radial vel z, scaled tangential vel x, scaled tangential vel y, scaled tangential vel z
+curr_snapshot = "190"
 
-halo_0_5_to_1 = pd.DataFrame(np.load(save_location + "all_part_prop_0.5_to_1.0.npy"), columns= ["radius", "rad_vel_x", "rad_vel_y", "rad_vel_z", "rad_tang_x", "rad_tang_y", "rad_tang_z"])
-halo_1_to_1_5 = pd.DataFrame(np.load(save_location + "all_part_prop_1.0_to_1.5.npy"), columns= ["radius", "rad_vel_x", "rad_vel_y", "rad_vel_z", "rad_tang_x", "rad_tang_y", "rad_tang_z"])
-halo_1_5_to_2 = pd.DataFrame(np.load(save_location + "all_part_prop_1.5_to_2.0.npy"), columns= ["radius", "rad_vel_x", "rad_vel_y", "rad_vel_z", "rad_tang_x", "rad_tang_y", "rad_tang_z"])
-halo_2_to_2_5 = pd.DataFrame(np.load(save_location + "all_part_prop_2.0_to_2.5.npy"), columns= ["radius", "rad_vel_x", "rad_vel_y", "rad_vel_z", "rad_tang_x", "rad_tang_y", "rad_tang_z"])
-halo_2_5_to_3 = pd.DataFrame(np.load(save_location + "all_part_prop_2.5_to_3.0.npy"), columns= ["radius", "rad_vel_x", "rad_vel_y", "rad_vel_z", "rad_tang_x", "rad_tang_y", "rad_tang_z"])
-halo_3_to_3_5 = pd.DataFrame(np.load(save_location + "all_part_prop_3.0_to_3.5.npy"), columns= ["radius", "rad_vel_x", "rad_vel_y", "rad_vel_z", "rad_tang_x", "rad_tang_y", "rad_tang_z"])
+# with h5py.File((save_location + "all_particle_properties" + curr_snapshot + ".hdf5"), 'r') as all_particle_properties:
+#     print(all_particle_properties.keys())
+#     scaled_radii = np.array(all_particle_properties["Scaled_radii"][:])
+#     radial_vel = np.array(all_particle_properties["Radial_vel"][:])
+#     tang_vel = np.array(all_particle_properties["Tangential_vel"][:])
+    
+    
+import pandas as pd
+from xgboost import XGBClassifier
+from sklearn.datasets import load_wine
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report  
+import time 
 
-fig, axes = plt.subplots(2,3)
-axes[0,0].set_title("halo_0_5_to_1")
-axes[0,1].set_title("halo_1_to_1_5")
-axes[0,2].set_title("halo_1_5_to_2")
-axes[1,0].set_title("halo_2_to_2_5")
-axes[1,1].set_title("halo_2_5_to_3")
-axes[1,2].set_title("halo_3_to_3_5")
+t1 = time.time()
+X, y = load_wine(return_X_y=True, as_frame=True)
+X_train, X_test, y_train, y_test = train_test_split(X, 
+                                                    y, 
+                                                    test_size=0.30, 
+                                                    random_state=0)
+classifier = XGBClassifier()
+model = classifier.fit(X_train, y_train)
+predictions = model.predict(X_test)
+classification = classification_report(y_test, predictions)
+print(classification)
+t2 = time.time()
+print(t2 - t1, "seconds")
 
-sns.heatmap(halo_0_5_to_1.corr(), xticklabels = halo_0_5_to_1.columns, yticklabels = halo_0_5_to_1.columns, ax = axes[0,0])
-sns.heatmap(halo_1_to_1_5.corr(), xticklabels = halo_0_5_to_1.columns, yticklabels = halo_0_5_to_1.columns, ax = axes[0,1])
-sns.heatmap(halo_1_5_to_2.corr(), xticklabels = halo_0_5_to_1.columns, yticklabels = halo_0_5_to_1.columns, ax = axes[0,2])
-sns.heatmap(halo_2_to_2_5.corr(), xticklabels = halo_0_5_to_1.columns, yticklabels = halo_0_5_to_1.columns, ax = axes[1,0])
-sns.heatmap(halo_2_5_to_3.corr(), xticklabels = halo_0_5_to_1.columns, yticklabels = halo_0_5_to_1.columns, ax = axes[1,1])
-sns.heatmap(halo_3_to_3_5.corr(), xticklabels = halo_0_5_to_1.columns, yticklabels = halo_0_5_to_1.columns, ax = axes[1,2])
-print(halo_0_5_to_1.shape[0] + halo_1_5_to_2.shape[0] + halo_1_to_1_5.shape[0] + halo_2_5_to_3.shape[0] + halo_3_to_3_5.shape[0] + halo_2_to_2_5.shape[0])
-plt.show()
+t3 = time.time()
+X, y = load_wine(return_X_y=True, as_frame=True)
+X_train, X_test, y_train, y_test = train_test_split(X, 
+                                                    y, 
+                                                    test_size=0.30, 
+                                                    random_state=0)
+classifier = XGBClassifier(tree_method='gpu_hist')
+model = classifier.fit(X_train, y_train)
+predictions = model.predict(X_test)
+classification = classification_report(y_test, predictions)
+print(classification)
+t4 = time.time()
+print(t4 - t3, "seconds")

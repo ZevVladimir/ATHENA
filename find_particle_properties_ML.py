@@ -9,45 +9,88 @@ from colossus.lss import peaks
 from matplotlib.pyplot import cm
 import time
 import h5py
+import os
+import pickle
 
 curr_snapshot = "190"
-file = "/home/zvladimi/ML_orbit_infall_project/calculated_info/"
-save_location =  "/home/zvladimi/ML_orbit_infall_project/calculated_info/"
-snapshot_path = "/home/zvladimi/ML_orbit_infall_project/particle_data/snapshot_" + curr_snapshot +"/snapshot_0" + curr_snapshot
+curr_hdf5_file = "sparta_190.hdf5"
+hdf5_file = "/home/zvladimi/ML_orbit_infall_project/SPARTA_data/" + curr_hdf5_file
+save_location =  "/home/zvladimi/ML_orbit_infall_project/calculated_info/" + curr_hdf5_file + "/"
+snapshot_path = "/home/zvladimi/ML_orbit_infall_project/particle_data/snapshot_" + curr_snapshot + "/snapshot_0" + curr_snapshot
 
 # get constants from pygadgetreader
-snapshot = 192 #set to what snapshot is being loaded in
+snapshot = int(curr_snapshot) #set to what snapshot is being loaded in
 red_shift = readheader(snapshot_path, 'redshift')
 scale_factor = 1/(1+red_shift)
 cosmol = cosmology.setCosmology("bolshoi")
 rho_m = cosmol.rho_m(red_shift)
 little_h = cosmol.h 
 hubble_constant = cosmol.Hz(red_shift) * 0.001 # convert to units km/s/kpc
-
+print(red_shift)
+print(scale_factor)
 G = constants.G
 
 box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
 box_size = box_size * 10**3 * scale_factor * little_h #convert to Kpc physical
 
+def check_pickle_exist_gadget(path, ptl_property, snapshot):
+    file_path = path + ptl_property + "_" + snapshot + ".pickle" 
+    if os.path.isfile(file_path):
+        with open(file_path, "rb") as pickle_file:
+            particle_info = pickle.load(pickle_file)
+    else:
+        particle_info = readsnap(snapshot_path, ptl_property, 'dm')
+        with open(file_path, "wb") as pickle_file:
+            pickle.dump(particle_info, pickle_file)
+    return particle_info
+
+def check_pickle_exist_hdf5_prop(path, first_group, second_group, third_group, hdf5_path):
+    file_path = path + first_group + "_" + second_group + "_" + third_group + ".pickle" 
+    if os.path.isfile(file_path):
+        with open(file_path, "rb") as pickle_file:
+            halo_info = pickle.load(pickle_file)
+    else:
+        print(hdf5_path)
+        with h5py.File(hdf5_path, 'r') as file:
+            if third_group != "":
+                halo_info = file[first_group][second_group][third_group][:]
+            else:
+                halo_info = file[first_group][second_group][:]
+        with open(file_path, "wb") as pickle_file:
+            pickle.dump(halo_info, pickle_file)
+    return halo_info
+
+
+def load_or_pickle_data(path, snapshot, hdf5):
+    if os.path.exists(path) != True:
+        os.makedirs(path)
+    ptl_pid = check_pickle_exist_gadget(path, "pid", snapshot)
+    ptl_vel = check_pickle_exist_gadget(path, "vel", snapshot)
+    ptl_pos = check_pickle_exist_gadget(path, "pos", snapshot)
+    ptl_mass = check_pickle_exist_gadget(path, "mass", snapshot)
+    
+    halo_pos = check_pickle_exist_hdf5_prop(path, "halos", "position", "", hdf5)
+    halo_vel = check_pickle_exist_hdf5_prop(path, "halos", "velocity", "", hdf5)
+    halo_last_snap = check_pickle_exist_hdf5_prop(path, "halos", "last_snap", "", hdf5)
+    halo_r200m = check_pickle_exist_hdf5_prop(path, "halos", "R200m", "", hdf5)
+    halo_id = check_pickle_exist_hdf5_prop(path, "halos", "id", "", hdf5)
+    halo_status = check_pickle_exist_hdf5_prop(path, "halos", "status", "", hdf5)
+    
+    num_pericenter = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "n_pericenter", hdf5)
+
+    return ptl_pid, ptl_vel, ptl_pos, ptl_mass, halo_pos, halo_vel, halo_last_snap, halo_r200m, halo_id, halo_status, num_pericenter
+
 #load particle info
-particles_pid = np.load(file + "particle_pid_192.npy")
-particles_vel = np.load(file + "particle_vel_192.npy")
-particles_pos = np.load(file + "particle_pos_192.npy") 
+particles_pid, particles_vel, particles_pos, particles_mass, halos_pos, halos_vel, halos_last_snap, halos_r200m, halos_id, halos_status, num_pericenter = load_or_pickle_data(save_location, curr_snapshot, hdf5_file)
+
 particles_pos = particles_pos * 10**3 * scale_factor * little_h #convert to kpc and physical
-particles_mass = np.load(file + "all_particle_mass_192.npy")
 mass = particles_mass[0] * 10**10 * little_h #units M_sun
 
 #load all halo info at snapshot
-halos_pos = np.load(file + "halo_position.npy")
 halos_pos = halos_pos[:,snapshot,:] * 10**3 * scale_factor * little_h #convert to kpc and physical
-halos_vel = np.load(file + "halo_velocity.npy")
 halos_vel = halos_vel[:,snapshot,:]
-halos_last_snap = np.load(file + "halo_last_snap.npy")
-halos_r200 = np.load(file + "halo_R200m.npy")
-halos_r200 = halos_r200[:,snapshot] * little_h # convert to kpc
-halos_id = np.load(file + "halo_id.npy")
+halos_r200m = halos_r200m[:,snapshot] * little_h # convert to kpc
 halos_id = halos_id[:,snapshot]
-halos_status = np.load(file + "halo_status.npy")
 halos_status = halos_status[:,snapshot]
 
 num_particles = particles_pid.size
@@ -58,9 +101,9 @@ indices_keep = np.zeros((halos_id.size))
 indices_keep = np.where((halos_last_snap >= snapshot) & (halos_status == 10))
 halos_pos = halos_pos[indices_keep]
 halos_vel = halos_vel[indices_keep]
-halos_r200 = halos_r200[indices_keep]
+halos_r200m = halos_r200m[indices_keep]
 halos_id = halos_id[indices_keep]
-total_num_halos = halos_r200.size #num of halos remaining
+total_num_halos = halos_r200m.size #num of halos remaining
 
 #construct a search tree iwth all of the particle positions
 particle_tree = cKDTree(data = particles_pos, leafsize = 3, balanced_tree = False, boxsize = box_size)
@@ -226,7 +269,8 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles):
         #Only take the particle positions that where found with the tree
         current_particles_pos = particles_pos[indices,:]
         current_particles_vel = particles_vel[indices,:]
-        current_halos_pos = halo_positions[i,:]
+        current_particles_pid = particles_pid[indices]
+        current_halos_pos = halo_positions[i,:]        
         
         all_part_vel[start:start+num_new_particles] = current_particles_vel
             
@@ -317,15 +361,27 @@ def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r20
     
     return average_val_part, average_val_hubble    
     
-def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, file):
+def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, file):        
     color = iter(cm.rainbow(np.linspace(0, 1, num_iter)))
         
     # get the halo_masses and number of particles
     num_particles_per_halo, halo_masses = initial_search(halos_pos, times_r200m, halo_r200m)
     
+    total_num_particles = np.sum(num_particles_per_halo)
     # convert masses to peaks
     scaled_halo_mass = halo_masses/little_h # units M⊙/h
     peak_heights = peaks.peakHeight(scaled_halo_mass, red_shift)
+    
+    # Determine if we are creating a completely new file (file doesn't have any keys) or if we are accessing a different number of particles
+    if len(file.keys()) < 3:
+        new_file = True
+    elif file["Scaled_radii"].shape[0] != total_num_particles:
+        del file["Scaled_radii"]
+        del file["Radial_vel"]
+        del file["Tangential_vel"]
+        new_file = True
+    else:
+        new_file = False
         
     # For how many graphs
     for j in range(num_iter):
@@ -340,18 +396,19 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, fi
             use_halo_pos = halos_pos[halos_within_range]
             use_halo_r200m = halo_r200m[halos_within_range]
             use_num_particles = num_particles_per_halo[halos_within_range]
-            total_num_particles = np.sum(use_num_particles)
+            total_num_use_particles = np.sum(use_num_particles)
             
-            print("Num particles: ", total_num_particles)
+            print("Num particles: ", total_num_use_particles)
 
-            radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_particles)   
+            radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles)   
 
-            if len(file.keys()) < 3:
-                file.create_dataset("Scaled_radii", maxshape=(None), data = scaled_radii, chunks = True)
-                file.create_dataset("Radial_vel", maxshape=(None, 3), data = radial_velocities_comp, chunks = True)
-                file.create_dataset("Tangential_vel", maxshape=(None, 3), data = tangential_velocities_comp, chunks = True)
-            else:
-                print(file.keys())
+            # with a new file and just started create all the datasets
+            if new_file and len(list(file.keys())) == 0:
+                file.create_dataset("Scaled_radii", data = scaled_radii, chunks = True, maxshape=(total_num_particles,))
+                file.create_dataset("Radial_vel", data = radial_velocities_comp, chunks = True, maxshape=(total_num_particles, 3))
+                file.create_dataset("Tangential_vel", data = tangential_velocities_comp, chunks = True, maxshape=(total_num_particles, 3))
+            # with a new file adding on additional data to the datasets
+            elif new_file and len(list(file.keys())) != 0:
                 file["Scaled_radii"].resize((file["Scaled_radii"].shape[0] + scaled_radii.shape[0]), axis = 0)
                 file["Scaled_radii"][-scaled_radii.shape[0]:] = scaled_radii
                 
@@ -360,7 +417,16 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, fi
                 
                 file["Tangential_vel"].resize((file["Tangential_vel"].shape[0] + tangential_velocities_comp.shape[0]), axis = 0)
                 file["Tangential_vel"][-tangential_velocities_comp.shape[0]:] = tangential_velocities_comp
+                
+            file_counter = 0
+            # if not a new file and same num of particles will just replace the previous information
+            if not new_file:
+                file["Scaled_radii"][file_counter:file_counter + scaled_radii.shape[0]] = scaled_radii
+                file["Radial_vel"][file_counter:file_counter + radial_velocities_comp.shape[0]] = radial_velocities_comp
+                file["Tangential_vel"][file_counter:file_counter + tangential_velocities_comp.shape[0]] = tangential_velocities_comp
             
+            file_counter = file_counter + scaled_radii.shape[0]
+               
             graph_rad_vel, graph_val_hubble = split_into_bins(num_bins, radial_velocities, scaled_radii, radii, r200m_per_part)
             graph_rad_vel = graph_rad_vel[~np.all(graph_rad_vel == 0, axis=1)]
             graph_val_hubble = graph_val_hubble[~np.all(graph_val_hubble == 0, axis=1)]
@@ -378,7 +444,7 @@ print("start particle assign")
 
 times_r200 = 14
 with h5py.File((save_location + "all_particle_properties" + curr_snapshot + ".hdf5"), 'a') as all_particle_properties:
-    hubble_vel = split_halo_by_mass(num_bins, start_nu, num_iter, times_r200, halos_r200, all_particle_properties)    
+    hubble_vel = split_halo_by_mass(num_bins, start_nu, num_iter, times_r200, halos_r200m, all_particle_properties)    
     
 
 arr1inds = hubble_vel[:,0].argsort()
