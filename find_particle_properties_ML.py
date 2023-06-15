@@ -19,15 +19,13 @@ save_location =  "/home/zvladimi/ML_orbit_infall_project/calculated_info/" + cur
 snapshot_path = "/home/zvladimi/ML_orbit_infall_project/particle_data/snapshot_" + curr_snapshot + "/snapshot_0" + curr_snapshot
 
 # get constants from pygadgetreader
-snapshot = int(curr_snapshot) #set to what snapshot is being loaded in
+snapshot_index = int(curr_snapshot) #set to what snapshot is being loaded in
 red_shift = readheader(snapshot_path, 'redshift')
 scale_factor = 1/(1+red_shift)
 cosmol = cosmology.setCosmology("bolshoi")
 rho_m = cosmol.rho_m(red_shift)
 little_h = cosmol.h 
 hubble_constant = cosmol.Hz(red_shift) * 0.001 # convert to units km/s/kpc
-print(red_shift)
-print(scale_factor)
 G = constants.G
 
 box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
@@ -60,7 +58,6 @@ def check_pickle_exist_hdf5_prop(path, first_group, second_group, third_group, h
             pickle.dump(halo_info, pickle_file)
     return halo_info
 
-
 def load_or_pickle_data(path, snapshot, hdf5):
     if os.path.exists(path) != True:
         os.makedirs(path)
@@ -77,33 +74,47 @@ def load_or_pickle_data(path, snapshot, hdf5):
     halo_status = check_pickle_exist_hdf5_prop(path, "halos", "status", "", hdf5)
     
     num_pericenter = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "n_pericenter", hdf5)
+    tracer_id = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "tracer_id", hdf5)
 
-    return ptl_pid, ptl_vel, ptl_pos, ptl_mass, halo_pos, halo_vel, halo_last_snap, halo_r200m, halo_id, halo_status, num_pericenter
+    return ptl_pid, ptl_vel, ptl_pos, ptl_mass, halo_pos, halo_vel, halo_last_snap, halo_r200m, halo_id, halo_status, num_pericenter, tracer_id
 
 #load particle info
-particles_pid, particles_vel, particles_pos, particles_mass, halos_pos, halos_vel, halos_last_snap, halos_r200m, halos_id, halos_status, num_pericenter = load_or_pickle_data(save_location, curr_snapshot, hdf5_file)
+particles_pid, particles_vel, particles_pos, particles_mass, halos_pos, halos_vel, halos_last_snap, halos_r200m, halos_id, halos_status, num_pericenter, tracer_id = load_or_pickle_data(save_location, curr_snapshot, hdf5_file)
 
 particles_pos = particles_pos * 10**3 * scale_factor * little_h #convert to kpc and physical
 mass = particles_mass[0] * 10**10 * little_h #units M_sun
 
 #load all halo info at snapshot
-halos_pos = halos_pos[:,snapshot,:] * 10**3 * scale_factor * little_h #convert to kpc and physical
-halos_vel = halos_vel[:,snapshot,:]
-halos_r200m = halos_r200m[:,snapshot] * little_h # convert to kpc
-halos_id = halos_id[:,snapshot]
-halos_status = halos_status[:,snapshot]
+halos_pos = halos_pos[:,snapshot_index,:] * 10**3 * scale_factor * little_h #convert to kpc and physical
+halos_vel = halos_vel[:,snapshot_index,:]
+halos_r200m = halos_r200m[:,snapshot_index] * little_h # convert to kpc
+halos_id = halos_id[:,snapshot_index]
+halos_status = halos_status[:,snapshot_index]
 
 num_particles = particles_pid.size
 
 # remove all halos for any halo that doesn't exist beyond snapshot 
 # remove all halos that aren't main halos (identified with tag = 10)
 indices_keep = np.zeros((halos_id.size))
-indices_keep = np.where((halos_last_snap >= snapshot) & (halos_status == 10))
+indices_keep = np.where((halos_last_snap >= snapshot_index) & (halos_status == 10))
 halos_pos = halos_pos[indices_keep]
 halos_vel = halos_vel[indices_keep]
 halos_r200m = halos_r200m[indices_keep]
 halos_id = halos_id[indices_keep]
 total_num_halos = halos_r200m.size #num of halos remaining
+
+orbit_assn = np.ones((tracer_id.size, 2), dtype = np.int32) * -1
+orbit_assn[:,0] = tracer_id
+num_pericenter[num_pericenter > 0] = 1
+orbit_assn[:,1] = num_pericenter
+
+match_ids = np.intersect1d(particles_pid, orbit_assn[:,0], return_indices = True)[1:] # only take the matching indices for particle pids and orbit_assn
+match_ids_pids = match_ids[0]
+match_ids_orbit = match_ids[1]
+
+particles_pos = particles_pos[match_ids_pids]
+particles_vel = particles_vel[match_ids_pids]
+orbit_assn = orbit_assn[match_ids_orbit]
 
 #construct a search tree iwth all of the particle positions
 particle_tree = cKDTree(data = particles_pos, leafsize = 3, balanced_tree = False, boxsize = box_size)
@@ -251,6 +262,7 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles):
     all_radii = np.zeros((total_particles), dtype = np.float32)
     all_scaled_radii = np.zeros(total_particles, dtype = np.float32)
     r200m_per_part = np.zeros(total_particles, dtype = np.float32)
+    all_orbit_asn = np.zeros((total_particles,2), dtype = np.int32)
 
     start = 0
     for i in range(num_halos):
@@ -258,19 +270,19 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles):
         # value of 1.4 determined by guessing if just r200 value or 1.1 miss a couple halo r200 values but 1.4 gets them all
         indices = particle_tree.query_ball_point(halo_positions[i,:], r = search_radius * halo_r200m[i])
 
+        #Only take the particle positions that where found with the tree
+        current_particles_pos = particles_pos[indices,:]
+        current_particles_vel = particles_vel[indices,:]
+        current_orbit_assn = orbit_assn[indices]
+        current_halos_pos = halo_positions[i,:]        
+
         # how many new particles being added
         num_new_particles = len(indices)
         halo_indices[i,0] = start
         halo_indices[i,1] = start + num_new_particles
 
         #for how many new particles create an array of how much mass there should be within that particle radius
-        use_mass = np.arange(1, num_new_particles + 1, 1) * mass
-
-        #Only take the particle positions that where found with the tree
-        current_particles_pos = particles_pos[indices,:]
-        current_particles_vel = particles_vel[indices,:]
-        current_particles_pid = particles_pid[indices]
-        current_halos_pos = halo_positions[i,:]        
+        use_mass = np.arange(1, num_new_particles + 1, 1) * mass       
         
         all_part_vel[start:start+num_new_particles] = current_particles_vel
             
@@ -313,10 +325,11 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles):
         all_radii[start:start+num_new_particles] = particle_radii
         all_scaled_radii[start:start+num_new_particles] = particle_radii/halo_r200m[i]
         r200m_per_part[start:start+num_new_particles] = halo_r200m[i]
+        all_orbit_asn[start:start+num_new_particles] = current_orbit_assn
         
         start += num_new_particles
-        
-    return calculated_radial_velocities, all_radii, all_scaled_radii, r200m_per_part, calculated_radial_velocities_comp, calculated_tangential_velocities_comp
+    
+    return all_orbit_asn, calculated_radial_velocities, all_radii, all_scaled_radii, r200m_per_part, calculated_radial_velocities_comp, calculated_tangential_velocities_comp
     
 def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r200_per_part):
     start_bin_val = 0.001
@@ -364,9 +377,10 @@ def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r20
 def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, file):        
     color = iter(cm.rainbow(np.linspace(0, 1, num_iter)))
         
+    print("\nstart initial search")    
     # get the halo_masses and number of particles
     num_particles_per_halo, halo_masses = initial_search(halos_pos, times_r200m, halo_r200m)
-    
+    print("finish initial search")
     total_num_particles = np.sum(num_particles_per_halo)
     # convert masses to peaks
     scaled_halo_mass = halo_masses/little_h # units M⊙/h
@@ -387,7 +401,7 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, fi
     for j in range(num_iter):
         c = next(color)
         end_nu = start_nu + 0.5
-        print("Start split:", start_nu, "to", end_nu)
+        print("\nStart split:", start_nu, "to", end_nu)
         # Get the indices of the halos that are within the desired peaks
     
         halos_within_range = np.where((peak_heights >= start_nu) & (peak_heights < end_nu))[0]
@@ -400,15 +414,23 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, fi
             
             print("Num particles: ", total_num_use_particles)
 
-            radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles)   
+            orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles)   
 
             # with a new file and just started create all the datasets
             if new_file and len(list(file.keys())) == 0:
+                file.create_dataset("PIDS", data = orbital_assign[:,0], chunks = True, maxshape=(total_num_particles,))
+                file.create_dataset("Orbit_Infall", data = orbital_assign[:,1], chunks = True, maxshape=(total_num_particles,))
                 file.create_dataset("Scaled_radii", data = scaled_radii, chunks = True, maxshape=(total_num_particles,))
                 file.create_dataset("Radial_vel", data = radial_velocities_comp, chunks = True, maxshape=(total_num_particles, 3))
                 file.create_dataset("Tangential_vel", data = tangential_velocities_comp, chunks = True, maxshape=(total_num_particles, 3))
             # with a new file adding on additional data to the datasets
             elif new_file and len(list(file.keys())) != 0:
+                file["PIDS"].resize((file["PIDS"].shape[0] + orbital_assign[:,0].shape[0]), axis = 0)
+                file["PIDS"][-orbital_assign[:,0].shape[0]:] = orbital_assign[:,0]
+                
+                file["Orbit_Infall"].resize((file["Orbit_Infall"].shape[0] + orbital_assign[:,1].shape[0]), axis = 0)
+                file["Orbit_Infall"][-orbital_assign[:,1].shape[0]:] = orbital_assign[:,1]
+                
                 file["Scaled_radii"].resize((file["Scaled_radii"].shape[0] + scaled_radii.shape[0]), axis = 0)
                 file["Scaled_radii"][-scaled_radii.shape[0]:] = scaled_radii
                 
