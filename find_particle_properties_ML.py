@@ -75,11 +75,12 @@ def load_or_pickle_data(path, snapshot, hdf5):
     
     num_pericenter = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "n_pericenter", hdf5)
     tracer_id = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "tracer_id", hdf5)
+    n_is_lower_limit = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "n_is_lower_limit", hdf5)
 
-    return ptl_pid, ptl_vel, ptl_pos, ptl_mass, halo_pos, halo_vel, halo_last_snap, halo_r200m, halo_id, halo_status, num_pericenter, tracer_id
+    return ptl_pid, ptl_vel, ptl_pos, ptl_mass, halo_pos, halo_vel, halo_last_snap, halo_r200m, halo_id, halo_status, num_pericenter, tracer_id, n_is_lower_limit
 
 #load particle info
-particles_pid, particles_vel, particles_pos, particles_mass, halos_pos, halos_vel, halos_last_snap, halos_r200m, halos_id, halos_status, num_pericenter, tracer_id = load_or_pickle_data(save_location, curr_snapshot, hdf5_file)
+particles_pid, particles_vel, particles_pos, particles_mass, halos_pos, halos_vel, halos_last_snap, halos_r200m, halos_id, halos_status, num_pericenter, tracer_id, n_is_lower_limit = load_or_pickle_data(save_location, curr_snapshot, hdf5_file)
 
 particles_pos = particles_pos * 10**3 * scale_factor * little_h #convert to kpc and physical
 mass = particles_mass[0] * 10**10 * little_h #units M_sun
@@ -103,18 +104,21 @@ halos_r200m = halos_r200m[indices_keep]
 halos_id = halos_id[indices_keep]
 total_num_halos = halos_r200m.size #num of halos remaining
 
-orbit_assn = np.ones((tracer_id.size, 2), dtype = np.int32) * -1
-orbit_assn[:,0] = tracer_id
-num_pericenter[num_pericenter > 0] = 1
-orbit_assn[:,1] = num_pericenter
+# create array that tracks the ids and if a tracer is orbiting or infalling.
+orbit_assn_tracers = np.zeros((tracer_id.size, 2), dtype = np.int32)
+orbit_assn_tracers[:,0] = tracer_id
+num_pericenter[num_pericenter > 0] = 1 # if there is more than one pericenter count as orbiting (1) and infalling is 0
+orbit_assn_tracers[:,1] = num_pericenter
 
-match_ids = np.intersect1d(particles_pid, orbit_assn[:,0], return_indices = True)[1:] # only take the matching indices for particle pids and orbit_assn
-match_ids_pids = match_ids[0]
-match_ids_orbit = match_ids[1]
+# However particle can also be orbiting if n_is_lower_limit is 1
+indices_pass_n_low_lim = np.where(n_is_lower_limit == 1)
+orbit_assn_tracers[indices_pass_n_low_lim,1] = 1
 
-particles_pos = particles_pos[match_ids_pids]
-particles_vel = particles_vel[match_ids_pids]
-orbit_assn = orbit_assn[match_ids_orbit]
+# create array that tracks the pids and if a particle is orbiting or infalling. (assume particle is infalling until proven otherwise)
+orbit_assn_pids = np.zeros((particles_pid.size, 2), dtype = np.int32)
+orbit_assn_pids[:,0] = particles_pid
+match_ids = np.intersect1d(particles_pid, tracer_id, return_indices = True)[1:] # only take the matching indices for particle pids and orbit_assn
+orbit_assn_pids[match_ids[0],1] = orbit_assn_tracers[match_ids[1],1] # assign the pids to the orbit/infall assignment of the matching tracers
 
 #construct a search tree iwth all of the particle positions
 particle_tree = cKDTree(data = particles_pos, leafsize = 3, balanced_tree = False, boxsize = box_size)
@@ -273,7 +277,7 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles):
         #Only take the particle positions that where found with the tree
         current_particles_pos = particles_pos[indices,:]
         current_particles_vel = particles_vel[indices,:]
-        current_orbit_assn = orbit_assn[indices]
+        current_orbit_assn = orbit_assn_pids[indices]
         current_halos_pos = halo_positions[i,:]        
 
         # how many new particles being added
