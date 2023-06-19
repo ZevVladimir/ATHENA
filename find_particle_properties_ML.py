@@ -73,14 +73,17 @@ def load_or_pickle_data(path, snapshot, hdf5):
     halo_id = check_pickle_exist_hdf5_prop(path, "halos", "id", "", hdf5)
     halo_status = check_pickle_exist_hdf5_prop(path, "halos", "status", "", hdf5)
     
+    density_prf_all = check_pickle_exist_hdf5_prop(path, "anl_prf", "M_all", "", hdf5)
+    density_prf_1halo = check_pickle_exist_hdf5_prop(path, "anl_prf", "M_1halo", "", hdf5)
+    
     num_pericenter = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "n_pericenter", hdf5)
     tracer_id = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "tracer_id", hdf5)
     n_is_lower_limit = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "n_is_lower_limit", hdf5)
 
-    return ptl_pid, ptl_vel, ptl_pos, ptl_mass, halo_pos, halo_vel, halo_last_snap, halo_r200m, halo_id, halo_status, num_pericenter, tracer_id, n_is_lower_limit
+    return ptl_pid, ptl_vel, ptl_pos, ptl_mass, halo_pos, halo_vel, halo_last_snap, halo_r200m, halo_id, halo_status, num_pericenter, tracer_id, n_is_lower_limit, density_prf_all, density_prf_1halo
 
 #load particle info
-particles_pid, particles_vel, particles_pos, particles_mass, halos_pos, halos_vel, halos_last_snap, halos_r200m, halos_id, halos_status, num_pericenter, tracer_id, n_is_lower_limit = load_or_pickle_data(save_location, curr_snapshot, hdf5_file)
+particles_pid, particles_vel, particles_pos, particles_mass, halos_pos, halos_vel, halos_last_snap, halos_r200m, halos_id, halos_status, num_pericenter, tracer_id, n_is_lower_limit, density_prf_all, density_prf_1halo = load_or_pickle_data(save_location, curr_snapshot, hdf5_file)
 
 particles_pos = particles_pos * 10**3 * scale_factor * little_h #convert to kpc and physical
 mass = particles_mass[0] * 10**10 * little_h #units M_sun
@@ -91,6 +94,8 @@ halos_vel = halos_vel[:,snapshot_index,:]
 halos_r200m = halos_r200m[:,snapshot_index] * little_h # convert to kpc
 halos_id = halos_id[:,snapshot_index]
 halos_status = halos_status[:,snapshot_index]
+density_prf_all = density_prf_all[:,snapshot_index,:]
+density_prf_1halo = density_prf_1halo[:,snapshot_index,:]
 
 num_particles = particles_pid.size
 
@@ -102,6 +107,8 @@ halos_pos = halos_pos[indices_keep]
 halos_vel = halos_vel[indices_keep]
 halos_r200m = halos_r200m[indices_keep]
 halos_id = halos_id[indices_keep]
+density_prf_all = density_prf_all[indices_keep]
+density_prf_1halo = density_prf_1halo[indices_keep]
 total_num_halos = halos_r200m.size #num of halos remaining
 
 # create array that tracks the ids and if a tracer is orbiting or infalling.
@@ -119,6 +126,12 @@ orbit_assn_pids = np.zeros((particles_pid.size, 2), dtype = np.int32)
 orbit_assn_pids[:,0] = particles_pid
 match_ids = np.intersect1d(particles_pid, tracer_id, return_indices = True)[1:] # only take the matching indices for particle pids and orbit_assn
 orbit_assn_pids[match_ids[0],1] = orbit_assn_tracers[match_ids[1],1] # assign the pids to the orbit/infall assignment of the matching tracers
+
+# Create bins for the density profile calculation
+num_prf_bins = density_prf_all.shape[1]
+start_prf_bins = 0.01
+end_prf_bins = 3.0
+prf_bins = np.logspace(np.log10(start_prf_bins), np.log10(end_prf_bins), num_prf_bins)
 
 #construct a search tree iwth all of the particle positions
 particle_tree = cKDTree(data = particles_pos, leafsize = 3, balanced_tree = False, boxsize = box_size)
@@ -235,6 +248,25 @@ def calc_tang_vel(radial_vel, physical_vel, rhat):
     
     return tangential_vel
 
+def compare_density_prf(masses, radii, actual_prf):
+    calculated_prf_all = np.zeros(num_prf_bins)
+    
+    for i in range(num_prf_bins - 1):
+        start_bin = prf_bins[i]
+        end_bin = prf_bins[i+1]  
+        
+        radii_within_range = np.where((radii >= start_bin) & (radii < end_bin))[0]
+        if radii_within_range.size != 0:
+            total_mass_within_bin = masses[radii_within_range[-1]]
+            calculated_prf_all[i] = total_mass_within_bin
+        else:
+            calculated_prf_all[i] = 0
+    for j in range(calculated_prf_all.size):
+        print("calc:", calculated_prf_all[j], "act:", actual_prf[j])
+    print(calculated_prf_all/mass)
+    print(actual_prf/mass)
+    print(np.allclose(calculated_prf_all, actual_prf, atol = 0.001))
+
 def initial_search(halo_positions, search_radius, halo_r200m):
     num_halos = halo_positions.shape[0]
     particles_per_halo = np.zeros(num_halos, dtype = np.int32)
@@ -254,7 +286,7 @@ def initial_search(halo_positions, search_radius, halo_r200m):
     
     return particles_per_halo, all_halo_mass
 
-def search_halos(halo_positions, halo_r200m, search_radius, total_particles):
+def search_halos(halo_positions, halo_r200m, search_radius, total_particles, dens_prf_all):
     num_halos = halo_positions.shape[0]
     halo_indices = np.zeros((num_halos,2), dtype = np.int32)
     all_part_vel = np.zeros((total_particles,3), dtype = np.float32)
@@ -330,6 +362,9 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles):
         all_scaled_radii[start:start+num_new_particles] = particle_radii/halo_r200m[i]
         r200m_per_part[start:start+num_new_particles] = halo_r200m[i]
         all_orbit_asn[start:start+num_new_particles] = current_orbit_assn
+        
+        if i == 1:
+            compare_density_prf(use_mass, particle_radii/halo_r200m[i], dens_prf_all[i])
         
         start += num_new_particles
     
@@ -413,12 +448,14 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, fi
         if halos_within_range.shape[0] > 0:
             use_halo_pos = halos_pos[halos_within_range]
             use_halo_r200m = halo_r200m[halos_within_range]
+            use_density_prf_all = density_prf_all[halos_within_range]
+            use_density_prf_1halo = density_prf_1halo[halos_within_range]
             use_num_particles = num_particles_per_halo[halos_within_range]
             total_num_use_particles = np.sum(use_num_particles)
             
             print("Num particles: ", total_num_use_particles)
 
-            orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles)   
+            orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles, use_density_prf_all)   
 
             # with a new file and just started create all the datasets
             if new_file and len(list(file.keys())) == 0:
