@@ -15,7 +15,7 @@ import pickle
 curr_snapshot = "190"
 curr_hdf5_file = "sparta_190.hdf5"
 hdf5_file = "/home/zvladimi/ML_orbit_infall_project/SPARTA_data/" + curr_hdf5_file
-save_location =  "/home/zvladimi/ML_orbit_infall_project/calculated_info/" + curr_hdf5_file + "/"
+save_location =  "/home/zvladimi/ML_orbit_infall_project/calculated_info/" + "calc_from_" + curr_hdf5_file + "/"
 snapshot_path = "/home/zvladimi/ML_orbit_infall_project/particle_data/snapshot_" + curr_snapshot + "/snapshot_0" + curr_snapshot
 
 # get constants from pygadgetreader
@@ -131,7 +131,7 @@ orbit_assn_pids[match_ids[0],1] = orbit_assn_tracers[match_ids[1],1] # assign th
 num_prf_bins = density_prf_all.shape[1]
 start_prf_bins = 0.01
 end_prf_bins = 3.0
-prf_bins = np.logspace(np.log10(start_prf_bins), np.log10(end_prf_bins), num_prf_bins)
+prf_bins = np.logspace(np.log10(start_prf_bins), np.log10(end_prf_bins), num_prf_bins+1)
 
 #construct a search tree iwth all of the particle positions
 particle_tree = cKDTree(data = particles_pos, leafsize = 3, balanced_tree = False, boxsize = box_size)
@@ -250,22 +250,33 @@ def calc_tang_vel(radial_vel, physical_vel, rhat):
 
 def compare_density_prf(masses, radii, actual_prf):
     calculated_prf_all = np.zeros(num_prf_bins)
-    
-    for i in range(num_prf_bins - 1):
+    print(actual_prf.size)
+    for i in range(num_prf_bins):
         start_bin = prf_bins[i]
         end_bin = prf_bins[i+1]  
         
         radii_within_range = np.where((radii >= start_bin) & (radii < end_bin))[0]
-        if radii_within_range.size != 0:
-            total_mass_within_bin = masses[radii_within_range[-1]]
-            calculated_prf_all[i] = total_mass_within_bin
+        if radii_within_range.size != 0 and i != 0:
+            calculated_prf_all[i] = calculated_prf_all[i - 1] + radii_within_range.size * mass
+        elif i == 0:
+            calculated_prf_all[i] = radii_within_range.size * mass
         else:
-            calculated_prf_all[i] = 0
+            calculated_prf_all[i] = calculated_prf_all[i - 1]
+
     for j in range(calculated_prf_all.size):
         print("calc:", calculated_prf_all[j], "act:", actual_prf[j])
-    print(calculated_prf_all/mass)
-    print(actual_prf/mass)
-    print(np.allclose(calculated_prf_all, actual_prf, atol = 0.001))
+    
+    middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
+
+    plt.figure(1)
+    plt.plot(middle_bins, calculated_prf_all, color = 'b', label = "calculated profile")
+    plt.plot(middle_bins, actual_prf, color = 'r', label = "actual profile")
+    plt.title("Density profile of halo")
+    plt.xlabel("radius $r/R_{200m}$")
+    plt.ylabel("Mass of halo $M_{\odot}$")
+    plt.xscale("log")
+    plt.legend()
+    plt.show()
 
 def initial_search(halo_positions, search_radius, halo_r200m):
     num_halos = halo_positions.shape[0]
@@ -363,7 +374,7 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         r200m_per_part[start:start+num_new_particles] = halo_r200m[i]
         all_orbit_asn[start:start+num_new_particles] = current_orbit_assn
         
-        if i == 1:
+        if i < 3:
             compare_density_prf(use_mass, particle_radii/halo_r200m[i], dens_prf_all[i])
         
         start += num_new_particles
@@ -415,7 +426,7 @@ def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r20
     
 def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, file):        
     color = iter(cm.rainbow(np.linspace(0, 1, num_iter)))
-        
+    
     print("\nstart initial search")    
     # get the halo_masses and number of particles
     num_particles_per_halo, halo_masses = initial_search(halos_pos, times_r200m, halo_r200m)
@@ -426,16 +437,18 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, fi
     peak_heights = peaks.peakHeight(scaled_halo_mass, red_shift)
     
     # Determine if we are creating a completely new file (file doesn't have any keys) or if we are accessing a different number of particles
-    if len(file.keys()) < 3:
+    if len(file.keys()) < 5:
         new_file = True
     elif file["Scaled_radii"].shape[0] != total_num_particles:
+        del file["PIDS"]
+        del file["Orbit_Infall"]
         del file["Scaled_radii"]
         del file["Radial_vel"]
         del file["Tangential_vel"]
         new_file = True
     else:
         new_file = False
-        
+
     # For how many graphs
     for j in range(num_iter):
         c = next(color)
@@ -484,6 +497,8 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, fi
             file_counter = 0
             # if not a new file and same num of particles will just replace the previous information
             if not new_file:
+                file["PIDS"][file_counter:file_counter + orbital_assign[:,0].shape[0]] = orbital_assign[:,0]
+                file["Orbit_Infall"][file_counter:file_counter + orbital_assign[:,1].shape[0]] = orbital_assign[:,1]
                 file["Scaled_radii"][file_counter:file_counter + scaled_radii.shape[0]] = scaled_radii
                 file["Radial_vel"][file_counter:file_counter + radial_velocities_comp.shape[0]] = radial_velocities_comp
                 file["Tangential_vel"][file_counter:file_counter + tangential_velocities_comp.shape[0]] = tangential_velocities_comp

@@ -3,20 +3,18 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import h5py
-import pandas as pd
 from xgboost import XGBClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report  
 import time 
 import pickle
 import os
-import xgboost as xgb
 
 curr_snapshot = "190"
 curr_hdf5_file = "sparta_190.hdf5"
 
-data_location = "/home/zvladimi/ML_orbit_infall_project/calculated_info/" + curr_hdf5_file + "/"
-save_location = "/home/zvladimi/ML_orbit_infall_project/training_data/" + curr_hdf5_file + "/"
+data_location = "/home/zvladimi/ML_orbit_infall_project/calculated_info/" + "calc_from_" + curr_hdf5_file + "/"
+save_location = "/home/zvladimi/ML_orbit_infall_project/training_data/" + "data_for_" + curr_hdf5_file + "/"
 
 np.random.seed(11)
 
@@ -52,7 +50,7 @@ def load_or_pickle_data(path, curr_split, indices, use_num_particles, snapshot):
 
 num_splits = 4
 with h5py.File((data_location + "all_particle_properties" + curr_snapshot + ".hdf5"), 'r') as all_particle_properties:
-    total_num_particles = all_particle_properties["PIDS"][:].shape[0]
+    total_num_particles = all_particle_properties["PIDS"][:].shape[0]    
     random_indices = np.random.choice(total_num_particles, total_num_particles)
     use_num_particles = int(np.floor(total_num_particles/num_splits))
     
