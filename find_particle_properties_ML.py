@@ -110,13 +110,13 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
     all_part_vel = np.zeros((total_particles,3), dtype = np.float32)
 
     calculated_r200m = np.zeros(halo_r200m.size)
-    calculated_radial_velocities = np.zeros((total_particles), dtype = np.float32)
+    calculated_radial_velocities = np.zeros((total_particles), dtype = np.float16)
     calculated_radial_velocities_comp = np.zeros((total_particles,3), dtype = np.float32)
     calculated_tangential_velocities_comp = np.zeros((total_particles,3), dtype = np.float32)
     all_radii = np.zeros((total_particles), dtype = np.float32)
-    all_scaled_radii = np.zeros(total_particles, dtype = np.float32)
-    r200m_per_part = np.zeros(total_particles, dtype = np.float32)
-    all_orbit_asn = np.zeros((total_particles,2), dtype = np.int32)
+    all_scaled_radii = np.zeros(total_particles, dtype = np.float16)
+    r200m_per_part = np.zeros(total_particles, dtype = np.float16)
+    all_orbit_asn = np.zeros((total_particles,2), dtype = np.int16)
 
     start = 0
     for i in range(num_halos):
@@ -231,7 +231,7 @@ def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r20
     
     return average_val_part, average_val_hubble    
     
-def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, file):        
+def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, file, ax):        
     color = iter(cm.rainbow(np.linspace(0, 1, num_iter)))
     
     print("\nstart initial search")    
@@ -316,7 +316,7 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, fi
             graph_rad_vel = graph_rad_vel[~np.all(graph_rad_vel == 0, axis=1)]
             graph_val_hubble = graph_val_hubble[~np.all(graph_val_hubble == 0, axis=1)]
 
-            rad_vel_vs_radius_plot(graph_rad_vel, graph_val_hubble, start_nu, end_nu, c)
+            rad_vel_vs_radius_plot(graph_rad_vel, graph_val_hubble, start_nu, end_nu, c, ax)
         start_nu = end_nu
         
     return graph_val_hubble     
@@ -327,12 +327,13 @@ num_iter = 7
 t1 = time.time()
 print("start particle assign")
 
+fig, ax1 = plt.subplots(1)
 times_r200 = 14
 with h5py.File((save_location + "all_particle_properties" + curr_snapshot + ".hdf5"), 'a') as all_particle_properties:
-    hubble_vel = split_halo_by_mass(num_bins, start_nu, num_iter, times_r200, halos_r200m, all_particle_properties)    
+    hubble_vel = split_halo_by_mass(num_bins, start_nu, num_iter, times_r200, halos_r200m, all_particle_properties, ax1)    
     
     
 t2 = time.time()
 print("finish binning: ", (t2- t1), " seconds")
-plt.show()
+plt.savefig("/home/zvladimi/ML_orbit_infall_project/Random_figures/avg_rad_vel_vs_pos.png")
 

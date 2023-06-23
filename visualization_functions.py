@@ -43,16 +43,20 @@ def brute_force(curr_particles_pos, r200, halo_x, halo_y, halo_z):
 
 #TODO add radial vel vs position graph
 
-def rad_vel_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color):
-    plt.plot(rad_vel[:,0], rad_vel[:,1], color = color, alpha = 0.7, label = r"${0} < \nu < {1}$".format(str(start_nu), str(end_nu)))
+def rad_vel_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = None):
+    if ax == None:
+        ax = plt.gca()
+    ax.plot(rad_vel[:,0], rad_vel[:,1], color = color, alpha = 0.7, label = r"${0} < \nu < {1}$".format(str(start_nu), str(end_nu)))
     arr1inds = hubble_vel[:,0].argsort()
     hubble_vel[:,0] = hubble_vel[arr1inds,0]
     hubble_vel[:,1] = hubble_vel[arr1inds,1]
-    plt.plot(hubble_vel[:,0], hubble_vel[:,1], color = "purple", alpha = 0.5, linestyle = "dashed", label = r"Hubble Flow")
-    plt.title("average radial velocity vs position all particles")
-    plt.xlabel("position $r/R_{200m}$")
-    plt.ylabel("average rad vel $v_r/v_{200m}$")
-    plt.xscale("log")    
-    plt.ylim([-.5,1])
-    plt.xlim([0.01,15])
-    plt.legend()
+    
+    ax.set_title("average radial velocity vs position all particles")
+    ax.set_xlabel("position $r/R_{200m}$")
+    ax.set_ylabel("average rad vel $v_r/v_{200m}$")
+    ax.set_xscale("log")    
+    ax.set_ylim([-.5,1])
+    ax.set_xlim([0.01,15])
+    ax.legend()
+    
+    return ax.plot(hubble_vel[:,0], hubble_vel[:,1], color = "purple", alpha = 0.5, linestyle = "dashed", label = r"Hubble Flow")
