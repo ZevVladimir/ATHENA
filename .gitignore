@@ -11,3 +11,6 @@ qiskit-vscode-log.out
 /figures/
 /training_data/
 /pygadgetreader/
+/np_arrays/
+/sparta/
+/__pycache__/
