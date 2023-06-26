@@ -30,7 +30,6 @@ hubble_constant = cosmol.Hz(red_shift) * 0.001 # convert to units km/s/kpc
 box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
 box_size = box_size * 10**3 * scale_factor * little_h #convert to Kpc physical
 
-
 #load particle info
 particles_pid, particles_vel, particles_pos, particles_mass, halos_pos, halos_vel, halos_last_snap, halos_r200m, halos_id, halos_status, num_pericenter, tracer_id, n_is_lower_limit, density_prf_all, density_prf_1halo = load_or_pickle_data(save_location, curr_snapshot, hdf5_file, snapshot_path)
 
@@ -85,6 +84,39 @@ prf_bins = np.logspace(np.log10(start_prf_bins), np.log10(end_prf_bins), num_prf
 #construct a search tree iwth all of the particle positions
 particle_tree = cKDTree(data = particles_pos, leafsize = 3, balanced_tree = False, boxsize = box_size)
 
+def compare_density_prf_orb(bins, radii, actual_prf, num_prf_bins, mass, orbit_assn):
+    calculated_prf_all = np.zeros(num_prf_bins)
+    start_bin = 0
+    
+    radii = radii[orbit_assn]
+    for i in range(num_prf_bins):
+        end_bin = bins[i]  
+        
+        radii_within_range = np.where((radii >= start_bin) & (radii < end_bin))[0]
+        if radii_within_range.size != 0 and i != 0:
+            calculated_prf_all[i] = calculated_prf_all[i - 1] + radii_within_range.size * mass
+        elif i == 0:
+            calculated_prf_all[i] = radii_within_range.size * mass
+        else:
+            calculated_prf_all[i] = calculated_prf_all[i - 1]
+            
+        start_bin = end_bin
+    # for j in range(calculated_prf_all.size):
+    #     print("calc:", calculated_prf_all[j], "act:", actual_prf[j])
+    bins = np.insert(bins,0,0)
+    middle_bins = (bins[1:] + bins[:-1]) / 2
+
+    plt.figure(2)
+    plt.plot(middle_bins, calculated_prf_all, color = 'b', alpha = 0.5, label = "calculated profile")
+    plt.plot(middle_bins, actual_prf, color = 'r', alpha = 0.5, label = "actual profile")
+    plt.title("Density profile of halo orbit")
+    plt.xlabel("radius $r/R_{200m}$")
+    plt.ylabel("Mass of halo $M_{\odot}$")
+    plt.xscale("log")
+    plt.yscale("log")
+    plt.legend()
+    plt.show()
+
 def initial_search(halo_positions, search_radius, halo_r200m):
     num_halos = halo_positions.shape[0]
     particles_per_halo = np.zeros(num_halos, dtype = np.int32)
@@ -104,7 +136,7 @@ def initial_search(halo_positions, search_radius, halo_r200m):
     
     return particles_per_halo, all_halo_mass
 
-def search_halos(halo_positions, halo_r200m, search_radius, total_particles, dens_prf_all):
+def search_halos(halo_positions, halo_r200m, search_radius, total_particles, dens_prf_all, dens_prf_1halo):
     num_halos = halo_positions.shape[0]
     halo_indices = np.zeros((num_halos,2), dtype = np.int32)
     all_part_vel = np.zeros((total_particles,3), dtype = np.float32)
@@ -181,8 +213,9 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         r200m_per_part[start:start+num_new_particles] = halo_r200m[i]
         all_orbit_asn[start:start+num_new_particles] = current_orbit_assn
         
-        # if i < 3:
-        #     compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], num_prf_bins, mass)
+        if i < 3:
+            # compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], num_prf_bins, mass)
+            compare_density_prf_orb(prf_bins, particle_radii/halo_r200m[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn[:,1])
         
         start += num_new_particles
     
@@ -275,7 +308,7 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, fi
             
             print("Num particles: ", total_num_use_particles)
 
-            orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles, use_density_prf_all)   
+            orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles, use_density_prf_all, use_density_prf_1halo)   
 
             # with a new file and just started create all the datasets
             if new_file and len(list(file.keys())) == 0:
