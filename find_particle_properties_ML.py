@@ -31,7 +31,7 @@ box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
 box_size = box_size * 10**3 * scale_factor * little_h #convert to Kpc physical
 
 #load particle info
-particles_pid, particles_vel, particles_pos, particles_mass, halos_pos, halos_vel, halos_last_snap, halos_r200m, halos_id, halos_status, num_pericenter, tracer_id, n_is_lower_limit, density_prf_all, density_prf_1halo = load_or_pickle_data(save_location, curr_snapshot, hdf5_file, snapshot_path)
+particles_pid, particles_vel, particles_pos, particles_mass, halos_pos, halos_vel, halos_last_snap, halos_r200m, halos_id, halos_status, num_pericenter, tracer_id, n_is_lower_limit, last_pericenter_snap, density_prf_all, density_prf_1halo = load_or_pickle_data(save_location, curr_snapshot, hdf5_file, snapshot_path)
 
 particles_pos = particles_pos * 10**3 * scale_factor * little_h #convert to kpc and physical
 mass = particles_mass[0] * 10**10 #units M_sun/h
@@ -62,18 +62,21 @@ total_num_halos = halos_r200m.size #num of halos remaining
 # create array that tracks the ids and if a tracer is orbiting or infalling.
 orbit_assn_tracers = np.zeros((tracer_id.size, 2), dtype = np.int32)
 orbit_assn_tracers[:,0] = tracer_id
-num_pericenter[num_pericenter > 0] = 1 # if there is more than one pericenter count as orbiting (1) and infalling is 0
-orbit_assn_tracers[:,1] = num_pericenter
+
+orb_mask = np.where(last_pericenter_snap <= snapshot_index)[0] # only want pericenters that have occurred at or before this snapshot
+num_pericenter[orb_mask] = 0
+# if there is more than one pericenter count as orbiting (1) and if it isn't it is infalling (0)
+orbit_assn_tracers[np.where(num_pericenter > 0)[0],1] = 1
 
 # However particle can also be orbiting if n_is_lower_limit is 1
-indices_pass_n_low_lim = np.where(n_is_lower_limit == 1)
-orbit_assn_tracers[indices_pass_n_low_lim,1] = 1
+orbit_assn_tracers[np.where(n_is_lower_limit == 1)[0],1] = 1
 
 # create array that tracks the pids and if a particle is orbiting or infalling. (assume particle is infalling until proven otherwise)
-orbit_assn_pids = np.zeros((particles_pid.size, 2), dtype = np.int32)
-orbit_assn_pids[:,0] = particles_pid
-match_ids = np.intersect1d(particles_pid, tracer_id, return_indices = True)[1:] # only take the matching indices for particle pids and orbit_assn
-orbit_assn_pids[match_ids[0],1] = orbit_assn_tracers[match_ids[1],1] # assign the pids to the orbit/infall assignment of the matching tracers
+orbit_assn_part = np.zeros((particles_pid.size, 2), dtype = np.int32)
+orbit_assn_part[:,0] = particles_pid
+match_ids = np.intersect1d(particles_pid, tracer_id, return_indices = True) # only take the matching indices for particle pids and orbit_assn
+
+orbit_assn_part[match_ids[1],1] = orbit_assn_tracers[match_ids[2],1] # assign the pids to the orbit/infall assignment of the matching tracers
 
 # Create bins for the density profile calculation
 num_prf_bins = density_prf_all.shape[1]
@@ -84,14 +87,81 @@ prf_bins = np.logspace(np.log10(start_prf_bins), np.log10(end_prf_bins), num_prf
 #construct a search tree iwth all of the particle positions
 particle_tree = cKDTree(data = particles_pos, leafsize = 3, balanced_tree = False, boxsize = box_size)
 
-def compare_density_prf_orb(bins, radii, actual_prf, num_prf_bins, mass, orbit_assn):
+def compare_density_prf(bins, radii, actual_prf, num_prf_bins, mass):
     calculated_prf_all = np.zeros(num_prf_bins)
     start_bin = 0
     
-    radii = radii[orbit_assn]
     for i in range(num_prf_bins):
         end_bin = bins[i]  
         
+        radii_within_range = np.where((radii >= start_bin) & (radii < end_bin))[0]
+        if radii_within_range.size != 0 and i != 0:
+            calculated_prf_all[i] = calculated_prf_all[i - 1] + radii_within_range.size * mass
+        elif i == 0:
+            calculated_prf_all[i] = radii_within_range.size * mass
+        else:
+            calculated_prf_all[i] = calculated_prf_all[i - 1]
+            
+        start_bin = end_bin
+    # for j in range(calculated_prf_all.size):
+    #     print("calc:", np.round(calculated_prf_all[j],-5), "act:", actual_prf[j])
+
+    bins = np.insert(bins,0,0)
+    middle_bins = (bins[1:] + bins[:-1]) / 2
+
+    
+    scaled_calc_prf = calculated_prf_all/mass
+    scaled_act_prf = actual_prf/mass
+    if np.all(np.isclose(scaled_calc_prf, scaled_act_prf, atol = 1)):
+        return True
+    else:
+        indices_no_match = np.where(scaled_calc_prf != scaled_act_prf)[0]
+        print(scaled_calc_prf[indices_no_match])
+        print(scaled_act_prf[indices_no_match])
+        plt.figure(1)
+        plt.plot(middle_bins, calculated_prf_all, '--', label = "my code profile")
+        plt.plot(middle_bins, actual_prf, '--', label = "SPARTA profile")
+        plt.title("Density profile of halo")
+        plt.xlabel("radius $r/R_{200m}$")
+        plt.ylabel("Mass of halo $M_{\odot}$")
+        plt.xscale("log")
+        plt.yscale("log")
+        plt.legend()
+        plt.show()
+        return False
+    
+def compare_density_prf_1halo(bins, radii, actual_prf_all, actual_prf_1halo, num_prf_bins, mass, orbit_assn):
+    calculated_prf_orb = np.zeros(num_prf_bins)
+    calculated_prf_inf = np.zeros(num_prf_bins)
+    calculated_prf_all = np.zeros(num_prf_bins)
+    start_bin = 0
+    # print(np.where(orbit_assn == 1)[0])
+    # print(np.where(orbit_assn == 0)[0])
+    # print(orbit_assn)
+    # print(radii)
+    orbit_radii = radii[np.where(orbit_assn == 1)[0]]
+    infall_radii = radii[np.where(orbit_assn == 0)[0]]
+
+    for i in range(num_prf_bins):
+        end_bin = bins[i]  
+        
+        orb_radii_within_range = np.where((orbit_radii >= start_bin) & (orbit_radii < end_bin))[0]
+        print(orb_radii_within_range)
+        if orb_radii_within_range.size != 0 and i != 0:
+            calculated_prf_orb[i] = calculated_prf_orb[i - 1] + orb_radii_within_range.size * mass
+        elif i == 0:
+            calculated_prf_orb[i] = orb_radii_within_range.size * mass
+        else:
+            calculated_prf_orb[i] = calculated_prf_orb[i - 1]
+            
+        inf_radii_within_range = np.where((infall_radii >= start_bin) & (infall_radii < end_bin))[0]
+        if inf_radii_within_range.size != 0 and i != 0:
+            calculated_prf_inf[i] = calculated_prf_inf[i - 1] + inf_radii_within_range.size * mass
+        elif i == 0:
+            calculated_prf_inf[i] = inf_radii_within_range.size * mass
+        else:
+            calculated_prf_inf[i] = calculated_prf_inf[i - 1]
+            
         radii_within_range = np.where((radii >= start_bin) & (radii < end_bin))[0]
         if radii_within_range.size != 0 and i != 0:
             calculated_prf_all[i] = calculated_prf_all[i - 1] + radii_within_range.size * mass
@@ -107,9 +177,14 @@ def compare_density_prf_orb(bins, radii, actual_prf, num_prf_bins, mass, orbit_a
     middle_bins = (bins[1:] + bins[:-1]) / 2
 
     plt.figure(2)
-    plt.plot(middle_bins, calculated_prf_all, color = 'b', alpha = 0.5, label = "calculated profile")
-    plt.plot(middle_bins, actual_prf, color = 'r', alpha = 0.5, label = "actual profile")
-    plt.title("Density profile of halo orbit")
+    plt.plot(middle_bins, calculated_prf_orb, 'b-', label = "my code profile orb")
+    plt.plot(middle_bins, calculated_prf_inf, 'g-', label = "my code profile inf")
+    plt.plot(middle_bins, calculated_prf_all, 'r-', label = "my code profile all")
+    plt.plot(middle_bins, actual_prf_all, 'c--', label = "SPARTA profile all part")
+    plt.plot(middle_bins, actual_prf_1halo, 'm--', label = "SPARTA profile orbit")
+    plt.plot(middle_bins, actual_prf_all - actual_prf_1halo, 'y--', label = "SPARTA profile inf")
+    
+    plt.title("1Halo Density Profile")
     plt.xlabel("radius $r/R_{200m}$")
     plt.ylabel("Mass of halo $M_{\odot}$")
     plt.xscale("log")
@@ -136,7 +211,7 @@ def initial_search(halo_positions, search_radius, halo_r200m):
     
     return particles_per_halo, all_halo_mass
 
-def search_halos(halo_positions, halo_r200m, search_radius, total_particles, dens_prf_all, dens_prf_1halo):
+def search_halos(halo_positions, halo_r200m, search_radius, total_particles, dens_prf_all, dens_prf_1halo, pid_type_assn):
     num_halos = halo_positions.shape[0]
     halo_indices = np.zeros((num_halos,2), dtype = np.int32)
     all_part_vel = np.zeros((total_particles,3), dtype = np.float32)
@@ -148,7 +223,7 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
     all_radii = np.zeros((total_particles), dtype = np.float32)
     all_scaled_radii = np.zeros(total_particles, dtype = np.float16)
     r200m_per_part = np.zeros(total_particles, dtype = np.float16)
-    all_orbit_asn = np.zeros((total_particles,2), dtype = np.int16)
+    all_orbit_assn = np.zeros((total_particles,2), dtype = np.int16)
 
     start = 0
     for i in range(num_halos):
@@ -159,7 +234,7 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         #Only take the particle positions that where found with the tree
         current_particles_pos = particles_pos[indices,:]
         current_particles_vel = particles_vel[indices,:]
-        current_orbit_assn = orbit_assn_pids[indices]
+        current_orbit_assn = pid_type_assn[indices]
         current_halos_pos = halo_positions[i,:]        
 
         # how many new particles being added
@@ -182,6 +257,7 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         particle_radii = unsorted_particle_radii[arrsortrad]
         current_particles_pos = current_particles_pos[arrsortrad]
         current_particles_vel = current_particles_vel[arrsortrad]
+        current_orbit_assn = current_orbit_assn[arrsortrad]
         coord_dist = unsorted_coord_dist[arrsortrad]
         
         #calculate the density at each particle
@@ -211,15 +287,17 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         all_radii[start:start+num_new_particles] = particle_radii
         all_scaled_radii[start:start+num_new_particles] = particle_radii/halo_r200m[i]
         r200m_per_part[start:start+num_new_particles] = halo_r200m[i]
-        all_orbit_asn[start:start+num_new_particles] = current_orbit_assn
+        all_orbit_assn[start:start+num_new_particles] = current_orbit_assn
         
+        # if compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], num_prf_bins, mass) == False:
+        #     print("No match in prf:",i)
+            
         if i < 3:
-            # compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], num_prf_bins, mass)
-            compare_density_prf_orb(prf_bins, particle_radii/halo_r200m[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn[:,1])
+            compare_density_prf_1halo(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn[:,1])
         
         start += num_new_particles
     
-    return all_orbit_asn, calculated_radial_velocities, all_radii, all_scaled_radii, r200m_per_part, calculated_radial_velocities_comp, calculated_tangential_velocities_comp
+    return all_orbit_assn, calculated_radial_velocities, all_radii, all_scaled_radii, r200m_per_part, calculated_radial_velocities_comp, calculated_tangential_velocities_comp
     
 def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r200_per_part):
     start_bin_val = 0.001
@@ -308,7 +386,7 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, fi
             
             print("Num particles: ", total_num_use_particles)
 
-            orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles, use_density_prf_all, use_density_prf_1halo)   
+            orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles, use_density_prf_all, use_density_prf_1halo, orbit_assn_part)   
 
             # with a new file and just started create all the datasets
             if new_file and len(list(file.keys())) == 0:
