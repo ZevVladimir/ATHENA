@@ -63,8 +63,8 @@ total_num_halos = halos_r200m.size #num of halos remaining
 orbit_assn_tracers = np.zeros((tracer_id.size, 2), dtype = np.int32)
 orbit_assn_tracers[:,0] = tracer_id
 
-orb_mask = np.where(last_pericenter_snap <= snapshot_index)[0] # only want pericenters that have occurred at or before this snapshot
-num_pericenter[orb_mask] = 0
+# only want pericenters that have occurred at or before this snapshot
+num_pericenter[np.where(last_pericenter_snap > snapshot_index)[0]] = 0
 # if there is more than one pericenter count as orbiting (1) and if it isn't it is infalling (0)
 orbit_assn_tracers[np.where(num_pericenter > 0)[0],1] = 1
 
@@ -146,7 +146,6 @@ def compare_density_prf_1halo(bins, radii, actual_prf_all, actual_prf_1halo, num
         end_bin = bins[i]  
         
         orb_radii_within_range = np.where((orbit_radii >= start_bin) & (orbit_radii < end_bin))[0]
-        print(orb_radii_within_range)
         if orb_radii_within_range.size != 0 and i != 0:
             calculated_prf_orb[i] = calculated_prf_orb[i - 1] + orb_radii_within_range.size * mass
         elif i == 0:
@@ -179,8 +178,8 @@ def compare_density_prf_1halo(bins, radii, actual_prf_all, actual_prf_1halo, num
     plt.figure(2)
     plt.plot(middle_bins, calculated_prf_orb, 'b-', label = "my code profile orb")
     plt.plot(middle_bins, calculated_prf_inf, 'g-', label = "my code profile inf")
-    plt.plot(middle_bins, calculated_prf_all, 'r-', label = "my code profile all")
-    plt.plot(middle_bins, actual_prf_all, 'c--', label = "SPARTA profile all part")
+    # plt.plot(middle_bins, calculated_prf_all, 'r-', label = "my code profile all")
+    # plt.plot(middle_bins, actual_prf_all, 'c--', label = "SPARTA profile all part")
     plt.plot(middle_bins, actual_prf_1halo, 'm--', label = "SPARTA profile orbit")
     plt.plot(middle_bins, actual_prf_all - actual_prf_1halo, 'y--', label = "SPARTA profile inf")
     
@@ -234,7 +233,7 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         #Only take the particle positions that where found with the tree
         current_particles_pos = particles_pos[indices,:]
         current_particles_vel = particles_vel[indices,:]
-        current_orbit_assn = pid_type_assn[indices]
+        current_orbit_assn = pid_type_assn[indices,:]
         current_halos_pos = halo_positions[i,:]        
 
         # how many new particles being added
