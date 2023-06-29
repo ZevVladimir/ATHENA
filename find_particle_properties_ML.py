@@ -31,7 +31,7 @@ box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
 box_size = box_size * 10**3 * scale_factor * little_h #convert to Kpc physical
 
 #load particle info
-particles_pid, particles_vel, particles_pos, particles_mass, halos_pos, halos_vel, halos_last_snap, halos_r200m, halos_id, halos_status, num_pericenter, tracer_id, n_is_lower_limit, last_pericenter_snap, density_prf_all, density_prf_1halo = load_or_pickle_data(save_location, curr_snapshot, hdf5_file, snapshot_path)
+particles_pid, particles_vel, particles_pos, particles_mass, halos_pos, halos_vel, halos_last_snap, halos_r200m, halos_id, halos_status, num_pericenter, tracer_id, n_is_lower_limit, last_pericenter_snap, density_prf_all, density_prf_1halo, halo_n, halo_first = load_or_pickle_data(save_location, curr_snapshot, hdf5_file, snapshot_path)
 
 particles_pos = particles_pos * 10**3 * scale_factor * little_h #convert to kpc and physical
 mass = particles_mass[0] * 10**10 #units M_sun/h
@@ -57,6 +57,8 @@ halos_r200m = halos_r200m[indices_keep]
 halos_id = halos_id[indices_keep]
 density_prf_all = density_prf_all[indices_keep]
 density_prf_1halo = density_prf_1halo[indices_keep]
+halo_n = halo_n[indices_keep]
+halo_first = halo_first[indices_keep]
 total_num_halos = halos_r200m.size #num of halos remaining
 
 # create array that tracks the ids and if a tracer is orbiting or infalling.
@@ -84,7 +86,12 @@ start_prf_bins = 0.01
 end_prf_bins = 3.0
 prf_bins = np.logspace(np.log10(start_prf_bins), np.log10(end_prf_bins), num_prf_bins)
 
-#construct a search tree iwth all of the particle positions
+sorted_unique_tracer_ids, tracer_indices, tracer_repeat_counts = np.unique(tracer_id, return_index = True, return_counts = True)
+indx_repeated_tracers = np.where(tracer_repeat_counts > 1)[0]
+repeated_tracer_ids = sorted_unique_tracer_ids[indx_repeated_tracers]
+
+
+#construct a search tree with all of the particle positions
 particle_tree = cKDTree(data = particles_pos, leafsize = 3, balanced_tree = False, boxsize = box_size)
 
 def compare_density_prf(bins, radii, actual_prf, num_prf_bins, mass):
@@ -210,7 +217,7 @@ def initial_search(halo_positions, search_radius, halo_r200m):
     
     return particles_per_halo, all_halo_mass
 
-def search_halos(halo_positions, halo_r200m, search_radius, total_particles, dens_prf_all, dens_prf_1halo, pid_type_assn):
+def search_halos(halo_positions, halo_r200m, search_radius, total_particles, dens_prf_all, dens_prf_1halo, pid_type_assn, curr_halo_n, curr_halo_first):
     num_halos = halo_positions.shape[0]
     halo_indices = np.zeros((num_halos,2), dtype = np.int32)
     all_part_vel = np.zeros((total_particles,3), dtype = np.float32)
@@ -229,6 +236,8 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         # find the indices of the particles within the expected r200 radius multiplied by times_r200 
         # value of 1.4 determined by guessing if just r200 value or 1.1 miss a couple halo r200 values but 1.4 gets them all
         indices = particle_tree.query_ball_point(halo_positions[i,:], r = search_radius * halo_r200m[i])
+        
+        curr_tracer_ids = tracer_id[curr_halo_first[i]:curr_halo_first[i] + curr_halo_n[i]]
 
         #Only take the particle positions that where found with the tree
         current_particles_pos = particles_pos[indices,:]
@@ -248,9 +257,14 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
             
         #calculate the radii of each particle based on the distance formula
         unsorted_particle_radii, unsorted_coord_dist = calculate_distance(current_halos_pos[0], current_halos_pos[1], current_halos_pos[2], current_particles_pos[:,0],
-                                    current_particles_pos[:,1], current_particles_pos[:,2], num_new_particles, box_size)
+                                    current_particles_pos[:,1], current_particles_pos[:,2], num_new_particles, box_size)         
+             
+        repeat_pids_ind = np.intersect1d(current_orbit_assn[:,0], repeated_tracer_ids, return_indices = True)[1] # find indices of pids that are not unique
+        curr_repeated_pids = current_orbit_assn[repeat_pids_ind,0] # which pids correspond to tracers that are repeated
+        correct_pids_ind = np.intersect1d(curr_repeated_pids, curr_tracer_ids, return_indices = True)[1] # find which tracers belong to this halo that are repeated
+        incorrect_pids = np.delete(curr_repeated_pids, correct_pids_ind) # remove the pids that have corresponding tracers in this halo
+        current_orbit_assn[np.intersect1d(incorrect_pids, current_orbit_assn[:,0], return_indices = True)[2],1] = 1 # at the indices where the incorrect pids are set those particles as infalling         
         
-            
         #sort the radii, positions, velocities, coord separations to allow for creation of plots and to correctly assign how much mass there is
         arrsortrad = unsorted_particle_radii.argsort()
         particle_radii = unsorted_particle_radii[arrsortrad]
@@ -291,8 +305,8 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         # if compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], num_prf_bins, mass) == False:
         #     print("No match in prf:",i)
             
-        # if i == 5 or i == 10 or i == 15:
-        #     compare_density_prf_1halo(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn[:,1])
+        if i == 5 or i == 10 or i == 15:
+            compare_density_prf_1halo(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn[:,1])
         
         start += num_new_particles
     
@@ -381,11 +395,13 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, fi
             use_density_prf_all = density_prf_all[halos_within_range]
             use_density_prf_1halo = density_prf_1halo[halos_within_range]
             use_num_particles = num_particles_per_halo[halos_within_range]
+            use_halo_n = halo_n[halos_within_range]
+            use_halo_first = halo_first[halos_within_range]
             total_num_use_particles = np.sum(use_num_particles)
             
             print("Num particles: ", total_num_use_particles)
 
-            orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles, use_density_prf_all, use_density_prf_1halo, orbit_assn_part)   
+            orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles, use_density_prf_all, use_density_prf_1halo, orbit_assn_part, use_halo_n, use_halo_first)   
 
             # with a new file and just started create all the datasets
             if new_file and len(list(file.keys())) == 0:
@@ -438,7 +454,7 @@ t1 = time.time()
 print("start particle assign")
 
 fig, ax1 = plt.subplots(1)
-times_r200 = 14
+times_r200 = 3
 with h5py.File((save_location + "all_particle_properties" + curr_snapshot + ".hdf5"), 'a') as all_particle_properties:
     hubble_vel = split_halo_by_mass(num_bins, start_nu, num_iter, times_r200, halos_r200m, all_particle_properties, ax1)    
     
