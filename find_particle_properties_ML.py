@@ -178,8 +178,8 @@ def compare_density_prf_1halo(bins, radii, actual_prf_all, actual_prf_1halo, num
     plt.figure(2)
     plt.plot(middle_bins, calculated_prf_orb, 'b-', label = "my code profile orb")
     plt.plot(middle_bins, calculated_prf_inf, 'g-', label = "my code profile inf")
-    # plt.plot(middle_bins, calculated_prf_all, 'r-', label = "my code profile all")
-    # plt.plot(middle_bins, actual_prf_all, 'c--', label = "SPARTA profile all part")
+    plt.plot(middle_bins, calculated_prf_all, 'r-', label = "my code profile all")
+    plt.plot(middle_bins, actual_prf_all, 'c--', label = "SPARTA profile all part")
     plt.plot(middle_bins, actual_prf_1halo, 'm--', label = "SPARTA profile orbit")
     plt.plot(middle_bins, actual_prf_all - actual_prf_1halo, 'y--', label = "SPARTA profile inf")
     
@@ -291,8 +291,8 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         # if compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], num_prf_bins, mass) == False:
         #     print("No match in prf:",i)
             
-        if i < 3:
-            compare_density_prf_1halo(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn[:,1])
+        # if i == 5 or i == 10 or i == 15:
+        #     compare_density_prf_1halo(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn[:,1])
         
         start += num_new_particles
     
