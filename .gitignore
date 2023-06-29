@@ -14,3 +14,6 @@ qiskit-vscode-log.out
 /np_arrays/
 /sparta/
 /__pycache__/
+/MLOI_venv/
+/pygadgetreader/
+.python-version

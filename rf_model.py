@@ -2,12 +2,13 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import h5py
-from xgboost import XGBClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report  
+from sklearn.ensemble import RandomForestClassifier
 import time 
 import pickle
 import os
+import multiprocessing as mp
 from imblearn import under_sampling
 
 curr_snapshot = "190"
@@ -48,24 +49,17 @@ def load_or_pickle_data(path, curr_split, indices, use_num_particles, snapshot):
 
     return orbit_infall, scaled_radii, radial_vel, tang_vel
 
-num_splits = 10
+num_splits = 25
 with h5py.File((data_location + "all_particle_properties" + curr_snapshot + ".hdf5"), 'r') as all_particle_properties:
     total_num_particles = all_particle_properties["PIDS"][:].shape[0]    
     random_indices = np.random.choice(total_num_particles, total_num_particles)
     use_num_particles = int(np.floor(total_num_particles/num_splits))
     
-model=None
-
-def choose_class(predictions):
-    predictions[predictions > 0.5] = 1
-    predictions[predictions <= 0.5] = 0
-    return predictions
-
 rus = under_sampling.RandomUnderSampler(random_state=0)
 t0 = time.time()
-for i in range(num_splits):
+for i in range(1):
     t1 = time.time()
-    print("Split:", (i+1), "/",num_splits)
+    print("Split:", (i + 1), "/",num_splits)
     
     orbit_infall, scaled_radii, radial_vel, tang_vel = load_or_pickle_data(save_location, i, random_indices, use_num_particles, curr_snapshot)
 
@@ -74,29 +68,46 @@ for i in range(num_splits):
     features[:,1:4] = radial_vel
     features[:,4:] = tang_vel
 
+    X_train, X_test, y_train, y_test = train_test_split(features, orbit_infall, test_size=0.30, random_state=0)
+    
+    total_num_particles = y_train.size
+    print(f'{total_num_particles:,}')
+    print(f'{np.where(y_train == 0)[0].size:,}')
+    print(f'{np.where(y_train == 1)[0].size:,}')
+    print(np.where(y_train == 0)[0].size / total_num_particles)
+    print(np.where(y_train == 1)[0].size / total_num_particles)
+    
+    X_train_rs, y_train_rs = rus.fit_resample(X_train, y_train)
+    
+    total_num_particles = y_train_rs.size
+    print(f'{total_num_particles:,}')
+    print(f'{np.where(y_train_rs == 0)[0].size:,}')
+    print(f'{np.where(y_train_rs == 1)[0].size:,}')
+    print(np.where(y_train_rs == 0)[0].size / total_num_particles)
+    print(np.where(y_train_rs == 1)[0].size / total_num_particles)
+    
+    model_params = {
+        'n_estimators': 25,
+        'max_depth': 15,
+        'n_jobs': 6,
+    }
+    
     t2 = time.time()
     print("Loaded data", t2 - t1, "seconds")
-
-    X_train, X_test, y_train, y_test = train_test_split(features, orbit_infall, test_size=0.30, random_state=0)
-
-    X_train_rs, y_train_rs = rus.fit_resample(X_train, y_train)
     
     t3 = time.time()
     
-    model = XGBClassifier(tree_method='gpu_hist')
-    model = model.fit(X_train_rs, y_train_rs)
-
-
-    predicts = model.predict(X_test)
+    model = RandomForestClassifier(**model_params)
+    model.fit(X_train_rs, y_train_rs)
 
     t4 = time.time()
     print("Fitted model", t4 - t3, "seconds")
+    
+    predicts = model.predict(X_test)
 
-    predicts = choose_class((predicts))
+    print(model.score(X_train, y_train))
+    print(model.score(X_test, y_test))
 
-    classification = classification_report(y_test, predicts)
-    print(classification)
-
-model.save_model(save_location + "xgb_model" + curr_snapshot + ".model")
-t5 = time.time()
-print("Total time:", t5-t0, "seconds")
+# model.save_model(save_location + "rnn_model" + curr_snapshot + ".model")
+# t5 = time.time()
+# print("Total time:", t5-t0, "seconds")
