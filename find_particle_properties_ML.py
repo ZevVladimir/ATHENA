@@ -94,66 +94,6 @@ repeated_tracer_ids = sorted_unique_tracer_ids[indx_repeated_tracers]
 #construct a search tree with all of the particle positions
 particle_tree = cKDTree(data = particles_pos, leafsize = 3, balanced_tree = False, boxsize = box_size)
 
-def compare_density_prf(bins, radii, actual_prf_all, actual_prf_1halo, num_prf_bins, mass, orbit_assn, num):
-    calculated_prf_orb = np.zeros(num_prf_bins)
-    calculated_prf_inf = np.zeros(num_prf_bins)
-    calculated_prf_all = np.zeros(num_prf_bins)
-    start_bin = 0
-    
-    orbit_radii = radii[np.where(orbit_assn == 1)[0]]
-    infall_radii = radii[np.where(orbit_assn == 0)[0]]
-
-    for i in range(num_prf_bins):
-        end_bin = bins[i]  
-        
-        orb_radii_within_range = np.where((orbit_radii >= start_bin) & (orbit_radii < end_bin))[0]
-        if orb_radii_within_range.size != 0 and i != 0:
-            calculated_prf_orb[i] = calculated_prf_orb[i - 1] + orb_radii_within_range.size * mass
-        elif i == 0:
-            calculated_prf_orb[i] = orb_radii_within_range.size * mass
-        else:
-            calculated_prf_orb[i] = calculated_prf_orb[i - 1]
-            
-        inf_radii_within_range = np.where((infall_radii >= start_bin) & (infall_radii < end_bin))[0]
-        if inf_radii_within_range.size != 0 and i != 0:
-            calculated_prf_inf[i] = calculated_prf_inf[i - 1] + inf_radii_within_range.size * mass
-        elif i == 0:
-            calculated_prf_inf[i] = inf_radii_within_range.size * mass
-        else:
-            calculated_prf_inf[i] = calculated_prf_inf[i - 1]
-            
-        radii_within_range = np.where((radii >= start_bin) & (radii < end_bin))[0]
-        if radii_within_range.size != 0 and i != 0:
-            calculated_prf_all[i] = calculated_prf_all[i - 1] + radii_within_range.size * mass
-        elif i == 0:
-            calculated_prf_all[i] = radii_within_range.size * mass
-        else:
-            calculated_prf_all[i] = calculated_prf_all[i - 1]
-            
-        start_bin = end_bin
-
-    bins = np.insert(bins,0,0)
-    middle_bins = (bins[1:] + bins[:-1]) / 2
-
-    fig, ax = plt.subplots(1,1)
-    ax.plot(middle_bins, calculated_prf_orb, 'b-', label = "my code profile orb")
-    ax.plot(middle_bins, calculated_prf_inf, 'g-', label = "my code profile inf")
-    ax.plot(middle_bins, calculated_prf_all, 'r-', label = "my code profile all")
-    ax.plot(middle_bins, actual_prf_all, 'c--', label = "SPARTA profile all part")
-    ax.plot(middle_bins, actual_prf_1halo, 'm--', label = "SPARTA profile orbit")
-    ax.plot(middle_bins, actual_prf_all - actual_prf_1halo, 'y--', label = "SPARTA profile inf")
-    
-    ax.set_title("1Halo Density Profile")
-    ax.set_xlabel("radius $r/R_{200m}$")
-    ax.set_ylabel("Mass of halo $M_{\odot}$")
-    ax.set_xscale("log")
-    ax.set_yscale("log")
-    ax.legend()
-    fig.savefig("/home/zvladimi/ML_orbit_infall_project/Random_figures/density_prf_" + str(overall_curr_search) + "_" + str(num) + ".png")
-    plt.show()
-    ax.clear()
-    fig.clear()
-
 def initial_search(halo_positions, search_radius, halo_r200m):
     num_halos = halo_positions.shape[0]
     particles_per_halo = np.zeros(num_halos, dtype = np.int32)
