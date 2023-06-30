@@ -94,50 +94,7 @@ repeated_tracer_ids = sorted_unique_tracer_ids[indx_repeated_tracers]
 #construct a search tree with all of the particle positions
 particle_tree = cKDTree(data = particles_pos, leafsize = 3, balanced_tree = False, boxsize = box_size)
 
-def compare_density_prf(bins, radii, actual_prf, num_prf_bins, mass):
-    calculated_prf_all = np.zeros(num_prf_bins)
-    start_bin = 0
-    
-    for i in range(num_prf_bins):
-        end_bin = bins[i]  
-        
-        radii_within_range = np.where((radii >= start_bin) & (radii < end_bin))[0]
-        if radii_within_range.size != 0 and i != 0:
-            calculated_prf_all[i] = calculated_prf_all[i - 1] + radii_within_range.size * mass
-        elif i == 0:
-            calculated_prf_all[i] = radii_within_range.size * mass
-        else:
-            calculated_prf_all[i] = calculated_prf_all[i - 1]
-            
-        start_bin = end_bin
-    # for j in range(calculated_prf_all.size):
-    #     print("calc:", np.round(calculated_prf_all[j],-5), "act:", actual_prf[j])
-
-    bins = np.insert(bins,0,0)
-    middle_bins = (bins[1:] + bins[:-1]) / 2
-
-    
-    scaled_calc_prf = calculated_prf_all/mass
-    scaled_act_prf = actual_prf/mass
-    if np.all(np.isclose(scaled_calc_prf, scaled_act_prf, atol = 1)):
-        return True
-    else:
-        indices_no_match = np.where(scaled_calc_prf != scaled_act_prf)[0]
-        print(scaled_calc_prf[indices_no_match])
-        print(scaled_act_prf[indices_no_match])
-        plt.figure(1)
-        plt.plot(middle_bins, calculated_prf_all, '--', label = "my code profile")
-        plt.plot(middle_bins, actual_prf, '--', label = "SPARTA profile")
-        plt.title("Density profile of halo")
-        plt.xlabel("radius $r/R_{200m}$")
-        plt.ylabel("Mass of halo $M_{\odot}$")
-        plt.xscale("log")
-        plt.yscale("log")
-        plt.legend()
-        plt.show()
-        return False
-    
-def compare_density_prf_1halo(bins, radii, actual_prf_all, actual_prf_1halo, num_prf_bins, mass, orbit_assn):
+def compare_density_prf(bins, radii, actual_prf_all, actual_prf_1halo, num_prf_bins, mass, orbit_assn):
     calculated_prf_orb = np.zeros(num_prf_bins)
     calculated_prf_inf = np.zeros(num_prf_bins)
     calculated_prf_all = np.zeros(num_prf_bins)
@@ -258,13 +215,14 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         #calculate the radii of each particle based on the distance formula
         unsorted_particle_radii, unsorted_coord_dist = calculate_distance(current_halos_pos[0], current_halos_pos[1], current_halos_pos[2], current_particles_pos[:,0],
                                     current_particles_pos[:,1], current_particles_pos[:,2], num_new_particles, box_size)         
-             
+              
+              
         repeat_pids_ind = np.intersect1d(current_orbit_assn[:,0], repeated_tracer_ids, return_indices = True)[1] # find indices of pids that are not unique
         curr_repeated_pids = current_orbit_assn[repeat_pids_ind,0] # which pids correspond to tracers that are repeated
         correct_pids_ind = np.intersect1d(curr_repeated_pids, curr_tracer_ids, return_indices = True)[1] # find which tracers belong to this halo that are repeated
         incorrect_pids = np.delete(curr_repeated_pids, correct_pids_ind) # remove the pids that have corresponding tracers in this halo
-        current_orbit_assn[np.intersect1d(incorrect_pids, current_orbit_assn[:,0], return_indices = True)[2],1] = 1 # at the indices where the incorrect pids are set those particles as infalling         
-        
+        current_orbit_assn[np.intersect1d(incorrect_pids, current_orbit_assn[:,0], return_indices = True)[2],1] = 0 # at the indices where the incorrect pids are set those particles as infalling   
+            
         #sort the radii, positions, velocities, coord separations to allow for creation of plots and to correctly assign how much mass there is
         arrsortrad = unsorted_particle_radii.argsort()
         particle_radii = unsorted_particle_radii[arrsortrad]
@@ -301,12 +259,10 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         all_scaled_radii[start:start+num_new_particles] = particle_radii/halo_r200m[i]
         r200m_per_part[start:start+num_new_particles] = halo_r200m[i]
         all_orbit_assn[start:start+num_new_particles] = current_orbit_assn
-        
-        # if compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], num_prf_bins, mass) == False:
-        #     print("No match in prf:",i)
+
             
         if i == 5 or i == 10 or i == 15:
-            compare_density_prf_1halo(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn[:,1])
+            compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn[:,1])
         
         start += num_new_particles
     
