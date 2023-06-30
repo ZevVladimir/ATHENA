@@ -1,4 +1,4 @@
-# MLOIS or Machine the Learning Orbit Infall Split
+# MLOIS or Machine Learning the Orbit Infall Split
 
 This is a project with Dr. Benedikt Diemer that will use data from the nbody simulations run by Dr. Diemer and then processed with SPARTA [1][2][3]. The goal is to construct and compare several machine learning models in order to develop one that can accurately predict if a particle is either currently orbiting a dark matter halo or is infalling into one. This will be used to help better define the radius of a dark matter halo.
 
