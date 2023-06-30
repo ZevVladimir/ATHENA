@@ -13,8 +13,8 @@ from imblearn import under_sampling
 curr_snapshot = "190"
 curr_hdf5_file = "sparta_190.hdf5"
 
-data_location = "/home/zvladimi/ML_orbit_infall_project/calculated_info/" + "calc_from_" + curr_hdf5_file + "/"
-save_location = "/home/zvladimi/ML_orbit_infall_project/training_data/" + "data_for_" + curr_hdf5_file + "/"
+data_location = "/home/zvladimi/MLOIS/calculated_info/" + "calc_from_" + curr_hdf5_file + "/"
+save_location = "/home/zvladimi/MLOIS/training_data/" + "data_for_" + curr_hdf5_file + "/"
 
 np.random.seed(11)
 

@@ -14,9 +14,9 @@ from visualization_functions import compare_density_prf, rad_vel_vs_radius_plot
 
 curr_snapshot = "190"
 curr_hdf5_file = "sparta_190.hdf5"
-hdf5_file = "/home/zvladimi/ML_orbit_infall_project/SPARTA_data/" + curr_hdf5_file
-save_location =  "/home/zvladimi/ML_orbit_infall_project/calculated_info/" + "calc_from_" + curr_hdf5_file + "/"
-snapshot_path = "/home/zvladimi/ML_orbit_infall_project/particle_data/snapshot_" + curr_snapshot + "/snapshot_0" + curr_snapshot
+hdf5_file = "/home/zvladimi/MLOIS/SPARTA_data/" + curr_hdf5_file
+save_location =  "/home/zvladimi/MLOIS/calculated_info/" + "calc_from_" + curr_hdf5_file + "/"
+snapshot_path = "/home/zvladimi/MLOIS/particle_data/snapshot_" + curr_snapshot + "/snapshot_0" + curr_snapshot
 
 # get constants from pygadgetreader
 snapshot_index = int(curr_snapshot) #set to what snapshot is being loaded in
