@@ -45,11 +45,11 @@ def load_or_pickle_data(path, snapshot, hdf5, snapshot_path):
     halo_id = check_pickle_exist_hdf5_prop(path, "halos", "id", "", hdf5)
     halo_status = check_pickle_exist_hdf5_prop(path, "halos", "status", "", hdf5)
     
-    halo_n = check_pickle_exist_hdf5_prop(path, "anl_prf", "halo_n", "", hdf5)
-    halo_first = check_pickle_exist_hdf5_prop(path, "anl_prf", "halo_first", "", hdf5)
     density_prf_all = check_pickle_exist_hdf5_prop(path, "anl_prf", "M_all", "", hdf5)
     density_prf_1halo = check_pickle_exist_hdf5_prop(path, "anl_prf", "M_1halo", "", hdf5)
     
+    halo_n = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "halo_n", hdf5)
+    halo_first = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "halo_first", hdf5)
     num_pericenter = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "n_pericenter", hdf5)
     tracer_id = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "tracer_id", hdf5)
     n_is_lower_limit = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "n_is_lower_limit", hdf5)

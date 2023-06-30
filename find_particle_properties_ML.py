@@ -94,15 +94,12 @@ repeated_tracer_ids = sorted_unique_tracer_ids[indx_repeated_tracers]
 #construct a search tree with all of the particle positions
 particle_tree = cKDTree(data = particles_pos, leafsize = 3, balanced_tree = False, boxsize = box_size)
 
-def compare_density_prf(bins, radii, actual_prf_all, actual_prf_1halo, num_prf_bins, mass, orbit_assn):
+def compare_density_prf(bins, radii, actual_prf_all, actual_prf_1halo, num_prf_bins, mass, orbit_assn, num):
     calculated_prf_orb = np.zeros(num_prf_bins)
     calculated_prf_inf = np.zeros(num_prf_bins)
     calculated_prf_all = np.zeros(num_prf_bins)
     start_bin = 0
-    # print(np.where(orbit_assn == 1)[0])
-    # print(np.where(orbit_assn == 0)[0])
-    # print(orbit_assn)
-    # print(radii)
+    
     orbit_radii = radii[np.where(orbit_assn == 1)[0]]
     infall_radii = radii[np.where(orbit_assn == 0)[0]]
 
@@ -134,26 +131,28 @@ def compare_density_prf(bins, radii, actual_prf_all, actual_prf_1halo, num_prf_b
             calculated_prf_all[i] = calculated_prf_all[i - 1]
             
         start_bin = end_bin
-    # for j in range(calculated_prf_all.size):
-    #     print("calc:", calculated_prf_all[j], "act:", actual_prf[j])
+
     bins = np.insert(bins,0,0)
     middle_bins = (bins[1:] + bins[:-1]) / 2
 
-    plt.figure(2)
-    plt.plot(middle_bins, calculated_prf_orb, 'b-', label = "my code profile orb")
-    plt.plot(middle_bins, calculated_prf_inf, 'g-', label = "my code profile inf")
-    plt.plot(middle_bins, calculated_prf_all, 'r-', label = "my code profile all")
-    plt.plot(middle_bins, actual_prf_all, 'c--', label = "SPARTA profile all part")
-    plt.plot(middle_bins, actual_prf_1halo, 'm--', label = "SPARTA profile orbit")
-    plt.plot(middle_bins, actual_prf_all - actual_prf_1halo, 'y--', label = "SPARTA profile inf")
+    fig, ax = plt.subplots(1,1)
+    ax.plot(middle_bins, calculated_prf_orb, 'b-', label = "my code profile orb")
+    ax.plot(middle_bins, calculated_prf_inf, 'g-', label = "my code profile inf")
+    ax.plot(middle_bins, calculated_prf_all, 'r-', label = "my code profile all")
+    ax.plot(middle_bins, actual_prf_all, 'c--', label = "SPARTA profile all part")
+    ax.plot(middle_bins, actual_prf_1halo, 'm--', label = "SPARTA profile orbit")
+    ax.plot(middle_bins, actual_prf_all - actual_prf_1halo, 'y--', label = "SPARTA profile inf")
     
-    plt.title("1Halo Density Profile")
-    plt.xlabel("radius $r/R_{200m}$")
-    plt.ylabel("Mass of halo $M_{\odot}$")
-    plt.xscale("log")
-    plt.yscale("log")
-    plt.legend()
+    ax.set_title("1Halo Density Profile")
+    ax.set_xlabel("radius $r/R_{200m}$")
+    ax.set_ylabel("Mass of halo $M_{\odot}$")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.legend()
+    fig.savefig("/home/zvladimi/ML_orbit_infall_project/Random_figures/density_prf_" + str(overall_curr_search) + "_" + str(num) + ".png")
     plt.show()
+    ax.clear()
+    fig.clear()
 
 def initial_search(halo_positions, search_radius, halo_r200m):
     num_halos = halo_positions.shape[0]
@@ -193,9 +192,8 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         # find the indices of the particles within the expected r200 radius multiplied by times_r200 
         # value of 1.4 determined by guessing if just r200 value or 1.1 miss a couple halo r200 values but 1.4 gets them all
         indices = particle_tree.query_ball_point(halo_positions[i,:], r = search_radius * halo_r200m[i])
-        
-        curr_tracer_ids = tracer_id[curr_halo_first[i]:curr_halo_first[i] + curr_halo_n[i]]
 
+        curr_tracer_ids = tracer_id[curr_halo_first[i]:curr_halo_first[i] + curr_halo_n[i]]
         #Only take the particle positions that where found with the tree
         current_particles_pos = particles_pos[indices,:]
         current_particles_vel = particles_vel[indices,:]
@@ -215,8 +213,7 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         #calculate the radii of each particle based on the distance formula
         unsorted_particle_radii, unsorted_coord_dist = calculate_distance(current_halos_pos[0], current_halos_pos[1], current_halos_pos[2], current_particles_pos[:,0],
                                     current_particles_pos[:,1], current_particles_pos[:,2], num_new_particles, box_size)         
-              
-              
+                   
         repeat_pids_ind = np.intersect1d(current_orbit_assn[:,0], repeated_tracer_ids, return_indices = True)[1] # find indices of pids that are not unique
         curr_repeated_pids = current_orbit_assn[repeat_pids_ind,0] # which pids correspond to tracers that are repeated
         correct_pids_ind = np.intersect1d(curr_repeated_pids, curr_tracer_ids, return_indices = True)[1] # find which tracers belong to this halo that are repeated
@@ -261,8 +258,8 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         all_orbit_assn[start:start+num_new_particles] = current_orbit_assn
 
             
-        if i == 5 or i == 10 or i == 15:
-            compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn[:,1])
+        if i == 0 or i == 5 or i == 10 or i == 15:
+            compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn[:,1], i)
         
         start += num_new_particles
     
@@ -311,7 +308,8 @@ def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r20
     
     return average_val_part, average_val_hubble    
     
-def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, file, ax):        
+def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, file, ax):  
+    global overall_curr_search      
     color = iter(cm.rainbow(np.linspace(0, 1, num_iter)))
     
     print("\nstart initial search")    
@@ -338,6 +336,8 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, fi
 
     # For how many graphs
     for j in range(num_iter):
+        t3 = time.time()
+        overall_curr_search = j
         c = next(color)
         end_nu = start_nu + 0.5
         print("\nStart split:", start_nu, "to", end_nu)
@@ -401,6 +401,9 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, fi
             rad_vel_vs_radius_plot(graph_rad_vel, graph_val_hubble, start_nu, end_nu, c, ax)
         start_nu = end_nu
         
+        t4 = time.time()
+        print("End split:", start_nu, "to", end_nu, "Total time:", (t4-t3))
+        
     return graph_val_hubble     
     
 num_bins = 50        
@@ -411,6 +414,7 @@ print("start particle assign")
 
 fig, ax1 = plt.subplots(1)
 times_r200 = 3
+overall_curr_search = 0
 with h5py.File((save_location + "all_particle_properties" + curr_snapshot + ".hdf5"), 'a') as all_particle_properties:
     hubble_vel = split_halo_by_mass(num_bins, start_nu, num_iter, times_r200, halos_r200m, all_particle_properties, ax1)    
     

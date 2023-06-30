@@ -49,7 +49,7 @@ def load_or_pickle_data(path, curr_split, indices, use_num_particles, snapshot):
 
     return orbit_infall, scaled_radii, radial_vel, tang_vel
 
-num_splits = 25
+num_splits = 20
 with h5py.File((data_location + "all_particle_properties" + curr_snapshot + ".hdf5"), 'r') as all_particle_properties:
     total_num_particles = all_particle_properties["PIDS"][:].shape[0]    
     random_indices = np.random.choice(total_num_particles, total_num_particles)
@@ -88,7 +88,7 @@ for i in range(1):
     
     model_params = {
         'n_estimators': 25,
-        'max_depth': 15,
+        'max_depth': 5,
         'n_jobs': 6,
     }
     
