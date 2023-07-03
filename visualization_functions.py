@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from calculation_functions import calculate_distance
 
-def compare_density_prf(bins, radii, actual_prf_all, actual_prf_1halo, num_prf_bins, mass, orbit_assn, num):
+def compare_density_prf(bins, radii, actual_prf_all, actual_prf_1halo, num_prf_bins, mass, orbit_assn, num, curr_mass_bin):
     calculated_prf_orb = np.zeros(num_prf_bins)
     calculated_prf_inf = np.zeros(num_prf_bins)
     calculated_prf_all = np.zeros(num_prf_bins)
@@ -57,7 +57,7 @@ def compare_density_prf(bins, radii, actual_prf_all, actual_prf_1halo, num_prf_b
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.legend()
-    fig.savefig("/home/zvladimi/ML_orbit_infall_project/Random_figures/density_prf_" + str(overall_curr_search) + "_" + str(num) + ".png")
+    fig.savefig("/home/zvladimi/MLOIS/Random_figures/density_prf_" + str(curr_mass_bin) + "_" + str(num) + ".png")
     plt.show()
     ax.clear()
     fig.clear()

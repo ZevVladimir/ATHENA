@@ -1,6 +1,7 @@
 import pickle
 import h5py 
 import os
+import numpy as np
 from pygadgetreader import readsnap, readheader
 
 def check_pickle_exist_gadget(path, ptl_property, snapshot, snapshot_path):
@@ -56,3 +57,54 @@ def load_or_pickle_data(path, snapshot, hdf5, snapshot_path):
     last_pericenter_snap = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "last_pericenter_snap", hdf5)
 
     return ptl_pid, ptl_vel, ptl_pos, ptl_mass, halo_pos, halo_vel, halo_last_snap, halo_r200m, halo_id, halo_status, num_pericenter, tracer_id, n_is_lower_limit, last_pericenter_snap, density_prf_all, density_prf_1halo, halo_n, halo_first
+
+def standardize(values):
+    return (values - values.mean())/values.std()
+
+def normalize(values):
+    return (values - values.min())/(values.max() - values.min())
+
+def load_training_data(path, parameter, hdf5, random_indices):
+    
+    file_path = path + parameter + ".pickle" 
+    if os.path.isfile(file_path):
+        with open(file_path, "rb") as pickle_file:
+            particle_info = pickle.load(pickle_file)
+    else:
+        particle_info = hdf5[parameter][:]
+        with open(file_path, "wb") as pickle_file:
+            pickle.dump(particle_info, pickle_file)
+    
+    particle_info = particle_info[random_indices]
+    return particle_info
+
+def load_or_pickle_data(path, data_location, curr_split, indices, use_num_particles, snapshot, param_list):
+    dataset = np.zeros(use_num_particles)
+    if os.path.exists(path) != True:
+        os.makedirs(path)
+        
+    with h5py.File((data_location + "all_particle_properties" + snapshot + ".hdf5"), 'r') as all_particle_properties:
+        start_index = curr_split * use_num_particles
+        use_random_indices = indices[start_index:start_index+use_num_particles]
+        
+        for i,parameter in enumerate(param_list):
+            curr_dataset = load_training_data(path, parameter, all_particle_properties, use_random_indices)
+            if parameter == 'Orbit_Infall' and i != 0:
+                dataset[:,0] = curr_dataset
+            elif parameter == 'Orbit_Infall' and i == 0:
+                dataset = curr_dataset
+            else:
+                dataset = np.column_stack((dataset, curr_dataset))
+
+    return dataset
+
+def build_ml_dataset(output_path, data_loc_path, curr_split, indices, use_num_particles, snapshot, param_list):
+    dataset_path = output_path + "dataset.pickle"
+    if os.path.exists(dataset_path) == True:
+        with open(dataset_path, "rb") as pickle_file:
+            return pickle.load(pickle_file)
+    else:
+        with open(dataset_path, "wb") as pickle_file:
+            dataset = load_or_pickle_data(output_path, data_loc_path, curr_split, indices, use_num_particles, snapshot, param_list)
+            pickle.dump(dataset, pickle_file)
+            return dataset

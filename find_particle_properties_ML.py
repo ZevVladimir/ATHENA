@@ -8,9 +8,10 @@ from colossus.lss import peaks
 from matplotlib.pyplot import cm
 import time
 import h5py
-from loading_functions import load_or_pickle_data
+from data_and_loading_functions import load_or_pickle_data
 from calculation_functions import *
 from visualization_functions import compare_density_prf, rad_vel_vs_radius_plot
+from sparta import sparta
 
 curr_snapshot = "190"
 curr_hdf5_file = "sparta_190.hdf5"
@@ -113,7 +114,8 @@ def initial_search(halo_positions, search_radius, halo_r200m):
     
     return particles_per_halo, all_halo_mass
 
-def search_halos(halo_positions, halo_r200m, search_radius, total_particles, dens_prf_all, dens_prf_1halo, pid_type_assn, curr_halo_n, curr_halo_first):
+def search_halos(halo_positions, halo_r200m, search_radius, total_particles, dens_prf_all, dens_prf_1halo, pid_type_assn, curr_halo_n, curr_halo_first, curr_halo_id):
+    global overall_curr_search
     num_halos = halo_positions.shape[0]
     halo_indices = np.zeros((num_halos,2), dtype = np.int32)
     all_part_vel = np.zeros((total_particles,3), dtype = np.float32)
@@ -134,6 +136,14 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         indices = particle_tree.query_ball_point(halo_positions[i,:], r = search_radius * halo_r200m[i])
 
         curr_tracer_ids = tracer_id[curr_halo_first[i]:curr_halo_first[i] + curr_halo_n[i]]
+        sparta_tracer_ids = sparta.load(filename = hdf5_file, halo_ids = curr_halo_id[i], load_halo_data = False, tracers = ['ptl'], results = ['oct'], log_level = 0)
+        # print(sparta_tracer_ids['tcr_ptl']['res_oct']['tracer_id'])
+        # print(curr_tracer_ids)
+        # print(np.array_equal(curr_tracer_ids,sparta_tracer_ids['tcr_ptl']['res_oct']['tracer_id']))
+        if np.array_equal(curr_tracer_ids,sparta_tracer_ids['tcr_ptl']['res_oct']['tracer_id']) == False:
+            print(curr_tracer_ids)
+            print(sparta_tracer_ids['tcr_ptl']['res_oct']['tracer_id'])
+            
         #Only take the particle positions that where found with the tree
         current_particles_pos = particles_pos[indices,:]
         current_particles_vel = particles_vel[indices,:]
@@ -199,7 +209,7 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
 
             
         if i == 0 or i == 5 or i == 10 or i == 15:
-            compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn[:,1], i)
+            compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn[:,1], i, overall_curr_search)
         
         start += num_new_particles
     
@@ -293,11 +303,12 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, fi
             use_num_particles = num_particles_per_halo[halos_within_range]
             use_halo_n = halo_n[halos_within_range]
             use_halo_first = halo_first[halos_within_range]
+            use_halo_id = halos_id[halos_within_range]
             total_num_use_particles = np.sum(use_num_particles)
             
             print("Num particles: ", total_num_use_particles)
 
-            orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles, use_density_prf_all, use_density_prf_1halo, orbit_assn_part, use_halo_n, use_halo_first)   
+            orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles, use_density_prf_all, use_density_prf_1halo, orbit_assn_part, use_halo_n, use_halo_first, use_halo_id)   
 
             # with a new file and just started create all the datasets
             if new_file and len(list(file.keys())) == 0:
