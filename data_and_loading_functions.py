@@ -78,7 +78,7 @@ def load_training_data(path, parameter, hdf5, random_indices):
     particle_info = particle_info[random_indices]
     return particle_info
 
-def load_or_pickle_data(path, data_location, curr_split, indices, use_num_particles, snapshot, param_list):
+def load_or_pickle_data_ml(path, data_location, curr_split, indices, use_num_particles, snapshot, param_list):
     dataset = np.zeros(use_num_particles)
     if os.path.exists(path) != True:
         os.makedirs(path)

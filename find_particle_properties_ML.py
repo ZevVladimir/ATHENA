@@ -74,23 +74,11 @@ orbit_assn_tracers[np.where(num_pericenter > 0)[0],1] = 1
 # However particle can also be orbiting if n_is_lower_limit is 1
 orbit_assn_tracers[np.where(n_is_lower_limit == 1)[0],1] = 1
 
-# create array that tracks the pids and if a particle is orbiting or infalling. (assume particle is infalling until proven otherwise)
-orbit_assn_part = np.zeros((particles_pid.size, 2), dtype = np.int32)
-orbit_assn_part[:,0] = particles_pid
-match_ids = np.intersect1d(particles_pid, tracer_id, return_indices = True) # only take the matching indices for particle pids and orbit_assn
-
-orbit_assn_part[match_ids[1],1] = orbit_assn_tracers[match_ids[2],1] # assign the pids to the orbit/infall assignment of the matching tracers
-
 # Create bins for the density profile calculation
 num_prf_bins = density_prf_all.shape[1]
 start_prf_bins = 0.01
 end_prf_bins = 3.0
 prf_bins = np.logspace(np.log10(start_prf_bins), np.log10(end_prf_bins), num_prf_bins)
-
-sorted_unique_tracer_ids, tracer_indices, tracer_repeat_counts = np.unique(tracer_id, return_index = True, return_counts = True)
-indx_repeated_tracers = np.where(tracer_repeat_counts > 1)[0]
-repeated_tracer_ids = sorted_unique_tracer_ids[indx_repeated_tracers]
-
 
 #construct a search tree with all of the particle positions
 particle_tree = cKDTree(data = particles_pos, leafsize = 3, balanced_tree = False, boxsize = box_size)
@@ -114,7 +102,7 @@ def initial_search(halo_positions, search_radius, halo_r200m):
     
     return particles_per_halo, all_halo_mass
 
-def search_halos(halo_positions, halo_r200m, search_radius, total_particles, dens_prf_all, dens_prf_1halo, pid_type_assn, curr_halo_n, curr_halo_first, curr_halo_id):
+def search_halos(halo_positions, halo_r200m, search_radius, total_particles, dens_prf_all, dens_prf_1halo, curr_halo_n, curr_halo_first, start_nu, end_nu):
     global overall_curr_search
     num_halos = halo_positions.shape[0]
     halo_indices = np.zeros((num_halos,2), dtype = np.int32)
@@ -130,24 +118,19 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
     all_orbit_assn = np.zeros((total_particles,2), dtype = np.int16)
 
     start = 0
+    t_start = time.time()
     for i in range(num_halos):
         # find the indices of the particles within the expected r200 radius multiplied by times_r200 
-        # value of 1.4 determined by guessing if just r200 value or 1.1 miss a couple halo r200 values but 1.4 gets them all
         indices = particle_tree.query_ball_point(halo_positions[i,:], r = search_radius * halo_r200m[i])
 
         curr_tracer_ids = tracer_id[curr_halo_first[i]:curr_halo_first[i] + curr_halo_n[i]]
-        sparta_tracer_ids = sparta.load(filename = hdf5_file, halo_ids = curr_halo_id[i], load_halo_data = False, tracers = ['ptl'], results = ['oct'], log_level = 0)
-        # print(sparta_tracer_ids['tcr_ptl']['res_oct']['tracer_id'])
-        # print(curr_tracer_ids)
-        # print(np.array_equal(curr_tracer_ids,sparta_tracer_ids['tcr_ptl']['res_oct']['tracer_id']))
-        if np.array_equal(curr_tracer_ids,sparta_tracer_ids['tcr_ptl']['res_oct']['tracer_id']) == False:
-            print(curr_tracer_ids)
-            print(sparta_tracer_ids['tcr_ptl']['res_oct']['tracer_id'])
             
         #Only take the particle positions that where found with the tree
         current_particles_pos = particles_pos[indices,:]
         current_particles_vel = particles_vel[indices,:]
-        current_orbit_assn = pid_type_assn[indices,:]
+        current_particles_pid = particles_pid[indices]
+        current_orbit_assn = np.zeros((current_particles_pid.size, 2))
+        current_orbit_assn[:,0] = current_particles_pid
         current_halos_pos = halo_positions[i,:]        
 
         # how many new particles being added
@@ -164,12 +147,14 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         unsorted_particle_radii, unsorted_coord_dist = calculate_distance(current_halos_pos[0], current_halos_pos[1], current_halos_pos[2], current_particles_pos[:,0],
                                     current_particles_pos[:,1], current_particles_pos[:,2], num_new_particles, box_size)         
                    
-        repeat_pids_ind = np.intersect1d(current_orbit_assn[:,0], repeated_tracer_ids, return_indices = True)[1] # find indices of pids that are not unique
-        curr_repeated_pids = current_orbit_assn[repeat_pids_ind,0] # which pids correspond to tracers that are repeated
-        correct_pids_ind = np.intersect1d(curr_repeated_pids, curr_tracer_ids, return_indices = True)[1] # find which tracers belong to this halo that are repeated
-        incorrect_pids = np.delete(curr_repeated_pids, correct_pids_ind) # remove the pids that have corresponding tracers in this halo
-        current_orbit_assn[np.intersect1d(incorrect_pids, current_orbit_assn[:,0], return_indices = True)[2],1] = 0 # at the indices where the incorrect pids are set those particles as infalling   
-            
+        poss_pids = np.intersect1d(current_particles_pid, curr_tracer_ids, return_indices = True) # only check pids that are within the tracers for this halo (otherwise infall)           
+        poss_pid_match = np.intersect1d(current_particles_pid[poss_pids[1]], orbit_assn_tracers[:,0], return_indices = True) # get the corresponding indices for the pids and their infall/orbit assn
+        current_orbit_assn[poss_pids[1],1] = orbit_assn_tracers[poss_pid_match[2],1] # match the assignment of the tracers to the tracking array
+        # create a mask to then set any particle that is not identified as orbiting to be infalling
+        mask = np.ones(current_particles_pid.size, dtype = bool)
+        mask[poss_pids[1]] = False
+        current_orbit_assn[mask] = 0 # set every pid that didn't have a match to infalling
+        
         #sort the radii, positions, velocities, coord separations to allow for creation of plots and to correctly assign how much mass there is
         arrsortrad = unsorted_particle_radii.argsort()
         particle_radii = unsorted_particle_radii[arrsortrad]
@@ -195,11 +180,15 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         else:
             calculated_r200m[i] = (particle_radii[indices_r200_met[0][0]] + particle_radii[indices_r200_met[0][1]])/2
         
-        #correspond_halo_prop[start:start+num_new_particles,1] = halo_v200
         
+        # calculate peculiar, radial, and tangential velocity
         peculiar_velocity = calc_pec_vel(current_particles_vel, halos_vel[i])
         calculated_radial_velocities[start:start+num_new_particles], calculated_radial_velocities_comp[start:start+num_new_particles], curr_v200m, physical_vel, rhat = calc_rad_vel(peculiar_velocity, particle_radii, coord_dist, halo_r200m[i], red_shift, little_h, hubble_constant)
         calculated_tangential_velocities_comp[start:start+num_new_particles] = calc_tang_vel(calculated_radial_velocities[start:start+num_new_particles], physical_vel, rhat)/curr_v200m
+        
+        # scale radial velocities and their components by V200m
+        # scale radii by R200m
+        # assign all values to portion of entire array for this halo mass bin
         calculated_radial_velocities[start:start+num_new_particles] = calculated_radial_velocities[start:start+num_new_particles]/curr_v200m
         calculated_radial_velocities_comp[start:start+num_new_particles] = calculated_radial_velocities_comp[start:start+num_new_particles]/curr_v200m
         all_radii[start:start+num_new_particles] = particle_radii
@@ -207,12 +196,19 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         r200m_per_part[start:start+num_new_particles] = halo_r200m[i]
         all_orbit_assn[start:start+num_new_particles] = current_orbit_assn
 
-            
+        # plot the density profiles for certain halos    
         if i == 0 or i == 5 or i == 10 or i == 15:
-            compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn[:,1], i, overall_curr_search)
+            compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn[:,1], i, start_nu, end_nu)
         
         start += num_new_particles
-    
+
+        if i % 250 == 0 and i != 0:
+            t_lap = time.time()
+            tot_time = t_lap - t_start
+            t_remain = (num_halos - i)/250 * tot_time
+            print("Halo lap:", (i-250), "to", i, "time:", tot_time, "time remaining:", np.round(t_remain/60,2), "min")
+            t_start = t_lap
+            
     return all_orbit_assn, calculated_radial_velocities, all_radii, all_scaled_radii, r200m_per_part, calculated_radial_velocities_comp, calculated_tangential_velocities_comp
     
 def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r200_per_part):
@@ -258,7 +254,7 @@ def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r20
     
     return average_val_part, average_val_hubble    
     
-def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, file, ax):  
+def split_halo_by_mass(num_bins, num_train_params, start_nu, num_iter, times_r200m, halo_r200m, file, ax):  
     global overall_curr_search      
     color = iter(cm.rainbow(np.linspace(0, 1, num_iter)))
     
@@ -272,29 +268,26 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, fi
     peak_heights = peaks.peakHeight(scaled_halo_mass, red_shift)
     
     # Determine if we are creating a completely new file (file doesn't have any keys) or if we are accessing a different number of particles
-    if len(file.keys()) < 5:
-        new_file = True
-    elif file["Scaled_radii"].shape[0] != total_num_particles:
-        del file["PIDS"]
-        del file["Orbit_Infall"]
-        del file["Scaled_radii"]
-        del file["Radial_vel"]
-        del file["Tangential_vel"]
+    if len(file.keys()) != num_train_params or file["PIDS"].shape[0] != total_num_particles:
+        for key in file.keys():
+            del file[key]
         new_file = True
     else:
         new_file = False
 
-    # For how many graphs
+    # For how many mass bin splits
     for j in range(num_iter):
         t3 = time.time()
         overall_curr_search = j
         c = next(color)
         end_nu = start_nu + 0.5
         print("\nStart split:", start_nu, "to", end_nu)
+        
         # Get the indices of the halos that are within the desired peaks
-    
         halos_within_range = np.where((peak_heights >= start_nu) & (peak_heights < end_nu))[0]
         print("Num halos: ", halos_within_range.shape[0])
+        
+        # only get the parameters we want for this specific halo bin
         if halos_within_range.shape[0] > 0:
             use_halo_pos = halos_pos[halos_within_range]
             use_halo_r200m = halo_r200m[halos_within_range]
@@ -303,12 +296,12 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, fi
             use_num_particles = num_particles_per_halo[halos_within_range]
             use_halo_n = halo_n[halos_within_range]
             use_halo_first = halo_first[halos_within_range]
-            use_halo_id = halos_id[halos_within_range]
             total_num_use_particles = np.sum(use_num_particles)
             
             print("Num particles: ", total_num_use_particles)
 
-            orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles, use_density_prf_all, use_density_prf_1halo, orbit_assn_part, use_halo_n, use_halo_first, use_halo_id)   
+            # calculate all the information
+            orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles, use_density_prf_all, use_density_prf_1halo, use_halo_n, use_halo_first, start_nu, end_nu)   
 
             # with a new file and just started create all the datasets
             if new_file and len(list(file.keys())) == 0:
@@ -345,21 +338,21 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, fi
             
             file_counter = file_counter + scaled_radii.shape[0]
                
-            graph_rad_vel, graph_val_hubble = split_into_bins(num_bins, radial_velocities, scaled_radii, radii, r200m_per_part)
-            graph_rad_vel = graph_rad_vel[~np.all(graph_rad_vel == 0, axis=1)]
-            graph_val_hubble = graph_val_hubble[~np.all(graph_val_hubble == 0, axis=1)]
+            # plot the scaled radial vel vs scaled radius
+            # graph_rad_vel, graph_val_hubble = split_into_bins(num_bins, radial_velocities, scaled_radii, radii, r200m_per_part)
+            # graph_rad_vel = graph_rad_vel[~np.all(graph_rad_vel == 0, axis=1)]
+            # graph_val_hubble = graph_val_hubble[~np.all(graph_val_hubble == 0, axis=1)]
 
-            rad_vel_vs_radius_plot(graph_rad_vel, graph_val_hubble, start_nu, end_nu, c, ax)
-        start_nu = end_nu
-        
+            # rad_vel_vs_radius_plot(graph_rad_vel, graph_val_hubble, start_nu, end_nu, c, ax)
         t4 = time.time()
         print("End split:", start_nu, "to", end_nu, "Total time:", (t4-t3))
         
-    return graph_val_hubble     
-    
+        start_nu = end_nu
+        
 num_bins = 50        
-start_nu = 0
-num_iter = 7
+start_nu = 1
+num_iter = 4
+num_train_params = 5
 t1 = time.time()
 print("start particle assign")
 
@@ -367,10 +360,10 @@ fig, ax1 = plt.subplots(1)
 times_r200 = 3
 overall_curr_search = 0
 with h5py.File((save_location + "all_particle_properties" + curr_snapshot + ".hdf5"), 'a') as all_particle_properties:
-    hubble_vel = split_halo_by_mass(num_bins, start_nu, num_iter, times_r200, halos_r200m, all_particle_properties, ax1)    
+    split_halo_by_mass(num_bins, num_train_params, start_nu, num_iter, times_r200, halos_r200m, all_particle_properties, ax1)    
     
     
 t2 = time.time()
 print("finish binning: ", (t2- t1), " seconds")
-plt.savefig("/home/zvladimi/ML_orbit_infall_project/Random_figures/avg_rad_vel_vs_pos.png")
+#plt.savefig("/home/zvladimi/MLOIS/Random_figures/avg_rad_vel_vs_pos.png")
 
