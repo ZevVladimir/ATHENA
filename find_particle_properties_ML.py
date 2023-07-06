@@ -86,7 +86,7 @@ def load_or_pickle_data(path, snapshot, hdf5):
 particles_pid, particles_vel, particles_pos, particles_mass, halos_pos, halos_vel, halos_last_snap, halos_r200m, halos_id, halos_status, num_pericenter, tracer_id, n_is_lower_limit, density_prf_all, density_prf_1halo = load_or_pickle_data(save_location, curr_snapshot, hdf5_file)
 
 particles_pos = particles_pos * 10**3 * scale_factor * little_h #convert to kpc and physical
-mass = particles_mass[0] * 10**10 * little_h #units M_sun
+mass = particles_mass[0] * 10**10 #units M_sun/h
 
 #load all halo info at snapshot
 halos_pos = halos_pos[:,snapshot_index,:] * 10**3 * scale_factor * little_h #convert to kpc and physical
@@ -263,9 +263,10 @@ def compare_density_prf(masses, radii, actual_prf):
         else:
             calculated_prf_all[i] = calculated_prf_all[i - 1]
 
-    for j in range(calculated_prf_all.size):
-        print("calc:", calculated_prf_all[j], "act:", actual_prf[j])
-    
+    # for j in range(calculated_prf_all.size):
+    #     print("calc:", calculated_prf_all[j], "act:", actual_prf[j])
+    print(actual_prf/mass)
+    print(calculated_prf_all/mass)
     middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
 
     plt.figure(1)
