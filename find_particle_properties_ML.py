@@ -130,8 +130,8 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         current_particles_pos = particles_pos[indices,:]
         current_particles_vel = particles_vel[indices,:]
         current_particles_pid = particles_pid[indices]
-        current_orbit_assn = np.zeros((current_particles_pid.size, 2))
-        current_orbit_assn[:,0] = current_particles_pid
+        #current_orbit_assn = np.zeros((current_particles_pid.size, 2))
+        current_orbit_assn_sparta = np.zeros((current_particles_pid.size, 2))
         current_halos_pos = halo_positions[i,:]        
 
         # how many new particles being added
@@ -149,14 +149,39 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
                                     current_particles_pos[:,1], current_particles_pos[:,2], num_new_particles, box_size)         
               
               
-        #sparta_tracer_ids = sparta.load(file_name = hdf5_file, halo_ids = curr_halo_id[i], load_halo_data = False, tracers = ['ptl'], results = ['oct'], log_level = 0)
-        poss_pids = np.intersect1d(current_particles_pid, curr_tracer_ids, return_indices = True) # only check pids that are within the tracers for this halo (otherwise infall)
-        poss_pid_match = np.intersect1d(current_particles_pid[poss_pids[1]], orbit_assn_tracers[:,0], return_indices = True) # get the corresponding indices for the pids and their infall/orbit assn
+        sparta_output = sparta.load(filename = hdf5_file, halo_ids = curr_halo_id[i], log_level = 0)['tcr_ptl']['res_oct'] # last_pericenter_snap, n_is_lower_limit, n_pericenter, tracer_id
+        sparta_last_pericenter_snap = sparta_output['last_pericenter_snap']
+        sparta_tracer_ids = sparta_output['tracer_id']
+        sparta_n_is_lower_limit = sparta_output['n_is_lower_limit']
+        sparta_n_pericenter = sparta_output['n_pericenter']
+        
+        orbit_assn_sparta = np.zeros((sparta_tracer_ids.size, 2), dtype = np.int32)
+        orbit_assn_sparta[:,0] = sparta_tracer_ids
+
+        # only want pericenters that have occurred at or before this snapshot
+        sparta_n_pericenter[np.where(sparta_last_pericenter_snap > snapshot_index)[0]] = 0
+        # if there is more than one pericenter count as orbiting (1) and if it isn't it is infalling (0)
+        orbit_assn_sparta[np.where(sparta_n_pericenter > 0)[0],1] = 1
+
+        # However particle can also be orbiting if n_is_lower_limit is 1
+        orbit_assn_sparta[np.where(sparta_n_is_lower_limit == 1)[0],1] = 1
+
+        poss_pids = np.intersect1d(current_particles_pid, orbit_assn_sparta[:,0], return_indices = True) # only check pids that are within the tracers for this halo (otherwise infall)
+        poss_pid_match = np.intersect1d(current_particles_pid[poss_pids[1]], orbit_assn_sparta[:,0], return_indices = True) # get the corresponding indices for the pids and their infall/orbit assn
         # create a mask to then set any particle that is not identified as orbiting to be infalling
-        current_orbit_assn[poss_pids[1],1] = orbit_assn_tracers[poss_pid_match[2],1]
+        current_orbit_assn_sparta[poss_pids[1],1] = orbit_assn_sparta[poss_pid_match[2],1]
         mask = np.ones(current_particles_pid.size, dtype = bool) 
         mask[poss_pids[1]] = False
-        current_orbit_assn[mask] = 0 # set every pid that didn't have a match to inflaling
+        current_orbit_assn_sparta[mask] = 0 # set every pid that didn't have a match to infalling
+
+
+        # poss_pids = np.intersect1d(current_particles_pid, curr_tracer_ids, return_indices = True) # only check pids that are within the tracers for this halo (otherwise infall)
+        # poss_pid_match = np.intersect1d(current_particles_pid[poss_pids[1]], orbit_assn_tracers[:,0], return_indices = True) # get the corresponding indices for the pids and their infall/orbit assn
+        # # create a mask to then set any particle that is not identified as orbiting to be infalling
+        # current_orbit_assn[poss_pids[1],1] = orbit_assn_tracers[poss_pid_match[2],1]
+        # mask = np.ones(current_particles_pid.size, dtype = bool) 
+        # mask[poss_pids[1]] = False
+        # current_orbit_assn[mask] = 0 # set every pid that didn't have a match to inflaling
               
         # repeat_pids_ind = np.intersect1d(current_orbit_assn[:,0], repeated_tracer_ids, return_indices = True)[1] # find indices of pids that are not unique
         # curr_repeated_pids = current_orbit_assn[repeat_pids_ind,0] # which pids correspond to tracers that are repeated
@@ -169,7 +194,8 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         particle_radii = unsorted_particle_radii[arrsortrad]
         current_particles_pos = current_particles_pos[arrsortrad]
         current_particles_vel = current_particles_vel[arrsortrad]
-        current_orbit_assn = current_orbit_assn[arrsortrad]
+        #current_orbit_assn = current_orbit_assn[arrsortrad]
+        current_orbit_assn_sparta = current_orbit_assn_sparta[arrsortrad]
         coord_dist = unsorted_coord_dist[arrsortrad]
         
         #calculate the density at each particle
@@ -203,13 +229,14 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         all_radii[start:start+num_new_particles] = particle_radii
         all_scaled_radii[start:start+num_new_particles] = particle_radii/halo_r200m[i]
         r200m_per_part[start:start+num_new_particles] = halo_r200m[i]
-        all_orbit_assn[start:start+num_new_particles] = current_orbit_assn
+        all_orbit_assn[start:start+num_new_particles] = current_orbit_assn_sparta
         
         # if compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], num_prf_bins, mass) == False:
         #     print("No match in prf:",i)
             
         if i == 5 or i == 10 or i == 15:
-            compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn[:,1])
+            #compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn[:,1], i, start_nu, end_nu)
+            compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn_sparta[:,1], i, start_nu, end_nu)
         
         start += num_new_particles
 
