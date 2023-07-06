@@ -83,147 +83,6 @@ prf_bins = np.logspace(np.log10(start_prf_bins), np.log10(end_prf_bins), num_prf
 #construct a search tree with all of the particle positions
 particle_tree = cKDTree(data = particles_pos, leafsize = 3, balanced_tree = False, boxsize = box_size)
 
-#calculate distance of particle from halo
-def calculate_distance(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_particles):
-    x_dist = particle_x - halo_x
-    y_dist = particle_y - halo_y
-    z_dist = particle_z - halo_z
-    
-    coord_diff = np.zeros((new_particles, 3))
-    coord_diff[:,0] = x_dist
-    coord_diff[:,1] = y_dist
-    coord_diff[:,2] = z_dist
-
-    half_box_size = box_size/2
-    
-    #handles periodic boundary conditions by checking if you were to add or subtract a boxsize would it then
-    #be within half a box size of the halo
-    #do this for x, y, and z coords
-    x_within_plus = np.where((x_dist + box_size) < half_box_size)
-    x_within_minus = np.where((x_dist - box_size) > -half_box_size)
-    
-    particle_x[x_within_plus] = particle_x[x_within_plus] + box_size
-    particle_x[x_within_minus] = particle_x[x_within_minus] - box_size
-    
-    coord_diff[:,0] = particle_x - halo_x
-    
-    y_within_plus = np.where((y_dist + box_size) < half_box_size)
-    y_within_minus = np.where((y_dist - box_size) > -half_box_size)
-    
-    particle_y[y_within_plus] = particle_y[y_within_plus] + box_size
-    particle_y[y_within_minus] = particle_y[y_within_minus] - box_size
-    
-    coord_diff[:,1] = particle_y - halo_y
-    
-    z_within_plus = np.where((z_dist + box_size) < half_box_size)
-    z_within_minus = np.where((z_dist - box_size) > -half_box_size)
-    
-    particle_z[z_within_plus] = particle_z[z_within_plus] + box_size
-    particle_z[z_within_minus] = particle_z[z_within_minus] - box_size
-    
-    coord_diff[:,2] = particle_z - halo_z
-
-    #calculate distance with standard sqrt((x_1-x_2)^2 + (y_1 - y_2)^2 + (z_1 - z_2)^2)
-    distance = np.zeros((new_particles,1))
-    distance = np.sqrt(np.square((halo_x - particle_x)) + np.square((halo_y - particle_y)) + np.square((halo_z - particle_z)))
-    
-    return distance, coord_diff
-
-#calculates density within sphere of given radius with given mass and calculating volume at each particle's radius
-def calculate_density(masses, radius):
-    volume = (4/3) * np.pi * np.power(radius,3)
-    return masses/volume
-
-#returns indices where density goes below overdensity value (200 * rho_c)
-def check_where_r200(my_density):
-    return np.where(my_density < (200 * rho_m))
-
-def calc_pec_vel(particle_vel, halo_vel):   
-    # Peculiar velocity is particle velocity minus the corresponding halo velocity
-    peculiar_velocities = particle_vel - halo_vel   
-
-    return peculiar_velocities
-
-def calc_rhat(x_comp, y_comp, z_comp):
-    rhat = np.zeros((x_comp.size, 3), dtype = np.float32)
-    # Get the magnitude for each particle
-    magnitude = np.sqrt(np.square(x_comp) + np.square(y_comp) + np.square(z_comp))
-    
-    # Scale the components by the magnitude to get a unit vector
-    rhat[:,0] = x_comp/magnitude
-    rhat[:,1] = y_comp/magnitude
-    rhat[:,2] = z_comp/magnitude
-    
-    return rhat
-
-def calc_v200m(mass, radius):
-    # calculate the v200m for a halo based on its mass and radius
-    return np.sqrt((G * mass)/radius)
-
-def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200):
-    
-    # Get the corresponding components, distances, and halo v200m for every particle
-    v_hubble = np.zeros(particle_dist.size, dtype = np.float32)
-    corresponding_hubble_m200m = mass_so.R_to_M(halo_r200, red_shift, "200c") * little_h # convert to M⊙
-    curr_v200m = calc_v200m(corresponding_hubble_m200m, halo_r200)
-        
-    # calculate the unit vector of the halo to the particle  
-    rhat = calc_rhat(coord_sep[:,0], coord_sep[:,1], coord_sep[:,2])
-    
-    # Hubble velocity is the hubble constant times the distance the particle is from the halo
-    v_hubble = hubble_constant * particle_dist   
-    
-    v_hubble = rhat * v_hubble[:, np.newaxis] 
-    
-    physical_vel = peculiar_vel + v_hubble    
-
-    radial_vel_comp = physical_vel * rhat
-    radial_vel = np.sum(radial_vel_comp, axis = 1)
-    
-    # Dot the velocity with rhat to get the radial component
-    #radial_component_vel = np.sum(np.multiply(peculiar_vel, rhat), axis = 1)
-    
-    # Add radial component and v_hubble since both are now in radial direction
-    #radial_vel = radial_component_vel + v_hubble
-
-    # scale all the radial velocities by v200m of the halo
-    return radial_vel, radial_vel_comp, curr_v200m, physical_vel, rhat
-
-def calc_tang_vel(radial_vel, physical_vel, rhat):
-    component_rad_vel = rhat * radial_vel[:, np.newaxis] 
-    tangential_vel = physical_vel - component_rad_vel
-    
-    return tangential_vel
-
-def compare_density_prf(masses, radii, actual_prf):
-    calculated_prf_all = np.zeros(num_prf_bins)
-    print(actual_prf.size)
-    for i in range(num_prf_bins):
-        start_bin = prf_bins[i]
-        end_bin = prf_bins[i+1]  
-        
-        radii_within_range = np.where((radii >= start_bin) & (radii < end_bin))[0]
-        if radii_within_range.size != 0 and i != 0:
-            calculated_prf_all[i] = calculated_prf_all[i - 1] + radii_within_range.size * mass
-        elif i == 0:
-            calculated_prf_all[i] = radii_within_range.size * mass
-        else:
-            calculated_prf_all[i] = calculated_prf_all[i - 1]
-
-    for j in range(calculated_prf_all.size):
-        print("calc:", calculated_prf_all[j], "act:", actual_prf[j])
-    
-    middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
-
-    plt.figure(1)
-    plt.plot(middle_bins, calculated_prf_all, color = 'b', label = "calculated profile")
-    plt.plot(middle_bins, actual_prf, color = 'r', label = "actual profile")
-    plt.title("Density profile of halo")
-    plt.xlabel("radius $r/R_{200m}$")
-    plt.ylabel("Mass of halo $M_{\odot}$")
-    plt.xscale("log")
-    plt.legend()
-    plt.show()
 
 def initial_search(halo_positions, search_radius, halo_r200m):
     num_halos = halo_positions.shape[0]
@@ -244,7 +103,7 @@ def initial_search(halo_positions, search_radius, halo_r200m):
     
     return particles_per_halo, all_halo_mass
 
-def search_halos(halo_positions, halo_r200m, search_radius, total_particles, dens_prf_all, dens_prf_1halo, curr_halo_n, curr_halo_first, start_nu, end_nu):
+def search_halos(halo_positions, halo_r200m, search_radius, total_particles, dens_prf_all, dens_prf_1halo, curr_halo_n, curr_halo_first, start_nu, end_nu, curr_halo_id):
     global overall_curr_search
     num_halos = halo_positions.shape[0]
     halo_indices = np.zeros((num_halos,2), dtype = np.int32)
@@ -288,8 +147,15 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         unsorted_particle_radii, unsorted_coord_dist = calculate_distance(current_halos_pos[0], current_halos_pos[1], current_halos_pos[2], current_particles_pos[:,0],
                                     current_particles_pos[:,1], current_particles_pos[:,2], num_new_particles, box_size)         
                    
+        sparta_tracer_ids = sparta.load(filename = hdf5_file, halo_ids = curr_halo_id[i], load_halo_data = False, tracers = ['ptl'], results = ['oct'], log_level = 0)
+        print(sparta_tracer_ids.keys())
+        print(sparta_tracer_ids['tcr_ptl']['res_oct'].shape)
+        print(curr_tracer_ids.shape)               
         poss_pids = np.intersect1d(current_particles_pid, curr_tracer_ids, return_indices = True) # only check pids that are within the tracers for this halo (otherwise infall)           
+        print(poss_pids[1].shape)
         poss_pid_match = np.intersect1d(current_particles_pid[poss_pids[1]], orbit_assn_tracers[:,0], return_indices = True) # get the corresponding indices for the pids and their infall/orbit assn
+        print(poss_pid_match[1].shape)
+        print(poss_pid_match[2].shape)
         current_orbit_assn[poss_pids[1],1] = orbit_assn_tracers[poss_pid_match[2],1] # match the assignment of the tracers to the tracking array
         # create a mask to then set any particle that is not identified as orbiting to be infalling
         mask = np.ones(current_particles_pid.size, dtype = bool)
@@ -437,12 +303,14 @@ def split_halo_by_mass(num_bins, num_train_params, start_nu, num_iter, times_r20
             use_num_particles = num_particles_per_halo[halos_within_range]
             use_halo_n = halo_n[halos_within_range]
             use_halo_first = halo_first[halos_within_range]
+            use_halo_id = halos_id[halos_within_range]
+
             total_num_use_particles = np.sum(use_num_particles)
             
             print("Num particles: ", total_num_use_particles)
 
             # calculate all the information
-            orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles, use_density_prf_all, use_density_prf_1halo, use_halo_n, use_halo_first, start_nu, end_nu)   
+            orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles, use_density_prf_all, use_density_prf_1halo, use_halo_n, use_halo_first, start_nu, end_nu, use_halo_id)   
 
             # with a new file and just started create all the datasets
             if new_file and len(list(file.keys())) == 0:
@@ -491,8 +359,8 @@ def split_halo_by_mass(num_bins, num_train_params, start_nu, num_iter, times_r20
         start_nu = end_nu
         
 num_bins = 50        
-start_nu = 1
-num_iter = 4
+start_nu = 2
+num_iter = 1
 num_train_params = 5
 t1 = time.time()
 print("start particle assign")
