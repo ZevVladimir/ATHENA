@@ -149,11 +149,20 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
                                     current_particles_pos[:,1], current_particles_pos[:,2], num_new_particles, box_size)         
               
               
-        repeat_pids_ind = np.intersect1d(current_orbit_assn[:,0], repeated_tracer_ids, return_indices = True)[1] # find indices of pids that are not unique
-        curr_repeated_pids = current_orbit_assn[repeat_pids_ind,0] # which pids correspond to tracers that are repeated
-        correct_pids_ind = np.intersect1d(curr_repeated_pids, curr_tracer_ids, return_indices = True)[1] # find which tracers belong to this halo that are repeated
-        incorrect_pids = np.delete(curr_repeated_pids, correct_pids_ind) # remove the pids that have corresponding tracers in this halo
-        current_orbit_assn[np.intersect1d(incorrect_pids, current_orbit_assn[:,0], return_indices = True)[2],1] = 0 # at the indices where the incorrect pids are set those particles as infalling   
+        #sparta_tracer_ids = sparta.load(file_name = hdf5_file, halo_ids = curr_halo_id[i], load_halo_data = False, tracers = ['ptl'], results = ['oct'], log_level = 0)
+        poss_pids = np.intersect1d(current_particles_pid, curr_tracer_ids, return_indices = True) # only check pids that are within the tracers for this halo (otherwise infall)
+        poss_pid_match = np.intersect1d(current_particles_pid[poss_pids[1]], orbit_assn_tracers[:,0], return_indices = True) # get the corresponding indices for the pids and their infall/orbit assn
+        # create a mask to then set any particle that is not identified as orbiting to be infalling
+        current_orbit_assn[poss_pids[1],1] = orbit_assn_tracers[poss_pid_match[2],1]
+        mask = np.ones(current_particles_pid.size, dtype = bool) 
+        mask[poss_pids[1]] = False
+        current_orbit_assn[mask] = 0 # set every pid that didn't have a match to inflaling
+              
+        # repeat_pids_ind = np.intersect1d(current_orbit_assn[:,0], repeated_tracer_ids, return_indices = True)[1] # find indices of pids that are not unique
+        # curr_repeated_pids = current_orbit_assn[repeat_pids_ind,0] # which pids correspond to tracers that are repeated
+        # correct_pids_ind = np.intersect1d(curr_repeated_pids, curr_tracer_ids, return_indices = True)[1] # find which tracers belong to this halo that are repeated
+        # incorrect_pids = np.delete(curr_repeated_pids, correct_pids_ind) # remove the pids that have corresponding tracers in this halo
+        # current_orbit_assn[np.intersect1d(incorrect_pids, current_orbit_assn[:,0], return_indices = True)[2],1] = 0 # at the indices where the incorrect pids are set those particles as infalling   
             
         #sort the radii, positions, velocities, coord separations to allow for creation of plots and to correctly assign how much mass there is
         arrsortrad = unsorted_particle_radii.argsort()
@@ -200,7 +209,7 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         #     print("No match in prf:",i)
             
         if i == 5 or i == 10 or i == 15:
-            compare_density_prf_1halo(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn[:,1])
+            compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn[:,1])
         
         start += num_new_particles
 
@@ -256,7 +265,7 @@ def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r20
     
     return average_val_part, average_val_hubble    
     
-def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, file, ax):        
+def split_halo_by_mass(num_bins, num_train_params, start_nu, num_iter, times_r200m, halo_r200m, file, ax):        
     color = iter(cm.rainbow(np.linspace(0, 1, num_iter)))
     
     print("\nstart initial search")    
@@ -344,10 +353,10 @@ def split_halo_by_mass(num_bins, start_nu, num_iter, times_r200m, halo_r200m, fi
             # graph_rad_vel = graph_rad_vel[~np.all(graph_rad_vel == 0, axis=1)]
             # graph_val_hubble = graph_val_hubble[~np.all(graph_val_hubble == 0, axis=1)]
 
-            rad_vel_vs_radius_plot(graph_rad_vel, graph_val_hubble, start_nu, end_nu, c, ax)
+            #rad_vel_vs_radius_plot(graph_rad_vel, graph_val_hubble, start_nu, end_nu, c, ax)
         start_nu = end_nu
         
-    return graph_val_hubble     
+         
     
 num_bins = 50        
 start_nu = 2
