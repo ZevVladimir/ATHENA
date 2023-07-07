@@ -155,11 +155,12 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         sparta_n_is_lower_limit = sparta_output['n_is_lower_limit']
         sparta_n_pericenter = sparta_output['n_pericenter']
         
-        orbit_assn_sparta = np.zeros((sparta_tracer_ids.size, 2), dtype = np.int32)
+        orbit_assn_sparta = np.zeros((sparta_tracer_ids.size, 2), dtype = np.int64)
         orbit_assn_sparta[:,0] = sparta_tracer_ids
 
         # only want pericenters that have occurred at or before this snapshot
         sparta_n_pericenter[np.where(sparta_last_pericenter_snap > snapshot_index)[0]] = 0
+
         # if there is more than one pericenter count as orbiting (1) and if it isn't it is infalling (0)
         orbit_assn_sparta[np.where(sparta_n_pericenter > 0)[0],1] = 1
 
@@ -172,22 +173,7 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         current_orbit_assn_sparta[poss_pids[1],1] = orbit_assn_sparta[poss_pid_match[2],1]
         mask = np.ones(current_particles_pid.size, dtype = bool) 
         mask[poss_pids[1]] = False
-        current_orbit_assn_sparta[mask] = 0 # set every pid that didn't have a match to infalling
-
-
-        # poss_pids = np.intersect1d(current_particles_pid, curr_tracer_ids, return_indices = True) # only check pids that are within the tracers for this halo (otherwise infall)
-        # poss_pid_match = np.intersect1d(current_particles_pid[poss_pids[1]], orbit_assn_tracers[:,0], return_indices = True) # get the corresponding indices for the pids and their infall/orbit assn
-        # # create a mask to then set any particle that is not identified as orbiting to be infalling
-        # current_orbit_assn[poss_pids[1],1] = orbit_assn_tracers[poss_pid_match[2],1]
-        # mask = np.ones(current_particles_pid.size, dtype = bool) 
-        # mask[poss_pids[1]] = False
-        # current_orbit_assn[mask] = 0 # set every pid that didn't have a match to inflaling
-              
-        # repeat_pids_ind = np.intersect1d(current_orbit_assn[:,0], repeated_tracer_ids, return_indices = True)[1] # find indices of pids that are not unique
-        # curr_repeated_pids = current_orbit_assn[repeat_pids_ind,0] # which pids correspond to tracers that are repeated
-        # correct_pids_ind = np.intersect1d(curr_repeated_pids, curr_tracer_ids, return_indices = True)[1] # find which tracers belong to this halo that are repeated
-        # incorrect_pids = np.delete(curr_repeated_pids, correct_pids_ind) # remove the pids that have corresponding tracers in this halo
-        # current_orbit_assn[np.intersect1d(incorrect_pids, current_orbit_assn[:,0], return_indices = True)[2],1] = 0 # at the indices where the incorrect pids are set those particles as infalling   
+        current_orbit_assn_sparta[mask] = 0 # set every pid that didn't have a match to infalling  
             
         #sort the radii, positions, velocities, coord separations to allow for creation of plots and to correctly assign how much mass there is
         arrsortrad = unsorted_particle_radii.argsort()
@@ -386,8 +372,8 @@ def split_halo_by_mass(num_bins, num_train_params, start_nu, num_iter, times_r20
          
     
 num_bins = 50        
-start_nu = 2
-num_iter = 1
+start_nu = 0
+num_iter = 7
 num_train_params = 5
 t1 = time.time()
 print("start particle assign")
