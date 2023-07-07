@@ -105,6 +105,21 @@ def build_ml_dataset(output_path, data_loc_path, curr_split, indices, use_num_pa
             return pickle.load(pickle_file)
     else:
         with open(dataset_path, "wb") as pickle_file:
-            dataset = load_or_pickle_data(output_path, data_loc_path, curr_split, indices, use_num_particles, snapshot, param_list)
+            dataset = load_or_pickle_data_ml(output_path, data_loc_path, curr_split, indices, use_num_particles, snapshot, param_list)
             pickle.dump(dataset, pickle_file)
             return dataset
+
+def save_to_hdf5(new_file, hdf5_file, data_name, dataset, chunk, max_shape, curr_idx):
+    if new_file and len(list(hdf5_file.keys())) == 0:
+        hdf5_file.create_dataset(data_name, data = dataset, chunks = chunk, maxshape = max_shape)
+
+    # with a new file adding on additional data to the datasets
+    elif new_file and len(list(hdf5_file.keys())) != 0:
+        hdf5_file[data_name].resize((hdf5_file[data_name].shape[0] + dataset.shape[0]), axis = 0)
+        hdf5_file[data_name][-dataset.shape[0]:] = dataset        
+    
+    # if not a new file and same num of particles will just replace the previous information
+    if not new_file:
+        hdf5_file[data_name][curr_idx:curr_idx + dataset.shape[0]] = dataset
+        
+        
