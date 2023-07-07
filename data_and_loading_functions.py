@@ -109,12 +109,12 @@ def build_ml_dataset(output_path, data_loc_path, curr_split, indices, use_num_pa
             pickle.dump(dataset, pickle_file)
             return dataset
 
-def save_to_hdf5(new_file, hdf5_file, data_name, dataset, chunk, max_shape, curr_idx):
-    if new_file and len(list(hdf5_file.keys())) == 0:
+def save_to_hdf5(new_file, hdf5_file, data_name, dataset, chunk, max_shape, curr_idx, max_num_keys):
+    if new_file and len(list(hdf5_file.keys())) < max_num_keys:
         hdf5_file.create_dataset(data_name, data = dataset, chunks = chunk, maxshape = max_shape)
 
     # with a new file adding on additional data to the datasets
-    elif new_file and len(list(hdf5_file.keys())) != 0:
+    elif new_file and len(list(hdf5_file.keys())) == max_num_keys:
         hdf5_file[data_name].resize((hdf5_file[data_name].shape[0] + dataset.shape[0]), axis = 0)
         hdf5_file[data_name][-dataset.shape[0]:] = dataset        
     

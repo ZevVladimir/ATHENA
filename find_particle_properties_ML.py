@@ -226,7 +226,7 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
             t_lap = time.time()
             tot_time = t_lap - t_start
             t_remain = (num_halos - i)/250 * tot_time
-            print("Halo lap:", (i-250), "to", i, "time:", tot_time, "time remaining:", np.round(t_remain/60,2), "min")
+            print("Halos:", (i-250), "to", i, "time taken:", np.round(tot_time,2), "seconds" , "time remaining:", np.round(t_remain/60,2), "minutes,",  np.round((t_remain),2), "seconds")
             t_start = t_lap
             
     return all_orbit_assn, calculated_radial_velocities, all_radii, all_scaled_radii, r200m_per_part, calculated_radial_velocities_comp, calculated_tangential_velocities_comp, halo_indices
@@ -274,7 +274,7 @@ def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r20
     
     return average_val_part, average_val_hubble    
     
-def split_halo_by_mass(num_bins, num_train_params, start_nu, num_iter, times_r200m, halo_r200m, file, ax):        
+def split_halo_by_mass(num_bins, num_train_params, start_nu, num_iter, nu_step, times_r200m, halo_r200m, file, ax):        
     color = iter(cm.rainbow(np.linspace(0, 1, num_iter)))
     
     print("\nstart initial search")    
@@ -296,8 +296,9 @@ def split_halo_by_mass(num_bins, num_train_params, start_nu, num_iter, times_r20
 
     # For how many mass bin splits
     for j in range(num_iter):
+        t_start = time.time()
         c = next(color)
-        end_nu = start_nu + 0.5
+        end_nu = start_nu + nu_step
         print("\nStart split:", start_nu, "to", end_nu)
         
         # Get the indices of the halos that are within the desired peaks
@@ -324,14 +325,14 @@ def split_halo_by_mass(num_bins, num_train_params, start_nu, num_iter, times_r20
             # calculate all the information
             orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp, halo_idxs = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles, use_density_prf_all, use_density_prf_1halo, use_halo_n, use_halo_first, start_nu, end_nu, use_halo_id)             
 
-            save_to_hdf5(new_file, file, "PIDS", dataset = orbital_assign[:,0], chunk = True, max_shape = (total_num_particles,), curr_idx = file_counter)
-            save_to_hdf5(new_file, file, "Orbit_Infall", dataset = orbital_assign[:,1], chunk = True, max_shape = (total_num_particles,), curr_idx = file_counter)
-            save_to_hdf5(new_file, file, "Scaled_radii", dataset = scaled_radii, chunk = True, max_shape = (total_num_particles,), curr_idx = file_counter)
-            save_to_hdf5(new_file, file, "Radial_vel", dataset = radial_velocities_comp, chunk = True, max_shape = (total_num_particles,3), curr_idx = file_counter)
-            save_to_hdf5(new_file, file, "Tangential_vel", dataset = tangential_velocities_comp, chunk = True, max_shape = (total_num_particles,3), curr_idx = file_counter)
-            save_to_hdf5(new_file, file, "Halo_start_ind", dataset = halo_idxs[:,0], chunk = True, max_shape = (total_num_halos,), curr_idx = file_counter)
-            save_to_hdf5(new_file, file, "Halo_num_ptl", dataset = halo_idxs[:,1], chunk = False, max_shape = (total_num_halos,), curr_idx = file_counter)
-            save_to_hdf5(new_file, file, "Halo_id", dataset = use_halo_id, chunk = False, max_shape = (total_num_halos,), curr_idx = file_counter)
+            save_to_hdf5(new_file, file, "PIDS", dataset = orbital_assign[:,0], chunk = True, max_shape = (total_num_particles,), curr_idx = file_counter, max_num_keys = num_save_params)
+            save_to_hdf5(new_file, file, "Orbit_Infall", dataset = orbital_assign[:,1], chunk = True, max_shape = (total_num_particles,), curr_idx = file_counter, max_num_keys = num_save_params)
+            save_to_hdf5(new_file, file, "Scaled_radii", dataset = scaled_radii, chunk = True, max_shape = (total_num_particles,), curr_idx = file_counter, max_num_keys = num_save_params)
+            save_to_hdf5(new_file, file, "Radial_vel", dataset = radial_velocities_comp, chunk = True, max_shape = (total_num_particles,3), curr_idx = file_counter, max_num_keys = num_save_params)
+            save_to_hdf5(new_file, file, "Tangential_vel", dataset = tangential_velocities_comp, chunk = True, max_shape = (total_num_particles,3), curr_idx = file_counter, max_num_keys = num_save_params)
+            save_to_hdf5(new_file, file, "Halo_start_ind", dataset = halo_idxs[:,0], chunk = True, max_shape = (total_num_halos,), curr_idx = file_counter, max_num_keys = num_save_params)
+            save_to_hdf5(new_file, file, "Halo_num_ptl", dataset = halo_idxs[:,1], chunk = True, max_shape = (total_num_halos,), curr_idx = file_counter, max_num_keys = num_save_params)
+            save_to_hdf5(new_file, file, "Halo_id", dataset = use_halo_id, chunk = True, max_shape = (total_num_halos,), curr_idx = file_counter, max_num_keys = num_save_params)
             
             file_counter = file_counter + scaled_radii.shape[0]
                
@@ -341,21 +342,24 @@ def split_halo_by_mass(num_bins, num_train_params, start_nu, num_iter, times_r20
             # graph_val_hubble = graph_val_hubble[~np.all(graph_val_hubble == 0, axis=1)]
 
             #rad_vel_vs_radius_plot(graph_rad_vel, graph_val_hubble, start_nu, end_nu, c, ax)
+        t_end = time.time()
+        print("finished bin:", start_nu, "to", end_nu, "in", np.round((t_end- t_start)/60,2), "minutes,", np.round((t_end- t_start),2), "seconds")
         start_nu = end_nu
         
          
     
 num_bins = 50        
 start_nu = 0
+nu_step = 0.5
 num_iter = 7
-num_train_params = 8
+num_save_params = 8
 t1 = time.time()
 print("start particle assign")
 
 fig, ax1 = plt.subplots(1)
 times_r200 = 3
 with h5py.File((save_location + "all_particle_properties" + curr_snapshot + ".hdf5"), 'a') as all_particle_properties:
-    split_halo_by_mass(num_bins, num_train_params, start_nu, num_iter, times_r200, halos_r200m, all_particle_properties, ax1)    
+    split_halo_by_mass(num_bins, num_save_params, start_nu, num_iter, nu_step, times_r200, halos_r200m, all_particle_properties, ax1)    
     
     
 t2 = time.time()

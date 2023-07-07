@@ -65,7 +65,7 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     ax.set_yscale("log")
     ax.legend()
     fig.savefig("/home/zvladimi/MLOIS/Random_figures/density_prf_" + str(start_nu) + "-" + str(end_nu) + "_" + str(num) + ".png")
-    plt.show()
+    #plt.show()
     ax.clear()
     fig.clear()
 
