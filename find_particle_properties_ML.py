@@ -8,14 +8,14 @@ from colossus.lss import peaks
 from matplotlib.pyplot import cm
 import time
 import h5py
-from data_and_loading_functions import load_or_pickle_data
+from data_and_loading_functions import load_or_pickle_data, save_to_hdf5
 from calculation_functions import *
 from visualization_functions import compare_density_prf, rad_vel_vs_radius_plot
 from sparta import sparta
 
 curr_snapshot = "190"
 curr_hdf5_file = "sparta_190.hdf5"
-hdf5_file = "/home/zvladimi/MLOIS/SPARTA_data/" + curr_hdf5_file
+hdf5_file_path = "/home/zvladimi/MLOIS/SPARTA_data/" + curr_hdf5_file
 save_location =  "/home/zvladimi/MLOIS/calculated_info/" + "calc_from_" + curr_hdf5_file + "/"
 snapshot_path = "/home/zvladimi/MLOIS/particle_data/snapshot_" + curr_snapshot + "/snapshot_0" + curr_snapshot
 
@@ -32,7 +32,7 @@ box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
 box_size = box_size * 10**3 * scale_factor * little_h #convert to Kpc physical
 
 #load particle info
-particles_pid, particles_vel, particles_pos, particles_mass, halos_pos, halos_vel, halos_last_snap, halos_r200m, halos_id, halos_status, num_pericenter, tracer_id, n_is_lower_limit, last_pericenter_snap, density_prf_all, density_prf_1halo, halo_n, halo_first = load_or_pickle_data(save_location, curr_snapshot, hdf5_file, snapshot_path)
+particles_pid, particles_vel, particles_pos, particles_mass, halos_pos, halos_vel, halos_last_snap, halos_r200m, halos_id, halos_status, num_pericenter, tracer_id, n_is_lower_limit, last_pericenter_snap, density_prf_all, density_prf_1halo, halo_n, halo_first = load_or_pickle_data(save_location, curr_snapshot, hdf5_file_path, snapshot_path)
 
 particles_pos = particles_pos * 10**3 * scale_factor * little_h #convert to kpc and physical
 mass = particles_mass[0] * 10**10 #units M_sun/h
@@ -137,7 +137,7 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         # how many new particles being added
         num_new_particles = len(indices)
         halo_indices[i,0] = start
-        halo_indices[i,1] = start + num_new_particles
+        halo_indices[i,1] = num_new_particles
 
         #for how many new particles create an array of how much mass there should be within that particle radius
         use_mass = np.arange(1, num_new_particles + 1, 1) * mass       
@@ -149,7 +149,7 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
                                     current_particles_pos[:,1], current_particles_pos[:,2], num_new_particles, box_size)         
               
               
-        sparta_output = sparta.load(filename = hdf5_file, halo_ids = curr_halo_id[i], log_level = 0)['tcr_ptl']['res_oct'] # last_pericenter_snap, n_is_lower_limit, n_pericenter, tracer_id
+        sparta_output = sparta.load(filename = hdf5_file_path, halo_ids = curr_halo_id[i], log_level = 0)['tcr_ptl']['res_oct'] # last_pericenter_snap, n_is_lower_limit, n_pericenter, tracer_id
         sparta_last_pericenter_snap = sparta_output['last_pericenter_snap']
         sparta_tracer_ids = sparta_output['tracer_id']
         sparta_n_is_lower_limit = sparta_output['n_is_lower_limit']
@@ -216,13 +216,9 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         all_scaled_radii[start:start+num_new_particles] = particle_radii/halo_r200m[i]
         r200m_per_part[start:start+num_new_particles] = halo_r200m[i]
         all_orbit_assn[start:start+num_new_particles] = current_orbit_assn_sparta
-        
-        # if compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], num_prf_bins, mass) == False:
-        #     print("No match in prf:",i)
             
         if i == 5 or i == 10 or i == 15:
-            #compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn[:,1], i, start_nu, end_nu)
-            compare_density_prf(prf_bins, particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], num_prf_bins, mass, current_orbit_assn_sparta[:,1], i, start_nu, end_nu)
+            compare_density_prf(particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], mass, current_orbit_assn_sparta[:,1], i, start_nu, end_nu)
         
         start += num_new_particles
 
@@ -233,7 +229,7 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
             print("Halo lap:", (i-250), "to", i, "time:", tot_time, "time remaining:", np.round(t_remain/60,2), "min")
             t_start = t_lap
             
-    return all_orbit_assn, calculated_radial_velocities, all_radii, all_scaled_radii, r200m_per_part, calculated_radial_velocities_comp, calculated_tangential_velocities_comp
+    return all_orbit_assn, calculated_radial_velocities, all_radii, all_scaled_radii, r200m_per_part, calculated_radial_velocities_comp, calculated_tangential_velocities_comp, halo_indices
     
 def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r200_per_part):
     start_bin_val = 0.001
@@ -322,42 +318,20 @@ def split_halo_by_mass(num_bins, num_train_params, start_nu, num_iter, times_r20
             total_num_use_particles = np.sum(use_num_particles)
             
             print("Num particles: ", total_num_use_particles)
+            
+            file_counter = 0
 
             # calculate all the information
-            orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles, use_density_prf_all, use_density_prf_1halo, use_halo_n, use_halo_first, start_nu, end_nu, use_halo_id)   
+            orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp, halo_idxs = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles, use_density_prf_all, use_density_prf_1halo, use_halo_n, use_halo_first, start_nu, end_nu, use_halo_id)             
 
-            # with a new file and just started create all the datasets
-            if new_file and len(list(file.keys())) == 0:
-                file.create_dataset("PIDS", data = orbital_assign[:,0], chunks = True, maxshape=(total_num_particles,))
-                file.create_dataset("Orbit_Infall", data = orbital_assign[:,1], chunks = True, maxshape=(total_num_particles,))
-                file.create_dataset("Scaled_radii", data = scaled_radii, chunks = True, maxshape=(total_num_particles,))
-                file.create_dataset("Radial_vel", data = radial_velocities_comp, chunks = True, maxshape=(total_num_particles, 3))
-                file.create_dataset("Tangential_vel", data = tangential_velocities_comp, chunks = True, maxshape=(total_num_particles, 3))
-            # with a new file adding on additional data to the datasets
-            elif new_file and len(list(file.keys())) != 0:
-                file["PIDS"].resize((file["PIDS"].shape[0] + orbital_assign[:,0].shape[0]), axis = 0)
-                file["PIDS"][-orbital_assign[:,0].shape[0]:] = orbital_assign[:,0]
-                
-                file["Orbit_Infall"].resize((file["Orbit_Infall"].shape[0] + orbital_assign[:,1].shape[0]), axis = 0)
-                file["Orbit_Infall"][-orbital_assign[:,1].shape[0]:] = orbital_assign[:,1]
-                
-                file["Scaled_radii"].resize((file["Scaled_radii"].shape[0] + scaled_radii.shape[0]), axis = 0)
-                file["Scaled_radii"][-scaled_radii.shape[0]:] = scaled_radii
-                
-                file["Radial_vel"].resize((file["Radial_vel"].shape[0] + radial_velocities_comp.shape[0]), axis = 0)
-                file["Radial_vel"][-radial_velocities_comp.shape[0]:] = radial_velocities_comp
-                
-                file["Tangential_vel"].resize((file["Tangential_vel"].shape[0] + tangential_velocities_comp.shape[0]), axis = 0)
-                file["Tangential_vel"][-tangential_velocities_comp.shape[0]:] = tangential_velocities_comp
-                
-            file_counter = 0
-            # if not a new file and same num of particles will just replace the previous information
-            if not new_file:
-                file["PIDS"][file_counter:file_counter + orbital_assign[:,0].shape[0]] = orbital_assign[:,0]
-                file["Orbit_Infall"][file_counter:file_counter + orbital_assign[:,1].shape[0]] = orbital_assign[:,1]
-                file["Scaled_radii"][file_counter:file_counter + scaled_radii.shape[0]] = scaled_radii
-                file["Radial_vel"][file_counter:file_counter + radial_velocities_comp.shape[0]] = radial_velocities_comp
-                file["Tangential_vel"][file_counter:file_counter + tangential_velocities_comp.shape[0]] = tangential_velocities_comp
+            save_to_hdf5(new_file, file, "PIDS", dataset = orbital_assign[:,0], chunk = True, max_shape = (total_num_particles,), curr_idx = file_counter)
+            save_to_hdf5(new_file, file, "Orbit_Infall", dataset = orbital_assign[:,1], chunk = True, max_shape = (total_num_particles,), curr_idx = file_counter)
+            save_to_hdf5(new_file, file, "Scaled_radii", dataset = scaled_radii, chunk = True, max_shape = (total_num_particles,), curr_idx = file_counter)
+            save_to_hdf5(new_file, file, "Radial_vel", dataset = radial_velocities_comp, chunk = True, max_shape = (total_num_particles,3), curr_idx = file_counter)
+            save_to_hdf5(new_file, file, "Tangential_vel", dataset = tangential_velocities_comp, chunk = True, max_shape = (total_num_particles,3), curr_idx = file_counter)
+            save_to_hdf5(new_file, file, "Halo_start_ind", dataset = halo_idxs[:,0], chunk = True, max_shape = (total_num_halos,), curr_idx = file_counter)
+            save_to_hdf5(new_file, file, "Halo_num_ptl", dataset = halo_idxs[:,1], chunk = False, max_shape = (total_num_halos,), curr_idx = file_counter)
+            save_to_hdf5(new_file, file, "Halo_id", dataset = use_halo_id, chunk = False, max_shape = (total_num_halos,), curr_idx = file_counter)
             
             file_counter = file_counter + scaled_radii.shape[0]
                
@@ -374,7 +348,7 @@ def split_halo_by_mass(num_bins, num_train_params, start_nu, num_iter, times_r20
 num_bins = 50        
 start_nu = 0
 num_iter = 7
-num_train_params = 5
+num_train_params = 8
 t1 = time.time()
 print("start particle assign")
 

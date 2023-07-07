@@ -1,8 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from calculation_functions import calculate_distance
+from data_and_loading_functions import check_pickle_exist_gadget
 
-def compare_density_prf(bins, radii, actual_prf_all, actual_prf_1halo, num_prf_bins, mass, orbit_assn, num, start_nu, end_nu):
+def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_assn, num, start_nu, end_nu):
+    # Create bins for the density profile calculation
+    num_prf_bins = actual_prf_all.shape[0]
+    start_prf_bins = 0.01 # set by parameters in SPARTA
+    end_prf_bins = 3.0 # set by parameters in SPARTA
+    prf_bins = np.logspace(np.log10(start_prf_bins), np.log10(end_prf_bins), num_prf_bins)
+    
     calculated_prf_orb = np.zeros(num_prf_bins)
     calculated_prf_inf = np.zeros(num_prf_bins)
     calculated_prf_all = np.zeros(num_prf_bins)
@@ -12,7 +19,7 @@ def compare_density_prf(bins, radii, actual_prf_all, actual_prf_1halo, num_prf_b
     infall_radii = radii[np.where(orbit_assn == 0)[0]]
 
     for i in range(num_prf_bins):
-        end_bin = bins[i]  
+        end_bin = prf_bins[i]  
         
         orb_radii_within_range = np.where((orbit_radii >= start_bin) & (orbit_radii < end_bin))[0]
         if orb_radii_within_range.size != 0 and i != 0:
@@ -40,8 +47,8 @@ def compare_density_prf(bins, radii, actual_prf_all, actual_prf_1halo, num_prf_b
             
         start_bin = end_bin
 
-    bins = np.insert(bins,0,0)
-    middle_bins = (bins[1:] + bins[:-1]) / 2
+    prf_bins = np.insert(prf_bins,0,0)
+    middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
 
     fig, ax = plt.subplots(1,1)
     ax.plot(middle_bins, calculated_prf_orb, 'b-', label = "my code profile orb")
