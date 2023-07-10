@@ -105,7 +105,7 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel):
     inf_mask = (orb_inf == 0)
     orb_mask = (orb_inf == 1)
 
-    fig, (plot1) = plt.subplots(1,1)
+    fig, (plot1,plot2,plot3) = plt.subplots(1,3)
     plot1.scatter(radius[inf_mask], radial_vel[inf_mask], color = "red", label = "Infalling Particles")
     plot1.scatter(radius[orb_mask], radial_vel[orb_mask], color = "blue", label = "Orbiting Particles")
     plot1.set_title("Radial Velocity vs Radius Orb/Inf label")
@@ -114,5 +114,23 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel):
     # plot1.set_xscale("log")
     # plot1.set_yscale("log")
     plot1.legend()
+
+    plot2.scatter(radius[inf_mask], tang_vel[inf_mask], color = "red", label = "Infalling Particles")
+    plot2.scatter(radius[orb_mask], tang_vel[orb_mask], color = "blue", label = "Orbiting Particles")
+    plot2.set_title("Radial Velocity vs Radius Orb/Inf label")
+    plot2.set_xlabel("radius $r/R_{200m}$")
+    plot2.set_ylabel("tang vel $v_t/v_{200m}$")
+    # plot2.set_xscale("log")
+    # plot2.set_yscale("log")
+    plot2.legend()
+
+    plot3.scatter(radial_vel[inf_mask], tang_vel[inf_mask], color = "red", label = "Infalling Particles")
+    plot3.scatter(radial_vel[orb_mask], tang_vel[orb_mask], color = "blue", label = "Orbiting Particles")
+    plot3.set_title("Radial Velocity vs Radius Orb/Inf label")
+    plot3.set_xlabel("rad vel $v_r/v_{200m}$")
+    plot3.set_ylabel("tang vel $v_t/v_{200m}$")
+    # plot3.set_xscale("log")
+    # plot3.set_yscale("log")
+    plot3.legend()
 
     plt.show()

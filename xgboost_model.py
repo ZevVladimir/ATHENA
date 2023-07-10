@@ -27,11 +27,11 @@ mass = ptl_mass[0] * 10**10 #units M_sun/h
 np.random.seed(11)
 
 num_splits = 1
-param_list = ['Orbit_Infall', 'Scaled_radii', 'Radial_vel', 'Tangential_vel']
+param_list = ['Orbit_Infall', 'Scaled_radii', 'Radial_vel', 'Radial_vel_magn', 'Tangential_vel', 'Tangential_vel_magn']
 num_test_halos = 5
 rng = np.random.default_rng()
-with h5py.File((data_location + "all_particle_properties" + curr_snapshot + ".hdf5"), 'r') as all_particle_properties:
-    total_num_halos = all_particle_properties["Halo_id"][:].shape[0]    
+with h5py.File((data_location + "all_halo_properties" + curr_snapshot + ".hdf5"), 'r') as all_halo_properties:
+    total_num_halos = all_halo_properties["Halo_id"][:].shape[0]   
     random_halo_indices = rng.permutation(total_num_halos)
     
 model = None
@@ -123,5 +123,5 @@ for j in range(num_test_halos):
     curr_density_prf_1halo = density_prf_1halo[halo_idx]
 
     #compare_density_prf(curr_test_halo[:,1], curr_density_prf_all[0], curr_density_prf_1halo[0], mass, test_predict, j, "", "", show_graph = True)
-    plot_radius_rad_vel_tang_vel_graphs(curr_test_halo[:,0],curr_test_halo[:,1], curr_test_halo[:,2], curr_test_halo[:,3])
+    plot_radius_rad_vel_tang_vel_graphs(curr_test_halo[:,0], curr_test_halo[:,1], curr_test_halo[:,5], curr_test_halo[:,9])
     start = start + curr_halo_num_ptl
