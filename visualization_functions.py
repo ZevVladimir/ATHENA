@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from calculation_functions import calculate_distance
 from data_and_loading_functions import check_pickle_exist_gadget
 
-def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_assn, num, start_nu, end_nu):
+def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_assn, num, start_nu, end_nu, show_graph = False):
     # Create bins for the density profile calculation
     num_prf_bins = actual_prf_all.shape[0]
     start_prf_bins = 0.01 # set by parameters in SPARTA
@@ -44,17 +44,20 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
             calculated_prf_all[i] = radii_within_range.size * mass
         else:
             calculated_prf_all[i] = calculated_prf_all[i - 1]
-            
+
         start_bin = end_bin
 
     prf_bins = np.insert(prf_bins,0,0)
     middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
 
     fig, ax = plt.subplots(1,1)
+
+    ax.plot(middle_bins, calculated_prf_all, 'r-', label = "my code profile all")
+    ax.plot(middle_bins, actual_prf_all, 'c--', label = "SPARTA profile all")
+
     ax.plot(middle_bins, calculated_prf_orb, 'b-', label = "my code profile orb")
     ax.plot(middle_bins, calculated_prf_inf, 'g-', label = "my code profile inf")
-    ax.plot(middle_bins, calculated_prf_all, 'r-', label = "my code profile all")
-    ax.plot(middle_bins, actual_prf_all, 'c--', label = "SPARTA profile all part")
+    
     ax.plot(middle_bins, actual_prf_1halo, 'm--', label = "SPARTA profile orbit")
     ax.plot(middle_bins, actual_prf_all - actual_prf_1halo, 'y--', label = "SPARTA profile inf")
     
@@ -65,7 +68,8 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     ax.set_yscale("log")
     ax.legend()
     fig.savefig("/home/zvladimi/MLOIS/Random_figures/density_prf_" + str(start_nu) + "-" + str(end_nu) + "_" + str(num) + ".png")
-    #plt.show()
+    if show_graph:
+        plt.show()
     ax.clear()
     fig.clear()
 
@@ -96,3 +100,19 @@ def rad_vel_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = No
     ax.legend()
     
     return ax.plot(hubble_vel[:,0], hubble_vel[:,1], color = "purple", alpha = 0.5, linestyle = "dashed", label = r"Hubble Flow")
+
+def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel):
+    inf_mask = (orb_inf == 0)
+    orb_mask = (orb_inf == 1)
+
+    fig, (plot1) = plt.subplots(1,1)
+    plot1.scatter(radius[inf_mask], radial_vel[inf_mask], color = "red", label = "Infalling Particles")
+    plot1.scatter(radius[orb_mask], radial_vel[orb_mask], color = "blue", label = "Orbiting Particles")
+    plot1.set_title("Radial Velocity vs Radius Orb/Inf label")
+    plot1.set_xlabel("radius $r/R_{200m}$")
+    plot1.set_ylabel("rad vel $v_r/v_{200m}$")
+    # plot1.set_xscale("log")
+    # plot1.set_yscale("log")
+    plot1.legend()
+
+    plt.show()

@@ -20,7 +20,7 @@ save_location = "/home/zvladimi/MLOIS/training_data/" + "data_for_" + curr_hdf5_
 
 np.random.seed(11)
 
-num_splits = 20
+num_splits = 1
 param_list = ['Orbit_Infall', 'Scaled_radii', 'Radial_vel', 'Tangential_vel']
 with h5py.File((data_location + "all_particle_properties" + curr_snapshot + ".hdf5"), 'r') as all_particle_properties:
     total_num_particles = all_particle_properties["PIDS"][:].shape[0]    

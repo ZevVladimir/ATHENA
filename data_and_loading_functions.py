@@ -64,50 +64,83 @@ def standardize(values):
 def normalize(values):
     return (values - values.min())/(values.max() - values.min())
 
-def load_training_data(path, parameter, hdf5, random_indices):
-    
-    file_path = path + parameter + ".pickle" 
-    if os.path.isfile(file_path):
-        with open(file_path, "rb") as pickle_file:
-            particle_info = pickle.load(pickle_file)
-    else:
-        particle_info = hdf5[parameter][:]
-        with open(file_path, "wb") as pickle_file:
-            pickle.dump(particle_info, pickle_file)
-    
-    particle_info = particle_info[random_indices]
-    return particle_info
+def build_ml_dataset(path, data_location, indices, snapshot, param_list, dataset_name):
 
-def load_or_pickle_data_ml(path, data_location, curr_split, indices, use_num_particles, snapshot, param_list):
-    dataset = np.zeros(use_num_particles)
+    halo_split_param = ['Halo_start_ind','Halo_num_ptl','Halo_id']
+    dataset_path = path + dataset_name + "dataset" + snapshot + ".pickle"
+
+    total_num_halos = indices.shape[0]
+
+    # if the directory for this hdf5 file exists if not make it
     if os.path.exists(path) != True:
         os.makedirs(path)
-        
-    with h5py.File((data_location + "all_particle_properties" + snapshot + ".hdf5"), 'r') as all_particle_properties:
-        start_index = curr_split * use_num_particles
-        use_random_indices = indices[start_index:start_index+use_num_particles]
-        
-        for i,parameter in enumerate(param_list):
-            curr_dataset = load_training_data(path, parameter, all_particle_properties, use_random_indices)
-            if parameter == 'Orbit_Infall' and i != 0:
-                dataset[:,0] = curr_dataset
-            elif parameter == 'Orbit_Infall' and i == 0:
-                dataset = curr_dataset
+
+    # if there isn't a pickle for the train_dataset make it 
+    elif os.path.exists(dataset_path) != True or os.path.exists(path + "halo_prop_ML.pickle") != True:
+        # load in the halo properties from the hdf5 file and put them all in one big array
+        with h5py.File((data_location + "all_particle_properties" + snapshot + ".hdf5"), 'r') as all_particle_properties:
+            # if there isn't a pickle of the halo properties loop through them and add them all to one big array
+            if os.path.exists(path + "halo_prop_ML.pickle") != True: 
+                halo_props = np.zeros(total_num_halos)
+                for i,parameter in enumerate(halo_split_param):
+                    curr_halo_prop = all_particle_properties[parameter]
+                    if i == 0:
+                        halo_props = curr_halo_prop
+                    else:
+                        halo_props = np.column_stack((halo_props, curr_halo_prop))
+                with open(path + "halo_prop_ML.pickle", "wb") as pickle_file:
+                    halo_props = halo_props[indices]
+                    pickle.dump(halo_props, pickle_file)
             else:
-                dataset = np.column_stack((dataset, curr_dataset))
+                with open(path + "halo_prop_ML.pickle", "rb") as pickle_file:
+                    halo_props = pickle.load(pickle_file)
 
-    return dataset
+            # get how many parameters there are (since velocities are split into)
+            num_cols = 0
+            for parameter in param_list:
+                param_dset = all_particle_properties[parameter][:]
+                if param_dset.ndim > 1:
+                    num_cols += param_dset.shape[1]
+                else:
+                    num_cols += 1
 
-def build_ml_dataset(output_path, data_loc_path, curr_split, indices, use_num_particles, snapshot, param_list):
-    dataset_path = output_path + "dataset.pickle"
-    if os.path.exists(dataset_path) == True:
-        with open(dataset_path, "rb") as pickle_file:
-            return pickle.load(pickle_file)
-    else:
+            full_dataset = np.zeros((np.sum(halo_props[:,1]), num_cols))
+
+            # go through each halo
+            count = 0
+            for j in range(indices.size):
+                curr_halo_start = halo_props[j,0]
+                curr_halo_num_ptl = halo_props[j,1]
+
+                halo_dataset = np.zeros((curr_halo_num_ptl,1))
+                # go through each parameter to load in for this halo
+                for k,parameter in enumerate(param_list):
+                    curr_dataset = all_particle_properties[parameter][curr_halo_start:curr_halo_start+curr_halo_num_ptl]
+
+                    # have it so orbit_infall assignment is always first column otherwise just stack them
+                    if parameter == 'Orbit_Infall' and k != 0:
+                        halo_dataset[:,0] = curr_dataset
+                    elif parameter == 'Orbit_Infall' and k == 0:
+                        halo_dataset = curr_dataset
+                    else:
+                        halo_dataset = np.column_stack((halo_dataset, curr_dataset))
+
+                full_dataset[count:count + curr_halo_num_ptl] = halo_dataset
+    
+                count = count + curr_halo_num_ptl
+
+        # once all the halos are gone through save them as pickles for later  
         with open(dataset_path, "wb") as pickle_file:
-            dataset = load_or_pickle_data_ml(output_path, data_loc_path, curr_split, indices, use_num_particles, snapshot, param_list)
-            pickle.dump(dataset, pickle_file)
-            return dataset
+            pickle.dump(full_dataset, pickle_file)
+
+    # if there are already pickle files just open them
+    else:
+        with open(dataset_path, "rb") as pickle_file:
+            full_dataset = pickle.load(pickle_file)
+        with open(path + "halo_prop_ML.pickle", "rb") as pickle_file:
+            halo_props = pickle.load(pickle_file)
+
+    return full_dataset, halo_props
 
 def save_to_hdf5(new_file, hdf5_file, data_name, dataset, chunk, max_shape, curr_idx, max_num_keys):
     if new_file and len(list(hdf5_file.keys())) < max_num_keys:
