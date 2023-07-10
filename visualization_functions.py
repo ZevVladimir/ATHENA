@@ -103,6 +103,14 @@ def rad_vel_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = No
 
 def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf):
 
+    inf_radius = radius[np.where(orb_inf == 0)]
+    orb_radius = radius[np.where(orb_inf == 1)]
+    inf_rad_vel = radial_vel[np.where(orb_inf == 0)]
+    orb_rad_vel = radial_vel[np.where(orb_inf == 1)]
+    inf_tang_vel = tang_vel[np.where(orb_inf == 0)]
+    orb_tang_vel = tang_vel[np.where(orb_inf == 1)]
+    
+
     incorrect_inf_radius = radius[np.where((orb_inf == 0) & (orb_inf != correct_orb_inf))]
     correct_inf_radius = radius[np.where((orb_inf == 0) & (orb_inf == correct_orb_inf))]
     incorrect_orb_radius = radius[np.where((orb_inf == 1) & (orb_inf != correct_orb_inf))]
@@ -119,38 +127,59 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     correct_orb_tang_vel = tang_vel[np.where((orb_inf == 1) & (orb_inf == correct_orb_inf))]
 
 
-    fig, (plot1,plot2,plot3) = plt.subplots(1,3)
-    plot1.scatter(incorrect_inf_radius, incorrect_inf_rad_vel, color = "red", marker = 'x', alpha = 0.3, label = "Incorrect Infalling Particles")
-    plot1.scatter(incorrect_orb_radius, incorrect_orb_rad_vel, color = "blue", marker = 'x', alpha = 0.3, label = "Incorrect Orbiting Particles")
-    # plot1.scatter(correct_inf_radius, correct_inf_rad_vel, color = "red", marker = 'o', alpha = 0.3, label = "Correct Infalling Particles")
-    # plot1.scatter(correct_orb_radius, correct_orb_rad_vel, color = "blue", marker = 'o', alpha = 0.3, label = "Correct Orbiting Particles")
-    plot1.set_title("Radial Velocity vs Radius Orb/Inf label")
+    # fig, (plot1,plot2,plot3) = plt.subplots(1,3)
+    
+    # plot1.hist2d(correct_inf_radius, correct_inf_rad_vel, bins = 20, color = "green")
+    # plot1.hist2d(correct_orb_radius, correct_orb_rad_vel, bins = 20, color = "yellow")
+    # plot1.hist2d(incorrect_inf_radius, incorrect_inf_rad_vel, bins = 20, color = "red")
+    # plot1.hist2d(incorrect_orb_radius, incorrect_orb_rad_vel, bins = 20, color = "blue")
+    # plot1.set_title("Radial Velocity vs Radius Orb/Inf label")
+    # plot1.set_xlabel("radius $r/R_{200m}$")
+    # plot1.set_ylabel("rad vel $v_r/v_{200m}$")
+    # # plot1.set_xscale("log")
+    # # plot1.set_yscale("log")
+    # plot1.legend()
+
+    # plot2.hist2d(correct_inf_radius, correct_inf_tang_vel, bins = 20, color = "green", label = "Correct Infalling Particles")
+    # plot2.hist2d(correct_orb_radius, correct_orb_tang_vel, bins = 20, color = "yellow", label = "Correct Orbiting Particles")
+    # plot2.hist2d(incorrect_inf_radius, incorrect_inf_tang_vel, bins = 20, color = "red", label = "Incorrect Infalling Particles")
+    # plot2.hist2d(incorrect_orb_radius, incorrect_orb_tang_vel, bins = 20, color = "blue", label = "Incorrect Orbiting Particles")
+    # plot2.set_title("Tangential Velocity vs Radius Orb/Inf label")
+    # plot2.set_xlabel("radius $r/R_{200m}$")
+    # plot2.set_ylabel("tang vel $v_t/v_{200m}$")
+    # # plot2.set_xscale("log")
+    # # plot2.set_yscale("log")
+    # plot2.legend()
+
+    # plot3.hist2d(incorrect_inf_rad_vel, incorrect_inf_tang_vel, bins = 20, color = "red", label = "Incorrect Infalling Particles")
+    # plot3.hist2d(incorrect_orb_rad_vel, incorrect_orb_tang_vel, bins = 20, color = "blue", label = "Incorrect Orbiting Particles")
+    # plot3.hist2d(correct_inf_rad_vel, correct_inf_tang_vel, bins = 20, color = "green", label = "Correct Infalling Particles")
+    # plot3.hist2d(correct_orb_rad_vel, correct_orb_tang_vel, bins = 20, color = "yellow", label = "Correct Orbiting Particles")
+    # plot3.set_title("Tangential Velocity vs Radial Velocity")
+    # plot3.set_xlabel("rad vel $v_r/v_{200m}$")
+    # plot3.set_ylabel("tang vel $v_t/v_{200m}$")
+    # # plot3.set_xscale("log")
+    # # plot3.set_yscale("log")
+    # plot3.legend()
+
+
+    fig1, (plot1,plot2,plot3) = plt.subplots(1,3)
+    plot1.hist2d(inf_radius, inf_rad_vel, bins = 50)
+    plot1.hist2d(orb_radius, orb_rad_vel, bins = 50)
+    plot1.set_title("Radial Velocity vs Radius")
     plot1.set_xlabel("radius $r/R_{200m}$")
     plot1.set_ylabel("rad vel $v_r/v_{200m}$")
-    # plot1.set_xscale("log")
-    # plot1.set_yscale("log")
-    plot1.legend()
 
-    plot2.scatter(incorrect_inf_radius, incorrect_inf_tang_vel, color = "red", marker = 'x', alpha = 0.3, label = "Incorrect Infalling Particles")
-    plot2.scatter(incorrect_orb_radius, incorrect_orb_tang_vel, color = "blue", marker = 'x', alpha = 0.3, label = "Incorrect Orbiting Particles")
-    # plot2.scatter(correct_inf_radius, correct_inf_tang_vel, color = "red", marker = 'o', alpha = 0.3, label = "Correct Infalling Particles")
-    # plot2.scatter(correct_orb_radius, correct_orb_tang_vel, color = "blue", marker = 'o', alpha = 0.3, label = "Correct Orbiting Particles")
-    plot2.set_title("Tangential Velocity vs Radius Orb/Inf label")
+    plot2.hist2d(inf_radius, inf_tang_vel, bins = 50)
+    plot2.hist2d(orb_radius, orb_tang_vel, bins = 50)
+    plot2.set_title("Tangential Velocity vs Radius")
     plot2.set_xlabel("radius $r/R_{200m}$")
     plot2.set_ylabel("tang vel $v_t/v_{200m}$")
-    # plot2.set_xscale("log")
-    # plot2.set_yscale("log")
-    plot2.legend()
 
-    plot3.scatter(incorrect_inf_rad_vel, incorrect_inf_tang_vel, color = "red", marker = 'x', alpha = 0.3, label = "Incorrect Infalling Particles")
-    plot3.scatter(incorrect_orb_rad_vel, incorrect_orb_tang_vel, color = "blue", marker = 'x', alpha = 0.3, label = "Incorrect Orbiting Particles")
-    # plot3.scatter(correct_inf_rad_vel, correct_inf_tang_vel, color = "red", marker = 'o', alpha = 0.3, label = "Correct Infalling Particles")
-    # plot3.scatter(correct_orb_rad_vel, correct_orb_tang_vel, color = "blue", marker = 'o', alpha = 0.3, label = "Correct Orbiting Particles")
+    plot3.hist2d(inf_tang_vel, inf_rad_vel, bins = 50)
+    plot3.hist2d(orb_tang_vel, orb_rad_vel, bins = 50)
     plot3.set_title("Tangential Velocity vs Radial Velocity")
     plot3.set_xlabel("rad vel $v_r/v_{200m}$")
     plot3.set_ylabel("tang vel $v_t/v_{200m}$")
-    # plot3.set_xscale("log")
-    # plot3.set_yscale("log")
-    plot3.legend()
 
     plt.show()
