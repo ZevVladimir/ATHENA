@@ -33,13 +33,6 @@ rng = np.random.default_rng()
 with h5py.File((data_location + "all_halo_properties" + curr_snapshot + ".hdf5"), 'r') as all_halo_properties:
     total_num_halos = all_halo_properties["Halo_id"][:].shape[0]   
     random_halo_indices = rng.permutation(total_num_halos)
-    
-model = None
-
-def choose_class(predictions):
-    predictions[predictions > 0.5] = 1
-    predictions[predictions <= 0.5] = 0
-    return predictions
 
 dataset, halo_props = build_ml_dataset(save_location, data_location, random_halo_indices, curr_snapshot, param_list, "full")
 
@@ -50,40 +43,42 @@ train_dataset = dataset[num_test_ptl:,:]
 rus = under_sampling.RandomUnderSampler(random_state=0)
 ros = over_sampling.RandomOverSampler(random_state=0)
 t0 = time.time()
-for i in range(num_splits):
-    t1 = time.time()
-    print("Split:", (i+1), "/",num_splits)
-    
-    
+if os.path.exists(save_location + "xgb_model" + curr_snapshot + ".pickle"):
+    model = pickle.load(open(save_location + "xgb_model" + curr_snapshot + ".pickle", "rb"))
+else:
+    model = None
+    for i in range(num_splits):
+        t1 = time.time()
+        print("Split:", (i+1), "/",num_splits)
+        
+        
 
-    t2 = time.time()
-    print("Loaded data", t2 - t1, "seconds")
+        t2 = time.time()
+        print("Loaded data", t2 - t1, "seconds")
 
-    X_train, X_val, y_train, y_val = train_test_split(train_dataset[:,1:], train_dataset[:,0], test_size=0.30, random_state=0)
+        X_train, X_val, y_train, y_val = train_test_split(train_dataset[:,1:], train_dataset[:,0], test_size=0.30, random_state=0)
 
-    # standardize has slightly better performance comapared to normalize
-    # X_train = standardize(X_train)
-    # X_test = standardize(X_test)
-    
-    #X_train_rus, y_train_rus = rus.fit_resample(X_train, y_train)
-    #X_train_ros, y_train_ros = ros.fit_resample(X_train, y_train)
-    
-    t3 = time.time()
-    
-    model = XGBClassifier(tree_method='gpu_hist')
-    model = model.fit(X_train, y_train)
+        # standardize has slightly better performance comapared to normalize
+        # X_train = standardize(X_train)
+        # X_test = standardize(X_test)
+        
+        #X_train_rus, y_train_rus = rus.fit_resample(X_train, y_train)
+        #X_train_ros, y_train_ros = ros.fit_resample(X_train, y_train)
+        
+        t3 = time.time()
+        
+        model = XGBClassifier(tree_method='gpu_hist')
+        model = model.fit(X_train, y_train)
 
-    predicts = model.predict(X_val)
+        predicts = model.predict(X_val)
 
-    t4 = time.time()
-    print("Fitted model", t4 - t3, "seconds")
+        t4 = time.time()
+        print("Fitted model", t4 - t3, "seconds")
 
-    predicts = choose_class((predicts))
+        classification = classification_report(y_val, predicts)
+        print(classification)
 
-    classification = classification_report(y_val, predicts)
-    print(classification)
-
-model.save_model(save_location + "xgb_model" + curr_snapshot + ".model")
+    pickle.dump(model, open(save_location + "xgb_model" + curr_snapshot + ".pickle", "wb"))
 t5 = time.time()
 print("Total time:", t5-t0, "seconds")
 
@@ -122,6 +117,9 @@ for j in range(num_test_halos):
     curr_density_prf_all = density_prf_all[halo_idx]
     curr_density_prf_1halo = density_prf_1halo[halo_idx]
 
+    actual_labels = curr_test_halo[:,0]
+    classification = classification_report(actual_labels, test_predict)
+    print(classification)
     #compare_density_prf(curr_test_halo[:,1], curr_density_prf_all[0], curr_density_prf_1halo[0], mass, test_predict, j, "", "", show_graph = True)
-    plot_radius_rad_vel_tang_vel_graphs(curr_test_halo[:,0], curr_test_halo[:,1], curr_test_halo[:,5], curr_test_halo[:,9])
+    plot_radius_rad_vel_tang_vel_graphs(test_predict, curr_test_halo[:,1], curr_test_halo[:,5], curr_test_halo[:,9], actual_labels)
     start = start + curr_halo_num_ptl
