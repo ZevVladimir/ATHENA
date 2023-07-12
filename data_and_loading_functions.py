@@ -15,8 +15,8 @@ def check_pickle_exist_gadget(path, ptl_property, snapshot, snapshot_path):
             pickle.dump(particle_info, pickle_file)
     return particle_info
 
-def check_pickle_exist_hdf5_prop(path, first_group, second_group, third_group, hdf5_path):
-    file_path = path + first_group + "_" + second_group + "_" + third_group + ".pickle" 
+def check_pickle_exist_hdf5_prop(path, first_group, second_group, third_group, hdf5_path, snapshot):
+    file_path = path + first_group + "_" + second_group + "_" + third_group + "_" + snapshot + ".pickle" 
     if os.path.isfile(file_path):
         with open(file_path, "rb") as pickle_file:
             halo_info = pickle.load(pickle_file)
@@ -39,22 +39,22 @@ def load_or_pickle_data(path, snapshot, hdf5, snapshot_path):
     ptl_pos = check_pickle_exist_gadget(path, "pos", snapshot, snapshot_path)
     ptl_mass = check_pickle_exist_gadget(path, "mass", snapshot, snapshot_path)
     
-    halo_pos = check_pickle_exist_hdf5_prop(path, "halos", "position", "", hdf5)
-    halo_vel = check_pickle_exist_hdf5_prop(path, "halos", "velocity", "", hdf5)
-    halo_last_snap = check_pickle_exist_hdf5_prop(path, "halos", "last_snap", "", hdf5)
-    halo_r200m = check_pickle_exist_hdf5_prop(path, "halos", "R200m", "", hdf5)
-    halo_id = check_pickle_exist_hdf5_prop(path, "halos", "id", "", hdf5)
-    halo_status = check_pickle_exist_hdf5_prop(path, "halos", "status", "", hdf5)
+    halo_pos = check_pickle_exist_hdf5_prop(path, "halos", "position", "", hdf5, snapshot)
+    halo_vel = check_pickle_exist_hdf5_prop(path, "halos", "velocity", "", hdf5, snapshot)
+    halo_last_snap = check_pickle_exist_hdf5_prop(path, "halos", "last_snap", "", hdf5, snapshot)
+    halo_r200m = check_pickle_exist_hdf5_prop(path, "halos", "R200m", "", hdf5, snapshot)
+    halo_id = check_pickle_exist_hdf5_prop(path, "halos", "id", "", hdf5, snapshot)
+    halo_status = check_pickle_exist_hdf5_prop(path, "halos", "status", "", hdf5, snapshot)
     
-    density_prf_all = check_pickle_exist_hdf5_prop(path, "anl_prf", "M_all", "", hdf5)
-    density_prf_1halo = check_pickle_exist_hdf5_prop(path, "anl_prf", "M_1halo", "", hdf5)
+    density_prf_all = check_pickle_exist_hdf5_prop(path, "anl_prf", "M_all", "", hdf5, snapshot)
+    density_prf_1halo = check_pickle_exist_hdf5_prop(path, "anl_prf", "M_1halo", "", hdf5, snapshot)
     
-    halo_n = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "halo_n", hdf5)
-    halo_first = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "halo_first", hdf5)
-    num_pericenter = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "n_pericenter", hdf5)
-    tracer_id = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "tracer_id", hdf5)
-    n_is_lower_limit = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "n_is_lower_limit", hdf5)
-    last_pericenter_snap = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "last_pericenter_snap", hdf5)
+    halo_n = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "halo_n", hdf5, snapshot)
+    halo_first = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "halo_first", hdf5, snapshot)
+    num_pericenter = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "n_pericenter", hdf5, snapshot)
+    tracer_id = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "tracer_id", hdf5, snapshot)
+    n_is_lower_limit = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "n_is_lower_limit", hdf5, snapshot)
+    last_pericenter_snap = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "last_pericenter_snap", hdf5, snapshot)
 
     return ptl_pid, ptl_vel, ptl_pos, ptl_mass, halo_pos, halo_vel, halo_last_snap, halo_r200m, halo_id, halo_status, num_pericenter, tracer_id, n_is_lower_limit, last_pericenter_snap, density_prf_all, density_prf_1halo, halo_n, halo_first
 
