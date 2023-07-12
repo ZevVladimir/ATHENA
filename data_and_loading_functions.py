@@ -64,38 +64,33 @@ def standardize(values):
 def normalize(values):
     return (values - values.min())/(values.max() - values.min())
 
-def build_ml_dataset(path, data_location, indices, snapshot, param_list, dataset_name):
-    halo_split_param = ['Halo_start_ind','Halo_num_ptl','Halo_id'] # use list to know for sure the order of numpy arrays
-    dataset_path = path + dataset_name + "dataset" + snapshot + ".pickle"
-
-    total_num_halos = indices.shape[0]
+def build_ml_dataset(path, data_location, sparta_name, param_list, dataset_name, total_num_halos, halo_split_param, snap):
+    dataset_path = path + dataset_name + "dataset" + sparta_name + ".pickle"
 
     # if the directory for this hdf5 file exists if not make it
     if os.path.exists(path) != True:
         os.makedirs(path)
 
     # if there isn't a pickle for the train_dataset make it 
-    elif os.path.exists(dataset_path) != True or os.path.exists(path + "halo_prop_ML.pickle") != True:
+    if os.path.exists(dataset_path) != True or os.path.exists(path + "halo_prop_ML.pickle") != True:
         # load in the halo properties from the hdf5 file and put them all in one big array
-        with h5py.File((data_location + "all_halo_properties" + snapshot + ".hdf5"), 'r') as all_halo_properties:
+        with h5py.File((data_location + "all_halo_properties" + sparta_name + ".hdf5"), 'r') as all_halo_properties:
             # if there isn't a pickle of the halo properties loop through them and add them all to one big array
             if os.path.exists(path + "halo_prop_ML.pickle") != True: 
                 halo_props = np.zeros(total_num_halos)
                 for i,parameter in enumerate(halo_split_param):
                     curr_halo_prop = all_halo_properties[parameter]
-                    print(curr_halo_prop)
                     if i == 0:
                         halo_props = curr_halo_prop
                     else:
                         halo_props = np.column_stack((halo_props, curr_halo_prop))
                 with open(path + "halo_prop_ML.pickle", "wb") as pickle_file:
-                    halo_props = halo_props[indices]
                     pickle.dump(halo_props, pickle_file)
             else:
                 with open(path + "halo_prop_ML.pickle", "rb") as pickle_file:
                     halo_props = pickle.load(pickle_file)
 
-        with h5py.File((data_location + "all_particle_properties" + snapshot + ".hdf5"), 'r') as all_particle_properties:
+        with h5py.File((data_location + "all_particle_properties" + sparta_name + ".hdf5"), 'r') as all_particle_properties:
             # get how many parameters there are (since velocities are split into)
             num_cols = 0
             for parameter in param_list:
@@ -109,7 +104,7 @@ def build_ml_dataset(path, data_location, indices, snapshot, param_list, dataset
 
             # go through each halo
             count = 0
-            for j in range(indices.size):
+            for j in range(halo_props.shape[0]):
                 curr_halo_start = halo_props[j,0]
                 curr_halo_num_ptl = halo_props[j,1]
 
@@ -118,9 +113,9 @@ def build_ml_dataset(path, data_location, indices, snapshot, param_list, dataset
                 for k,parameter in enumerate(param_list):
                     curr_dataset = all_particle_properties[parameter][curr_halo_start:curr_halo_start+curr_halo_num_ptl]
                     # have it so orbit_infall assignment is always first column otherwise just stack them
-                    if parameter == 'Orbit_Infall' and k != 0:
+                    if parameter == ('Orbit_Infall_' + snap) and k != 0:
                         halo_dataset[:,0] = curr_dataset
-                    elif parameter == 'Orbit_Infall' and k == 0:
+                    elif parameter == ('Orbit_Infall_' + snap) and k == 0:
                         halo_dataset = curr_dataset
                     else:
                         halo_dataset = np.column_stack((halo_dataset, curr_dataset))
@@ -142,11 +137,11 @@ def build_ml_dataset(path, data_location, indices, snapshot, param_list, dataset
 
     return full_dataset, halo_props
 
-def save_to_hdf5(new_file, hdf5_file, data_name, dataset, chunk, max_shape, curr_idx, max_num_keys):
-    if new_file and len(list(hdf5_file.keys())) < max_num_keys:
+def save_to_hdf5(new_file, hdf5_file, data_name, dataset, chunk, max_shape, curr_idx, max_num_keys, num_snap):
+    if new_file and len(list(hdf5_file.keys())) < (max_num_keys * num_snap):
         hdf5_file.create_dataset(data_name, data = dataset, chunks = chunk, maxshape = max_shape)
     # with a new file adding on additional data to the datasets
-    elif new_file and len(list(hdf5_file.keys())) == max_num_keys:
+    elif new_file and len(list(hdf5_file.keys())) == (max_num_keys * num_snap):
 
         hdf5_file[data_name].resize((hdf5_file[data_name].shape[0] + dataset.shape[0]), axis = 0)
         hdf5_file[data_name][-dataset.shape[0]:] = dataset   
@@ -155,4 +150,17 @@ def save_to_hdf5(new_file, hdf5_file, data_name, dataset, chunk, max_shape, curr
     if not new_file:
         hdf5_file[data_name][curr_idx:curr_idx + dataset.shape[0]] = dataset
         
-        
+def choose_halo_split(indices, snap, halo_props, particle_props, num_features):
+    start_idxs = halo_props["Halo_start_ind_" + snap].to_numpy()
+    num_ptls = halo_props["Halo_num_ptl_" + snap].to_numpy()
+
+    dataset = np.zeros((np.sum(num_ptls[indices]), num_features))
+    start = 0
+    for idx in indices:
+        start_ind = start_idxs[idx]
+        curr_num_ptl = num_ptls[idx]
+        dataset[start:start+curr_num_ptl] = particle_props[start_ind:start_ind+curr_num_ptl]
+
+        start = start + curr_num_ptl
+
+    return dataset
