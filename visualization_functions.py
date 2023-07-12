@@ -1,9 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from calculation_functions import calculate_distance
+import seaborn as sns
+import matplotlib as mpl
 from data_and_loading_functions import check_pickle_exist_gadget
 
-def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_assn, num, start_nu, end_nu, show_graph = False):
+def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_assn, num, start_nu, end_nu, show_graph = False, save_graph = False):
     # Create bins for the density profile calculation
     num_prf_bins = actual_prf_all.shape[0]
     start_prf_bins = 0.01 # set by parameters in SPARTA
@@ -67,7 +69,8 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.legend()
-    fig.savefig("/home/zvladimi/MLOIS/Random_figures/density_prf_" + str(start_nu) + "-" + str(end_nu) + "_" + str(num) + ".png")
+    if save_graph:
+        fig.savefig("/home/zvladimi/MLOIS/Random_figures/density_prf_" + str(start_nu) + "-" + str(end_nu) + "_" + str(num) + ".png")
     if show_graph:
         plt.show()
     ax.clear()
@@ -160,26 +163,46 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     # plot3.set_ylabel("tang vel $v_t/v_{200m}$")
     # # plot3.set_xscale("log")
     # # plot3.set_yscale("log")
-    # plot3.legend()
+    # plot3.legend()matplotlib
 
+    num_bins = 30
+    ptl_min = 10
+    cmap = plt.get_cmap("inferno")
 
     fig1, (plot1,plot2,plot3) = plt.subplots(1,3)
-    plot1.hist2d(inf_radius, inf_rad_vel, bins = 50)
-    plot1.hist2d(orb_radius, orb_rad_vel, bins = 50)
+    #plot1.hist2d(inf_radius, inf_rad_vel, bins = num_bins, cmap = cmap, cmin = ptl_min)
+    hist1 = plot1.hist2d(orb_radius, orb_rad_vel, bins = num_bins, cmap = cmap, cmin = ptl_min)
     plot1.set_title("Radial Velocity vs Radius")
     plot1.set_xlabel("radius $r/R_{200m}$")
     plot1.set_ylabel("rad vel $v_r/v_{200m}$")
+    fig1.colorbar(hist1[3], ax = plot1)
 
-    plot2.hist2d(inf_radius, inf_tang_vel, bins = 50)
-    plot2.hist2d(orb_radius, orb_tang_vel, bins = 50)
+    #plot2.hist2d(inf_radius, inf_tang_vel, bins = num_bins, cmap = cmap, cmin = ptl_min)
+    hist2 = plot2.hist2d(orb_radius, orb_tang_vel, bins = num_bins, cmap = cmap, cmin = ptl_min)
     plot2.set_title("Tangential Velocity vs Radius")
     plot2.set_xlabel("radius $r/R_{200m}$")
     plot2.set_ylabel("tang vel $v_t/v_{200m}$")
+    fig1.colorbar(hist2[3], ax = plot2)
 
-    plot3.hist2d(inf_tang_vel, inf_rad_vel, bins = 50)
-    plot3.hist2d(orb_tang_vel, orb_rad_vel, bins = 50)
+    #plot3.hist2d(inf_tang_vel, inf_rad_vel, bins = num_bins, cmap = cmap, cmin = ptl_min)
+    hist3 = plot3.hist2d(orb_tang_vel, orb_rad_vel, bins = num_bins, cmap = cmap, cmin = ptl_min)
     plot3.set_title("Tangential Velocity vs Radial Velocity")
     plot3.set_xlabel("rad vel $v_r/v_{200m}$")
     plot3.set_ylabel("tang vel $v_t/v_{200m}$")
+    fig1.colorbar(hist3[3], ax = plot3)
+    
+    plt.show()
 
+def graph_feature_importance(feature_names, feature_importance):
+    mpl.rcParams.update({'font.size': 16})
+    fig2, (plot1) = plt.subplots(1,1)
+    import_idxs = np.argsort(feature_importance)
+    plot1.barh(feature_names[import_idxs], feature_importance[import_idxs])
+    plot1.set_xlabel = ("XGBoost feature importance")
+    plt.show()
+
+def graph_correlation_matrix(data, feature_names):
+    mpl.rcParams.update({'font.size': 12})
+    heatmap = sns.heatmap(data.corr(), annot = True, cbar = True)
+    heatmap.set_title("Feature Correlation Heatmap")
     plt.show()
