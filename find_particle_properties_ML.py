@@ -107,14 +107,14 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
     all_part_vel = np.zeros((total_particles,3), dtype = np.float32)
 
     calculated_r200m = np.zeros(halo_r200m.size)
-    calculated_radial_velocities = np.zeros((total_particles), dtype = np.float16)
+    calculated_radial_velocities = np.zeros((total_particles), dtype = np.float32)
     calculated_radial_velocities_comp = np.zeros((total_particles,3), dtype = np.float32)
     calculated_tangential_velocities_comp = np.zeros((total_particles,3), dtype = np.float32)
     calculated_tangential_velocities_magn  = np.zeros((total_particles), dtype = np.float32)
     all_radii = np.zeros((total_particles), dtype = np.float32)
-    all_scaled_radii = np.zeros(total_particles, dtype = np.float16)
-    r200m_per_part = np.zeros(total_particles, dtype = np.float16)
-    all_orbit_assn = np.zeros((total_particles,2), dtype = np.int16)
+    all_scaled_radii = np.zeros(total_particles, dtype = np.float32)
+    r200m_per_part = np.zeros(total_particles, dtype = np.float32)
+    all_orbit_assn = np.zeros((total_particles,2), dtype = np.int64)
 
     start = 0
     t_start = time.time()
@@ -172,8 +172,9 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         current_orbit_assn_sparta[poss_pids[1],1] = orbit_assn_sparta[poss_pid_match[2],1]
         mask = np.ones(current_particles_pid.size, dtype = bool) 
         mask[poss_pids[1]] = False
-        current_orbit_assn_sparta[mask] = 0 # set every pid that didn't have a match to infalling  
-            
+        current_orbit_assn_sparta[mask,1] = 0 # set every pid that didn't have a match to infalling  
+        current_orbit_assn_sparta[:,0] = current_particles_pid
+
         #sort the radii, positions, velocities, coord separations to allow for creation of plots and to correctly assign how much mass there is
         arrsortrad = unsorted_particle_radii.argsort()
         particle_radii = unsorted_particle_radii[arrsortrad]
@@ -303,6 +304,8 @@ def split_halo_by_mass(num_bins, num_ptl_params, num_halo_params, start_nu, num_
     scaled_halo_mass = halo_masses/little_h # units M⊙/h
     peak_heights = peaks.peakHeight(scaled_halo_mass, red_shift)
 
+    file_counter = 0
+
     # For how many mass bin splits
     for j in range(num_iter):
         t_start = time.time()
@@ -329,7 +332,6 @@ def split_halo_by_mass(num_bins, num_ptl_params, num_halo_params, start_nu, num_
             
             print("Num particles: ", total_num_use_particles)
             
-            file_counter = 0
 
             # calculate all the information
             orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp, tangential_velocities_magn, halo_idxs = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles, use_density_prf_all, use_density_prf_1halo, use_halo_n, use_halo_first, start_nu, end_nu, use_halo_id, sparta_file_path, snapshot_index)             
@@ -367,7 +369,6 @@ num_save_ptl_params = 5
 num_save_halo_params = 3
 times_r200 = 6
 global halo_start_idx 
-halo_start_idx = 0
 curr_sparta_file = "sparta_cbol_l0063_n0256"
 snapshot_list = ["189", "190"]
 
@@ -377,6 +378,7 @@ print("start particle assign")
 for i, snap in enumerate(snapshot_list):
     t3 = time.time()
 for i, snap in enumerate(snapshot_list):
+    halo_start_idx = 0
     hdf5_file_path, save_location, particles_pos, particles_vel, particles_pid, box_size, mass, tracer_id, rho_m, halos_pos, halos_vel, halos_id, total_num_halos, halos_r200m, red_shift, little_h, hubble_constant, density_prf_all, density_prf_1halo, halo_n, halo_first = load_snap_data(curr_sparta_file, snap, snapshot_list)
     t4 = time.time()
     print("\n finish loading data: ", (t4- t3), " seconds")

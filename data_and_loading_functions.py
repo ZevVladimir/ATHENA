@@ -76,7 +76,7 @@ def build_ml_dataset(path, data_location, sparta_name, param_list, dataset_name,
         # load in the halo properties from the hdf5 file and put them all in one big array
         with h5py.File((data_location + "all_halo_properties" + sparta_name + ".hdf5"), 'r') as all_halo_properties:
             # if there isn't a pickle of the halo properties loop through them and add them all to one big array
-            if os.path.exists(path + "halo_prop_ML.pickle") != True: 
+            if os.path.exists(path + "halo_prop_ML_" + snap + ".pickle") != True: 
                 halo_props = np.zeros(total_num_halos)
                 for i,parameter in enumerate(halo_split_param):
                     curr_halo_prop = all_halo_properties[parameter]
@@ -84,10 +84,10 @@ def build_ml_dataset(path, data_location, sparta_name, param_list, dataset_name,
                         halo_props = curr_halo_prop
                     else:
                         halo_props = np.column_stack((halo_props, curr_halo_prop))
-                with open(path + "halo_prop_ML.pickle", "wb") as pickle_file:
+                with open(path + "halo_prop_ML_" + snap + ".pickle", "wb") as pickle_file:
                     pickle.dump(halo_props, pickle_file)
             else:
-                with open(path + "halo_prop_ML.pickle", "rb") as pickle_file:
+                with open(path + "halo_prop_ML_" + snap + ".pickle", "rb") as pickle_file:
                     halo_props = pickle.load(pickle_file)
 
         with h5py.File((data_location + "all_particle_properties" + sparta_name + ".hdf5"), 'r') as all_particle_properties:
@@ -101,7 +101,6 @@ def build_ml_dataset(path, data_location, sparta_name, param_list, dataset_name,
                     num_cols += 1
 
             full_dataset = np.zeros((np.sum(halo_props[:,1]), num_cols))
-
             # go through each halo
             count = 0
             for j in range(halo_props.shape[0]):
@@ -113,10 +112,10 @@ def build_ml_dataset(path, data_location, sparta_name, param_list, dataset_name,
                 for k,parameter in enumerate(param_list):
                     curr_dataset = all_particle_properties[parameter][curr_halo_start:curr_halo_start+curr_halo_num_ptl]
                     # have it so orbit_infall assignment is always first column otherwise just stack them
-                    if parameter == ('Orbit_Infall_' + snap) and k != 0:
-                        halo_dataset[:,0] = curr_dataset
-                    elif parameter == ('Orbit_Infall_' + snap) and k == 0:
+                    if k == 0:
                         halo_dataset = curr_dataset
+                    elif parameter == ('Orbit_Infall_' + snap):
+                        halo_dataset = np.insert(halo_dataset, curr_dataset, 0, axis = 1)
                     else:
                         halo_dataset = np.column_stack((halo_dataset, curr_dataset))
 
@@ -159,6 +158,8 @@ def choose_halo_split(indices, snap, halo_props, particle_props, num_features):
     for idx in indices:
         start_ind = start_idxs[idx]
         curr_num_ptl = num_ptls[idx]
+        print(start_ind)
+        print(curr_num_ptl)
         dataset[start:start+curr_num_ptl] = particle_props[start_ind:start_ind+curr_num_ptl]
 
         start = start + curr_num_ptl
