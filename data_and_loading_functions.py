@@ -16,7 +16,9 @@ def check_pickle_exist_gadget(path, ptl_property, snapshot, snapshot_path):
     return particle_info
 
 def check_pickle_exist_hdf5_prop(path, first_group, second_group, third_group, hdf5_path, snapshot):
+    print(path)
     file_path = path + first_group + "_" + second_group + "_" + third_group + "_" + snapshot + ".pickle" 
+    print(file_path)
     if os.path.isfile(file_path):
         with open(file_path, "rb") as pickle_file:
             halo_info = pickle.load(pickle_file)
