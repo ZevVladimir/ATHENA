@@ -39,6 +39,8 @@ halo_prop_df = pd.DataFrame()
 all_feature_names = np.array([])
 all_halo_prop_names = np.array([])
 
+num_test_halos = 5
+
 if os.path.exists(save_location + curr_sparta_file + "full_dataset_" + snapshot_list[-1] + "_to_" + snapshot_list[0]) != True:
     for i, snap in enumerate(snapshot_list):
         print(snap)
@@ -72,7 +74,23 @@ if os.path.exists(save_location + curr_sparta_file + "full_dataset_" + snapshot_
             dataset = dataset[match_pids_compare]
 
         if i == 0:
-            start_dataset = dataset
+            rng = np.random.default_rng()
+            random_halo_indices = rng.permutation(halo_prop_df["Halo_id_" + snapshot_list[0]].to_numpy().shape[0])
+            test_halo_props = halo_props[random_halo_indices[:num_test_halos]]
+            test_halo_props_sort = test_halo_props[test_halo_props[:,2].argsort()[::-1]]
+            num_test_ptl = np.sum(test_halo_props[:,1])
+            test_dataset = np.zeros((num_test_ptl, len(snap_feature_names)))
+            start = 0
+            for j,idx in enumerate(test_halo_props_sort[:,0]):
+                num_new_ptl = test_halo_props[j,1]
+                start_ptl = test_halo_props[j,0]
+                print(dataset.shape)
+                print(dataset[start_ptl:start_ptl+num_new_ptl].shape)
+                test_dataset[start:start+num_new_ptl] = dataset[start_ptl:start_ptl+num_new_ptl]
+
+                dataset = np.delete(dataset, np.arange(start_ptl, start_ptl+num_new_ptl,1), axis = 0)
+                start = start + num_new_ptl
+                
         elif i == 1:
             start_dataset = start_dataset[match_pids_start]
             dataset = np.column_stack((start_dataset,dataset))
@@ -86,24 +104,20 @@ if os.path.exists(save_location + curr_sparta_file + "full_dataset_" + snapshot_
     dataset_df = dataset_df.drop(["PIDS_190", "PIDS_189"], axis = 1)
 
     pickle.dump(dataset_df, open(save_location + curr_sparta_file + "full_dataset_" + snapshot_list[-1] + "_to_" + snapshot_list[0], "wb"))
+    pickle.dump(test_dataset, open(save_location + curr_sparta_file + "test_dataset_" + snapshot_list[-1] + "_to_" + snapshot_list[0], "wb"))
 else:
     dataset_df = pickle.load(open(save_location + curr_sparta_file + "full_dataset_" + snapshot_list[-1] + "_to_" + snapshot_list[0], "rb"))
+    test_dataset = pickle.load(open(save_location + curr_sparta_file + "test_dataset_" + snapshot_list[-1] + "_to_" + snapshot_list[0], "rb"))
 
 print(dataset_df)
-rng = np.random.default_rng()
+
 print(dataset_df.keys())
-random_halo_indices = rng.permutation(halo_prop_df["Halo_id_" + snapshot_list[0]].to_numpy().shape[0])
-num_test_halos = 10
-num_validation_halos= 10
+
+
 
 #graph_correlation_matrix(dataset_df, all_feature_names)
 t2 = time.time()
 print("Loaded data", t2 - t1, "seconds")
-
-num_test_ptl = np.sum(halo_props[:num_test_halos,1])
-# test_dataset = choose_halo_split(random_halo_indices[:num_test_halos], snapshot_list[0], halo_prop_df, dataset_df.to_numpy(), all_feature_names.size)
-# validation_dataset = choose_halo_split(random_halo_indices[num_test_halos:num_test_halos+num_validation_halos], snapshot_list[0], halo_prop_df, dataset_df.to_numpy(), all_feature_names.size)
-# training_dataset = choose_halo_split(random_halo_indices[num_test_halos+num_validation_halos:], snapshot_list[0], halo_prop_df, dataset_df.to_numpy(), all_feature_names.size)
 
 # rus = under_sampling.RandomUnderSampler(random_state=0)
 # ros = over_sampling.RandomOverSampler(random_state=0)
