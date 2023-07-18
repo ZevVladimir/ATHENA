@@ -15,9 +15,9 @@ def check_pickle_exist_gadget(path, ptl_property, snapshot, snapshot_path):
             pickle.dump(particle_info, pickle_file)
     return particle_info
 
-def check_pickle_exist_hdf5_prop(path, first_group, second_group, third_group, hdf5_path, snapshot):
+def check_pickle_exist_hdf5_prop(path, first_group, second_group, third_group, hdf5_path, sparta_name):
     print(path)
-    file_path = path + first_group + "_" + second_group + "_" + third_group + "_" + snapshot + ".pickle" 
+    file_path = path + first_group + "_" + second_group + "_" + third_group + "_" + sparta_name + ".pickle" 
     print(file_path)
     if os.path.isfile(file_path):
         with open(file_path, "rb") as pickle_file:
@@ -33,32 +33,53 @@ def check_pickle_exist_hdf5_prop(path, first_group, second_group, third_group, h
             pickle.dump(halo_info, pickle_file)
     return halo_info
 
-def load_or_pickle_data(path, snapshot, hdf5, snapshot_path):
+def load_or_pickle_ptl_data(path, snapshot, snapshot_path, scale_factor, little_h):
     if os.path.exists(path) != True:
         os.makedirs(path)
     ptl_pid = check_pickle_exist_gadget(path, "pid", snapshot, snapshot_path)
     ptl_vel = check_pickle_exist_gadget(path, "vel", snapshot, snapshot_path)
     ptl_pos = check_pickle_exist_gadget(path, "pos", snapshot, snapshot_path)
     ptl_mass = check_pickle_exist_gadget(path, "mass", snapshot, snapshot_path)
-    
-    halo_pos = check_pickle_exist_hdf5_prop(path, "halos", "position", "", hdf5, snapshot)
-    halo_vel = check_pickle_exist_hdf5_prop(path, "halos", "velocity", "", hdf5, snapshot)
-    halo_last_snap = check_pickle_exist_hdf5_prop(path, "halos", "last_snap", "", hdf5, snapshot)
-    halo_r200m = check_pickle_exist_hdf5_prop(path, "halos", "R200m", "", hdf5, snapshot)
-    halo_id = check_pickle_exist_hdf5_prop(path, "halos", "id", "", hdf5, snapshot)
-    halo_status = check_pickle_exist_hdf5_prop(path, "halos", "status", "", hdf5, snapshot)
-    
-    density_prf_all = check_pickle_exist_hdf5_prop(path, "anl_prf", "M_all", "", hdf5, snapshot)
-    density_prf_1halo = check_pickle_exist_hdf5_prop(path, "anl_prf", "M_1halo", "", hdf5, snapshot)
-    
-    halo_n = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "halo_n", hdf5, snapshot)
-    halo_first = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "halo_first", hdf5, snapshot)
-    num_pericenter = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "n_pericenter", hdf5, snapshot)
-    tracer_id = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "tracer_id", hdf5, snapshot)
-    n_is_lower_limit = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "n_is_lower_limit", hdf5, snapshot)
-    last_pericenter_snap = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "last_pericenter_snap", hdf5, snapshot)
 
-    return ptl_pid, ptl_vel, ptl_pos, ptl_mass, halo_pos, halo_vel, halo_last_snap, halo_r200m, halo_id, halo_status, num_pericenter, tracer_id, n_is_lower_limit, last_pericenter_snap, density_prf_all, density_prf_1halo, halo_n, halo_first
+    particles_pos = particles_pos * 10**3 * scale_factor * little_h #convert to kpc and physical
+    ptl_mass = ptl_mass[0] * 10**10 #units M_sun/h
+
+    return ptl_pid, ptl_vel, ptl_pos, ptl_mass
+
+def load_or_pickle_SPARTA_data(path, sparta_name, hdf5_path, scale_factor, little_h, primary_snap):
+    halo_pos = check_pickle_exist_hdf5_prop(path, "halos", "position", "", hdf5_path, sparta_name)
+    halo_vel = check_pickle_exist_hdf5_prop(path, "halos", "velocity", "", hdf5_path, sparta_name)
+    halo_last_snap = check_pickle_exist_hdf5_prop(path, "halos", "last_snap", "", hdf5_path, sparta_name)
+    halo_r200m = check_pickle_exist_hdf5_prop(path, "halos", "R200m", "", hdf5_path, sparta_name)
+    halo_id = check_pickle_exist_hdf5_prop(path, "halos", "id", "", hdf5_path, sparta_name)
+    halo_status = check_pickle_exist_hdf5_prop(path, "halos", "status", "", hdf5_path, sparta_name)
+    
+    density_prf_all = check_pickle_exist_hdf5_prop(path, "anl_prf", "M_all", "", hdf5_path, sparta_name)
+    density_prf_1halo = check_pickle_exist_hdf5_prop(path, "anl_prf", "M_1halo", "", hdf5_path, sparta_name)
+
+    num_pericenter = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "n_pericenter", hdf5_path, sparta_name)
+    tracer_id = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "tracer_id", hdf5_path, sparta_name)
+    n_is_lower_limit = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "n_is_lower_limit", hdf5_path, sparta_name)
+    last_pericenter_snap = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "last_pericenter_snap", hdf5_path, sparta_name)
+
+    halos_pos = halos_pos * 10**3 * scale_factor * little_h #convert to kpc and physical
+    halos_r200m = halos_r200m * little_h # convert to kpc
+
+    total_num_halos = halos_r200m.shape[0] #num of halos remaining
+
+    # create array that tracks the ids and if a tracer is orbiting or infalling.
+    orbit_assn_tracers = np.zeros((tracer_id.size, 2), dtype = np.int32)
+    orbit_assn_tracers[:,0] = tracer_id
+
+    # only want pericenters that have occurred at or before this snapshot
+    num_pericenter[np.where(last_pericenter_snap > primary_snap)[0]] = 0
+    # if there is more than one pericenter count as orbiting (1) and if it isn't it is infalling (0)
+    orbit_assn_tracers[np.where(num_pericenter > 0)[0],1] = 1
+
+    # However particle can also be orbiting if n_is_lower_limit is 1
+    orbit_assn_tracers[np.where(n_is_lower_limit == 1)[0],1] = 1
+
+    return halo_pos, halo_vel, halo_last_snap, halo_r200m, halo_id, halo_status, num_pericenter, tracer_id, n_is_lower_limit, last_pericenter_snap, density_prf_all, density_prf_1halo, halo_last_snap, halo_status, total_num_halos
 
 def standardize(values):
     return (values - values.mean())/values.std()

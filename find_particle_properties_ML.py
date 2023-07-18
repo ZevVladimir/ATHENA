@@ -8,78 +8,10 @@ from colossus.lss import peaks
 from matplotlib.pyplot import cm
 import time
 import h5py
-from data_and_loading_functions import load_or_pickle_data, save_to_hdf5
+from data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5
 from calculation_functions import *
 from visualization_functions import compare_density_prf, rad_vel_vs_radius_plot
 from sparta import sparta
-
-def load_snap_data(sparta_file_name, curr_snapshot, snap_list):
-    hdf5_file_path = "/home/zvladimi/MLOIS/SPARTA_data/" + sparta_file_name + ".hdf5"
-    save_location =  "/home/zvladimi/MLOIS/calculated_info/" + "calc_from_" + sparta_file_name + "_" + snap_list[0] + "to" + snap_list[-1] + "/"
-    snapshot_path = "/home/zvladimi/MLOIS/particle_data/snapshot_" + curr_snapshot + "/snapshot_0" + curr_snapshot
-
-    # get constants from pygadgetreader
-    snapshot_index = int(curr_snapshot) #set to what snapshot is being loaded in
-    red_shift = readheader(snapshot_path, 'redshift')
-    scale_factor = 1/(1+red_shift)
-    cosmol = cosmology.setCosmology("bolshoi")
-    rho_m = cosmol.rho_m(red_shift)
-    little_h = cosmol.h 
-    hubble_constant = cosmol.Hz(red_shift) * 0.001 # convert to units km/s/kpc
-
-    box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
-    box_size = box_size * 10**3 * scale_factor * little_h #convert to Kpc physical
-
-    #load particle info
-    particles_pid, particles_vel, particles_pos, particles_mass, halos_pos, halos_vel, halos_last_snap, halos_r200m, halos_id, halos_status, num_pericenter, tracer_id, n_is_lower_limit, last_pericenter_snap, density_prf_all, density_prf_1halo, halo_n, halo_first = load_or_pickle_data(save_location, curr_snapshot, hdf5_file_path, snapshot_path)
-
-    particles_pos = particles_pos * 10**3 * scale_factor * little_h #convert to kpc and physical
-    mass = particles_mass[0] * 10**10 #units M_sun/h
-
-    #load all halo info at snapshot
-    halos_pos = halos_pos[:,snapshot_index,:] * 10**3 * scale_factor * little_h #convert to kpc and physical
-    halos_vel = halos_vel[:,snapshot_index,:]
-    halos_r200m = halos_r200m[:,snapshot_index] * little_h # convert to kpc
-    halos_id = halos_id[:,snapshot_index]
-    halos_status = halos_status[:,snapshot_index]
-    density_prf_all = density_prf_all[:,snapshot_index,:]
-    density_prf_1halo = density_prf_1halo[:,snapshot_index,:]
-
-    num_particles = particles_pid.size
-
-    # remove all halos for any halo that doesn't exist beyond snapshot 
-    # remove all halos that aren't main halos (identified with tag = 10)
-    indices_keep = np.zeros((halos_id.size))
-    indices_keep = np.where((halos_last_snap >= snapshot_index) & (halos_status == 10))
-    halos_pos = halos_pos[indices_keep]
-    halos_vel = halos_vel[indices_keep]
-    halos_r200m = halos_r200m[indices_keep]
-    halos_id = halos_id[indices_keep]
-    density_prf_all = density_prf_all[indices_keep]
-    density_prf_1halo = density_prf_1halo[indices_keep]
-    halo_n = halo_n[indices_keep]
-    halo_first = halo_first[indices_keep]
-    total_num_halos = halos_r200m.size #num of halos remaining
-
-    # create array that tracks the ids and if a tracer is orbiting or infalling.
-    orbit_assn_tracers = np.zeros((tracer_id.size, 2), dtype = np.int32)
-    orbit_assn_tracers[:,0] = tracer_id
-
-    # only want pericenters that have occurred at or before this snapshot
-    num_pericenter[np.where(last_pericenter_snap > snapshot_index)[0]] = 0
-    # if there is more than one pericenter count as orbiting (1) and if it isn't it is infalling (0)
-    orbit_assn_tracers[np.where(num_pericenter > 0)[0],1] = 1
-
-    # However particle can also be orbiting if n_is_lower_limit is 1
-    orbit_assn_tracers[np.where(n_is_lower_limit == 1)[0],1] = 1
-
-    # Create bins for the density profile calculation
-    num_prf_bins = density_prf_all.shape[1]
-    start_prf_bins = 0.01
-    end_prf_bins = 3.0
-    prf_bins = np.logspace(np.log10(start_prf_bins), np.log10(end_prf_bins), num_prf_bins)
-
-    return hdf5_file_path, save_location, particles_pos, particles_vel, particles_pid, box_size, mass, tracer_id, rho_m, halos_pos, halos_vel, halos_id, total_num_halos, halos_r200m, red_shift, little_h, hubble_constant, density_prf_all, density_prf_1halo, halo_n, halo_first
 
 def initial_search(halo_positions, search_radius, halo_r200m):
     num_halos = halo_positions.shape[0]
@@ -88,7 +20,7 @@ def initial_search(halo_positions, search_radius, halo_r200m):
     
     for i in range(num_halos):
         #find how many particles we are finding
-        indices = particle_tree.query_ball_point(halo_positions[i,:], r = search_radius * halo_r200m[i])
+        indices = primary_particle_tree.query_ball_point(halo_positions[i,:], r = search_radius * halo_r200m[i])
 
         # how many new particles being added and correspondingly how massive the halo is
         num_new_particles = len(indices)
@@ -100,7 +32,8 @@ def initial_search(halo_positions, search_radius, halo_r200m):
     
     return particles_per_halo, all_halo_mass
 
-def search_halos(halo_positions, halo_r200m, search_radius, total_particles, dens_prf_all, dens_prf_1halo, curr_halo_n, curr_halo_first, start_nu, end_nu, curr_halo_id, sparta_file_path, snapshot_index):
+def search_halos(halo_idxs, halo_positions, halo_r200m, search_radius, total_particles, dens_prf_all, dens_prf_1halo, start_nu, end_nu, curr_halo_id, sparta_file_path, snapshot_list):
+    primary_snap = snapshot_list[0]
     global halo_start_idx
     num_halos = halo_positions.shape[0]
     halo_indices = np.zeros((num_halos,2), dtype = np.int32)
@@ -120,17 +53,17 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
     t_start = time.time()
     for i in range(num_halos):
         # find the indices of the particles within the expected r200 radius multiplied by times_r200 
-        indices = particle_tree.query_ball_point(halo_positions[i,:], r = search_radius * halo_r200m[i])
+        indices = primary_particle_tree.query_ball_point(halo_positions[i,primary_snap,:], r = search_radius * halo_r200m[i,primary_snap])
         
-        curr_tracer_ids = tracer_id[curr_halo_first[i]:curr_halo_first[i] + curr_halo_n[i]]
-
         #Only take the particle positions that where found with the tree
-        current_particles_pos = particles_pos[indices,:]
-        current_particles_vel = particles_vel[indices,:]
-        current_particles_pid = particles_pid[indices]
+        current_particles_pos = prim_particles_pos[indices,:]
+        current_particles_vel = prim_particles_vel[indices,:]
+        current_particles_pid = prim_particles_pid[indices]
         #current_orbit_assn = np.zeros((current_particles_pid.size, 2))
         current_orbit_assn_sparta = np.zeros((current_particles_pid.size, 2))
-        current_halos_pos = halo_positions[i,:]        
+        current_halos_pos = halo_positions[i,primary_snap,:]        
+
+        halo_ptl_id = 
 
         # how many new particles being added
         num_new_particles = len(indices)
@@ -158,7 +91,7 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
         orbit_assn_sparta[:,0] = sparta_tracer_ids
 
         # only want pericenters that have occurred at or before this snapshot
-        sparta_n_pericenter[np.where(sparta_last_pericenter_snap > snapshot_index)[0]] = 0
+        sparta_n_pericenter[np.where(sparta_last_pericenter_snap > primary_snap)[0]] = 0
 
         # if there is more than one pericenter count as orbiting (1) and if it isn't it is infalling (0)
         orbit_assn_sparta[np.where(sparta_n_pericenter > 0)[0],1] = 1
@@ -220,7 +153,7 @@ def search_halos(halo_positions, halo_r200m, search_radius, total_particles, den
             
         if i == 50 or i == 100 or i == 113:
             compare_density_prf(particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], mass, current_orbit_assn_sparta[:,1], i, start_nu, end_nu)
-        
+
         start += num_new_particles
 
         if i % 250 == 0 and i != 0:
@@ -275,7 +208,8 @@ def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r20
     
     return average_val_part, average_val_hubble    
     
-def split_halo_by_mass(num_bins, num_ptl_params, num_halo_params, start_nu, num_iter, nu_step, times_r200m, halo_r200m, sparta_file_path, sparta_file_name, snapshot_index, new_file, snap_done):
+def split_halo_by_mass(num_bins, halos_status, halos_last_snap, num_ptl_params, num_halo_params, start_nu, num_iter, nu_step, times_r200m, halo_r200m, sparta_file_path, sparta_file_name, snapshot_list, new_file, snap_done):
+    primary_snap = snapshot_list[0] 
     # with h5py.File((save_location + "all_halo_properties" + sparta_file_name + ".hdf5"), 'a') as all_halo_properties:
     #     if new_file:
     #         for key in all_halo_properties.keys():
@@ -313,8 +247,8 @@ def split_halo_by_mass(num_bins, num_ptl_params, num_halo_params, start_nu, num_
         end_nu = start_nu + nu_step
         print("\nStart split:", start_nu, "to", end_nu)
         
-        # Get the indices of the halos that are within the desired peaks
-        halos_within_range = np.where((peak_heights >= start_nu) & (peak_heights < end_nu))[0]
+        # Get the indices of the halos that are within the desired peaks as well as ones that are 
+        halos_within_range = np.where((peak_heights >= start_nu) & (peak_heights < end_nu) & (halos_last_snap >= primary_snap) & (halos_status == 10))[0]
         print("Num halos: ", halos_within_range.shape[0])
         
         # only get the parameters we want for this specific halo bin
@@ -324,8 +258,6 @@ def split_halo_by_mass(num_bins, num_ptl_params, num_halo_params, start_nu, num_
             use_density_prf_all = density_prf_all[halos_within_range]
             use_density_prf_1halo = density_prf_1halo[halos_within_range]
             use_num_particles = num_particles_per_halo[halos_within_range]
-            use_halo_n = halo_n[halos_within_range]
-            use_halo_first = halo_first[halos_within_range]
             use_halo_id = halos_id[halos_within_range]
 
             total_num_use_particles = np.sum(use_num_particles)
@@ -334,20 +266,20 @@ def split_halo_by_mass(num_bins, num_ptl_params, num_halo_params, start_nu, num_
             
 
             # calculate all the information
-            orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp, tangential_velocities_magn, halo_idxs = search_halos(use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles, use_density_prf_all, use_density_prf_1halo, use_halo_n, use_halo_first, start_nu, end_nu, use_halo_id, sparta_file_path, snapshot_index)             
+            orbital_assign, radial_velocities, radii, scaled_radii, r200m_per_part, radial_velocities_comp, tangential_velocities_comp, tangential_velocities_magn, halo_idxs = search_halos(halos_within_range, use_halo_pos, use_halo_r200m, times_r200m, total_num_use_particles, use_density_prf_all, use_density_prf_1halo, start_nu, end_nu, use_halo_id, sparta_file_path, snapshot_list)             
             with h5py.File((save_location + "all_particle_properties" + sparta_file_name + ".hdf5"), 'a') as all_particle_properties:
 
-                save_to_hdf5(new_file, all_particle_properties, "PIDS_" + str(snapshot_index), dataset = orbital_assign[:,0], chunk = True, max_shape = (total_num_particles,), curr_idx = file_counter, max_num_keys = num_ptl_params, num_snap = snap_done)
-                save_to_hdf5(new_file, all_particle_properties, "Orbit_Infall_" + str(snapshot_index), dataset = orbital_assign[:,1], chunk = True, max_shape = (total_num_particles,), curr_idx = file_counter, max_num_keys = num_ptl_params, num_snap = snap_done)
-                save_to_hdf5(new_file, all_particle_properties, "Scaled_radii_" + str(snapshot_index), dataset = scaled_radii, chunk = True, max_shape = (total_num_particles,), curr_idx = file_counter, max_num_keys = num_ptl_params, num_snap = snap_done)
-                save_to_hdf5(new_file, all_particle_properties, "Radial_vel_magn_" + str(snapshot_index), dataset = radial_velocities, chunk = True, max_shape = (total_num_particles,), curr_idx = file_counter, max_num_keys = num_ptl_params, num_snap = snap_done)
-                save_to_hdf5(new_file, all_particle_properties, "Tangential_vel_magn_" + str(snapshot_index), dataset = tangential_velocities_magn, chunk = True, max_shape = (total_num_particles,), curr_idx = file_counter, max_num_keys = num_ptl_params, num_snap = snap_done)
+                save_to_hdf5(new_file, all_particle_properties, "PIDS_" + str(primary_snap), dataset = orbital_assign[:,0], chunk = True, max_shape = (total_num_particles,), curr_idx = file_counter, max_num_keys = num_ptl_params, num_snap = snap_done)
+                save_to_hdf5(new_file, all_particle_properties, "Orbit_Infall_" + str(primary_snap), dataset = orbital_assign[:,1], chunk = True, max_shape = (total_num_particles,), curr_idx = file_counter, max_num_keys = num_ptl_params, num_snap = snap_done)
+                save_to_hdf5(new_file, all_particle_properties, "Scaled_radii_" + str(primary_snap), dataset = scaled_radii, chunk = True, max_shape = (total_num_particles,), curr_idx = file_counter, max_num_keys = num_ptl_params, num_snap = snap_done)
+                save_to_hdf5(new_file, all_particle_properties, "Radial_vel_magn_" + str(primary_snap), dataset = radial_velocities, chunk = True, max_shape = (total_num_particles,), curr_idx = file_counter, max_num_keys = num_ptl_params, num_snap = snap_done)
+                save_to_hdf5(new_file, all_particle_properties, "Tangential_vel_magn_" + str(primary_snap), dataset = tangential_velocities_magn, chunk = True, max_shape = (total_num_particles,), curr_idx = file_counter, max_num_keys = num_ptl_params, num_snap = snap_done)
             
             with h5py.File((save_location + "all_halo_properties" + sparta_file_name + ".hdf5"), 'a') as all_halo_properties:
 
-                save_to_hdf5(new_file, all_halo_properties, "Halo_start_ind_" + str(snapshot_index), dataset = halo_idxs[:,0], chunk = True, max_shape = (total_num_halos,), curr_idx = file_counter, max_num_keys = num_halo_params, num_snap = snap_done)
-                save_to_hdf5(new_file, all_halo_properties, "Halo_num_ptl_" + str(snapshot_index), dataset = halo_idxs[:,1], chunk = True, max_shape = (total_num_halos,), curr_idx = file_counter, max_num_keys = num_halo_params, num_snap = snap_done)
-                save_to_hdf5(new_file, all_halo_properties, "Halo_id_" + str(snapshot_index), dataset = use_halo_id, chunk = True, max_shape = (total_num_halos,), curr_idx = file_counter, max_num_keys = num_halo_params, num_snap = snap_done)
+                save_to_hdf5(new_file, all_halo_properties, "Halo_start_ind_" + str(primary_snap), dataset = halo_idxs[:,0], chunk = True, max_shape = (total_num_halos,), curr_idx = file_counter, max_num_keys = num_halo_params, num_snap = snap_done)
+                save_to_hdf5(new_file, all_halo_properties, "Halo_num_ptl_" + str(primary_snap), dataset = halo_idxs[:,1], chunk = True, max_shape = (total_num_halos,), curr_idx = file_counter, max_num_keys = num_halo_params, num_snap = snap_done)
+                save_to_hdf5(new_file, all_halo_properties, "Halo_id_" + str(primary_snap), dataset = use_halo_id, chunk = True, max_shape = (total_num_halos,), curr_idx = file_counter, max_num_keys = num_halo_params, num_snap = snap_done)
             
             file_counter = file_counter + scaled_radii.shape[0]
                
@@ -368,27 +300,65 @@ num_iter = 7
 num_save_ptl_params = 5
 num_save_halo_params = 3
 times_r200 = 6
+dynamical_time = 2.448854618582507 # calculated by (2 * R200m)/V200m not sure how to do this each time... but hard coded for now from running this code with set snapshots
 global halo_start_idx 
 curr_sparta_file = "sparta_cbol_l0063_n0256"
-snapshot_list = ["189", "190"]
+
+# snapshot list should go from high to low (the first value will be what is searched around and generally you want that to be the more recent snap)
+snapshot_list = [190, 189]
+
+primary_snapshot = snapshot_list[0]
+hdf5_file_path = "/home/zvladimi/MLOIS/SPARTA_data/" + curr_sparta_file + ".hdf5"
+save_location =  "/home/zvladimi/MLOIS/calculated_info/" + "calc_from_" + curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "/"
+snapshot_path = "/home/zvladimi/MLOIS/particle_data/snapshot_" + str(primary_snapshot) + "/snapshot_0" + str(primary_snapshot)
+
+# get constants from pygadgetreader
+red_shift = readheader(snapshot_path, 'redshift')
+scale_factor = 1/(1+red_shift)
+cosmol = cosmology.setCosmology("bolshoi")
+rho_m = cosmol.rho_m(red_shift)
+little_h = cosmol.h 
+hubble_constant = cosmol.Hz(red_shift) * 0.001 # convert to units km/s/kpc
+
+box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
+box_size = box_size * 10**3 * scale_factor * little_h #convert to Kpc physical
+
 
 t1 = time.time()
 print("start particle assign")
 
-for i, snap in enumerate(snapshot_list):
-    t3 = time.time()
-for i, snap in enumerate(snapshot_list):
-    halo_start_idx = 0
-    hdf5_file_path, save_location, particles_pos, particles_vel, particles_pid, box_size, mass, tracer_id, rho_m, halos_pos, halos_vel, halos_id, total_num_halos, halos_r200m, red_shift, little_h, hubble_constant, density_prf_all, density_prf_1halo, halo_n, halo_first = load_snap_data(curr_sparta_file, snap, snapshot_list)
-    t4 = time.time()
-    print("\n finish loading data: ", (t4- t3), " seconds")
-    #construct a search tree with all of the particle positions
-    particle_tree = cKDTree(data = particles_pos, leafsize = 3, balanced_tree = False, boxsize = box_size)
-    split_halo_by_mass(num_bins, num_save_ptl_params, num_save_halo_params, start_nu, num_iter, nu_step, times_r200, halos_r200m, hdf5_file_path, curr_sparta_file, int(snap), True, (i+1))    
-    t5 = time.time()
-    print("finish snap " + snap + ": ", np.round((t5- t3)/60,2), "minutes,", (t5- t3), " seconds" + "\n")
+
+t3 = time.time()
+
+halo_start_idx = 0
+prim_particles_pid, prim_particles_vel, prim_particles_pos, mass = load_or_pickle_ptl_data(save_location, str(primary_snapshot), snapshot_path, scale_factor, little_h)
+halos_pos, halos_vel, halo_last_snap, halos_r200m, halos_id, halo_status, num_pericenter, tracer_id, n_is_lower_limit, last_pericenter_snap, density_prf_all, density_prf_1halo, halos_last_snap, halos_status, total_num_halos = load_or_pickle_SPARTA_data(save_location, curr_sparta_file, hdf5_file_path, scale_factor, little_h, primary_snapshot)
+
+t4 = time.time()
+print("\n finish loading data: ", (t4- t3), " seconds")
+#construct a search tree with all of the particle positions
+primary_particle_tree = cKDTree(data = prim_particles_pos, leafsize = 3, balanced_tree = False, boxsize = box_size)
+
+for snap in snapshot_list[1:]:
+    comp_snapshot_path = "/home/zvladimi/MLOIS/particle_data/snapshot_" + str(snap) + "/snapshot_0" + str(snap)
+
+    # get constants from pygadgetreader
+    comp_red_shift = readheader(comp_snapshot_path, 'redshift')
+    comp_scale_factor = 1/(1+red_shift)
+    comp_rho_m = cosmol.rho_m(red_shift)
+    comp_hubble_constant = cosmol.Hz(red_shift) * 0.001 # convert to units km/s/kpc
+
+    comp_box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
+    comp_box_size = comp_box_size * 10**3 * comp_scale_factor * little_h #convert to Kpc physical
+
+    comp_particles_pid, comp_particles_vel, comp_particles_pos, mass = load_or_pickle_ptl_data(save_location, str(snap), comp_snapshot_path, scale_factor, little_h)
+    comp_particle_tree = cKDTree(data = comp_particles_pos, leafsize = 3, balanced_tree = False, boxsize = comp_box_size)
+
+    split_halo_by_mass(num_bins, halos_status, halos_last_snap, num_save_ptl_params, num_save_halo_params, start_nu, num_iter, nu_step, times_r200, halos_r200m, hdf5_file_path, curr_sparta_file, snapshot_list, True, len(snapshot_list))    
+t5 = time.time()
+print("finish calculations: ", np.round((t5- t3)/60,2), "minutes,", (t5- t3), " seconds" + "\n")
 
 t2 = time.time()
-print("All finished: ", np.round((t2- t1)/60,2), "minutes,", (t2- t1), " seconds")
+print("Total time: ", np.round((t2- t1)/60,2), "minutes,", (t2- t1), " seconds")
 #plt.savefig("/home/zvladimi/MLOIS/Random_figures/avg_rad_vel_vs_pos.png")
 
