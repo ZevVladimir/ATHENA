@@ -15,17 +15,19 @@ from calculation_functions import *
 from visualization_functions import compare_density_prf, rad_vel_vs_radius_plot
 from sparta import sparta
 
-def initial_search(halo_positions, search_radius, halo_r200m):
+def initial_search(halo_positions, search_radius, halo_r200m, tree):
     num_halos = halo_positions.shape[0]
     particles_per_halo = np.zeros(num_halos, dtype = np.int32)
     all_halo_mass = np.zeros(num_halos, dtype = np.float32)
     
     for i in range(num_halos):
         #find how many particles we are finding
-        indices = p_particle_tree.query_ball_point(halo_positions[i,:], r = search_radius * halo_r200m[i])
+        indices = tree.query_ball_point(halo_positions[i,:], r = search_radius * halo_r200m[i])
 
         # how many new particles being added and correspondingly how massive the halo is
         num_new_particles = len(indices)
+        if num_new_particles == 0:
+            print(halo_positions[i,:])
         all_halo_mass[i] = num_new_particles * mass
         particles_per_halo[i] = num_new_particles
 
@@ -233,12 +235,13 @@ def split_halo_by_mass(num_bins, prim_halos_status, comp_halos_status, prim_halo
     
     print("\nstart initial search")    
     # get the halo_masses and number of particles
-    p_num_particles_per_halo, p_halo_masses = initial_search(p_halos_pos, times_r200m, p_halo_r200m)
-    c_num_particles_per_halo, c_halo_masses = initial_search(c_halos_pos, times_r200m, c_halo_r200m)
+    p_num_particles_per_halo, p_halo_masses = initial_search(p_halos_pos, times_r200m, p_halo_r200m, p_particle_tree)
+    c_num_particles_per_halo, c_halo_masses = initial_search(c_halos_pos, times_r200m, c_halo_r200m, c_particle_tree)
     print("finish initial search")
     p_total_num_particles = np.sum(p_num_particles_per_halo)
     # convert masses to peaks
     p_scaled_halo_mass = p_halo_masses/little_h # units M⊙/h
+    print(np.sort(p_halo_masses))
     peak_heights = peaks.peakHeight(p_scaled_halo_mass, p_red_shift)
 
     file_counter = 0
@@ -328,7 +331,7 @@ global halo_start_idx
 curr_sparta_file = "sparta_cbol_l0063_n0256"
 
 # snapshot list should go from high to low (the first value will be what is searched around and generally you want that to be the more recent snap)
-snapshot_list = [190, 189]
+snapshot_list = [190]
 
 p_snapshot = snapshot_list[0]
 hdf5_file_path = "/home/zvladimi/MLOIS/SPARTA_data/" + curr_sparta_file + ".hdf5"
@@ -345,10 +348,8 @@ cosmol = cosmology.setCosmology("bolshoi")
 little_h = cosmol.h 
 
 for i, snap in enumerate(snapshot_list):
-    snapshot_path = "/home/zvladimi/MLOIS/particle_data/snapshot_" + "{:04d}".format(snap) + "/snapshot_" + "{:04d}".format(snap)
     
-
-    #idx = (np.abs(array - past_time)).argmin()
+    snapshot_path = "/home/zvladimi/MLOIS/particle_data/snapdir_" + "{:04d}".format(snap) + "/snapshot_" + "{:04d}".format(snap)
 
     if i == 0:
         # get constants from pygadgetreader
@@ -370,6 +371,19 @@ for i, snap in enumerate(snapshot_list):
         curr_time = cosmol.age(p_red_shift)
         past_time = curr_time - t_dyn
 
+        closest_time = 0
+        closest_snap = 0
+        for j in range(193):
+            
+            red_shift = readheader("/home/zvladimi/MLOIS/particle_data/snapdir_" + "{:04d}".format(j) + "/snapshot_" + "{:04d}".format(j), 'redshift')
+            comp_time = cosmol.age(red_shift)
+            
+            if np.abs(past_time - comp_time) < np.abs(past_time - closest_time):
+                closest_time = comp_time
+                closest_snap = j
+
+        snapshot_list.append(closest_snap)
+        print(snapshot_list)
     else:
         # get constants from pygadgetreader
         c_red_shift = readheader(snapshot_path, 'redshift')
