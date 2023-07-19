@@ -300,7 +300,8 @@ num_iter = 7
 num_save_ptl_params = 5
 num_save_halo_params = 3
 times_r200 = 6
-dynamical_time = 2.448854618582507 # calculated by (2 * R200m)/V200m not sure how to do this each time... but hard coded for now from running this code with set snapshots
+
+t_dyn = 2.448854618582507 # calculated by (2 * R200m)/V200m not sure how to do this each time... but hard coded for now from running this code with set snapshots
 global halo_start_idx 
 curr_sparta_file = "sparta_cbol_l0063_n0256"
 
@@ -328,9 +329,13 @@ for i, snap in enumerate(snapshot_list):
     scale_factor = 1/(1+red_shift)
     rho_m = cosmol.rho_m(red_shift)
     hubble_constant = cosmol.Hz(red_shift) * 0.001 # convert to units km/s/kpc
-
     box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
     box_size = box_size * 10**3 * scale_factor * little_h #convert to Kpc physical
+
+    curr_time = cosmol.age(red_shift)
+    past_time = curr_time - t_dyn
+
+    #idx = (np.abs(array - past_time)).argmin()
 
     if i == 0:
         prim_particles_pid, prim_particles_vel, prim_particles_pos, mass = load_or_pickle_ptl_data(save_location, str(primary_snapshot), snapshot_path, scale_factor, little_h)
