@@ -299,11 +299,11 @@ def split_halo_by_mass(num_bins, num_ptl_params, num_halo_params, start_nu, num_
 
             with h5py.File((save_location + "all_particle_properties" + sparta_file_name + ".hdf5"), 'a') as all_particle_properties:
 
-                save_to_hdf5(new_file, all_particle_properties, "HPIDS_" + str(p_snap), dataset = p_orbital_assign[:,0], chunk = True, max_shape = (p_total_num_particles,), curr_idx = file_counter, max_num_keys = num_ptl_params)
-                save_to_hdf5(new_file, all_particle_properties, "Orbit_Infall_" + str(p_snap), dataset = p_orbital_assign[:,1], chunk = True, max_shape = (p_total_num_particles,), curr_idx = file_counter, max_num_keys = num_ptl_params)
-                save_to_hdf5(new_file, all_particle_properties, "Scaled_radii_" + str(p_snap), dataset = all_scaled_radii, chunk = True, max_shape = (p_total_num_particles,2), curr_idx = file_counter, max_num_keys = num_ptl_params)
-                save_to_hdf5(new_file, all_particle_properties, "Radial_vel_magn_" + str(p_snap), dataset = all_rad_vel, chunk = True, max_shape = (p_total_num_particles,2), curr_idx = file_counter, max_num_keys = num_ptl_params)
-                save_to_hdf5(new_file, all_particle_properties, "Tangential_vel_magn_" + str(p_snap), dataset = all_tang_vel, chunk = True, max_shape = (p_total_num_particles,2), curr_idx = file_counter, max_num_keys = num_ptl_params)
+                save_to_hdf5(new_file, all_particle_properties, "HPIDS_", dataset = p_orbital_assign[:,0], chunk = True, max_shape = (p_total_num_particles,), curr_idx = file_counter, max_num_keys = num_ptl_params)
+                save_to_hdf5(new_file, all_particle_properties, "Orbit_Infall_", dataset = p_orbital_assign[:,1], chunk = True, max_shape = (p_total_num_particles,), curr_idx = file_counter, max_num_keys = num_ptl_params)
+                save_to_hdf5(new_file, all_particle_properties, "Scaled_radii_", dataset = all_scaled_radii, chunk = True, max_shape = (p_total_num_particles,2), curr_idx = file_counter, max_num_keys = num_ptl_params)
+                save_to_hdf5(new_file, all_particle_properties, "Radial_vel_magn_", dataset = all_rad_vel, chunk = True, max_shape = (p_total_num_particles,2), curr_idx = file_counter, max_num_keys = num_ptl_params)
+                save_to_hdf5(new_file, all_particle_properties, "Tangential_vel_magn_", dataset = all_tang_vel, chunk = True, max_shape = (p_total_num_particles,2), curr_idx = file_counter, max_num_keys = num_ptl_params)
             
             # with h5py.File((save_location + "all_halo_properties" + sparta_file_name + ".hdf5"), 'a') as all_halo_properties:
 

@@ -6,6 +6,7 @@ from pygadgetreader import readsnap, readheader
 
 def check_pickle_exist_gadget(path, ptl_property, snapshot, snapshot_path):
     file_path = path + ptl_property + "_" + snapshot + ".pickle" 
+    print(file_path)
     if os.path.isfile(file_path):
         with open(file_path, "rb") as pickle_file:
             particle_info = pickle.load(pickle_file)
