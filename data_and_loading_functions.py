@@ -53,11 +53,6 @@ def load_or_pickle_SPARTA_data(path, sparta_name, hdf5_path, scale_factor, littl
     
     density_prf_all = check_pickle_exist_hdf5_prop(path, "anl_prf", "M_all", "", hdf5_path, sparta_name)
     density_prf_1halo = check_pickle_exist_hdf5_prop(path, "anl_prf", "M_1halo", "", hdf5_path, sparta_name)
-
-    num_pericenter = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "n_pericenter", hdf5_path, sparta_name)
-    tracer_id = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "tracer_id", hdf5_path, sparta_name)
-    n_is_lower_limit = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "n_is_lower_limit", hdf5_path, sparta_name)
-    last_pericenter_snap = check_pickle_exist_hdf5_prop(path, "tcr_ptl", "res_oct", "last_pericenter_snap", hdf5_path, sparta_name)
     
     halos_pos = halos_pos[:,snap,:]
     halos_vel = halos_vel[:,snap,:]
@@ -72,19 +67,7 @@ def load_or_pickle_SPARTA_data(path, sparta_name, hdf5_path, scale_factor, littl
     
     total_num_halos = halos_r200m.shape[0] #num of halos remaining
 
-    # create array that tracks the ids and if a tracer is orbiting or infalling.
-    orbit_assn_tracers = np.zeros((tracer_id.size, 2), dtype = np.int32)
-    orbit_assn_tracers[:,0] = tracer_id
-
-    # only want pericenters that have occurred at or before this snapshot
-    num_pericenter[np.where(last_pericenter_snap > snap)[0]] = 0
-    # if there is more than one pericenter count as orbiting (1) and if it isn't it is infalling (0)
-    orbit_assn_tracers[np.where(num_pericenter > 0)[0],1] = 1
-
-    # However particle can also be orbiting if n_is_lower_limit is 1
-    orbit_assn_tracers[np.where(n_is_lower_limit == 1)[0],1] = 1
-
-    return halos_pos, halos_vel, halo_last_snap, halos_r200m, halo_id, halo_status, num_pericenter, tracer_id, n_is_lower_limit, last_pericenter_snap, density_prf_all, density_prf_1halo, halo_last_snap, halo_status, total_num_halos
+    return halos_pos, halos_vel, halo_last_snap, halos_r200m, halo_id, halo_status, density_prf_all, density_prf_1halo, halo_last_snap, halo_status, total_num_halos
 
 def standardize(values):
     return (values - values.mean())/values.std()
@@ -193,3 +176,15 @@ def choose_halo_split(indices, snap, halo_props, particle_props, num_features):
         start = start + curr_num_ptl
 
     return dataset
+
+def find_closest_snap(cosmology, time_find):
+    closest_time = 0
+    closest_snap = 0
+    for i in range(193):
+        red_shift = readheader("/home/zvladimi/MLOIS/particle_data/snapdir_" + "{:04d}".format(i) + "/snapshot_" + "{:04d}".format(i), 'redshift')
+        comp_time = cosmology.age(red_shift)
+        
+        if np.abs(time_find - comp_time) < np.abs(time_find - closest_time):
+            closest_time = comp_time
+            closest_snap = i
+    return closest_snap

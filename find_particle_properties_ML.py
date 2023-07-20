@@ -254,7 +254,7 @@ def split_halo_by_mass(num_bins, prim_halos_status, comp_halos_status, prim_halo
         print("\nStart split:", start_nu, "to", end_nu)
         
         # Get the indices of the halos that are within the desired peaks as well as ones that are 
-        halos_within_range = np.where((peak_heights >= start_nu) & (peak_heights < end_nu) & (p_halos_last_snap >= p_snap) & (p_halos_status[p_snap] == 10) & (c_halos_last_snap >= c_snap) & (c_halos_status[c_snap] > 0))[0]
+        halos_within_range = np.where((peak_heights >= start_nu) & (peak_heights < end_nu))
         print("Num halos: ", halos_within_range.shape[0])
         
         # only get the parameters we want for this specific halo bin
