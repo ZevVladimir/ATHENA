@@ -64,10 +64,8 @@ def load_or_pickle_SPARTA_data(path, sparta_name, hdf5_path, scale_factor, littl
     
     halos_pos = halos_pos * 10**3 * scale_factor * little_h #convert to kpc and physical
     halos_r200m = halos_r200m * little_h # convert to kpc
-    
-    total_num_halos = halos_r200m.shape[0] #num of halos remaining
 
-    return halos_pos, halos_vel, halo_last_snap, halos_r200m, halo_id, halo_status, density_prf_all, density_prf_1halo, halo_last_snap, halo_status, total_num_halos
+    return halos_pos, halos_vel, halos_r200m, halo_id, density_prf_all, density_prf_1halo, halo_status, halo_last_snap
 
 def standardize(values):
     return (values - values.mean())/values.std()
@@ -147,11 +145,11 @@ def build_ml_dataset(path, data_location, sparta_name, param_list, dataset_name,
 
     return full_dataset, halo_props
 
-def save_to_hdf5(new_file, hdf5_file, data_name, dataset, chunk, max_shape, curr_idx, max_num_keys, num_snap):
-    if new_file and len(list(hdf5_file.keys())) < (max_num_keys * num_snap):
+def save_to_hdf5(new_file, hdf5_file, data_name, dataset, chunk, max_shape, curr_idx, max_num_keys):
+    if new_file and len(list(hdf5_file.keys())) < (max_num_keys):
         hdf5_file.create_dataset(data_name, data = dataset, chunks = chunk, maxshape = max_shape)
     # with a new file adding on additional data to the datasets
-    elif new_file and len(list(hdf5_file.keys())) == (max_num_keys * num_snap):
+    elif new_file and len(list(hdf5_file.keys())) == (max_num_keys):
 
         hdf5_file[data_name].resize((hdf5_file[data_name].shape[0] + dataset.shape[0]), axis = 0)
         hdf5_file[data_name][-dataset.shape[0]:] = dataset   
