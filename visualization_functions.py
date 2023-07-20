@@ -197,6 +197,8 @@ def graph_feature_importance(feature_names, feature_importance):
     mpl.rcParams.update({'font.size': 16})
     fig2, (plot1) = plt.subplots(1,1)
     import_idxs = np.argsort(feature_importance)
+    print(import_idxs)
+    print(feature_names)
     plot1.barh(feature_names[import_idxs], feature_importance[import_idxs])
     plot1.set_xlabel = ("XGBoost feature importance")
     plt.show()
