@@ -32,60 +32,15 @@ np.random.seed(11)
 t1 = time.time()
 num_splits = 1
 
-num_cols = 0
-all_keys = []
-with h5py.File((data_location + "all_particle_properties" + curr_sparta_file + ".hdf5"), 'r') as all_ptl_properties: 
-    for key in all_ptl_properties.keys():
-        if all_ptl_properties[key].ndim > 1:
-            num_cols += all_ptl_properties[key].shape[1]
-        else:
-            num_cols += 1
-        
-    num_rows = all_ptl_properties[key].shape[0]
-
-    full_dataset = np.zeros((num_rows, num_cols))
-    curr_col = 0
-    for key in all_ptl_properties.keys():
-        if all_ptl_properties[key].ndim > 1:
-            for row in range(all_ptl_properties[key].ndim):
-                full_dataset[:,curr_col] = all_ptl_properties[key][:,row]
-                all_keys.append(key + str(snapshot_list[row]))
-                curr_col += 1
-        else:
-            full_dataset[:,curr_col] = all_ptl_properties[key]
-            all_keys.append(key)
-            curr_col += 1
-
-halo_idxs = np.zeros(full_dataset.shape[0])
-for i,id in enumerate(full_dataset[:,0]):
-    halo_idxs[i] = depair(id)[1]
-u, unique_idx, unique_count = np.unique(halo_idxs, return_index=True, return_counts=True)
-unique_idx = unique_idx[np.where(unique_count > 1000)]
-unique_count = unique_count[np.where(unique_count > 1000)]
-num_test_halos = 5
-
-test_dataset = np.zeros((np.sum(unique_count[:num_test_halos]), full_dataset.shape[1]))
-train_dataset = np.zeros((np.sum(unique_count[num_test_halos:]), full_dataset.shape[1]))
-delete_indices = np.zeros((np.sum(unique_count[:num_test_halos])), dtype = np.int64)
-
-start = 0
-for i in range(num_test_halos):
-    num_new_pnts = unique_count[i]
-    location_halo_ptls = np.where(halo_idxs == halo_idxs[unique_idx[i]])[0]
-    test_dataset[start:start+num_new_pnts,:] = full_dataset[location_halo_ptls]
-    delete_indices[start:start+num_new_pnts] = location_halo_ptls
-    start = start + num_new_pnts
-print(delete_indices)
-train_dataset = np.delete(full_dataset, delete_indices, axis = 0)
-
-print(full_dataset.shape)
+train_dataset, all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "train", snapshot_list = snapshot_list)
+test_dataset, all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "test", snapshot_list = snapshot_list)
 print(train_dataset.shape)
 print(test_dataset.shape)
 print(all_keys)
 
 dataset_df = pd.DataFrame(train_dataset[:,2:], columns = all_keys[2:])
 print(dataset_df)
-graph_correlation_matrix(dataset_df, np.array(all_keys[2:]))
+#graph_correlation_matrix(dataset_df, np.array(all_keys[2:]))
 t2 = time.time()
 print("Loaded data", t2 - t1, "seconds")
 
@@ -120,7 +75,7 @@ pickle.dump(model, open(save_location + "xgb_model" + curr_sparta_file + ".pickl
 t5 = time.time()
 print("Total time:", t5-t0, "seconds")
 
-graph_feature_importance(np.array(all_keys[2:]), model.feature_importances_)
+#graph_feature_importance(np.array(all_keys[2:]), model.feature_importances_)
 
 predicts = model.predict(X_val)
 classification = classification_report(y_val, predicts)
@@ -143,28 +98,32 @@ p_halos_status = halos_status[:,snapshot_list[0]]
 c_halos_status = halos_status[:,snapshot_list[1]]
 density_prf_all = density_prf_all[:,snapshot_index,:]
 density_prf_1halo = density_prf_1halo[:,snapshot_index,:]
-# indices_keep = np.zeros((halos_id.size))
-# indices_keep = np.where((p_halos_status == 10) & (halos_last_snap >= snapshot_list[0]) & (c_halos_status > 0) & (halos_last_snap >= snapshot_list[1]))[0]
-# halos_id = halos_id[indices_keep]
-# density_prf_all = density_prf_all[indices_keep]
-# density_prf_1halo = density_prf_1halo[indices_keep]
+
+match_halo_idxs = np.where((p_halos_status == 10) & (halos_last_snap >= 190) & (c_halos_status > 0) & (halos_last_snap >= snapshot_list[1]))[0]
+
+num_test_halos = 10
+test_indices = [2680, 962, 5171, 17, 1709, 5796, 2946, 2952, 3558, 5834]
+test_indices = match_halo_idxs[test_indices]
+test_density_prf_all = density_prf_all[test_indices]
+test_density_prf_1halo = density_prf_1halo[test_indices]
+
+halo_idxs = np.zeros(test_dataset.shape[0])
+for i,id in enumerate(test_dataset[:,0]):
+    halo_idxs[i] = depair(id)[1]
 
 start = 0
 for j in range(num_test_halos):
-    curr_halo_num_ptl = unique_count[j]
-    curr_test_halo = test_dataset[start:start+curr_halo_num_ptl]
-
+    curr_halo_idx = test_indices[j]
+    curr_test_halo = test_dataset[np.where(halo_idxs == curr_halo_idx)]
+    print(curr_test_halo.shape)
     test_predict = model.predict(curr_test_halo[:,2:])
 
-    curr_halo_idx = halo_idxs[unique_idx[j]].astype(np.int64)
-    print(halo_idxs)
-    print(curr_halo_idx)
     curr_density_prf_all = density_prf_all[curr_halo_idx]
     curr_density_prf_1halo = density_prf_1halo[curr_halo_idx]
 
     actual_labels = curr_test_halo[:,1]
+
     classification = classification_report(actual_labels, test_predict)
-    print(classification)
+
     #compare_density_prf(curr_test_halo[:,1], curr_density_prf_all[0], curr_density_prf_1halo[0], mass, test_predict, j, "", "", show_graph = True, save_graph = False)
     plot_radius_rad_vel_tang_vel_graphs(test_predict, curr_test_halo[:,4], curr_test_halo[:,2], curr_test_halo[:,6], actual_labels)
-    start = start + curr_halo_num_ptl
