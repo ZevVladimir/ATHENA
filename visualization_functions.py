@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from calculation_functions import calculate_distance
 import seaborn as sns
 import matplotlib as mpl
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from data_and_loading_functions import check_pickle_exist_gadget
 
 def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_assn, num, start_nu, end_nu, show_graph = False, save_graph = False):
@@ -105,7 +106,9 @@ def rad_vel_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = No
     return ax.plot(hubble_vel[:,0], hubble_vel[:,1], color = "purple", alpha = 0.5, linestyle = "dashed", label = r"Hubble Flow")
 
 def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf):
-
+    print(radius.shape)
+    print(orb_inf.shape)
+    print(radius)
     inf_radius = radius[np.where(orb_inf == 0)]
     orb_radius = radius[np.where(orb_inf == 1)]
     inf_rad_vel = radial_vel[np.where(orb_inf == 0)]
@@ -113,85 +116,164 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     inf_tang_vel = tang_vel[np.where(orb_inf == 0)]
     orb_tang_vel = tang_vel[np.where(orb_inf == 1)]
     
-
-    incorrect_inf_radius = radius[np.where((orb_inf == 0) & (orb_inf != correct_orb_inf))]
-    correct_inf_radius = radius[np.where((orb_inf == 0) & (orb_inf == correct_orb_inf))]
-    incorrect_orb_radius = radius[np.where((orb_inf == 1) & (orb_inf != correct_orb_inf))]
-    correct_orb_radius = radius[np.where((orb_inf == 1) & (orb_inf == correct_orb_inf))]
-
-    incorrect_inf_rad_vel = radial_vel[np.where((orb_inf == 0) & (orb_inf != correct_orb_inf))]
-    correct_inf_rad_vel = radial_vel[np.where((orb_inf == 0) & (orb_inf == correct_orb_inf))]
-    incorrect_orb_rad_vel = radial_vel[np.where((orb_inf == 1) & (orb_inf != correct_orb_inf))]
-    correct_orb_rad_vel = radial_vel[np.where((orb_inf == 1) & (orb_inf == correct_orb_inf))]
-
-    incorrect_inf_tang_vel = tang_vel[np.where((orb_inf == 0) & (orb_inf != correct_orb_inf))]
-    correct_inf_tang_vel = tang_vel[np.where((orb_inf == 0) & (orb_inf == correct_orb_inf))]
-    incorrect_orb_tang_vel = tang_vel[np.where((orb_inf == 1) & (orb_inf != correct_orb_inf))]
-    correct_orb_tang_vel = tang_vel[np.where((orb_inf == 1) & (orb_inf == correct_orb_inf))]
-
-
-    # fig, (plot1,plot2,plot3) = plt.subplots(1,3)
+    max_radius = np.max(radius)
+    max_rad_vel = np.max(radial_vel)
+    min_rad_vel = np.min(radial_vel)
+    max_tang_vel = np.max(tang_vel)
+    min_tang_vel = np.min(tang_vel)
     
-    # plot1.hist2d(correct_inf_radius, correct_inf_rad_vel, bins = 20, color = "green")
-    # plot1.hist2d(correct_orb_radius, correct_orb_rad_vel, bins = 20, color = "yellow")
-    # plot1.hist2d(incorrect_inf_radius, incorrect_inf_rad_vel, bins = 20, color = "red")
-    # plot1.hist2d(incorrect_orb_radius, incorrect_orb_rad_vel, bins = 20, color = "blue")
-    # plot1.set_title("Radial Velocity vs Radius Orb/Inf label")
+    num_bins = 30
+    ptl_min = 0
+    cmap = plt.get_cmap("inferno")
+
+    fig = plt.figure(constrained_layout=True)
+    fig.suptitle('ML Predictions')
+
+    sub_fig_titles = ["Orbiting Particles", "Infalling Particles", "Orbit/Infall Ratio"]
+    # create 3x1 subfigs
+    subfigs = fig.subfigures(nrows=3, ncols=1)
+    for row, subfig in enumerate(subfigs):
+        subfig.suptitle(sub_fig_titles[row])
+
+        # create 1x3 subplots per subfig
+        axs = subfig.subplots(nrows=1, ncols=3)
+        if row == 0:
+            hist1 = axs[0].hist2d(orb_radius, orb_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, cmin = ptl_min)
+            axs[0].set_title("Radial Velocity vs Radius")
+            axs[0].set_xlabel("radius $r/R_{200m}$")
+            axs[0].set_ylabel("rad vel $v_r/v_{200m}$")
+            divider = make_axes_locatable(axs[0])
+            cax = divider.append_axes('right', size='5%', pad=0.05)
+            subfig.colorbar(hist1[3], cax=cax, orientation='vertical')
+            
+            hist2 = axs[1].hist2d(orb_radius, orb_tang_vel, bins = num_bins, range = [[0,max_radius],[min_tang_vel,max_tang_vel]], cmap = cmap, cmin = ptl_min)
+            axs[1].set_title("Tangential Velocity vs Radius")
+            axs[1].set_xlabel("radius $r/R_{200m}$")
+            axs[1].set_ylabel("tang vel $v_t/v_{200m}$")
+            divider = make_axes_locatable(axs[1])
+            cax = divider.append_axes('right', size='5%', pad=0.05)
+            subfig.colorbar(hist2[3], cax=cax, orientation='vertical')
+
+            hist3 = axs[2].hist2d(orb_tang_vel, orb_rad_vel, bins = num_bins, range = [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]], cmap = cmap, cmin = ptl_min)
+            axs[2].set_title("Tangential Velocity vs Radial Velocity")
+            axs[2].set_xlabel("rad vel $v_r/v_{200m}$")
+            axs[2].set_ylabel("tang vel $v_t/v_{200m}$")
+            divider = make_axes_locatable(axs[2])
+            cax = divider.append_axes('right', size='5%', pad=0.05)
+            subfig.colorbar(hist3[3], cax=cax, orientation='vertical')
+
+        elif row == 1:
+            hist4 = axs[0].hist2d(inf_radius, inf_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, cmin = ptl_min)
+            axs[0].set_title("Radial Velocity vs Radius")
+            axs[0].set_xlabel("radius $r/R_{200m}$")
+            axs[0].set_ylabel("rad vel $v_r/v_{200m}$")
+            divider = make_axes_locatable(axs[0])
+            cax = divider.append_axes('right', size='5%', pad=0.05)
+            subfig.colorbar(hist4[3], cax=cax, orientation='vertical')
+
+            hist5 = axs[1].hist2d(inf_radius, inf_tang_vel, bins = num_bins, range = [[0,max_radius],[min_tang_vel,max_tang_vel]], cmap = cmap, cmin = ptl_min)
+            axs[1].set_title("Tangential Velocity vs Radius")
+            axs[1].set_xlabel("radius $r/R_{200m}$")
+            axs[1].set_ylabel("tang vel $v_t/v_{200m}$")
+            divider = make_axes_locatable(axs[1])
+            cax = divider.append_axes('right', size='5%', pad=0.05)
+            subfig.colorbar(hist5[3], cax=cax, orientation='vertical')
+
+            hist6 = axs[2].hist2d(inf_tang_vel, inf_rad_vel, bins = num_bins, range = [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]], cmap = cmap, cmin = ptl_min)
+            axs[2].set_title("Tangential Velocity vs Radial Velocity")
+            axs[2].set_xlabel("rad vel $v_r/v_{200m}$")
+            axs[2].set_ylabel("tang vel $v_t/v_{200m}$")
+            divider = make_axes_locatable(axs[2])
+            cax = divider.append_axes('right', size='5%', pad=0.05)
+            subfig.colorbar(hist6[3], cax=cax, orientation='vertical')
+
+        else:
+            #orbital divided by infall
+            ratio_rad_rvel = hist1[0]/(hist1[0] + hist4[0])
+            ratio_rad_rvel[(np.isnan(ratio_rad_rvel))] = 0
+            ratio_rad_rvel = np.round(ratio_rad_rvel,2)
+
+            ratio_rad_tvel = hist2[0]/(hist2[0] + hist5[0])
+            ratio_rad_tvel[(np.isnan(ratio_rad_tvel))] = 0
+            ratio_rad_tvel = np.round(ratio_rad_rvel,2)
+
+            ratio_rvel_tvel = hist3[0]/(hist3[0] + hist6[0])
+            ratio_rvel_tvel[(np.isnan(ratio_rvel_tvel))] = 0
+            ratio_rvel_tvel = np.round(ratio_rvel_tvel,2)
+
+            hist7 = axs[0].imshow(np.flip(ratio_rad_rvel, axis = 1).T, cmap = cmap, extent = [0, num_bins, 0, num_bins])
+            axs[0].set_title("Radial Velocity vs Radius")
+            axs[0].set_xlabel("radius $r/R_{200m}$")
+            axs[0].set_ylabel("rad vel $v_r/v_{200m}$")
+            divider = make_axes_locatable(axs[0])
+            cax = divider.append_axes('right', size='5%', pad=0.05)
+            subfig.colorbar(hist7, cax=cax, orientation='vertical')
+
+            hist8 = axs[1].imshow(np.flip(ratio_rad_rvel, axis = 1).T, cmap = cmap, extent = [0, num_bins, 0, num_bins])
+            axs[1].set_title("Tangential Velocity vs Radius")
+            axs[1].set_xlabel("radius $r/R_{200m}$")
+            axs[1].set_ylabel("tang vel $v_t/v_{200m}$")
+            divider = make_axes_locatable(axs[1])
+            cax = divider.append_axes('right', size='5%', pad=0.05)
+            subfig.colorbar(hist8, cax=cax, orientation='vertical')
+
+            hist9 = axs[2].imshow(np.flip(ratio_rad_rvel, axis = 1).T, cmap = cmap, extent = [0, num_bins, 0, num_bins])
+            # for i in range(num_bins):
+            #     for j in range(num_bins):
+            #         axs[2].text(i,j, ratio_rvel_tvel[i,j], color="w", ha="center", va="center", fontsize = "xx-small", fontweight="bold")
+            axs[2].set_title("Tangential Velocity vs Radial Velocity")
+            axs[2].set_xlabel("rad vel $v_r/v_{200m}$")
+            axs[2].set_ylabel("tang vel $v_t/v_{200m}$")
+            divider = make_axes_locatable(axs[2])
+            cax = divider.append_axes('right', size='5%', pad=0.05)
+            subfig.colorbar(hist9, cax=cax, orientation='vertical')
+
+    # fig1, (plot1,plot2,plot3) = plt.subplots(1,3)
+    # hist1 = plot1.hist2d(orb_radius, orb_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, cmin = ptl_min)
+    # plot1.set_title("Radial Velocity vs Radius")
     # plot1.set_xlabel("radius $r/R_{200m}$")
     # plot1.set_ylabel("rad vel $v_r/v_{200m}$")
-    # # plot1.set_xscale("log")
-    # # plot1.set_yscale("log")
-    # plot1.legend()
-
-    # plot2.hist2d(correct_inf_radius, correct_inf_tang_vel, bins = 20, color = "green", label = "Correct Infalling Particles")
-    # plot2.hist2d(correct_orb_radius, correct_orb_tang_vel, bins = 20, color = "yellow", label = "Correct Orbiting Particles")
-    # plot2.hist2d(incorrect_inf_radius, incorrect_inf_tang_vel, bins = 20, color = "red", label = "Incorrect Infalling Particles")
-    # plot2.hist2d(incorrect_orb_radius, incorrect_orb_tang_vel, bins = 20, color = "blue", label = "Incorrect Orbiting Particles")
-    # plot2.set_title("Tangential Velocity vs Radius Orb/Inf label")
+    # fig1.colorbar(hist1[3], ax = plot1)
+    
+    # hist2 = plot2.hist2d(orb_radius, orb_tang_vel, bins = num_bins, range = [[0,max_radius],[min_tang_vel,max_tang_vel]], cmap = cmap, cmin = ptl_min)
+    # plot2.set_title("Tangential Velocity vs Radius")
     # plot2.set_xlabel("radius $r/R_{200m}$")
     # plot2.set_ylabel("tang vel $v_t/v_{200m}$")
-    # # plot2.set_xscale("log")
-    # # plot2.set_yscale("log")
-    # plot2.legend()
+    # fig1.colorbar(hist2[3], ax = plot2)
 
-    # plot3.hist2d(incorrect_inf_rad_vel, incorrect_inf_tang_vel, bins = 20, color = "red", label = "Incorrect Infalling Particles")
-    # plot3.hist2d(incorrect_orb_rad_vel, incorrect_orb_tang_vel, bins = 20, color = "blue", label = "Incorrect Orbiting Particles")
-    # plot3.hist2d(correct_inf_rad_vel, correct_inf_tang_vel, bins = 20, color = "green", label = "Correct Infalling Particles")
-    # plot3.hist2d(correct_orb_rad_vel, correct_orb_tang_vel, bins = 20, color = "yellow", label = "Correct Orbiting Particles")
+    # hist3 = plot3.hist2d(orb_tang_vel, orb_rad_vel, bins = num_bins, range = [[min_rad_vel,max_rad_vel],[min_tang_vel,max_tang_vel]], cmap = cmap, cmin = ptl_min)
     # plot3.set_title("Tangential Velocity vs Radial Velocity")
     # plot3.set_xlabel("rad vel $v_r/v_{200m}$")
     # plot3.set_ylabel("tang vel $v_t/v_{200m}$")
-    # # plot3.set_xscale("log")
-    # # plot3.set_yscale("log")
-    # plot3.legend()matplotlib
+    # fig1.colorbar(hist3[3], ax = plot3)
 
-    num_bins = 30
-    ptl_min = 10
-    cmap = plt.get_cmap("inferno")
+    # fig1.suptitle("Orbital Particles")
 
-    fig1, (plot1,plot2,plot3) = plt.subplots(1,3)
-    #plot1.hist2d(inf_radius, inf_rad_vel, bins = num_bins, cmap = cmap, cmin = ptl_min)
-    hist1 = plot1.hist2d(orb_radius, orb_rad_vel, bins = num_bins, cmap = cmap, cmin = ptl_min)
-    plot1.set_title("Radial Velocity vs Radius")
-    plot1.set_xlabel("radius $r/R_{200m}$")
-    plot1.set_ylabel("rad vel $v_r/v_{200m}$")
-    fig1.colorbar(hist1[3], ax = plot1)
+    # fig2, (plot4,plot5,plot6) = plt.subplots(1,3)
+    # hist4 = plot4.hist2d(inf_radius, inf_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, cmin = ptl_min)
+    # plot4.set_title("Radial Velocity vs Radius")
+    # plot4.set_xlabel("radius $r/R_{200m}$")
+    # plot4.set_ylabel("rad vel $v_r/v_{200m}$")
+    # fig2.colorbar(hist4[3], ax = plot4)
 
-    #plot2.hist2d(inf_radius, inf_tang_vel, bins = num_bins, cmap = cmap, cmin = ptl_min)
-    hist2 = plot2.hist2d(orb_radius, orb_tang_vel, bins = num_bins, cmap = cmap, cmin = ptl_min)
-    plot2.set_title("Tangential Velocity vs Radius")
-    plot2.set_xlabel("radius $r/R_{200m}$")
-    plot2.set_ylabel("tang vel $v_t/v_{200m}$")
-    fig1.colorbar(hist2[3], ax = plot2)
+    # hist5 = plot5.hist2d(inf_radius, inf_tang_vel, bins = num_bins, range = [[0,max_radius],[min_tang_vel,max_tang_vel]], cmap = cmap, cmin = ptl_min)
+    # plot5.set_title("Tangential Velocity vs Radius")
+    # plot5.set_xlabel("radius $r/R_{200m}$")
+    # plot5.set_ylabel("tang vel $v_t/v_{200m}$")
+    # fig2.colorbar(hist5[3], ax = plot5)
 
-    #plot3.hist2d(inf_tang_vel, inf_rad_vel, bins = num_bins, cmap = cmap, cmin = ptl_min)
-    hist3 = plot3.hist2d(orb_tang_vel, orb_rad_vel, bins = num_bins, cmap = cmap, cmin = ptl_min)
-    plot3.set_title("Tangential Velocity vs Radial Velocity")
-    plot3.set_xlabel("rad vel $v_r/v_{200m}$")
-    plot3.set_ylabel("tang vel $v_t/v_{200m}$")
-    fig1.colorbar(hist3[3], ax = plot3)
+    # hist6 = plot6.hist2d(inf_tang_vel, inf_rad_vel, bins = num_bins, range = [[min_rad_vel,max_rad_vel],[min_tang_vel,max_tang_vel]], cmap = cmap, cmin = ptl_min)
+    # plot6.set_title("Tangential Velocity vs Radial Velocity")
+    # plot6.set_xlabel("rad vel $v_r/v_{200m}$")
+    # plot6.set_ylabel("tang vel $v_t/v_{200m}$")
+    # fig2.colorbar(hist6[3], ax = plot6)
     
-    plt.show()
+    # fig2.suptitle("Infall Particles")
+
+
+    # print(np.array_equal(hist1[1], hist4[1]))
+    # print(np.array_equal(hist1[2], hist4[2]))
+    #plt.show()
 
 def graph_feature_importance(feature_names, feature_importance):
     mpl.rcParams.update({'font.size': 16})

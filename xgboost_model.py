@@ -65,7 +65,7 @@ for i in range(num_splits):
     
     t3 = time.time()
     
-    model = XGBClassifier(tree_method='gpu_hist', n_estimators = 100)
+    model = XGBClassifier(tree_method='gpu_hist', eta = 0.01, n_estimators = 100)
     model = model.fit(X_train, y_train)
 
     t4 = time.time()
@@ -100,10 +100,10 @@ density_prf_all = density_prf_all[:,snapshot_index,:]
 density_prf_1halo = density_prf_1halo[:,snapshot_index,:]
 
 match_halo_idxs = np.where((p_halos_status == 10) & (halos_last_snap >= 190) & (c_halos_status > 0) & (halos_last_snap >= snapshot_list[1]))[0]
-
-num_test_halos = 10
-test_indices = [2680, 962, 5171, 17, 1709, 5796, 2946, 2952, 3558, 5834]
-test_indices = match_halo_idxs[test_indices]
+#[2680, 962, 5171, 17, 1709, 5796, 2946, 2952, 3558, 5834]
+test_indices = [2680, 5171, 1709, 5796, 2946]
+num_test_halos = len(test_indices)
+test_indices = match_halo_idxs[test_indices] 
 test_density_prf_all = density_prf_all[test_indices]
 test_density_prf_1halo = density_prf_1halo[test_indices]
 
@@ -113,17 +113,18 @@ for i,id in enumerate(test_dataset[:,0]):
 
 start = 0
 for j in range(num_test_halos):
+    print(j)
     curr_halo_idx = test_indices[j]
     curr_test_halo = test_dataset[np.where(halo_idxs == curr_halo_idx)]
-    print(curr_test_halo.shape)
     test_predict = model.predict(curr_test_halo[:,2:])
 
-    curr_density_prf_all = density_prf_all[curr_halo_idx]
-    curr_density_prf_1halo = density_prf_1halo[curr_halo_idx]
-
+    curr_density_prf_all = test_density_prf_all[j]
+    curr_density_prf_1halo = test_density_prf_1halo[j]
     actual_labels = curr_test_halo[:,1]
 
     classification = classification_report(actual_labels, test_predict)
-
-    #compare_density_prf(curr_test_halo[:,1], curr_density_prf_all[0], curr_density_prf_1halo[0], mass, test_predict, j, "", "", show_graph = True, save_graph = False)
+    print(classification)
+    #compare_density_prf(curr_test_halo[:,1], curr_density_prf_all, curr_density_prf_1halo, mass, test_predict, j, "", "", show_graph = True, save_graph = False)
     plot_radius_rad_vel_tang_vel_graphs(test_predict, curr_test_halo[:,4], curr_test_halo[:,2], curr_test_halo[:,6], actual_labels)
+    plot_radius_rad_vel_tang_vel_graphs(actual_labels, curr_test_halo[:,4], curr_test_halo[:,2], curr_test_halo[:,6], actual_labels)
+    plt.show()
