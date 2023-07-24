@@ -40,7 +40,7 @@ print(all_keys)
 
 dataset_df = pd.DataFrame(train_dataset[:,2:], columns = all_keys[2:])
 print(dataset_df)
-#graph_correlation_matrix(dataset_df, np.array(all_keys[2:]))
+graph_correlation_matrix(dataset_df, np.array(all_keys[2:]))
 t2 = time.time()
 print("Loaded data", t2 - t1, "seconds")
 
@@ -75,7 +75,7 @@ pickle.dump(model, open(save_location + "xgb_model" + curr_sparta_file + ".pickl
 t5 = time.time()
 print("Total time:", t5-t0, "seconds")
 
-#graph_feature_importance(np.array(all_keys[2:]), model.feature_importances_)
+graph_feature_importance(np.array(all_keys[2:]), model.feature_importances_)
 
 predicts = model.predict(X_val)
 classification = classification_report(y_val, predicts)
@@ -100,8 +100,8 @@ density_prf_all = density_prf_all[:,snapshot_index,:]
 density_prf_1halo = density_prf_1halo[:,snapshot_index,:]
 
 match_halo_idxs = np.where((p_halos_status == 10) & (halos_last_snap >= 190) & (c_halos_status > 0) & (halos_last_snap >= snapshot_list[1]))[0]
-#[2680, 962, 5171, 17, 1709, 5796, 2946, 2952, 3558, 5834]
-test_indices = [2680, 5171, 1709, 5796, 2946]
+#[ 321 6238  927 5728  599 3315 4395 4458 2159 7281]
+test_indices = [321, 6238, 5728, 599, 3315, 4395, 4458, 2159, 7281]
 num_test_halos = len(test_indices)
 test_indices = match_halo_idxs[test_indices] 
 test_density_prf_all = density_prf_all[test_indices]
@@ -126,5 +126,5 @@ for j in range(num_test_halos):
     print(classification)
     #compare_density_prf(curr_test_halo[:,1], curr_density_prf_all, curr_density_prf_1halo, mass, test_predict, j, "", "", show_graph = True, save_graph = False)
     plot_radius_rad_vel_tang_vel_graphs(test_predict, curr_test_halo[:,4], curr_test_halo[:,2], curr_test_halo[:,6], actual_labels)
-    plot_radius_rad_vel_tang_vel_graphs(actual_labels, curr_test_halo[:,4], curr_test_halo[:,2], curr_test_halo[:,6], actual_labels)
+    #plot_radius_rad_vel_tang_vel_graphs(actual_labels, curr_test_halo[:,4], curr_test_halo[:,2], curr_test_halo[:,6], actual_labels)
     plt.show()

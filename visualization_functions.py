@@ -106,9 +106,6 @@ def rad_vel_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = No
     return ax.plot(hubble_vel[:,0], hubble_vel[:,1], color = "purple", alpha = 0.5, linestyle = "dashed", label = r"Hubble Flow")
 
 def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf):
-    print(radius.shape)
-    print(orb_inf.shape)
-    print(radius)
     inf_radius = radius[np.where(orb_inf == 0)]
     orb_radius = radius[np.where(orb_inf == 1)]
     inf_rad_vel = radial_vel[np.where(orb_inf == 0)]
@@ -195,7 +192,7 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
 
             ratio_rad_tvel = hist2[0]/(hist2[0] + hist5[0])
             ratio_rad_tvel[(np.isnan(ratio_rad_tvel))] = 0
-            ratio_rad_tvel = np.round(ratio_rad_rvel,2)
+            ratio_rad_tvel = np.round(ratio_rad_tvel,2)
 
             ratio_rvel_tvel = hist3[0]/(hist3[0] + hist6[0])
             ratio_rvel_tvel[(np.isnan(ratio_rvel_tvel))] = 0
@@ -209,7 +206,7 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
             cax = divider.append_axes('right', size='5%', pad=0.05)
             subfig.colorbar(hist7, cax=cax, orientation='vertical')
 
-            hist8 = axs[1].imshow(np.flip(ratio_rad_rvel, axis = 1).T, cmap = cmap, extent = [0, num_bins, 0, num_bins])
+            hist8 = axs[1].imshow(np.flip(ratio_rad_tvel, axis = 1).T, cmap = cmap, extent = [0, num_bins, 0, num_bins])
             axs[1].set_title("Tangential Velocity vs Radius")
             axs[1].set_xlabel("radius $r/R_{200m}$")
             axs[1].set_ylabel("tang vel $v_t/v_{200m}$")
@@ -217,7 +214,7 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
             cax = divider.append_axes('right', size='5%', pad=0.05)
             subfig.colorbar(hist8, cax=cax, orientation='vertical')
 
-            hist9 = axs[2].imshow(np.flip(ratio_rad_rvel, axis = 1).T, cmap = cmap, extent = [0, num_bins, 0, num_bins])
+            hist9 = axs[2].imshow(np.flip(ratio_rvel_tvel, axis = 1).T, cmap = cmap, extent = [0, num_bins, 0, num_bins])
             # for i in range(num_bins):
             #     for j in range(num_bins):
             #         axs[2].text(i,j, ratio_rvel_tvel[i,j], color="w", ha="center", va="center", fontsize = "xx-small", fontweight="bold")
