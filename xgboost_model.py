@@ -40,7 +40,7 @@ print(all_keys)
 
 dataset_df = pd.DataFrame(train_dataset[:,2:], columns = all_keys[2:])
 print(dataset_df)
-graph_correlation_matrix(dataset_df, np.array(all_keys[2:]))
+#graph_correlation_matrix(dataset_df, np.array(all_keys[2:]))
 t2 = time.time()
 print("Loaded data", t2 - t1, "seconds")
 
@@ -48,40 +48,42 @@ print("Loaded data", t2 - t1, "seconds")
 # ros = over_sampling.RandomOverSampler(random_state=0)
 t0 = time.time()
 
+X_train, X_val, y_train, y_val = train_test_split(train_dataset[:,2:], train_dataset[:,1], test_size=0.30, random_state=0)
 
-model = None
-for i in range(num_splits):
-    
-    print("Split:", (i+1), "/",num_splits)
-    
-    X_train, X_val, y_train, y_val = train_test_split(train_dataset[:,2:], train_dataset[:,1], test_size=0.30, random_state=0)
+if os.path.exists(save_location + "xgb_model" + curr_sparta_file + ".pickle"):
+    with open(save_location + "xgb_model" + curr_sparta_file + ".pickle", "rb") as pickle_file:
+        model = pickle.load(pickle_file)
+else:
+    model = None
+    for i in range(num_splits):
+        
+        print("Split:", (i+1), "/",num_splits)
+        
 
-    # standardize has slightly better performance comapared to normalize
-    # X_train = standardize(X_train)
-    # X_test = standardize(X_test)
-    
-    #X_train_rus, y_train_rus = rus.fit_resample(X_train, y_train)
-    #X_train_ros, y_train_ros = ros.fit_resample(X_train, y_train)
-    
-    t3 = time.time()
-    
-    model = XGBClassifier(tree_method='gpu_hist', eta = 0.01, n_estimators = 100)
-    model = model.fit(X_train, y_train)
+        # standardize has slightly better performance comapared to normalize
+        # X_train = standardize(X_train)
+        # X_test = standardize(X_test)
+        
+        #X_train_rus, y_train_rus = rus.fit_resample(X_train, y_train)
+        #X_train_ros, y_train_ros = ros.fit_resample(X_train, y_train)
+        
+        t3 = time.time()
+        
+        model = XGBClassifier(tree_method='gpu_hist', eta = 0.01, n_estimators = 100)
+        model = model.fit(X_train, y_train)
 
-    t4 = time.time()
-    print("Fitted model", t4 - t3, "seconds")
+        t4 = time.time()
+        print("Fitted model", t4 - t3, "seconds")
 
-pickle.dump(model, open(save_location + "xgb_model" + curr_sparta_file + ".pickle", "wb"))
-t5 = time.time()
-print("Total time:", t5-t0, "seconds")
+    pickle.dump(model, open(save_location + "xgb_model" + curr_sparta_file + ".pickle", "wb"))
+    t5 = time.time()
+    print("Total time:", t5-t0, "seconds")
 
-graph_feature_importance(np.array(all_keys[2:]), model.feature_importances_)
+#graph_feature_importance(np.array(all_keys[2:]), model.feature_importances_)
 
 predicts = model.predict(X_val)
 classification = classification_report(y_val, predicts)
 print(classification)
-
-
 
 num_bins = 50
 snapshot_index = int(snapshot_list[0])
@@ -125,6 +127,6 @@ for j in range(num_test_halos):
     classification = classification_report(actual_labels, test_predict)
     print(classification)
     #compare_density_prf(curr_test_halo[:,1], curr_density_prf_all, curr_density_prf_1halo, mass, test_predict, j, "", "", show_graph = True, save_graph = False)
-    plot_radius_rad_vel_tang_vel_graphs(test_predict, curr_test_halo[:,4], curr_test_halo[:,2], curr_test_halo[:,6], actual_labels)
-    #plot_radius_rad_vel_tang_vel_graphs(actual_labels, curr_test_halo[:,4], curr_test_halo[:,2], curr_test_halo[:,6], actual_labels)
+    plot_radius_rad_vel_tang_vel_graphs(test_predict, curr_test_halo[:,4], curr_test_halo[:,2], curr_test_halo[:,6], actual_labels, "ML Predictions")
+    plot_radius_rad_vel_tang_vel_graphs(actual_labels, curr_test_halo[:,4], curr_test_halo[:,2], curr_test_halo[:,6], actual_labels, "Actual Labels")
     plt.show()

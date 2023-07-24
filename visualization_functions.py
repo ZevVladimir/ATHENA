@@ -105,7 +105,7 @@ def rad_vel_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = No
     
     return ax.plot(hubble_vel[:,0], hubble_vel[:,1], color = "purple", alpha = 0.5, linestyle = "dashed", label = r"Hubble Flow")
 
-def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf):
+def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf, title):
     inf_radius = radius[np.where(orb_inf == 0)]
     orb_radius = radius[np.where(orb_inf == 1)]
     inf_rad_vel = radial_vel[np.where(orb_inf == 0)]
@@ -124,7 +124,7 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     cmap = plt.get_cmap("inferno")
 
     fig = plt.figure(constrained_layout=True)
-    fig.suptitle('ML Predictions')
+    fig.suptitle(title)
 
     sub_fig_titles = ["Orbiting Particles", "Infalling Particles", "Orbit/Infall Ratio"]
     # create 3x1 subfigs
@@ -139,50 +139,38 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
             axs[0].set_title("Radial Velocity vs Radius")
             axs[0].set_xlabel("radius $r/R_{200m}$")
             axs[0].set_ylabel("rad vel $v_r/v_{200m}$")
-            divider = make_axes_locatable(axs[0])
-            cax = divider.append_axes('right', size='5%', pad=0.05)
-            subfig.colorbar(hist1[3], cax=cax, orientation='vertical')
+            subfig.colorbar(hist1[3], ax=axs[0], shrink = 0.6, pad = 0.01)
             
             hist2 = axs[1].hist2d(orb_radius, orb_tang_vel, bins = num_bins, range = [[0,max_radius],[min_tang_vel,max_tang_vel]], cmap = cmap, cmin = ptl_min)
             axs[1].set_title("Tangential Velocity vs Radius")
             axs[1].set_xlabel("radius $r/R_{200m}$")
             axs[1].set_ylabel("tang vel $v_t/v_{200m}$")
-            divider = make_axes_locatable(axs[1])
-            cax = divider.append_axes('right', size='5%', pad=0.05)
-            subfig.colorbar(hist2[3], cax=cax, orientation='vertical')
+            subfig.colorbar(hist2[3], ax=axs[1], shrink = 0.6, pad = 0.01)
 
             hist3 = axs[2].hist2d(orb_tang_vel, orb_rad_vel, bins = num_bins, range = [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]], cmap = cmap, cmin = ptl_min)
             axs[2].set_title("Tangential Velocity vs Radial Velocity")
             axs[2].set_xlabel("rad vel $v_r/v_{200m}$")
             axs[2].set_ylabel("tang vel $v_t/v_{200m}$")
-            divider = make_axes_locatable(axs[2])
-            cax = divider.append_axes('right', size='5%', pad=0.05)
-            subfig.colorbar(hist3[3], cax=cax, orientation='vertical')
+            subfig.colorbar(hist3[3], ax=axs[2], shrink = 0.6, pad = 0.01)
 
         elif row == 1:
             hist4 = axs[0].hist2d(inf_radius, inf_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, cmin = ptl_min)
             axs[0].set_title("Radial Velocity vs Radius")
             axs[0].set_xlabel("radius $r/R_{200m}$")
             axs[0].set_ylabel("rad vel $v_r/v_{200m}$")
-            divider = make_axes_locatable(axs[0])
-            cax = divider.append_axes('right', size='5%', pad=0.05)
-            subfig.colorbar(hist4[3], cax=cax, orientation='vertical')
+            subfig.colorbar(hist4[3], ax=axs[0], shrink = 0.6, pad = 0.01)
 
             hist5 = axs[1].hist2d(inf_radius, inf_tang_vel, bins = num_bins, range = [[0,max_radius],[min_tang_vel,max_tang_vel]], cmap = cmap, cmin = ptl_min)
             axs[1].set_title("Tangential Velocity vs Radius")
             axs[1].set_xlabel("radius $r/R_{200m}$")
             axs[1].set_ylabel("tang vel $v_t/v_{200m}$")
-            divider = make_axes_locatable(axs[1])
-            cax = divider.append_axes('right', size='5%', pad=0.05)
-            subfig.colorbar(hist5[3], cax=cax, orientation='vertical')
+            subfig.colorbar(hist5[3], ax=axs[1], shrink = 0.6, pad = 0.01)
 
             hist6 = axs[2].hist2d(inf_tang_vel, inf_rad_vel, bins = num_bins, range = [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]], cmap = cmap, cmin = ptl_min)
             axs[2].set_title("Tangential Velocity vs Radial Velocity")
             axs[2].set_xlabel("rad vel $v_r/v_{200m}$")
             axs[2].set_ylabel("tang vel $v_t/v_{200m}$")
-            divider = make_axes_locatable(axs[2])
-            cax = divider.append_axes('right', size='5%', pad=0.05)
-            subfig.colorbar(hist6[3], cax=cax, orientation='vertical')
+            subfig.colorbar(hist6[3], ax=axs[2], shrink = 0.6, pad = 0.01)
 
         else:
             #orbital divided by infall
@@ -200,31 +188,25 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
 
             hist7 = axs[0].imshow(np.flip(ratio_rad_rvel, axis = 1).T, cmap = cmap, extent = [0, num_bins, 0, num_bins])
             axs[0].set_title("Radial Velocity vs Radius")
-            axs[0].set_xlabel("radius $r/R_{200m}$")
-            axs[0].set_ylabel("rad vel $v_r/v_{200m}$")
-            divider = make_axes_locatable(axs[0])
-            cax = divider.append_axes('right', size='5%', pad=0.05)
-            subfig.colorbar(hist7, cax=cax, orientation='vertical')
+            axs[0].set_xlabel("x bin")
+            axs[0].set_ylabel("y bin")
+            subfig.colorbar(hist7, ax=axs[0], shrink = 0.6, pad = 0.01)
 
             hist8 = axs[1].imshow(np.flip(ratio_rad_tvel, axis = 1).T, cmap = cmap, extent = [0, num_bins, 0, num_bins])
             axs[1].set_title("Tangential Velocity vs Radius")
-            axs[1].set_xlabel("radius $r/R_{200m}$")
-            axs[1].set_ylabel("tang vel $v_t/v_{200m}$")
-            divider = make_axes_locatable(axs[1])
-            cax = divider.append_axes('right', size='5%', pad=0.05)
-            subfig.colorbar(hist8, cax=cax, orientation='vertical')
+            axs[1].set_xlabel("x bin")
+            axs[1].set_ylabel("y bin")
+            subfig.colorbar(hist8, ax=axs[1], shrink = 0.6, pad = 0.01)
 
             hist9 = axs[2].imshow(np.flip(ratio_rvel_tvel, axis = 1).T, cmap = cmap, extent = [0, num_bins, 0, num_bins])
             # for i in range(num_bins):
             #     for j in range(num_bins):
             #         axs[2].text(i,j, ratio_rvel_tvel[i,j], color="w", ha="center", va="center", fontsize = "xx-small", fontweight="bold")
             axs[2].set_title("Tangential Velocity vs Radial Velocity")
-            axs[2].set_xlabel("rad vel $v_r/v_{200m}$")
-            axs[2].set_ylabel("tang vel $v_t/v_{200m}$")
-            divider = make_axes_locatable(axs[2])
-            cax = divider.append_axes('right', size='5%', pad=0.05)
-            subfig.colorbar(hist9, cax=cax, orientation='vertical')
-
+            axs[2].set_xlabel("x bin")
+            axs[2].set_ylabel("y bin")
+            subfig.colorbar(hist9, ax=axs[2], shrink = 0.6, pad = 0.01)
+            
     # fig1, (plot1,plot2,plot3) = plt.subplots(1,3)
     # hist1 = plot1.hist2d(orb_radius, orb_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, cmin = ptl_min)
     # plot1.set_title("Radial Velocity vs Radius")
