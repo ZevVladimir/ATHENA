@@ -48,7 +48,7 @@ print("Loaded data", t2 - t1, "seconds")
 # ros = over_sampling.RandomOverSampler(random_state=0)
 t0 = time.time()
 
-X_train, X_val, y_train, y_val = train_test_split(train_dataset[:,2:], train_dataset[:,1], test_size=0.30, random_state=0)
+X_train, X_val, y_train, y_val = train_test_split(train_dataset[:,2:], train_dataset[:,1], test_size=0.20, random_state=0)
 
 if os.path.exists(save_location + "xgb_model" + curr_sparta_file + ".pickle"):
     with open(save_location + "xgb_model" + curr_sparta_file + ".pickle", "rb") as pickle_file:
@@ -103,7 +103,7 @@ density_prf_1halo = density_prf_1halo[:,snapshot_index,:]
 
 match_halo_idxs = np.where((p_halos_status == 10) & (halos_last_snap >= 190) & (c_halos_status > 0) & (halos_last_snap >= snapshot_list[1]))[0]
 #[ 321 6238  927 5728  599 3315 4395 4458 2159 7281]
-test_indices = [321, 6238, 5728, 599, 3315, 4395, 4458, 2159, 7281]
+test_indices = [7267, 6907, 5717,  598, 4453, 3778, 3308, 2129, 4387, 1419, 2154, 5141, 5374, 6225,320,  925,   26, 5138, 7071, 2411, 7337, 3075, 5901, 4449, 6800]
 num_test_halos = len(test_indices)
 test_indices = match_halo_idxs[test_indices] 
 test_density_prf_all = density_prf_all[test_indices]
@@ -114,19 +114,31 @@ for i,id in enumerate(test_dataset[:,0]):
     halo_idxs[i] = depair(id)[1]
 
 start = 0
+all_accuracy = []
 for j in range(num_test_halos):
     print(j)
     curr_halo_idx = test_indices[j]
     curr_test_halo = test_dataset[np.where(halo_idxs == curr_halo_idx)]
+    
+    # idx_around_r200m = np.where((curr_test_halo[:,4] > 0.9) & (curr_test_halo[:,4] < 1.1))[0]
+    # test_predict = model.predict(curr_test_halo[idx_around_r200m,2:])
     test_predict = model.predict(curr_test_halo[:,2:])
-
     curr_density_prf_all = test_density_prf_all[j]
     curr_density_prf_1halo = test_density_prf_1halo[j]
+    # actual_labels = curr_test_halo[idx_around_r200m,1]
     actual_labels = curr_test_halo[:,1]
 
-    classification = classification_report(actual_labels, test_predict)
-    print(classification)
+    classification = classification_report(actual_labels, test_predict, output_dict=True)
+    all_accuracy.append(classification["accuracy"])
+    print(classification["accuracy"])
+    #print(classification)
+    #if j == 19:
     #compare_density_prf(curr_test_halo[:,1], curr_density_prf_all, curr_density_prf_1halo, mass, test_predict, j, "", "", show_graph = True, save_graph = False)
-    plot_radius_rad_vel_tang_vel_graphs(test_predict, curr_test_halo[:,4], curr_test_halo[:,2], curr_test_halo[:,6], actual_labels, "ML Predictions")
-    plot_radius_rad_vel_tang_vel_graphs(actual_labels, curr_test_halo[:,4], curr_test_halo[:,2], curr_test_halo[:,6], actual_labels, "Actual Labels")
-    plt.show()
+        # plot_radius_rad_vel_tang_vel_graphs(test_predict, curr_test_halo[idx_around_r200m,4], curr_test_halo[idx_around_r200m,2], curr_test_halo[idx_around_r200m,6], actual_labels, "ML Predictions")
+        # plot_radius_rad_vel_tang_vel_graphs(actual_labels, curr_test_halo[idx_around_r200m,4], curr_test_halo[idx_around_r200m,2], curr_test_halo[idx_around_r200m,6], actual_labels, "Actual Labels")
+        # plot_radius_rad_vel_tang_vel_graphs(test_predict, curr_test_halo[:,4], curr_test_halo[:,2], curr_test_halo[:,6], actual_labels, "ML Predictions")
+        # plot_radius_rad_vel_tang_vel_graphs(actual_labels, curr_test_halo[:,4], curr_test_halo[:,2], curr_test_halo[:,6], actual_labels, "Actual Labels")
+    #plt.show()
+print(all_accuracy)
+plt.hist(all_accuracy)
+plt.show()

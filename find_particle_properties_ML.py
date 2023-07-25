@@ -348,7 +348,7 @@ num_iter = 7
 num_save_ptl_params = 5
 num_save_halo_params = 3
 times_r200 = 6
-num_test_halos = 10
+num_test_halos = 25
 
 t_dyn = 2.448854618582507 # calculated by (2 * R200m)/V200m not sure how to do this each time... but hard coded for now from running this code with set snapshots
 global halo_start_idx 
