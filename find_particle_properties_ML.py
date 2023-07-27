@@ -10,6 +10,7 @@ from colossus.lss import peaks
 from matplotlib.pyplot import cm
 import time
 import h5py
+import pickle
 from data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5, find_closest_snap
 from calculation_functions import *
 from visualization_functions import compare_density_prf, rad_vel_vs_radius_plot
@@ -348,7 +349,7 @@ num_iter = 7
 num_save_ptl_params = 5
 num_save_halo_params = 3
 times_r200 = 6
-num_test_halos = 25
+num_test_halos = 100
 
 t_dyn = 2.448854618582507 # calculated by (2 * R200m)/V200m not sure how to do this each time... but hard coded for now from running this code with set snapshots
 global halo_start_idx 
@@ -438,6 +439,11 @@ test_indices = rng.choice(all_indices, size = num_test_halos, replace = False)
 train_indices = np.delete(all_indices, test_indices)
 print(train_indices)
 print(test_indices)
+
+with open(save_location + "test_indices.pickle", "wb") as pickle_file:
+    pickle.dump(test_indices, pickle_file)
+with open(save_location + "train_indices.pickle", "wb") as pickle_file:
+    pickle.dump(train_indices, pickle_file)
 
 # construct search trees for each snapshot
 p_particle_tree = cKDTree(data = p_particles_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size)
