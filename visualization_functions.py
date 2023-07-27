@@ -1,9 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from calculation_functions import calculate_distance
 import seaborn as sns
-import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from sklearn.metrics import classification_report
 from data_and_loading_functions import check_pickle_exist_gadget
 
 def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_assn, num, start_nu, end_nu, show_graph = False, save_graph = False):
@@ -105,7 +106,7 @@ def rad_vel_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = No
     
     return ax.plot(hubble_vel[:,0], hubble_vel[:,1], color = "purple", alpha = 0.5, linestyle = "dashed", label = r"Hubble Flow")
 
-def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf, title):
+def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf, title, num_bins, halo_idx, plot, save):
     inf_radius = radius[np.where(orb_inf == 0)]
     orb_radius = radius[np.where(orb_inf == 1)]
     inf_rad_vel = radial_vel[np.where(orb_inf == 0)]
@@ -119,12 +120,11 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     max_tang_vel = np.max(tang_vel)
     min_tang_vel = np.min(tang_vel)
     
-    num_bins = 30
     ptl_min = 0
     cmap = plt.get_cmap("inferno")
 
     fig = plt.figure(constrained_layout=True)
-    fig.suptitle(title)
+    fig.suptitle(title + str(halo_idx))
 
     sub_fig_titles = ["Orbiting Particles", "Infalling Particles", "Orbit/Infall Ratio"]
     # create 3x1 subfigs
@@ -207,52 +207,10 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
             axs[2].set_ylabel("y bin")
             subfig.colorbar(hist9, ax=axs[2], shrink = 0.6, pad = 0.01)
             
-    # fig1, (plot1,plot2,plot3) = plt.subplots(1,3)
-    # hist1 = plot1.hist2d(orb_radius, orb_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, cmin = ptl_min)
-    # plot1.set_title("Radial Velocity vs Radius")
-    # plot1.set_xlabel("radius $r/R_{200m}$")
-    # plot1.set_ylabel("rad vel $v_r/v_{200m}$")
-    # fig1.colorbar(hist1[3], ax = plot1)
-    
-    # hist2 = plot2.hist2d(orb_radius, orb_tang_vel, bins = num_bins, range = [[0,max_radius],[min_tang_vel,max_tang_vel]], cmap = cmap, cmin = ptl_min)
-    # plot2.set_title("Tangential Velocity vs Radius")
-    # plot2.set_xlabel("radius $r/R_{200m}$")
-    # plot2.set_ylabel("tang vel $v_t/v_{200m}$")
-    # fig1.colorbar(hist2[3], ax = plot2)
-
-    # hist3 = plot3.hist2d(orb_tang_vel, orb_rad_vel, bins = num_bins, range = [[min_rad_vel,max_rad_vel],[min_tang_vel,max_tang_vel]], cmap = cmap, cmin = ptl_min)
-    # plot3.set_title("Tangential Velocity vs Radial Velocity")
-    # plot3.set_xlabel("rad vel $v_r/v_{200m}$")
-    # plot3.set_ylabel("tang vel $v_t/v_{200m}$")
-    # fig1.colorbar(hist3[3], ax = plot3)
-
-    # fig1.suptitle("Orbital Particles")
-
-    # fig2, (plot4,plot5,plot6) = plt.subplots(1,3)
-    # hist4 = plot4.hist2d(inf_radius, inf_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, cmin = ptl_min)
-    # plot4.set_title("Radial Velocity vs Radius")
-    # plot4.set_xlabel("radius $r/R_{200m}$")
-    # plot4.set_ylabel("rad vel $v_r/v_{200m}$")
-    # fig2.colorbar(hist4[3], ax = plot4)
-
-    # hist5 = plot5.hist2d(inf_radius, inf_tang_vel, bins = num_bins, range = [[0,max_radius],[min_tang_vel,max_tang_vel]], cmap = cmap, cmin = ptl_min)
-    # plot5.set_title("Tangential Velocity vs Radius")
-    # plot5.set_xlabel("radius $r/R_{200m}$")
-    # plot5.set_ylabel("tang vel $v_t/v_{200m}$")
-    # fig2.colorbar(hist5[3], ax = plot5)
-
-    # hist6 = plot6.hist2d(inf_tang_vel, inf_rad_vel, bins = num_bins, range = [[min_rad_vel,max_rad_vel],[min_tang_vel,max_tang_vel]], cmap = cmap, cmin = ptl_min)
-    # plot6.set_title("Tangential Velocity vs Radial Velocity")
-    # plot6.set_xlabel("rad vel $v_r/v_{200m}$")
-    # plot6.set_ylabel("tang vel $v_t/v_{200m}$")
-    # fig2.colorbar(hist6[3], ax = plot6)
-    
-    # fig2.suptitle("Infall Particles")
-
-
-    # print(np.array_equal(hist1[1], hist4[1]))
-    # print(np.array_equal(hist1[2], hist4[2]))
-    #plt.show()
+    if plot:
+        plt.show()
+    if save:
+        fig.savefig("/home/zvladimi/MLOIS/Random_figures/2d_hists/_2d_hist_" + str(halo_idx) + title + ".png", dpi = 1000)
 
 def graph_feature_importance(feature_names, feature_importance):
     mpl.rcParams.update({'font.size': 16})
@@ -269,3 +227,74 @@ def graph_correlation_matrix(data, feature_names):
     heatmap = sns.heatmap(data.corr(), annot = True, cbar = True)
     heatmap.set_title("Feature Correlation Heatmap")
     plt.show()
+    
+def graph_err_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, halo_idx, plot, save):
+    bin_width = (np.max(radius) - 0) / num_bins
+    
+    inf_radius = radius[np.where(corr_orb_inf == 0)]
+    orb_radius = radius[np.where(corr_orb_inf == 1)]
+
+    all_accuracy = []
+    inf_accuracy = []
+    orb_accuracy = []
+    bins = []
+    start_bin = 0
+    for i in range(num_bins):
+        bins.append(start_bin)
+        finish_bin = start_bin + bin_width
+        idx_in_bin = np.where((radius >= start_bin) & (radius < finish_bin))[0]
+        if idx_in_bin.shape[0] == 0:
+            start_bin = finish_bin
+            all_accuracy.append(np.NaN)
+            continue
+        bin_preds = pred_orb_inf[idx_in_bin]
+        bin_corr = corr_orb_inf[idx_in_bin]
+        classification = classification_report(bin_corr, bin_preds, output_dict=True, zero_division=0)
+        all_accuracy.append(classification["accuracy"])
+        
+        start_bin = finish_bin
+    bins.append(start_bin)    
+        
+    start_bin = 0
+    for j in range(num_bins):
+        finish_bin = start_bin + bin_width
+        idx_in_bin = np.where((inf_radius >= start_bin) & (inf_radius < finish_bin))[0]
+        if idx_in_bin.shape[0] == 0:
+            start_bin = finish_bin
+            inf_accuracy.append(np.NaN)
+            continue
+        bin_preds = pred_orb_inf[idx_in_bin]
+        bin_corr = corr_orb_inf[idx_in_bin]
+        classification = classification_report(bin_corr, bin_preds, output_dict=True, zero_division=0)
+        inf_accuracy.append(classification["accuracy"])
+        
+        start_bin = finish_bin
+
+    start_bin = 0
+    for k in range(num_bins):
+        finish_bin = start_bin + bin_width
+        idx_in_bin = np.where((orb_radius >= start_bin) & (orb_radius < finish_bin))[0]
+        if idx_in_bin.shape[0] == 0:
+            start_bin = finish_bin
+            orb_accuracy.append(np.NaN)
+            continue
+        bin_preds = pred_orb_inf[idx_in_bin]
+        bin_corr = corr_orb_inf[idx_in_bin]
+        classification = classification_report(bin_corr, bin_preds, output_dict=True, zero_division=0)
+        orb_accuracy.append(classification["accuracy"])
+        
+        start_bin = finish_bin
+    
+    fig, ax = plt.subplots(1,1)
+    ax.stairs(all_accuracy, bins, color = "black", alpha = 0.4, label = "all ptl")    
+    ax.stairs(inf_accuracy, bins, color = "blue", alpha = 0.4, label = "inf ptl")
+    ax.stairs(orb_accuracy, bins, color = "red", alpha = 0.4, label = "orb ptl")
+    ax.set_title("Halo: " + str(halo_idx) + " Num ptls: " + str(radius.shape[0]))
+    ax.set_xlabel("radius $r/R_{200m}$")
+    ax.set_ylabel("Accuracy")
+    ax.set_ylim(-0.1,1.1)
+    plt.legend()
+    if plot:
+        plt.show()
+    if save:
+        fig.savefig("/home/zvladimi/MLOIS/Random_figures/error_by_rad_graphs/error_by_rad_" + str(halo_idx) + ".png")

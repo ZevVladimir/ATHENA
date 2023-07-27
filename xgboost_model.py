@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import h5py
 from xgboost import XGBClassifier
@@ -11,11 +12,17 @@ import os
 from imblearn import under_sampling, over_sampling
 import shap
 from pairing import depair
+from pygadgetreader import readsnap, readheader
+from colossus.cosmology import cosmology
+from colossus.lss import peaks
 from data_and_loading_functions import standardize, build_ml_dataset, check_pickle_exist_gadget, check_pickle_exist_hdf5_prop, choose_halo_split
-from visualization_functions import compare_density_prf, plot_radius_rad_vel_tang_vel_graphs, graph_feature_importance, graph_correlation_matrix
+from visualization_functions import compare_density_prf, plot_radius_rad_vel_tang_vel_graphs, graph_feature_importance, graph_correlation_matrix, graph_err_by_bin
+
+cosmol = cosmology.setCosmology("bolshoi")
 
 # SHOULD BE DESCENDING
 snapshot_list = [190, 176]
+p_snap = snapshot_list[0]
 curr_sparta_file = "sparta_cbol_l0063_n0256"
 
 sparta_location = "/home/zvladimi/MLOIS/SPARTA_data/" + curr_sparta_file + ".hdf5"
@@ -85,7 +92,7 @@ predicts = model.predict(X_val)
 classification = classification_report(y_val, predicts)
 print(classification)
 
-num_bins = 50
+num_bins = 30
 snapshot_index = int(snapshot_list[0])
 
 curr_sparta_file = "sparta_cbol_l0063_n0256"
@@ -103,42 +110,77 @@ density_prf_1halo = density_prf_1halo[:,snapshot_index,:]
 
 match_halo_idxs = np.where((p_halos_status == 10) & (halos_last_snap >= 190) & (c_halos_status > 0) & (halos_last_snap >= snapshot_list[1]))[0]
 #[ 321 6238  927 5728  599 3315 4395 4458 2159 7281]
-test_indices = [7267, 6907, 5717,  598, 4453, 3778, 3308, 2129, 4387, 1419, 2154, 5141, 5374, 6225,320,  925,   26, 5138, 7071, 2411, 7337, 3075, 5901, 4449, 6800]
-num_test_halos = len(test_indices)
+with open(data_location + "test_indices", "rb") as pickle_file:
+    test_indices = pickle.load(pickle_file)
+
+num_test_halos = test_indices.shape[0]
 test_indices = match_halo_idxs[test_indices] 
 test_density_prf_all = density_prf_all[test_indices]
 test_density_prf_1halo = density_prf_1halo[test_indices]
 
-halo_idxs = np.zeros(test_dataset.shape[0])
+test_halo_idxs = np.zeros(test_dataset.shape[0])
 for i,id in enumerate(test_dataset[:,0]):
-    halo_idxs[i] = depair(id)[1]
+    test_halo_idxs[i] = depair(id)[1]
+
+halo_masses = np.zeros(num_test_halos)
 
 start = 0
 all_accuracy = []
 for j in range(num_test_halos):
-    print(j)
     curr_halo_idx = test_indices[j]
-    curr_test_halo = test_dataset[np.where(halo_idxs == curr_halo_idx)]
-    
-    # idx_around_r200m = np.where((curr_test_halo[:,4] > 0.9) & (curr_test_halo[:,4] < 1.1))[0]
-    # test_predict = model.predict(curr_test_halo[idx_around_r200m,2:])
-    test_predict = model.predict(curr_test_halo[:,2:])
-    curr_density_prf_all = test_density_prf_all[j]
-    curr_density_prf_1halo = test_density_prf_1halo[j]
-    # actual_labels = curr_test_halo[idx_around_r200m,1]
-    actual_labels = curr_test_halo[:,1]
+    curr_test_halo = test_dataset[np.where(test_halo_idxs == curr_halo_idx)]
+    halo_masses[j] = curr_test_halo.shape[0] * mass
 
-    classification = classification_report(actual_labels, test_predict, output_dict=True)
-    all_accuracy.append(classification["accuracy"])
-    print(classification["accuracy"])
-    #print(classification)
-    #if j == 19:
-    #compare_density_prf(curr_test_halo[:,1], curr_density_prf_all, curr_density_prf_1halo, mass, test_predict, j, "", "", show_graph = True, save_graph = False)
-        # plot_radius_rad_vel_tang_vel_graphs(test_predict, curr_test_halo[idx_around_r200m,4], curr_test_halo[idx_around_r200m,2], curr_test_halo[idx_around_r200m,6], actual_labels, "ML Predictions")
-        # plot_radius_rad_vel_tang_vel_graphs(actual_labels, curr_test_halo[idx_around_r200m,4], curr_test_halo[idx_around_r200m,2], curr_test_halo[idx_around_r200m,6], actual_labels, "Actual Labels")
-        # plot_radius_rad_vel_tang_vel_graphs(test_predict, curr_test_halo[:,4], curr_test_halo[:,2], curr_test_halo[:,6], actual_labels, "ML Predictions")
-        # plot_radius_rad_vel_tang_vel_graphs(actual_labels, curr_test_halo[:,4], curr_test_halo[:,2], curr_test_halo[:,6], actual_labels, "Actual Labels")
-    #plt.show()
+snapshot_path = "/home/zvladimi/MLOIS/particle_data/snapdir_" + "{:04d}".format(p_snap) + "/snapshot_" + "{:04d}".format(p_snap)
+p_red_shift = readheader(snapshot_path, 'redshift')
+peak_heights = peaks.peakHeight(halo_masses, p_red_shift)
+
+start_nu = 0 
+nu_step = 0.5
+num_iter = 7
+
+for k in range(num_iter):
+    print(k)
+    end_nu = start_nu + nu_step
+    
+    idx_within_nu = np.where((peak_heights >= start_nu) & (peak_heights < end_nu))[0]
+    curr_test_halo_idxs = test_indices[idx_within_nu]
+    
+    #curr_halo_idx = test_indices[k]
+    if curr_test_halo_idxs.shape[0] != 0:
+         
+        for l, idx in enumerate(curr_test_halo_idxs):
+            if l == 0:
+                test_halos_within = test_dataset[np.where(test_halo_idxs == idx)]
+            else:
+                curr_test_halo = test_dataset[np.where(test_halo_idxs == idx)]
+                test_halos_within = np.row_stack((test_halos_within, curr_test_halo))
+            
+        print(test_halos_within)
+        # idx_around_r200m = np.where((curr_test_halo[:,4] > 0.9) & (curr_test_halo[:,4] < 1.1))[0]
+        # test_predict = model.predict(curr_test_halo[idx_around_r200m,2:])
+        test_predict = model.predict(test_halos_within[:,2:])
+        #curr_density_prf_all = test_density_prf_all[k]
+        #curr_density_prf_1halo = test_density_prf_1halo[k]
+        # actual_labels = curr_test_halo[idx_around_r200m,1]
+        actual_labels = test_halos_within[:,1]
+        classification = classification_report(actual_labels, test_predict, output_dict=True)
+
+        all_accuracy.append(classification["accuracy"])
+        #compare_density_prf(curr_test_halo[:,1], curr_density_prf_all, curr_density_prf_1halo, mass, test_predict, k, "", "", show_graph = True, save_graph = False)
+        # plot_radius_rad_vel_tang_vel_graphs(test_predict, curr_test_halo[idx_around_r200m,4], curr_test_halo[idx_around_r200m,2], curr_test_halo[idx_around_r200m,6], actual_labels, "ML Predictions", num_bins)
+        # plot_radius_rad_vel_tang_vel_graphs(actual_labels, curr_test_halo[idx_around_r200m,4], curr_test_halo[idx_around_r200m,2], curr_test_halo[idx_around_r200m,6], actual_labels, "Actual Labels", num_bins)
+        plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,4], test_halos_within[:,2], test_halos_within[:,6], actual_labels, "ML Predictions", num_bins, end_nu, plot = False, save = True)
+        plot_radius_rad_vel_tang_vel_graphs(actual_labels, test_halos_within[:,4], test_halos_within[:,2], test_halos_within[:,6], actual_labels, "Actual Labels", num_bins, end_nu, plot = False, save = True)
+        #plt.show()
+        graph_err_by_bin(test_predict, actual_labels, test_halos_within[:,4], num_bins, end_nu, plot = False, save = True)
+    
+    start_nu = end_nu
+    
 print(all_accuracy)
-plt.hist(all_accuracy)
-plt.show()
+fig, ax = plt.subplots(1,1)
+ax.set_title("Number of halos at each accuracy level")
+ax.set_xlabel("Accuracy")
+ax.set_ylabel("Num halos")
+ax.hist(all_accuracy)
+fig.savefig("/home/zvladimi/MLOIS/Random_figures/all_test_halo_acc.png")
