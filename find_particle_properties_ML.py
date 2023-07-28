@@ -349,7 +349,7 @@ num_iter = 7
 num_save_ptl_params = 5
 num_save_halo_params = 3
 times_r200 = 6
-num_test_halos = 100
+num_test_halos = 1500
 
 t_dyn = 2.448854618582507 # calculated by (2 * R200m)/V200m not sure how to do this each time... but hard coded for now from running this code with set snapshots
 global halo_start_idx 
@@ -437,8 +437,6 @@ rng = np.random.default_rng(seed = 100)
 all_indices = np.arange(0,match_halo_idxs.shape[0])
 test_indices = rng.choice(all_indices, size = num_test_halos, replace = False)
 train_indices = np.delete(all_indices, test_indices)
-print(train_indices)
-print(test_indices)
 
 with open(save_location + "test_indices.pickle", "wb") as pickle_file:
     pickle.dump(test_indices, pickle_file)

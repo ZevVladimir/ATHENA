@@ -110,7 +110,7 @@ density_prf_1halo = density_prf_1halo[:,snapshot_index,:]
 
 match_halo_idxs = np.where((p_halos_status == 10) & (halos_last_snap >= 190) & (c_halos_status > 0) & (halos_last_snap >= snapshot_list[1]))[0]
 #[ 321 6238  927 5728  599 3315 4395 4458 2159 7281]
-with open(data_location + "test_indices", "rb") as pickle_file:
+with open(data_location + "test_indices.pickle", "rb") as pickle_file:
     test_indices = pickle.load(pickle_file)
 
 num_test_halos = test_indices.shape[0]
@@ -140,12 +140,12 @@ nu_step = 0.5
 num_iter = 7
 
 for k in range(num_iter):
-    print(k)
     end_nu = start_nu + nu_step
     
     idx_within_nu = np.where((peak_heights >= start_nu) & (peak_heights < end_nu))[0]
     curr_test_halo_idxs = test_indices[idx_within_nu]
-    
+    print(start_nu, "to", end_nu, ":", idx_within_nu.shape, "halos")
+
     #curr_halo_idx = test_indices[k]
     if curr_test_halo_idxs.shape[0] != 0:
          
@@ -155,8 +155,7 @@ for k in range(num_iter):
             else:
                 curr_test_halo = test_dataset[np.where(test_halo_idxs == idx)]
                 test_halos_within = np.row_stack((test_halos_within, curr_test_halo))
-            
-        print(test_halos_within)
+        print(test_halos_within.shape)
         # idx_around_r200m = np.where((curr_test_halo[:,4] > 0.9) & (curr_test_halo[:,4] < 1.1))[0]
         # test_predict = model.predict(curr_test_halo[idx_around_r200m,2:])
         test_predict = model.predict(test_halos_within[:,2:])
@@ -170,10 +169,10 @@ for k in range(num_iter):
         #compare_density_prf(curr_test_halo[:,1], curr_density_prf_all, curr_density_prf_1halo, mass, test_predict, k, "", "", show_graph = True, save_graph = False)
         # plot_radius_rad_vel_tang_vel_graphs(test_predict, curr_test_halo[idx_around_r200m,4], curr_test_halo[idx_around_r200m,2], curr_test_halo[idx_around_r200m,6], actual_labels, "ML Predictions", num_bins)
         # plot_radius_rad_vel_tang_vel_graphs(actual_labels, curr_test_halo[idx_around_r200m,4], curr_test_halo[idx_around_r200m,2], curr_test_halo[idx_around_r200m,6], actual_labels, "Actual Labels", num_bins)
-        plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,4], test_halos_within[:,2], test_halos_within[:,6], actual_labels, "ML Predictions", num_bins, end_nu, plot = False, save = True)
-        plot_radius_rad_vel_tang_vel_graphs(actual_labels, test_halos_within[:,4], test_halos_within[:,2], test_halos_within[:,6], actual_labels, "Actual Labels", num_bins, end_nu, plot = False, save = True)
+        plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,4], test_halos_within[:,2], test_halos_within[:,6], actual_labels, "ML Predictions", num_bins, start_nu, end_nu, plot = False, save = True)
+        plot_radius_rad_vel_tang_vel_graphs(actual_labels, test_halos_within[:,4], test_halos_within[:,2], test_halos_within[:,6], actual_labels, "Actual Labels", num_bins, start_nu, end_nu, plot = False, save = True)
         #plt.show()
-        graph_err_by_bin(test_predict, actual_labels, test_halos_within[:,4], num_bins, end_nu, plot = False, save = True)
+        graph_err_by_bin(test_predict, actual_labels, test_halos_within[:,4], num_bins, start_nu, end_nu, plot = False, save = True)
     
     start_nu = end_nu
     

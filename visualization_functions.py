@@ -106,7 +106,7 @@ def rad_vel_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = No
     
     return ax.plot(hubble_vel[:,0], hubble_vel[:,1], color = "purple", alpha = 0.5, linestyle = "dashed", label = r"Hubble Flow")
 
-def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf, title, num_bins, halo_idx, plot, save):
+def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf, title, num_bins, start_nu, end_nu, plot, save):
     inf_radius = radius[np.where(orb_inf == 0)]
     orb_radius = radius[np.where(orb_inf == 1)]
     inf_rad_vel = radial_vel[np.where(orb_inf == 0)]
@@ -124,7 +124,7 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     cmap = plt.get_cmap("inferno")
 
     fig = plt.figure(constrained_layout=True)
-    fig.suptitle(title + str(halo_idx))
+    fig.suptitle(title + " " + str(start_nu) + " to " + str(end_nu))
 
     sub_fig_titles = ["Orbiting Particles", "Infalling Particles", "Orbit/Infall Ratio"]
     # create 3x1 subfigs
@@ -210,7 +210,7 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     if plot:
         plt.show()
     if save:
-        fig.savefig("/home/zvladimi/MLOIS/Random_figures/2d_hists/_2d_hist_" + str(halo_idx) + title + ".png", dpi = 1000)
+        fig.savefig("/home/zvladimi/MLOIS/Random_figures/2d_hists/_2d_hist_" + str(start_nu) + "_" + str(end_nu) + "_" + title + ".png", dpi = 1000)
 
 def graph_feature_importance(feature_names, feature_importance):
     mpl.rcParams.update({'font.size': 16})
@@ -228,7 +228,7 @@ def graph_correlation_matrix(data, feature_names):
     heatmap.set_title("Feature Correlation Heatmap")
     plt.show()
     
-def graph_err_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, halo_idx, plot, save):
+def graph_err_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, start_nu, end_nu, plot, save):
     bin_width = (np.max(radius) - 0) / num_bins
     
     inf_radius = radius[np.where(corr_orb_inf == 0)]
@@ -289,7 +289,7 @@ def graph_err_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, halo_idx, plo
     ax.stairs(all_accuracy, bins, color = "black", alpha = 0.4, label = "all ptl")    
     ax.stairs(inf_accuracy, bins, color = "blue", alpha = 0.4, label = "inf ptl")
     ax.stairs(orb_accuracy, bins, color = "red", alpha = 0.4, label = "orb ptl")
-    ax.set_title("Halo: " + str(halo_idx) + " Num ptls: " + str(radius.shape[0]))
+    ax.set_title("Halo: " + str(start_nu) + "_" + str(end_nu) + " Num ptls: " + str(radius.shape[0]))
     ax.set_xlabel("radius $r/R_{200m}$")
     ax.set_ylabel("Accuracy")
     ax.set_ylim(-0.1,1.1)
@@ -297,4 +297,4 @@ def graph_err_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, halo_idx, plo
     if plot:
         plt.show()
     if save:
-        fig.savefig("/home/zvladimi/MLOIS/Random_figures/error_by_rad_graphs/error_by_rad_" + str(halo_idx) + ".png")
+        fig.savefig("/home/zvladimi/MLOIS/Random_figures/error_by_rad_graphs/error_by_rad_" + str(start_nu) + "_" + str(end_nu) + ".png")
