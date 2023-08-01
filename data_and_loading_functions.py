@@ -69,10 +69,14 @@ def load_or_pickle_SPARTA_data(path, sparta_name, hdf5_path, scale_factor, littl
     return halos_pos, halos_vel, halos_r200m, halo_id, density_prf_all, density_prf_1halo, halo_status, halo_last_snap
 
 def standardize(values):
-    return (values - values.mean())/values.std()
+    for col in range(values.shape[1]):
+        values[:,col] = (values[:,col] - values[:,col].mean())/values[:,col].std()
+    return values
 
 def normalize(values):
-    return (values - values.min())/(values.max() - values.min())
+    for col in range(values.shape[1]):
+        values[:,col] = (values[:,col] - values.min())/(values.max() - values.min())
+    return 
 
 def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapshot_list):
     dataset_path = save_path + dataset_name + "_dataset_" + sparta_name + ".pickle"
@@ -144,8 +148,6 @@ def choose_halo_split(indices, snap, halo_props, particle_props, num_features):
     for idx in indices:
         start_ind = start_idxs[idx]
         curr_num_ptl = num_ptls[idx]
-        print(start_ind)
-        print(curr_num_ptl)
         dataset[start:start+curr_num_ptl] = particle_props[start_ind:start_ind+curr_num_ptl]
 
         start = start + curr_num_ptl

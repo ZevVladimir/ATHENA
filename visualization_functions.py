@@ -107,6 +107,7 @@ def rad_vel_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = No
     return ax.plot(hubble_vel[:,0], hubble_vel[:,1], color = "purple", alpha = 0.5, linestyle = "dashed", label = r"Hubble Flow")
 
 def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf, title, num_bins, start_nu, end_nu, plot, save):
+    mpl.rcParams.update({'font.size': 8})
     inf_radius = radius[np.where(orb_inf == 0)]
     orb_radius = radius[np.where(orb_inf == 1)]
     inf_rad_vel = radial_vel[np.where(orb_inf == 0)]
@@ -120,11 +121,11 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     max_tang_vel = np.max(tang_vel)
     min_tang_vel = np.min(tang_vel)
     
-    ptl_min = 0
+    ptl_min = 20
     cmap = plt.get_cmap("inferno")
 
     fig = plt.figure(constrained_layout=True)
-    fig.suptitle(title + " " + str(start_nu) + " to " + str(end_nu))
+    fig.suptitle(title + " nu:" + str(start_nu) + " to " + str(end_nu))
 
     sub_fig_titles = ["Orbiting Particles", "Infalling Particles", "Orbit/Infall Ratio"]
     # create 3x1 subfigs
@@ -135,41 +136,35 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
         # create 1x3 subplots per subfig
         axs = subfig.subplots(nrows=1, ncols=3)
         if row == 0:
-            hist1 = axs[0].hist2d(orb_radius, orb_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, cmin = ptl_min)
-            axs[0].set_title("Radial Velocity vs Radius")
-            axs[0].set_xlabel("radius $r/R_{200m}$")
-            axs[0].set_ylabel("rad vel $v_r/v_{200m}$")
+            hist1 = axs[0].hist2d(orb_radius, orb_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, norm="linear")
+            axs[0].set_xlabel("$r/R_{200m}$")
+            axs[0].set_ylabel("$v_r/v_{200m}$")
             subfig.colorbar(hist1[3], ax=axs[0], shrink = 0.6, pad = 0.01)
             
-            hist2 = axs[1].hist2d(orb_radius, orb_tang_vel, bins = num_bins, range = [[0,max_radius],[min_tang_vel,max_tang_vel]], cmap = cmap, cmin = ptl_min)
-            axs[1].set_title("Tangential Velocity vs Radius")
-            axs[1].set_xlabel("radius $r/R_{200m}$")
-            axs[1].set_ylabel("tang vel $v_t/v_{200m}$")
+            hist2 = axs[1].hist2d(orb_radius, orb_tang_vel, bins = num_bins, range = [[0,max_radius],[min_tang_vel,max_tang_vel]], cmap = cmap, norm="linear")
+            axs[1].set_xlabel("$r/R_{200m}$")
+            axs[1].set_ylabel("$v_t/v_{200m}$")
             subfig.colorbar(hist2[3], ax=axs[1], shrink = 0.6, pad = 0.01)
 
-            hist3 = axs[2].hist2d(orb_tang_vel, orb_rad_vel, bins = num_bins, range = [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]], cmap = cmap, cmin = ptl_min)
-            axs[2].set_title("Tangential Velocity vs Radial Velocity")
-            axs[2].set_xlabel("rad vel $v_r/v_{200m}$")
-            axs[2].set_ylabel("tang vel $v_t/v_{200m}$")
+            hist3 = axs[2].hist2d(orb_tang_vel, orb_rad_vel, bins = num_bins, range = [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]], cmap = cmap, norm="linear")
+            axs[2].set_xlabel("$v_r/v_{200m}$")
+            axs[2].set_ylabel("$v_t/v_{200m}$")
             subfig.colorbar(hist3[3], ax=axs[2], shrink = 0.6, pad = 0.01)
 
         elif row == 1:
             hist4 = axs[0].hist2d(inf_radius, inf_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, cmin = ptl_min)
-            axs[0].set_title("Radial Velocity vs Radius")
-            axs[0].set_xlabel("radius $r/R_{200m}$")
-            axs[0].set_ylabel("rad vel $v_r/v_{200m}$")
+            axs[0].set_xlabel("$r/R_{200m}$")
+            axs[0].set_ylabel("$v_r/v_{200m}$")
             subfig.colorbar(hist4[3], ax=axs[0], shrink = 0.6, pad = 0.01)
 
             hist5 = axs[1].hist2d(inf_radius, inf_tang_vel, bins = num_bins, range = [[0,max_radius],[min_tang_vel,max_tang_vel]], cmap = cmap, cmin = ptl_min)
-            axs[1].set_title("Tangential Velocity vs Radius")
-            axs[1].set_xlabel("radius $r/R_{200m}$")
-            axs[1].set_ylabel("tang vel $v_t/v_{200m}$")
+            axs[1].set_xlabel("$r/R_{200m}$")
+            axs[1].set_ylabel("$v_t/v_{200m}$")
             subfig.colorbar(hist5[3], ax=axs[1], shrink = 0.6, pad = 0.01)
 
             hist6 = axs[2].hist2d(inf_tang_vel, inf_rad_vel, bins = num_bins, range = [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]], cmap = cmap, cmin = ptl_min)
-            axs[2].set_title("Tangential Velocity vs Radial Velocity")
-            axs[2].set_xlabel("rad vel $v_r/v_{200m}$")
-            axs[2].set_ylabel("tang vel $v_t/v_{200m}$")
+            axs[2].set_xlabel("$v_r/v_{200m}$")
+            axs[2].set_ylabel("$v_t/v_{200m}$")
             subfig.colorbar(hist6[3], ax=axs[2], shrink = 0.6, pad = 0.01)
 
         else:
@@ -187,13 +182,11 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
             ratio_rvel_tvel = np.round(ratio_rvel_tvel,2)
 
             hist7 = axs[0].imshow(np.flip(ratio_rad_rvel, axis = 1).T, cmap = cmap, extent = [0, num_bins, 0, num_bins])
-            axs[0].set_title("Radial Velocity vs Radius")
             axs[0].set_xlabel("x bin")
             axs[0].set_ylabel("y bin")
             subfig.colorbar(hist7, ax=axs[0], shrink = 0.6, pad = 0.01)
 
             hist8 = axs[1].imshow(np.flip(ratio_rad_tvel, axis = 1).T, cmap = cmap, extent = [0, num_bins, 0, num_bins])
-            axs[1].set_title("Tangential Velocity vs Radius")
             axs[1].set_xlabel("x bin")
             axs[1].set_ylabel("y bin")
             subfig.colorbar(hist8, ax=axs[1], shrink = 0.6, pad = 0.01)
@@ -201,8 +194,6 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
             hist9 = axs[2].imshow(np.flip(ratio_rvel_tvel, axis = 1).T, cmap = cmap, extent = [0, num_bins, 0, num_bins])
             # for i in range(num_bins):
             #     for j in range(num_bins):
-            #         axs[2].text(i,j, ratio_rvel_tvel[i,j], color="w", ha="center", va="center", fontsize = "xx-small", fontweight="bold")
-            axs[2].set_title("Tangential Velocity vs Radial Velocity")
             axs[2].set_xlabel("x bin")
             axs[2].set_ylabel("y bin")
             subfig.colorbar(hist9, ax=axs[2], shrink = 0.6, pad = 0.01)
@@ -212,7 +203,7 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     if save:
         fig.savefig("/home/zvladimi/MLOIS/Random_figures/2d_hists/_2d_hist_" + str(start_nu) + "_" + str(end_nu) + "_" + title + ".png", dpi = 1000)
 
-def graph_feature_importance(feature_names, feature_importance):
+def graph_feature_importance(feature_names, feature_importance, model_name, plot, save):
     mpl.rcParams.update({'font.size': 16})
     fig2, (plot1) = plt.subplots(1,1)
     import_idxs = np.argsort(feature_importance)
@@ -220,7 +211,11 @@ def graph_feature_importance(feature_names, feature_importance):
     print(feature_names)
     plot1.barh(feature_names[import_idxs], feature_importance[import_idxs])
     plot1.set_xlabel = ("XGBoost feature importance")
-    plt.show()
+    
+    if plot:
+        plt.show()
+    if save:
+        fig2.savefig("/home/zvladimi/MLOIS/Random_figures/feature_importance_" + model_name + ".png")
 
 def graph_correlation_matrix(data, feature_names):
     mpl.rcParams.update({'font.size': 12})
@@ -298,3 +293,28 @@ def graph_err_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, start_nu, end
         plt.show()
     if save:
         fig.savefig("/home/zvladimi/MLOIS/Random_figures/error_by_rad_graphs/error_by_rad_" + str(start_nu) + "_" + str(end_nu) + ".png")
+        
+def feature_dist(features, labels, plot, save):
+    tot_plts = features.shape[1]
+    num_col = 4
+    
+    num_rows = tot_plts // num_col
+    if tot_plts % num_col != 0:
+        num_rows += 1
+    
+    position = np.arange(1, tot_plts + 1)
+    
+    fig = plt.figure(1)
+    
+    for i in range(tot_plts):
+        ax = fig.add_subplot(num_rows, num_col, position[i])
+        ax.hist(features[:,i])
+        ax.set_title(labels[i])
+        ax.set_ylabel("counts")
+    
+    if plot:
+        plt.show()
+    if save:
+        fig.savefig("/home/zvladimi/MLOIS/Random_figures/feature_dist/feature_dist.png")
+        
+        
