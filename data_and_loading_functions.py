@@ -75,8 +75,8 @@ def standardize(values):
 
 def normalize(values):
     for col in range(values.shape[1]):
-        values[:,col] = (values[:,col] - values.min())/(values.max() - values.min())
-    return 
+        values[:,col] = (values[:,col] - values[:,col].min())/(values[:,col].max() - values[:,col].min())
+    return values
 
 def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapshot_list):
     dataset_path = save_path + dataset_name + "_dataset_" + sparta_name + ".pickle"

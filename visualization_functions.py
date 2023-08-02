@@ -73,6 +73,7 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     ax.legend()
     if save_graph:
         fig.savefig("/home/zvladimi/MLOIS/Random_figures/density_prf_" + str(start_nu) + "-" + str(end_nu) + "_" + str(num) + ".png")
+        mpl.pyplot.close()
     if show_graph:
         plt.show()
     ax.clear()
@@ -133,39 +134,56 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     for row, subfig in enumerate(subfigs):
         subfig.suptitle(sub_fig_titles[row])
 
+        np_hist1, x_edge1, y_edge1 = np.histogram2d(orb_radius, orb_rad_vel, bins=num_bins)
+        np_hist2, x_edge2, y_edge2 = np.histogram2d(orb_radius, orb_tang_vel, bins=num_bins)
+        np_hist3, x_edge3, y_edge3 = np.histogram2d(orb_tang_vel, orb_rad_vel, bins=num_bins)
+        np_hist4, x_edge4, y_edge4 = np.histogram2d(inf_radius, inf_rad_vel, bins=num_bins)
+        np_hist5, x_edge5, y_edge5 = np.histogram2d(inf_radius, inf_tang_vel, bins=num_bins)
+        np_hist6, x_edge6, y_edge6 = np.histogram2d(inf_tang_vel, inf_rad_vel, bins=num_bins)
+        max_ptl = np.max(np_hist1)
+        if np.max(np_hist2) > max_ptl:
+            max_ptl = np.max(np_hist2)
+        if np.max(np_hist3) > max_ptl:
+            max_ptl = np.max(np_hist3)
+        if np.max(np_hist4) > max_ptl:
+            max_ptl = np.max(np_hist4)
+        if np.max(np_hist5) > max_ptl:
+            max_ptl = np.max(np_hist5)    
+        if np.max(np_hist6) > max_ptl:
+            max_ptl = np.max(np_hist6)
+                
         # create 1x3 subplots per subfig
         axs = subfig.subplots(nrows=1, ncols=3)
         if row == 0:
-            hist1 = axs[0].hist2d(orb_radius, orb_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, norm="linear")
+            
+            
+            hist1 = axs[0].hist2d(orb_radius, orb_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, vmin = 0, vmax = max_ptl)
             axs[0].set_xlabel("$r/R_{200m}$")
             axs[0].set_ylabel("$v_r/v_{200m}$")
-            subfig.colorbar(hist1[3], ax=axs[0], shrink = 0.6, pad = 0.01)
             
-            hist2 = axs[1].hist2d(orb_radius, orb_tang_vel, bins = num_bins, range = [[0,max_radius],[min_tang_vel,max_tang_vel]], cmap = cmap, norm="linear")
+            hist2 = axs[1].hist2d(orb_radius, orb_tang_vel, bins = num_bins, range = [[0,max_radius],[min_tang_vel,max_tang_vel]], cmap = cmap, vmin = 0, vmax = max_ptl)
             axs[1].set_xlabel("$r/R_{200m}$")
             axs[1].set_ylabel("$v_t/v_{200m}$")
-            subfig.colorbar(hist2[3], ax=axs[1], shrink = 0.6, pad = 0.01)
 
-            hist3 = axs[2].hist2d(orb_tang_vel, orb_rad_vel, bins = num_bins, range = [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]], cmap = cmap, norm="linear")
+            hist3 = axs[2].hist2d(orb_tang_vel, orb_rad_vel, bins = num_bins, range = [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]], cmap = cmap, vmin = 0, vmax = max_ptl)
             axs[2].set_xlabel("$v_r/v_{200m}$")
             axs[2].set_ylabel("$v_t/v_{200m}$")
-            subfig.colorbar(hist3[3], ax=axs[2], shrink = 0.6, pad = 0.01)
+            
+            subfig.colorbar(hist1[3], ax=axs[-1], pad = 0.1)
 
         elif row == 1:
-            hist4 = axs[0].hist2d(inf_radius, inf_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, cmin = ptl_min)
+            hist4 = axs[0].hist2d(inf_radius, inf_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, vmin = 0, vmax = max_ptl)
             axs[0].set_xlabel("$r/R_{200m}$")
             axs[0].set_ylabel("$v_r/v_{200m}$")
-            subfig.colorbar(hist4[3], ax=axs[0], shrink = 0.6, pad = 0.01)
 
-            hist5 = axs[1].hist2d(inf_radius, inf_tang_vel, bins = num_bins, range = [[0,max_radius],[min_tang_vel,max_tang_vel]], cmap = cmap, cmin = ptl_min)
+            hist5 = axs[1].hist2d(inf_radius, inf_tang_vel, bins = num_bins, range = [[0,max_radius],[min_tang_vel,max_tang_vel]], cmap = cmap, vmin = 0, vmax = max_ptl)
             axs[1].set_xlabel("$r/R_{200m}$")
             axs[1].set_ylabel("$v_t/v_{200m}$")
-            subfig.colorbar(hist5[3], ax=axs[1], shrink = 0.6, pad = 0.01)
 
-            hist6 = axs[2].hist2d(inf_tang_vel, inf_rad_vel, bins = num_bins, range = [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]], cmap = cmap, cmin = ptl_min)
+            hist6 = axs[2].hist2d(inf_tang_vel, inf_rad_vel, bins = num_bins, range = [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]], cmap = cmap, vmin = 0, vmax = max_ptl)
             axs[2].set_xlabel("$v_r/v_{200m}$")
             axs[2].set_ylabel("$v_t/v_{200m}$")
-            subfig.colorbar(hist6[3], ax=axs[2], shrink = 0.6, pad = 0.01)
+            subfig.colorbar(hist1[3], ax=axs[-1], pad = 0.1)
 
         else:
             #orbital divided by infall
@@ -202,13 +220,12 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
         plt.show()
     if save:
         fig.savefig("/home/zvladimi/MLOIS/Random_figures/2d_hists/_2d_hist_" + str(start_nu) + "_" + str(end_nu) + "_" + title + ".png", dpi = 1000)
+        mpl.pyplot.close()
 
 def graph_feature_importance(feature_names, feature_importance, model_name, plot, save):
     mpl.rcParams.update({'font.size': 16})
     fig2, (plot1) = plt.subplots(1,1)
     import_idxs = np.argsort(feature_importance)
-    print(import_idxs)
-    print(feature_names)
     plot1.barh(feature_names[import_idxs], feature_importance[import_idxs])
     plot1.set_xlabel = ("XGBoost feature importance")
     
@@ -216,6 +233,7 @@ def graph_feature_importance(feature_names, feature_importance, model_name, plot
         plt.show()
     if save:
         fig2.savefig("/home/zvladimi/MLOIS/Random_figures/feature_importance_" + model_name + ".png")
+        mpl.pyplot.close()
 
 def graph_correlation_matrix(data, feature_names):
     mpl.rcParams.update({'font.size': 12})
@@ -293,10 +311,11 @@ def graph_err_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, start_nu, end
         plt.show()
     if save:
         fig.savefig("/home/zvladimi/MLOIS/Random_figures/error_by_rad_graphs/error_by_rad_" + str(start_nu) + "_" + str(end_nu) + ".png")
+        mpl.pyplot.close()
         
-def feature_dist(features, labels, plot, save):
+def feature_dist(features, labels, save_name, plot, save):
     tot_plts = features.shape[1]
-    num_col = 4
+    num_col = 3
     
     num_rows = tot_plts // num_col
     if tot_plts % num_col != 0:
@@ -305,6 +324,7 @@ def feature_dist(features, labels, plot, save):
     position = np.arange(1, tot_plts + 1)
     
     fig = plt.figure(1)
+    fig = plt.figure(tight_layout=True)
     
     for i in range(tot_plts):
         ax = fig.add_subplot(num_rows, num_col, position[i])
@@ -315,6 +335,7 @@ def feature_dist(features, labels, plot, save):
     if plot:
         plt.show()
     if save:
-        fig.savefig("/home/zvladimi/MLOIS/Random_figures/feature_dist/feature_dist.png")
+        fig.savefig("/home/zvladimi/MLOIS/Random_figures/feature_dist/feature_dist_" + save_name + ".png")
+        mpl.pyplot.close()
         
         
