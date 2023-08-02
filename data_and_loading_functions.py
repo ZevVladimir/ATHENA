@@ -4,9 +4,12 @@ import os
 import numpy as np
 from pygadgetreader import readsnap, readheader
 
+def create_directory(path):
+    if os.path.exists(path) != True:
+        os.makedirs(path)
+
 def check_pickle_exist_gadget(path, ptl_property, snapshot, snapshot_path):
     file_path = path + ptl_property + "_" + snapshot + ".pickle" 
-    print(file_path)
     if os.path.isfile(file_path):
         with open(file_path, "rb") as pickle_file:
             particle_info = pickle.load(pickle_file)
@@ -79,7 +82,13 @@ def normalize(values):
     return values
 
 def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapshot_list):
-    dataset_path = save_path + dataset_name + "_dataset_" + sparta_name + ".pickle"
+    save_path = save_path + "datasets/"
+    create_directory(save_path)
+    dataset_path = save_path + dataset_name + "_dataset_" + sparta_name 
+    
+    for snap in snapshot_list:
+        dataset_path = dataset_path + "_" + str(snap)
+    dataset_path = dataset_path + ".pickle"
 
     # if the directory for this hdf5 file exists if not make it
     if os.path.exists(save_path) != True:
@@ -107,21 +116,21 @@ def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapsh
                         curr_col += 1
                 else:
                     full_dataset[:,curr_col] = all_ptl_properties[key]
-                    all_keys.append(key)
+                    all_keys.append(key + str(snapshot_list[0]))
                     curr_col += 1
     
 
         # once all the halos are gone through save them as pickles for later  
         with open(dataset_path, "wb") as pickle_file:
             pickle.dump(full_dataset, pickle_file)
-        with open(save_path + dataset_name + "dataset_all_keys", "wb") as pickle_file:
+        with open(save_path + dataset_name + "_dataset_all_keys.pickle", "wb") as pickle_file:
             pickle.dump(all_keys, pickle_file)
 
     # if there are already pickle files just open them
     else:
         with open(dataset_path, "rb") as pickle_file:
             full_dataset = pickle.load(pickle_file)
-        with open(save_path + dataset_name + "dataset_all_keys", "rb") as pickle_file:
+        with open(save_path + dataset_name + "_dataset_all_keys.pickle", "rb") as pickle_file:
             all_keys = pickle.load(pickle_file)
 
     return full_dataset, all_keys
@@ -131,7 +140,6 @@ def save_to_hdf5(new_file, hdf5_file, data_name, dataset, chunk, max_shape, curr
         hdf5_file.create_dataset(data_name, data = dataset, chunks = chunk, maxshape = max_shape)
     # with a new file adding on additional data to the datasets
     elif new_file and len(list(hdf5_file.keys())) == (max_num_keys):
-
         hdf5_file[data_name].resize((hdf5_file[data_name].shape[0] + dataset.shape[0]), axis = 0)
         hdf5_file[data_name][-dataset.shape[0]:] = dataset   
 

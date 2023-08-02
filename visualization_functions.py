@@ -5,7 +5,7 @@ from calculation_functions import calculate_distance
 import seaborn as sns
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from sklearn.metrics import classification_report
-from data_and_loading_functions import check_pickle_exist_gadget
+from data_and_loading_functions import check_pickle_exist_gadget, create_directory
 
 def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_assn, num, start_nu, end_nu, show_graph = False, save_graph = False):
     # Create bins for the density profile calculation
@@ -71,6 +71,7 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.legend()
+    
     if save_graph:
         fig.savefig("/home/zvladimi/MLOIS/Random_figures/density_prf_" + str(start_nu) + "-" + str(end_nu) + "_" + str(num) + ".png")
         mpl.pyplot.close()
@@ -107,7 +108,7 @@ def rad_vel_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = No
     
     return ax.plot(hubble_vel[:,0], hubble_vel[:,1], color = "purple", alpha = 0.5, linestyle = "dashed", label = r"Hubble Flow")
 
-def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf, title, num_bins, start_nu, end_nu, plot, save):
+def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf, title, num_bins, start_nu, end_nu, plot, save, save_location):
     mpl.rcParams.update({'font.size': 8})
     inf_radius = radius[np.where(orb_inf == 0)]
     orb_radius = radius[np.where(orb_inf == 1)]
@@ -219,12 +220,14 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     if plot:
         plt.show()
     if save:
-        fig.savefig("/home/zvladimi/MLOIS/Random_figures/2d_hists/_2d_hist_" + str(start_nu) + "_" + str(end_nu) + "_" + title + ".png", dpi = 1000)
+        create_directory(save_location + "2d_hists/")
+        fig.savefig(save_location + "2d_hists/_2d_hist_" + str(start_nu) + "_" + str(end_nu) + "_" + title + ".png", dpi = 1000)
         mpl.pyplot.close()
 
-def graph_feature_importance(feature_names, feature_importance, model_name, plot, save):
-    mpl.rcParams.update({'font.size': 16})
+def graph_feature_importance(feature_names, feature_importance, model_name, plot, save, save_location):
+    mpl.rcParams.update({'font.size': 8})
     fig2, (plot1) = plt.subplots(1,1)
+    fig2.tight_layout()
     import_idxs = np.argsort(feature_importance)
     plot1.barh(feature_names[import_idxs], feature_importance[import_idxs])
     plot1.set_xlabel = ("XGBoost feature importance")
@@ -232,7 +235,8 @@ def graph_feature_importance(feature_names, feature_importance, model_name, plot
     if plot:
         plt.show()
     if save:
-        fig2.savefig("/home/zvladimi/MLOIS/Random_figures/feature_importance_" + model_name + ".png")
+        create_directory(save_location + "feature_importance_plots/")
+        fig2.savefig(save_location + "feature_importance_plots/" + "feat_imp_" + model_name + ".png", bbox_inches="tight")
         mpl.pyplot.close()
 
 def graph_correlation_matrix(data, feature_names):
@@ -241,7 +245,7 @@ def graph_correlation_matrix(data, feature_names):
     heatmap.set_title("Feature Correlation Heatmap")
     plt.show()
     
-def graph_err_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, start_nu, end_nu, plot, save):
+def graph_err_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, start_nu, end_nu, plot, save, save_location):
     bin_width = (np.max(radius) - 0) / num_bins
     
     inf_radius = radius[np.where(corr_orb_inf == 0)]
@@ -310,10 +314,11 @@ def graph_err_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, start_nu, end
     if plot:
         plt.show()
     if save:
-        fig.savefig("/home/zvladimi/MLOIS/Random_figures/error_by_rad_graphs/error_by_rad_" + str(start_nu) + "_" + str(end_nu) + ".png")
+        create_directory(save_location + "error_by_rad_graphs/")
+        fig.savefig(save_location + "error_by_rad_graphs/error_by_rad_" + str(start_nu) + "_" + str(end_nu) + ".png")
         mpl.pyplot.close()
         
-def feature_dist(features, labels, save_name, plot, save):
+def feature_dist(features, labels, save_name, plot, save, save_location):
     tot_plts = features.shape[1]
     num_col = 3
     
@@ -335,7 +340,8 @@ def feature_dist(features, labels, save_name, plot, save):
     if plot:
         plt.show()
     if save:
-        fig.savefig("/home/zvladimi/MLOIS/Random_figures/feature_dist/feature_dist_" + save_name + ".png")
+        create_directory(save_location + "feature_dist_hists")
+        fig.savefig(save_location + "feature_dist_hists/feature_dist_" + save_name + ".png")
         mpl.pyplot.close()
         
         
