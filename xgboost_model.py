@@ -21,7 +21,7 @@ from visualization_functions import *
 cosmol = cosmology.setCosmology("bolshoi")
 
 # SHOULD BE DESCENDING
-snapshot_list = [190]
+snapshot_list = [190,176]
 p_snap = snapshot_list[0]
 curr_sparta_file = "sparta_cbol_l0063_n0256"
 
@@ -74,6 +74,13 @@ feature_dist(train_dataset[:,2:], train_all_keys[2:], "orig_data", False, True, 
 
 X_train, X_val, y_train, y_val = train_test_split(train_dataset[:,2:], train_dataset[:,1], test_size=0.20, random_state=0)
 
+train_rand_idxs = np.random.permutation(X_train.shape[0])
+val_rand_idxs = np.random.permutation(X_val.shape[0])
+X_train = X_train[train_rand_idxs]
+y_train = y_train[train_rand_idxs]
+X_val = X_val[val_rand_idxs]
+y_val = y_val[val_rand_idxs]
+
 for i,key in enumerate(train_all_keys[2:]):
     if key == "Scaled_radii_" + str(p_snap):
         scaled_radii_loc = i
@@ -124,11 +131,12 @@ def train_model(X, y, rad_range, num_params, snapshots, graph_feat_imp, save_loc
     return model
 
 def det_class(below, at, beyond):
-    predicts = np.zeros(below.shape[0])
-    prob_inf = (below[:,0] + at[:,0] + beyond[:,0])/3
-    prob_orb = (below[:,1] + at[:,1] + beyond[:,1])/3
+    all_pred_prob = np.column_stack((below,at))
+    all_pred_prob = np.column_stack((all_pred_prob,beyond))
+    pred_loc = np.argmax(all_pred_prob, axis = 1)
 
-    predicts[np.where(prob_inf <= prob_orb)] = 1
+    predicts = np.zeros(below.shape[0])
+    predicts[np.where((pred_loc % 2) != 0)] = 1
     
     return predicts
 
@@ -220,8 +228,6 @@ for k in range(num_iter):
         #curr_density_prf_1halo = test_density_prf_1halo[k]
 
         actual_labels = test_halos_within[:,1]
-        print(actual_labels)
-        print(test_predict)
         classification = classification_report(actual_labels, test_predict, output_dict=True)
 
         all_accuracy.append(classification["accuracy"])

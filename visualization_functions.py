@@ -6,6 +6,7 @@ import seaborn as sns
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from sklearn.metrics import classification_report
 from data_and_loading_functions import check_pickle_exist_gadget, create_directory
+import general_plotting as gp
 
 def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_assn, num, start_nu, end_nu, show_graph = False, save_graph = False):
     # Create bins for the density profile calculation
@@ -155,7 +156,22 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
                 
         # create 1x3 subplots per subfig
         axs = subfig.subplots(nrows=1, ncols=3)
-        if row == 0:           
+        if row == 0:  
+            plot_types = ["hist2d","hist2d","hist2d"]
+            x_data = np.zeros((orb_radius.shape[0],1,3))
+            y_data = np.zeros((orb_radius.shape[0],1,3))
+
+            x_data[:,0,0] = orb_radius
+            x_data[:,0,1] = orb_radius
+            x_data[:,0,2] = orb_tang_vel
+        
+            y_data[:,0,0] = orb_rad_vel
+            y_data[:,0,1] = orb_tang_vel
+            y_data[:,0,2] = orb_rad_vel
+
+            kwargs = {"cmap": cmap, "vmin":0, "vmax":max_ptl}
+            plotter = gp.plot_determiner(plot_types=plot_types,plot_size=(1,3),X=x_data,Y=y_data,fig_title = "Orbiting Particles", show=True, kwargs=kwargs)
+            #plotter.plot()         
             hist1 = axs[0].hist2d(orb_radius, orb_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, vmin = 0, vmax = max_ptl)
             axs[0].set_xlabel("$r/R_{200m}$")
             axs[0].set_ylabel("$v_r/v_{200m}$")
