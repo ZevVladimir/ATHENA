@@ -105,7 +105,7 @@ def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapsh
                     num_cols += 1
                 
             num_rows = all_ptl_properties[key].shape[0]
-
+            print(num_cols)
             full_dataset = np.zeros((num_rows, num_cols))
             curr_col = 0
             for key in all_ptl_properties.keys():

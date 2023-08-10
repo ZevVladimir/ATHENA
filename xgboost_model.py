@@ -21,7 +21,7 @@ from visualization_functions import *
 cosmol = cosmology.setCosmology("bolshoi")
 
 # SHOULD BE DESCENDING
-snapshot_list = [190, 176]
+snapshot_list = [190]
 p_snap = snapshot_list[0]
 curr_sparta_file = "sparta_cbol_l0063_n0256"
 
@@ -54,7 +54,7 @@ num_splits = 1
 
 train_dataset, train_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "train", snapshot_list = snapshot_list)
 test_dataset, test_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "test", snapshot_list = snapshot_list)
-
+print(test_all_keys)
 dataset_df = pd.DataFrame(train_dataset[:,2:], columns = train_all_keys[2:])
 test_dataset_df = pd.DataFrame(test_dataset[:,2:], columns = test_all_keys[2:])
 print(dataset_df)
@@ -203,13 +203,15 @@ for k in range(num_iter):
     #curr_halo_idx = test_indices[k]
     if curr_test_halo_idxs.shape[0] != 0:
         for l, idx in enumerate(curr_test_halo_idxs):
+            print(idx)
             if l == 0:
                 test_halos_within = test_dataset[np.where(test_halo_idxs == idx)]
+                break
             else:
                 curr_test_halo = test_dataset[np.where(test_halo_idxs == idx)]
                 test_halos_within = np.row_stack((test_halos_within, curr_test_halo))
         
-        print(test_halos_within.shape)
+        print(test_halos_within)
         predicts_below = model_below_r200m.predict_proba(test_halos_within[:,2:])
         predicts_at = model_at_r200m.predict_proba(test_halos_within[:,2:])
         predicts_beyond = model_beyond_r200m.predict_proba(test_halos_within[:,2:])
@@ -218,6 +220,8 @@ for k in range(num_iter):
         #curr_density_prf_1halo = test_density_prf_1halo[k]
 
         actual_labels = test_halos_within[:,1]
+        print(actual_labels)
+        print(test_predict)
         classification = classification_report(actual_labels, test_predict, output_dict=True)
 
         all_accuracy.append(classification["accuracy"])
@@ -227,7 +231,7 @@ for k in range(num_iter):
         plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "ML Predictions", num_bins, start_nu, end_nu, plot = False, save = True, save_location=save_location)
         plot_radius_rad_vel_tang_vel_graphs(actual_labels, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "Actual Labels", num_bins, start_nu, end_nu, plot = False, save = True, save_location=save_location)
         #plt.show()
-        graph_err_by_bin(test_predict, actual_labels, test_halos_within[:,scaled_radii_loc], num_bins, start_nu, end_nu, plot = False, save = True, save_location = save_location)
+        graph_err_by_bin(test_predict, actual_labels, test_halos_within[:,2+scaled_radii_loc], num_bins, start_nu, end_nu, plot = False, save = True, save_location = save_location)
     
     start_nu = end_nu
     

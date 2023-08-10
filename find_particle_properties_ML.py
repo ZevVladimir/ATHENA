@@ -215,10 +215,10 @@ def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r20
     
 def split_halo_by_mass(num_bins, num_ptl_params, start_nu, num_iter, nu_step, times_r200m, p_halos_pos, p_halo_r200m, p_density_prf_all, p_density_prf_1halo, p_halos_id, sparta_file_path, sparta_file_name, snapshot_list, new_file, all_halo_idxs, train, train_indices, test_indices, c_halos_pos = None, c_halos_r200m = None, c_density_prf_all = None, c_density_prf_1halo = None, c_halos_id = None):
     #TODO have it so you don't have to delete the .hdf5 file each time
-    prim_only = True
+    prim_only = False
     if c_halos_pos is None or c_halos_r200m is None or c_density_prf_all is None or c_density_prf_1halo is None or c_halos_id is None:
         print("Can't do comparison, only doing primary snapshot")
-        prim_only = False
+        prim_only = True
         
     # choose which indices to use and only take those values
     if train:
@@ -304,7 +304,7 @@ def split_halo_by_mass(num_bins, num_ptl_params, start_nu, num_iter, nu_step, ti
                 all_scaled_radii = np.column_stack((p_scaled_radii, c_scaled_radii))
                 all_rad_vel = np.column_stack((p_rad_vel, c_rad_vel))
                 all_tang_vel = np.column_stack((p_tang_vel, c_tang_vel))
-                (p_total_num_particles,2)
+                use_max_shape = (p_total_num_particles,2)
             
             if prim_only == True:
                 all_scaled_radii = p_scaled_radii
@@ -348,8 +348,8 @@ global halo_start_idx
 curr_sparta_file = "sparta_cbol_l0063_n0256"
 
 # snapshot list should go from high to low (the first value will be what is searched around and generally you want that to be the more recent snap)
-snapshot_list = [190]
-prim_only = False
+snapshot_list = [176]
+prim_only = True # TURN THIS TRUE if you want only 1 snapshot
 
 p_snap = snapshot_list[0]
 hdf5_file_path = "/home/zvladimi/MLOIS/SPARTA_data/" + curr_sparta_file + ".hdf5"
@@ -376,7 +376,7 @@ t4 = time.time()
 print("\n finish loading data: ", (t4- t3), " seconds")
 
 if prim_only == True:
-    save_location =  "/home/zvladimi/MLOIS/calculated_info/" + "calc_from_" + curr_sparta_file + "_" + str(snapshot_list[0]) + "/"
+    save_location =  "/home/zvladimi/MLOIS/calculated_info/" + curr_sparta_file + "_" + str(snapshot_list[0]) + "/"
     print(save_location)
     if os.path.exists(save_location) != True:
         os.makedirs(save_location)
@@ -404,7 +404,6 @@ if prim_only == False:
     c_box_size = c_box_size * 10**3 * c_scale_factor * little_h #convert to Kpc physical
     
     # load particle data and SPARTA data for the comparison snap
-    snapshot_path = "/home/zvladimi/MLOIS/particle_data/snapdir_" + "{:04d}".format(c_snap) + "/snapshot_" + "{:04d}".format(c_snap)
     c_particles_pid, c_particles_vel, c_particles_pos, mass = load_or_pickle_ptl_data(save_location, str(c_snap), snapshot_path, c_scale_factor, little_h)
     c_halos_pos, c_halos_vel, c_halos_r200m, c_halos_id, c_density_prf_all, c_density_prf_1halo, c_halos_status, c_halos_last_snap = load_or_pickle_SPARTA_data(save_location, curr_sparta_file, hdf5_file_path, c_scale_factor, little_h, c_snap)
 
@@ -423,6 +422,7 @@ if prim_only == False:
     c_halos_id = c_halos_id[match_halo_idxs]
     c_density_prf_all = c_density_prf_all[match_halo_idxs]
     c_density_prf_1halo = c_density_prf_1halo[match_halo_idxs]
+    
 if prim_only == True:
     match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_snap))[0]
 total_num_halos = match_halo_idxs.shape[0]
@@ -437,7 +437,7 @@ p_density_prf_1halo = p_density_prf_1halo[match_halo_idxs]
 
 # choose how many test halos we want to take out and which indices belong to which dataset
 rng = np.random.default_rng(seed = 100)
-all_indices = np.arange(0,match_halo_idxs.shape[0])
+all_indices = np.arange(0,total_num_halos)
 test_indices = rng.choice(all_indices, size = num_test_halos, replace = False)
 train_indices = np.delete(all_indices, test_indices)
 

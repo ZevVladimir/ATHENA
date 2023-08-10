@@ -155,9 +155,7 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
                 
         # create 1x3 subplots per subfig
         axs = subfig.subplots(nrows=1, ncols=3)
-        if row == 0:
-            
-            
+        if row == 0:           
             hist1 = axs[0].hist2d(orb_radius, orb_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, vmin = 0, vmax = max_ptl)
             axs[0].set_xlabel("$r/R_{200m}$")
             axs[0].set_ylabel("$v_r/v_{200m}$")
@@ -247,7 +245,7 @@ def graph_correlation_matrix(data, feature_names):
     
 def graph_err_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, start_nu, end_nu, plot, save, save_location):
     bin_width = (np.max(radius) - 0) / num_bins
-    
+    print("max radius:", np.max(radius))
     inf_radius = radius[np.where(corr_orb_inf == 0)]
     orb_radius = radius[np.where(corr_orb_inf == 1)]
 
