@@ -210,7 +210,12 @@ for k in range(num_iter):
 
     #curr_halo_idx = test_indices[k]
     if curr_test_halo_idxs.shape[0] != 0:
+        print(test_density_prf_all.shape)
+        density_prf_all_within = np.zeros(test_density_prf_all.shape[1])
+        density_prf_1halo_within = np.zeros(test_density_prf_1halo.shape[1])
         for l, idx in enumerate(curr_test_halo_idxs):
+            density_prf_all_within = density_prf_all_within + test_density_prf_all[l]
+            density_prf_1halo_within = density_prf_1halo_within + test_density_prf_1halo[l]
             print(idx)
             if l == 0:
                 test_halos_within = test_dataset[np.where(test_halo_idxs == idx)]
@@ -224,16 +229,12 @@ for k in range(num_iter):
         predicts_at = model_at_r200m.predict_proba(test_halos_within[:,2:])
         predicts_beyond = model_beyond_r200m.predict_proba(test_halos_within[:,2:])
         test_predict = det_class(predicts_below, predicts_at, predicts_below)
-        #curr_density_prf_all = test_density_prf_all[k]
-        #curr_density_prf_1halo = test_density_prf_1halo[k]
 
         actual_labels = test_halos_within[:,1]
         classification = classification_report(actual_labels, test_predict, output_dict=True)
 
         all_accuracy.append(classification["accuracy"])
-        #compare_density_prf(curr_test_halo[:,1], curr_density_prf_all, curr_density_prf_1halo, mass, test_predict, k, "", "", show_graph = True, save_graph = False)
-        # plot_radius_rad_vel_tang_vel_graphs(test_predict, curr_test_halo[idx_around_r200m,scaled_radii_loc], curr_test_halo[idx_around_r200m,2], curr_test_halo[idx_around_r200m,6], actual_labels, "ML Predictions", num_bins)
-        # plot_radius_rad_vel_tang_vel_graphs(actual_labels, curr_test_halo[idx_around_r200m,scaled_radii_loc], curr_test_halo[idx_around_r200m,2], curr_test_halo[idx_around_r200m,6], actual_labels, "Actual Labels", num_bins)
+        compare_density_prf(test_halos_within[:,2+scaled_radii_loc], density_prf_all_within, density_prf_1halo_within, mass, test_predict, k, "", "", show_graph = True, save_graph = False)
         plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "ML Predictions", num_bins, start_nu, end_nu, plot = True, save = True, save_location=save_location)
         
         graph_err_by_bin(test_predict, actual_labels, test_halos_within[:,2+scaled_radii_loc], num_bins, start_nu, end_nu, plot = False, save = True, save_location = save_location)

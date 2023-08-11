@@ -57,14 +57,14 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
 
     fig, ax = plt.subplots(1,1)
 
-    ax.plot(middle_bins, calculated_prf_all, 'r-', label = "my code profile all")
-    ax.plot(middle_bins, actual_prf_all, 'c--', label = "SPARTA profile all")
+    ax.plot(middle_bins, calculated_prf_all/actual_prf_all, 'r-', label = "my code / SPARTA profile all")
+    #ax.plot(middle_bins, actual_prf_all, 'c--', label = "SPARTA profile all")
 
-    ax.plot(middle_bins, calculated_prf_orb, 'b-', label = "my code profile orb")
-    ax.plot(middle_bins, calculated_prf_inf, 'g-', label = "my code profile inf")
+    ax.plot(middle_bins, calculated_prf_orb/actual_prf_1halo, 'b-', label = "my code / SPARTA profile orb")
+    ax.plot(middle_bins, calculated_prf_inf/(actual_prf_all - actual_prf_1halo), 'g-', label = "my code / SPARTA profile inf")
     
-    ax.plot(middle_bins, actual_prf_1halo, 'm--', label = "SPARTA profile orbit")
-    ax.plot(middle_bins, actual_prf_all - actual_prf_1halo, 'y--', label = "SPARTA profile inf")
+    #ax.plot(middle_bins, actual_prf_1halo, 'm--', label = "SPARTA profile orbit")
+    #ax.plot(middle_bins, actual_prf_all - actual_prf_1halo, 'y--', label = "SPARTA profile inf")
     
     ax.set_title("1Halo Density Profile")
     ax.set_xlabel("radius $r/R_{200m}$")
@@ -79,8 +79,7 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     if show_graph:
         plt.show()
         plt.close()
-    ax.clear()
-    fig.clear()
+
 
 def brute_force(curr_particles_pos, r200, halo_x, halo_y, halo_z):
     within_box = curr_particles_pos[np.where((curr_particles_pos[:,0] < r200 + halo_x) & (curr_particles_pos[:,0] > r200 - halo_x) & (curr_particles_pos[:,1] < r200 + halo_y) & (curr_particles_pos[:,1] > r200 - halo_y) & (curr_particles_pos[:,2] < r200 + halo_z) & (curr_particles_pos[:,2] > r200 - halo_z))]
