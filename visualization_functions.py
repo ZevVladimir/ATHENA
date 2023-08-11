@@ -75,12 +75,12 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     
     if save_graph:
         fig.savefig("/home/zvladimi/MLOIS/Random_figures/density_prf_" + str(start_nu) + "-" + str(end_nu) + "_" + str(num) + ".png")
-        mpl.pyplot.close()
+        plt.close()
     if show_graph:
         plt.show()
+        plt.close()
     ax.clear()
     fig.clear()
-
 
 def brute_force(curr_particles_pos, r200, halo_x, halo_y, halo_z):
     within_box = curr_particles_pos[np.where((curr_particles_pos[:,0] < r200 + halo_x) & (curr_particles_pos[:,0] > r200 - halo_x) & (curr_particles_pos[:,1] < r200 + halo_y) & (curr_particles_pos[:,1] > r200 - halo_y) & (curr_particles_pos[:,2] < r200 + halo_z) & (curr_particles_pos[:,2] > r200 - halo_z))]
@@ -123,120 +123,150 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     min_rad_vel = np.min(radial_vel)
     max_tang_vel = np.max(tang_vel)
     min_tang_vel = np.min(tang_vel)
+
+    np_hist1, x_edge1, y_edge1 = np.histogram2d(orb_radius, orb_rad_vel, bins=num_bins)
+    np_hist2, x_edge2, y_edge2 = np.histogram2d(orb_radius, orb_tang_vel, bins=num_bins)
+    np_hist3, x_edge3, y_edge3 = np.histogram2d(orb_tang_vel, orb_rad_vel, bins=num_bins)
+    np_hist4, x_edge4, y_edge4 = np.histogram2d(inf_radius, inf_rad_vel, bins=num_bins)
+    np_hist5, x_edge5, y_edge5 = np.histogram2d(inf_radius, inf_tang_vel, bins=num_bins)
+    np_hist6, x_edge6, y_edge6 = np.histogram2d(inf_tang_vel, inf_rad_vel, bins=num_bins)
+    max_ptl = np.max(np_hist1)
+    if np.max(np_hist2) > max_ptl:
+        max_ptl = np.max(np_hist2)
+    if np.max(np_hist3) > max_ptl:
+        max_ptl = np.max(np_hist3)
+    if np.max(np_hist4) > max_ptl:
+        max_ptl = np.max(np_hist4)
+    if np.max(np_hist5) > max_ptl:
+        max_ptl = np.max(np_hist5)    
+    if np.max(np_hist6) > max_ptl:
+        max_ptl = np.max(np_hist6)
+
+    #orbital divided by infall
+    ratio_rad_rvel = np_hist1/(np_hist1 + np_hist4)
+    ratio_rad_rvel[(np.isnan(ratio_rad_rvel))] = 0
+    ratio_rad_rvel = np.round(ratio_rad_rvel,2)
+
+    ratio_rad_tvel = np_hist2/(np_hist2 + np_hist5)
+    ratio_rad_tvel[(np.isnan(ratio_rad_tvel))] = 0
+    ratio_rad_tvel = np.round(ratio_rad_tvel,2)
+
+    ratio_rvel_tvel = np_hist3/(np_hist3 + np_hist6)
+    ratio_rvel_tvel[(np.isnan(ratio_rvel_tvel))] = 0
+    ratio_rvel_tvel = np.round(ratio_rvel_tvel,2)
     
     ptl_min = 20
     cmap = plt.get_cmap("inferno")
 
-    fig = plt.figure(constrained_layout=True)
-    fig.suptitle(title + " nu:" + str(start_nu) + " to " + str(end_nu))
+    # fig = plt.figure(constrained_layout=True)
+    # fig.suptitle(title + " nu:" + str(start_nu) + " to " + str(end_nu))
 
-    sub_fig_titles = ["Orbiting Particles", "Infalling Particles", "Orbit/Infall Ratio"]
+    sub_fig_titles = ["Orbiting Particles", "Infalling Particles"]
+
+    plot_types = ["hist2d","hist2d","hist2d","hist2d","hist2d","hist2d"]
+    x_data = np.zeros((orb_inf.shape[0],1,6))
+    y_data = np.zeros((orb_inf.shape[0],1,6))
+
+    x_data[:orb_radius.shape[0],0,0] = orb_radius
+    x_data[:orb_radius.shape[0],0,1] = orb_radius
+    x_data[:orb_tang_vel.shape[0],0,2] = orb_tang_vel
+    x_data[:inf_radius.shape[0],0,3] = inf_radius
+    x_data[:inf_radius.shape[0],0,4] = inf_radius
+    x_data[:inf_tang_vel.shape[0],0,5] = inf_tang_vel
+
+    y_data[:orb_rad_vel.shape[0],0,0] = orb_rad_vel
+    y_data[:orb_tang_vel.shape[0],0,1] = orb_tang_vel
+    y_data[:orb_rad_vel.shape[0],0,2] = orb_rad_vel
+    y_data[:inf_rad_vel.shape[0],0,3] = inf_rad_vel
+    y_data[:inf_tang_vel.shape[0],0,4] = inf_tang_vel
+    y_data[:inf_rad_vel.shape[0],0,5] = inf_rad_vel
+
+    x_data[x_data == 0] = np.NaN
+    y_data[y_data == 0] = np.NaN
+
+    args = [[num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]]], [num_bins, [[0,max_radius],[min_tang_vel,max_tang_vel]]], [num_bins, [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]]],
+            [num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]]], [num_bins, [[0,max_radius],[min_tang_vel,max_tang_vel]]], [num_bins, [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]]]]
+    kwargs = {"cmap": cmap, "vmin":0, "vmax":max_ptl}
+    x_labels = ["$r/R_{200m}$","$r/R_{200m}$","$v_r/v_{200m}$","$r/R_{200m}$","$r/R_{200m}$","$v_r/v_{200m}$"]
+    y_labels =["$v_r/v_{200m}$","$v_t/v_{200m}$","$v_t/v_{200m}$","$v_r/v_{200m}$","$v_t/v_{200m}$","$v_t/v_{200m}$"]
+    plotter = gp.plot_determiner(plot_types=plot_types,plot_size=(2,3),X=x_data,Y=y_data, x_label=x_labels, y_label=y_labels, fig_title = title + " nu:" + str(start_nu) + " to " + str(end_nu), subplot_title = sub_fig_titles, constrained=True, show=True, args = args, kwargs=kwargs)
+    plotter.plot()   
+
+
+
     # create 3x1 subfigs
-    subfigs = fig.subfigures(nrows=3, ncols=1)
-    for row, subfig in enumerate(subfigs):
-        subfig.suptitle(sub_fig_titles[row])
-
-        np_hist1, x_edge1, y_edge1 = np.histogram2d(orb_radius, orb_rad_vel, bins=num_bins)
-        np_hist2, x_edge2, y_edge2 = np.histogram2d(orb_radius, orb_tang_vel, bins=num_bins)
-        np_hist3, x_edge3, y_edge3 = np.histogram2d(orb_tang_vel, orb_rad_vel, bins=num_bins)
-        np_hist4, x_edge4, y_edge4 = np.histogram2d(inf_radius, inf_rad_vel, bins=num_bins)
-        np_hist5, x_edge5, y_edge5 = np.histogram2d(inf_radius, inf_tang_vel, bins=num_bins)
-        np_hist6, x_edge6, y_edge6 = np.histogram2d(inf_tang_vel, inf_rad_vel, bins=num_bins)
-        max_ptl = np.max(np_hist1)
-        if np.max(np_hist2) > max_ptl:
-            max_ptl = np.max(np_hist2)
-        if np.max(np_hist3) > max_ptl:
-            max_ptl = np.max(np_hist3)
-        if np.max(np_hist4) > max_ptl:
-            max_ptl = np.max(np_hist4)
-        if np.max(np_hist5) > max_ptl:
-            max_ptl = np.max(np_hist5)    
-        if np.max(np_hist6) > max_ptl:
-            max_ptl = np.max(np_hist6)
-                
-        # create 1x3 subplots per subfig
-        axs = subfig.subplots(nrows=1, ncols=3)
-        if row == 0:  
-            plot_types = ["hist2d","hist2d","hist2d"]
-            x_data = np.zeros((orb_radius.shape[0],1,3))
-            y_data = np.zeros((orb_radius.shape[0],1,3))
-
-            x_data[:,0,0] = orb_radius
-            x_data[:,0,1] = orb_radius
-            x_data[:,0,2] = orb_tang_vel
-        
-            y_data[:,0,0] = orb_rad_vel
-            y_data[:,0,1] = orb_tang_vel
-            y_data[:,0,2] = orb_rad_vel
-
-            kwargs = {"cmap": cmap, "vmin":0, "vmax":max_ptl}
-            plotter = gp.plot_determiner(plot_types=plot_types,plot_size=(1,3),X=x_data,Y=y_data,fig_title = "Orbiting Particles", show=True, kwargs=kwargs)
-            #plotter.plot()         
-            hist1 = axs[0].hist2d(orb_radius, orb_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, vmin = 0, vmax = max_ptl)
-            axs[0].set_xlabel("$r/R_{200m}$")
-            axs[0].set_ylabel("$v_r/v_{200m}$")
+    # subfigs = fig.subfigures(nrows=3, ncols=1)
+    # for row, subfig in enumerate(subfigs):
+    #     subfig.suptitle(sub_fig_titles[row])
+    #     # create 1x3 subplots per subfig
+    #     axs = subfig.subplots(nrows=1, ncols=3)
+    #     if row == 0:        
+    #         hist1 = axs[0].hist2d(orb_radius, orb_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, vmin = 0, vmax = max_ptl)
+    #         axs[0].set_xlabel("$r/R_{200m}$")
+    #         axs[0].set_ylabel("$v_r/v_{200m}$")
             
-            hist2 = axs[1].hist2d(orb_radius, orb_tang_vel, bins = num_bins, range = [[0,max_radius],[min_tang_vel,max_tang_vel]], cmap = cmap, vmin = 0, vmax = max_ptl)
-            axs[1].set_xlabel("$r/R_{200m}$")
-            axs[1].set_ylabel("$v_t/v_{200m}$")
+    #         hist2 = axs[1].hist2d(orb_radius, orb_tang_vel, bins = num_bins, range = [[0,max_radius],[min_tang_vel,max_tang_vel]], cmap = cmap, vmin = 0, vmax = max_ptl)
+    #         axs[1].set_xlabel("$r/R_{200m}$")
+    #         axs[1].set_ylabel("$v_t/v_{200m}$")
 
-            hist3 = axs[2].hist2d(orb_tang_vel, orb_rad_vel, bins = num_bins, range = [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]], cmap = cmap, vmin = 0, vmax = max_ptl)
-            axs[2].set_xlabel("$v_r/v_{200m}$")
-            axs[2].set_ylabel("$v_t/v_{200m}$")
+    #         hist3 = axs[2].hist2d(orb_tang_vel, orb_rad_vel, bins = num_bins, range = [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]], cmap = cmap, vmin = 0, vmax = max_ptl)
+    #         axs[2].set_xlabel("$v_r/v_{200m}$")
+    #         axs[2].set_ylabel("$v_t/v_{200m}$")
             
-            subfig.colorbar(hist1[3], ax=axs[-1], pad = 0.1)
+    #         subfig.colorbar(hist1[3], ax=axs[-1], pad = 0.1)
 
-        elif row == 1:
-            hist4 = axs[0].hist2d(inf_radius, inf_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, vmin = 0, vmax = max_ptl)
-            axs[0].set_xlabel("$r/R_{200m}$")
-            axs[0].set_ylabel("$v_r/v_{200m}$")
+    #     elif row == 1:
+    #         hist4 = axs[0].hist2d(inf_radius, inf_rad_vel, bins = num_bins, range = [[0,max_radius],[min_rad_vel,max_rad_vel]], cmap = cmap, vmin = 0, vmax = max_ptl)
+    #         axs[0].set_xlabel("$r/R_{200m}$")
+    #         axs[0].set_ylabel("$v_r/v_{200m}$")
 
-            hist5 = axs[1].hist2d(inf_radius, inf_tang_vel, bins = num_bins, range = [[0,max_radius],[min_tang_vel,max_tang_vel]], cmap = cmap, vmin = 0, vmax = max_ptl)
-            axs[1].set_xlabel("$r/R_{200m}$")
-            axs[1].set_ylabel("$v_t/v_{200m}$")
+    #         hist5 = axs[1].hist2d(inf_radius, inf_tang_vel, bins = num_bins, range = [[0,max_radius],[min_tang_vel,max_tang_vel]], cmap = cmap, vmin = 0, vmax = max_ptl)
+    #         axs[1].set_xlabel("$r/R_{200m}$")
+    #         axs[1].set_ylabel("$v_t/v_{200m}$")
 
-            hist6 = axs[2].hist2d(inf_tang_vel, inf_rad_vel, bins = num_bins, range = [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]], cmap = cmap, vmin = 0, vmax = max_ptl)
-            axs[2].set_xlabel("$v_r/v_{200m}$")
-            axs[2].set_ylabel("$v_t/v_{200m}$")
-            subfig.colorbar(hist1[3], ax=axs[-1], pad = 0.1)
+    #         hist6 = axs[2].hist2d(inf_tang_vel, inf_rad_vel, bins = num_bins, range = [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]], cmap = cmap, vmin = 0, vmax = max_ptl)
+    #         axs[2].set_xlabel("$v_r/v_{200m}$")
+    #         axs[2].set_ylabel("$v_t/v_{200m}$")
+    #         subfig.colorbar(hist1[3], ax=axs[-1], pad = 0.1)
 
-        else:
-            #orbital divided by infall
-            ratio_rad_rvel = hist1[0]/(hist1[0] + hist4[0])
-            ratio_rad_rvel[(np.isnan(ratio_rad_rvel))] = 0
-            ratio_rad_rvel = np.round(ratio_rad_rvel,2)
+    #     else:
+    #         #orbital divided by infall
+    #         ratio_rad_rvel = hist1[0]/(hist1[0] + hist4[0])
+    #         ratio_rad_rvel[(np.isnan(ratio_rad_rvel))] = 0
+    #         ratio_rad_rvel = np.round(ratio_rad_rvel,2)
 
-            ratio_rad_tvel = hist2[0]/(hist2[0] + hist5[0])
-            ratio_rad_tvel[(np.isnan(ratio_rad_tvel))] = 0
-            ratio_rad_tvel = np.round(ratio_rad_tvel,2)
+    #         ratio_rad_tvel = hist2[0]/(hist2[0] + hist5[0])
+    #         ratio_rad_tvel[(np.isnan(ratio_rad_tvel))] = 0
+    #         ratio_rad_tvel = np.round(ratio_rad_tvel,2)
 
-            ratio_rvel_tvel = hist3[0]/(hist3[0] + hist6[0])
-            ratio_rvel_tvel[(np.isnan(ratio_rvel_tvel))] = 0
-            ratio_rvel_tvel = np.round(ratio_rvel_tvel,2)
+    #         ratio_rvel_tvel = hist3[0]/(hist3[0] + hist6[0])
+    #         ratio_rvel_tvel[(np.isnan(ratio_rvel_tvel))] = 0
+    #         ratio_rvel_tvel = np.round(ratio_rvel_tvel,2)
 
-            hist7 = axs[0].imshow(np.flip(ratio_rad_rvel, axis = 1).T, cmap = cmap, extent = [0, num_bins, 0, num_bins])
-            axs[0].set_xlabel("x bin")
-            axs[0].set_ylabel("y bin")
-            subfig.colorbar(hist7, ax=axs[0], shrink = 0.6, pad = 0.01)
+    #         hist7 = axs[0].imshow(np.flip(ratio_rad_rvel, axis = 1).T, cmap = cmap, extent = [0, num_bins, 0, num_bins])
+    #         axs[0].set_xlabel("x bin")
+    #         axs[0].set_ylabel("y bin")
+    #         subfig.colorbar(hist7, ax=axs[0], shrink = 0.6, pad = 0.01)
 
-            hist8 = axs[1].imshow(np.flip(ratio_rad_tvel, axis = 1).T, cmap = cmap, extent = [0, num_bins, 0, num_bins])
-            axs[1].set_xlabel("x bin")
-            axs[1].set_ylabel("y bin")
-            subfig.colorbar(hist8, ax=axs[1], shrink = 0.6, pad = 0.01)
+    #         hist8 = axs[1].imshow(np.flip(ratio_rad_tvel, axis = 1).T, cmap = cmap, extent = [0, num_bins, 0, num_bins])
+    #         axs[1].set_xlabel("x bin")
+    #         axs[1].set_ylabel("y bin")
+    #         subfig.colorbar(hist8, ax=axs[1], shrink = 0.6, pad = 0.01)
 
-            hist9 = axs[2].imshow(np.flip(ratio_rvel_tvel, axis = 1).T, cmap = cmap, extent = [0, num_bins, 0, num_bins])
-            # for i in range(num_bins):
-            #     for j in range(num_bins):
-            axs[2].set_xlabel("x bin")
-            axs[2].set_ylabel("y bin")
-            subfig.colorbar(hist9, ax=axs[2], shrink = 0.6, pad = 0.01)
+    #         hist9 = axs[2].imshow(np.flip(ratio_rvel_tvel, axis = 1).T, cmap = cmap, extent = [0, num_bins, 0, num_bins])
+    #         # for i in range(num_bins):
+    #         #     for j in range(num_bins):
+    #         axs[2].set_xlabel("x bin")
+    #         axs[2].set_ylabel("y bin")
+    #         subfig.colorbar(hist9, ax=axs[2], shrink = 0.6, pad = 0.01)
             
-    if plot:
-        plt.show()
-    if save:
-        create_directory(save_location + "2d_hists/")
-        fig.savefig(save_location + "2d_hists/_2d_hist_" + str(start_nu) + "_" + str(end_nu) + "_" + title + ".png", dpi = 1000)
-        mpl.pyplot.close()
+    # if plot:
+    #     plt.show()
+    #     plt.close()
+    # if save:
+    #     create_directory(save_location + "2d_hists/")
+    #     fig.savefig(save_location + "2d_hists/_2d_hist_" + str(start_nu) + "_" + str(end_nu) + "_" + title + ".png", dpi = 1000)
+    #     plt.close()
 
 def graph_feature_importance(feature_names, feature_importance, model_name, plot, save, save_location):
     mpl.rcParams.update({'font.size': 8})
@@ -248,16 +278,18 @@ def graph_feature_importance(feature_names, feature_importance, model_name, plot
     
     if plot:
         plt.show()
+        plt.close()
     if save:
         create_directory(save_location + "feature_importance_plots/")
         fig2.savefig(save_location + "feature_importance_plots/" + "feat_imp_" + model_name + ".png", bbox_inches="tight")
-        mpl.pyplot.close()
+        plt.close()
 
 def graph_correlation_matrix(data, feature_names):
     mpl.rcParams.update({'font.size': 12})
     heatmap = sns.heatmap(data.corr(), annot = True, cbar = True)
     heatmap.set_title("Feature Correlation Heatmap")
     plt.show()
+    plt.close()
     
 def graph_err_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, start_nu, end_nu, plot, save, save_location):
     bin_width = (np.max(radius) - 0) / num_bins
@@ -327,10 +359,11 @@ def graph_err_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, start_nu, end
     plt.legend()
     if plot:
         plt.show()
+        plt.close()
     if save:
         create_directory(save_location + "error_by_rad_graphs/")
         fig.savefig(save_location + "error_by_rad_graphs/error_by_rad_" + str(start_nu) + "_" + str(end_nu) + ".png")
-        mpl.pyplot.close()
+        plt.close()
         
 def feature_dist(features, labels, save_name, plot, save, save_location):
     tot_plts = features.shape[1]
@@ -353,9 +386,10 @@ def feature_dist(features, labels, save_name, plot, save, save_location):
     
     if plot:
         plt.show()
+        plt.close()
     if save:
         create_directory(save_location + "feature_dist_hists")
         fig.savefig(save_location + "feature_dist_hists/feature_dist_" + save_name + ".png")
-        mpl.pyplot.close()
+        plt.close()
         
         

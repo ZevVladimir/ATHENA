@@ -125,8 +125,8 @@ def train_model(X, y, rad_range, num_params, snapshots, graph_feat_imp, save_loc
         pickle.dump(model, open(model_location, "wb"))
         t5 = time.time()
         print("Total time:", t5-t0, "seconds")
-    if graph_feat_imp:
-        graph_feature_importance(np.array(train_all_keys[2:]), model.feature_importances_, rad_range, False, True, save_location)
+    # if graph_feat_imp:
+    #     graph_feature_importance(np.array(train_all_keys[2:]), model.feature_importances_, rad_range, False, True, save_location)
        
     return model
 
@@ -234,8 +234,8 @@ for k in range(num_iter):
         #compare_density_prf(curr_test_halo[:,1], curr_density_prf_all, curr_density_prf_1halo, mass, test_predict, k, "", "", show_graph = True, save_graph = False)
         # plot_radius_rad_vel_tang_vel_graphs(test_predict, curr_test_halo[idx_around_r200m,scaled_radii_loc], curr_test_halo[idx_around_r200m,2], curr_test_halo[idx_around_r200m,6], actual_labels, "ML Predictions", num_bins)
         # plot_radius_rad_vel_tang_vel_graphs(actual_labels, curr_test_halo[idx_around_r200m,scaled_radii_loc], curr_test_halo[idx_around_r200m,2], curr_test_halo[idx_around_r200m,6], actual_labels, "Actual Labels", num_bins)
-        plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "ML Predictions", num_bins, start_nu, end_nu, plot = False, save = True, save_location=save_location)
-        plot_radius_rad_vel_tang_vel_graphs(actual_labels, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "Actual Labels", num_bins, start_nu, end_nu, plot = False, save = True, save_location=save_location)
+        plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "ML Predictions", num_bins, start_nu, end_nu, plot = True, save = True, save_location=save_location)
+        plot_radius_rad_vel_tang_vel_graphs(actual_labels, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "Actual Labels", num_bins, start_nu, end_nu, plot = True, save = True, save_location=save_location)
         #plt.show()
         graph_err_by_bin(test_predict, actual_labels, test_halos_within[:,2+scaled_radii_loc], num_bins, start_nu, end_nu, plot = False, save = True, save_location = save_location)
     
