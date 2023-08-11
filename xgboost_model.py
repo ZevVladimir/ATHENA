@@ -235,8 +235,7 @@ for k in range(num_iter):
         # plot_radius_rad_vel_tang_vel_graphs(test_predict, curr_test_halo[idx_around_r200m,scaled_radii_loc], curr_test_halo[idx_around_r200m,2], curr_test_halo[idx_around_r200m,6], actual_labels, "ML Predictions", num_bins)
         # plot_radius_rad_vel_tang_vel_graphs(actual_labels, curr_test_halo[idx_around_r200m,scaled_radii_loc], curr_test_halo[idx_around_r200m,2], curr_test_halo[idx_around_r200m,6], actual_labels, "Actual Labels", num_bins)
         plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "ML Predictions", num_bins, start_nu, end_nu, plot = True, save = True, save_location=save_location)
-        plot_radius_rad_vel_tang_vel_graphs(actual_labels, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "Actual Labels", num_bins, start_nu, end_nu, plot = True, save = True, save_location=save_location)
-        #plt.show()
+        
         graph_err_by_bin(test_predict, actual_labels, test_halos_within[:,2+scaled_radii_loc], num_bins, start_nu, end_nu, plot = False, save = True, save_location = save_location)
     
     start_nu = end_nu
