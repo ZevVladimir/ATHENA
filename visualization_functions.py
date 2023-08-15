@@ -8,7 +8,8 @@ from sklearn.metrics import classification_report
 from data_and_loading_functions import check_pickle_exist_gadget, create_directory
 import general_plotting as gp
 
-def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_assn, num, start_nu, end_nu, show_graph = False, save_graph = False):
+def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_assn, num, start_nu, end_nu, save_location, show_graph = False, save_graph = False):
+    create_directory(save_location + "dens_prfl_ratio/")
     # Create bins for the density profile calculation
     num_prf_bins = actual_prf_all.shape[0]
     start_prf_bins = 0.01 # set by parameters in SPARTA
@@ -57,24 +58,24 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
 
     fig, ax = plt.subplots(1,1)
 
-    ax.plot(middle_bins, calculated_prf_all/actual_prf_all, 'r-', label = "my code / SPARTA profile all")
+    ax.step(middle_bins, calculated_prf_all/actual_prf_all, 'r', label = "my code / SPARTA profile all")
     #ax.plot(middle_bins, actual_prf_all, 'c--', label = "SPARTA profile all")
 
-    ax.plot(middle_bins, calculated_prf_orb/actual_prf_1halo, 'b-', label = "my code / SPARTA profile orb")
-    ax.plot(middle_bins, calculated_prf_inf/(actual_prf_all - actual_prf_1halo), 'g-', label = "my code / SPARTA profile inf")
+    ax.step(middle_bins, calculated_prf_orb/actual_prf_1halo, 'b', label = "my code / SPARTA profile orb")
+    ax.step(middle_bins, calculated_prf_inf/(actual_prf_all - actual_prf_1halo), 'g', label = "my code / SPARTA profile inf")
     
     #ax.plot(middle_bins, actual_prf_1halo, 'm--', label = "SPARTA profile orbit")
     #ax.plot(middle_bins, actual_prf_all - actual_prf_1halo, 'y--', label = "SPARTA profile inf")
     
-    ax.set_title("1Halo Density Profile")
+    ax.set_title("ML Predicted  / Actual Density Profile for nu: " + str(start_nu) + "-" + str(end_nu))
     ax.set_xlabel("radius $r/R_{200m}$")
-    ax.set_ylabel("Mass of halo $M_{\odot}$")
+    ax.set_ylabel("ML Dens Prf / Act Dens Prf")
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.legend()
     
     if save_graph:
-        fig.savefig("/home/zvladimi/MLOIS/Random_figures/density_prf_" + str(start_nu) + "-" + str(end_nu) + "_" + str(num) + ".png")
+        fig.savefig(save_location + "dens_prfl_ratio/" + str(start_nu) + "-" + str(end_nu) + ".png")
         plt.close()
     if show_graph:
         plt.show()
@@ -150,8 +151,8 @@ def create_hist_max_ptl(radius, radial_vel, tang_vel, labels, num_bins):
     
     return max_ptl, inf_radius, orb_radius, inf_rad_vel, orb_rad_vel, inf_tang_vel, orb_tang_vel
 
-
-def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf, title, num_bins, start_nu, end_nu, plot, save, save_location):
+def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf, title, num_bins, start_nu, end_nu, show, save, save_location):
+    create_directory(save_location + "/2dhist/")
     mpl.rcParams.update({'font.size': 8})
 
     ml_max_ptl, ml_inf_radius, ml_orb_radius, ml_inf_rad_vel, ml_orb_rad_vel, ml_inf_tang_vel, ml_orb_tang_vel = create_hist_max_ptl(radius, radial_vel, tang_vel, orb_inf, num_bins)
@@ -219,15 +220,21 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     x_labels = ["$r/R_{200m}$","$r/R_{200m}$","$v_r/v_{200m}$","$r/R_{200m}$","$r/R_{200m}$","$v_r/v_{200m}$"]
     y_labels =["$v_r/v_{200m}$","$v_t/v_{200m}$","$v_t/v_{200m}$","$v_r/v_{200m}$","$v_t/v_{200m}$","$v_t/v_{200m}$"]
     
-    ml_plotter = gp.plot_determiner(plot_types=plot_types,plot_size=(2,3),X=ml_x_data,Y=ml_y_data, x_label=x_labels, y_label=y_labels, fig_title = "ML Predictions nu:" + str(start_nu) + " to " + str(end_nu), subplot_title = sub_fig_titles, constrained=True, show=False, args = args, kwargs=kwargs)
+    ml_plotter = gp.plot_determiner(plot_types=plot_types,plot_size=(2,3),X=ml_x_data,Y=ml_y_data, x_label=x_labels, y_label=y_labels, fig_title = "ML Predictions nu:" + str(start_nu) + " to " + str(end_nu), subplot_title = sub_fig_titles, constrained=True, save_location = (save_location + "/2dhist/nu:" + str(start_nu) + " to " + str(end_nu) + "_ML Predictions.png"), args = args, kwargs=kwargs)
     ml_plotter.plot()   
+    
+    if save:
+        ml_plotter.save()
+    if show:
+        ml_plotter.show()
 
-    act_plotter = gp.plot_determiner(plot_types=plot_types,plot_size=(2,3),X=act_x_data,Y=act_y_data, x_label=x_labels, y_label=y_labels, fig_title = "Actual Labels nu:" + str(start_nu) + " to " + str(end_nu), subplot_title = sub_fig_titles, constrained=True, show=False, args = args, kwargs=kwargs)
+    act_plotter = gp.plot_determiner(plot_types=plot_types,plot_size=(2,3),X=act_x_data,Y=act_y_data, x_label=x_labels, y_label=y_labels, fig_title = "Actual Labels nu:" + str(start_nu) + " to " + str(end_nu), subplot_title = sub_fig_titles, constrained=True, save_location = (save_location + "/2dhist/nu:" + str(start_nu) + " to " + str(end_nu) + "_Actual Labels.png"), args = args, kwargs=kwargs)
     act_plotter.plot()   
     
-    if plot:
-        plt.show()
-
+    if save:
+        act_plotter.save()
+    if show:
+        act_plotter.show()
 
 def graph_feature_importance(feature_names, feature_importance, model_name, plot, save, save_location):
     mpl.rcParams.update({'font.size': 8})
@@ -235,7 +242,9 @@ def graph_feature_importance(feature_names, feature_importance, model_name, plot
     fig2.tight_layout()
     import_idxs = np.argsort(feature_importance)
     plot1.barh(feature_names[import_idxs], feature_importance[import_idxs])
-    plot1.set_xlabel = ("XGBoost feature importance")
+    plot1.set_xlabel("XGBoost feature importance")
+    plot1.set_title("Feature Importance for model: " + model_name)
+    plot1.set_xlim(0,1)
     
     if plot:
         plt.show()
@@ -245,12 +254,21 @@ def graph_feature_importance(feature_names, feature_importance, model_name, plot
         fig2.savefig(save_location + "feature_importance_plots/" + "feat_imp_" + model_name + ".png", bbox_inches="tight")
         plt.close()
 
-def graph_correlation_matrix(data, feature_names):
-    mpl.rcParams.update({'font.size': 12})
+def graph_correlation_matrix(data, save_location, show, save):
+    create_directory(save_location + "/corr_matrix/")
+    mpl.rcParams.update({'font.size': 8})
+    
+
     heatmap = sns.heatmap(data.corr(), annot = True, cbar = True)
     heatmap.set_title("Feature Correlation Heatmap")
-    plt.show()
-    plt.close()
+
+    if show:
+        plt.show()
+        plt.close()
+    if save:
+        fig = heatmap.get_figure()
+        fig.savefig(save_location + "/corr_matrix/corr_matrix.png")
+        plt.close()
     
 def graph_err_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, start_nu, end_nu, plot, save, save_location):
     bin_width = (np.max(radius) - 0) / num_bins
@@ -309,15 +327,75 @@ def graph_err_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, start_nu, end
         
         start_bin = finish_bin
     
-    fig, ax = plt.subplots(1,1)
-    ax.stairs(all_accuracy, bins, color = "black", alpha = 0.4, label = "all ptl")    
-    ax.stairs(inf_accuracy, bins, color = "blue", alpha = 0.4, label = "inf ptl")
-    ax.stairs(orb_accuracy, bins, color = "red", alpha = 0.4, label = "orb ptl")
-    ax.set_title("Halo: " + str(start_nu) + "_" + str(end_nu) + " Num ptls: " + str(radius.shape[0]))
-    ax.set_xlabel("radius $r/R_{200m}$")
-    ax.set_ylabel("Accuracy")
-    ax.set_ylim(-0.1,1.1)
-    plt.legend()
+    # plot_types = ["stairs","stairs","stairs","stairs"]
+    # plot_size = (2,2)
+
+    # x_data = np.zeros((num_bins,3,4))
+    # y_data = np.zeros((num_bins,3,4))
+    # print(len(all_accuracy))
+    # print(num_bins)
+    # print(len(bins))
+    # x_data[:,0,0] = all_accuracy
+    # x_data[:,1,0] = inf_accuracy
+    # x_data[:,2,0] = orb_accuracy
+    # x_data[:,0,1] = all_accuracy
+    # x_data[:,1,1] = all_accuracy
+    # x_data[:,2,1] = all_accuracy
+    # x_data[:,0,2] = inf_accuracy
+    # x_data[:,1,2] = inf_accuracy
+    # x_data[:,2,2] = inf_accuracy
+    # x_data[:,0,3] = orb_accuracy
+    # x_data[:,1,3] = orb_accuracy
+    # x_data[:,2,3] = orb_accuracy
+    # x_data[:,0,0] = bins
+    # x_data[:,1,0] = bins
+    # x_data[:,2,0] = bins
+    # x_data[:,:,1] = bins
+    # x_data[:,:,2] = bins
+    # x_data[:,:,3] = bins
+
+    # y_lim = [(-0.1,1.1),(-0.1,1.1),(-0.1,1.1),(-0.1,1.1)]
+    # x_label = ["radius $r/R_{200m}$","radius $r/R_{200m}$","radius $r/R_{200m}$","radius $r/R_{200m}$"]
+    # y_label = ["Accuracy","Accuracy","Accuracy","Accuracy"]
+    # save_location = save_location + "error_by_rad_graphs/error_by_rad_" + str(start_nu) + "_" + str(end_nu) + ".png"
+    # line_labels = ["All ptl", "inf ptl", "orb ptl", "All ptl","All ptl","All ptl","inf ptl","inf ptl","inf ptl","orb ptl","orb ptl","orb ptl"]
+
+    # accuracy_plotter = gp.plot_determiner(plot_types=plot_types, plot_size=plot_size, X=x_data, Y=y_data, ylim=y_lim, x_label=x_label, y_label=y_label, line_labels=line_labels, fig_title="Accuracy Per r/R200m Bin", save_location=save_location, save=True)
+    # accuracy_plotter.plot()
+    # accuracy_plotter.save()
+    
+    fig, ax = plt.subplots(2,2, layout="constrained")
+    fig.suptitle("Accuracy by Radius for nu: " + str(start_nu) + "_" + str(end_nu))
+    ax[0,0].stairs(all_accuracy, bins, color = "black", alpha = 0.6, label = "all ptl")    
+    ax[0,0].stairs(inf_accuracy, bins, color = "blue", alpha = 0.4, label = "inf ptl")
+    ax[0,0].stairs(orb_accuracy, bins, color = "red", alpha = 0.4, label = "orb ptl")
+    ax[0,0].set_title("All Density Prfs")
+    ax[0,0].set_xlabel("radius $r/R_{200m}$")
+    ax[0,0].set_ylabel("Accuracy")
+    ax[0,0].set_ylim(-0.1,1.1)
+    ax[0,0].legend()
+    
+    ax[0,1].stairs(all_accuracy, bins, color = "black", label = "all ptl")    
+    ax[0,1].set_title("All Mass Profile")
+    ax[0,1].set_xlabel("radius $r/R_{200m}$")
+    ax[0,1].set_ylabel("Accuracy")
+    ax[0,1].set_ylim(-0.1,1.1)
+    ax[0,1].legend()
+   
+    ax[1,0].stairs(inf_accuracy, bins, color = "blue", label = "inf ptl")
+    ax[1,0].set_title("Infalling Profile")
+    ax[1,0].set_xlabel("radius $r/R_{200m}$")
+    ax[1,0].set_ylabel("Accuracy")
+    ax[1,0].set_ylim(-0.1,1.1)
+    ax[1,0].legend()
+
+    ax[1,1].stairs(orb_accuracy, bins, color = "red", label = "orb ptl")
+    ax[1,1].set_title("Orbiting Profile")
+    ax[1,1].set_xlabel("radius $r/R_{200m}$")
+    ax[1,1].set_ylabel("Accuracy")
+    ax[1,1].set_ylim(-0.1,1.1)
+    ax[1,1].legend()
+
     if plot:
         plt.show()
         plt.close()

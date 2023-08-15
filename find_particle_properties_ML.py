@@ -12,6 +12,7 @@ import time
 import h5py
 import pickle
 import os
+from concurrent.futures import ProcessPoolExecutor
 from data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5, find_closest_snap
 from calculation_functions import *
 from visualization_functions import compare_density_prf, rad_vel_vs_radius_plot
@@ -156,8 +157,8 @@ def search_halos(particle_tree, halo_idxs, halo_positions, halo_r200m, search_ra
         r200m_per_part[start:start+num_new_particles] = halo_r200m[i]
         all_orbit_assn[start:start+num_new_particles] = current_orbit_assn_sparta
 
-        if i == 50 or i == 100 or i == 113:
-            compare_density_prf(particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], mass, current_orbit_assn_sparta[:,1], i, start_nu, end_nu)
+        # if i == 50 or i == 100 or i == 113:
+        #     compare_density_prf(particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], mass, current_orbit_assn_sparta[:,1], i, start_nu, end_nu)
 
         start += num_new_particles
 
@@ -340,7 +341,7 @@ nu_step = 0.5
 num_iter = 7
 num_save_ptl_params = 5
 num_save_halo_params = 3
-times_r200 = 6
+#times_r200m = 4
 num_test_halos = 1500
 
 t_dyn = 2.448854618582507 # calculated by (2 * R200m)/V200m not sure how to do this each time... but hard coded for now from running this code with set snapshots
@@ -348,8 +349,13 @@ global halo_start_idx
 curr_sparta_file = "sparta_cbol_l0063_n0256"
 
 # snapshot list should go from high to low (the first value will be what is searched around and generally you want that to be the more recent snap)
-snapshot_list = [176]
-prim_only = True # TURN THIS TRUE if you want only 1 snapshot
+prim_only = input("Only using 1 snap? (y/n):").lower().strip() == 'y'
+t_dyn_step = int(input("If you entered n and you want to do an amount of dynamical times back enter the number: (otherwise enter 0 and continue)"))
+snapshot_list = []
+snapshot_list.append(int(input("What snapshots (if only 1 or doing x t_dyn back just enter the primary snap [xxxx] otherwise list the snaps [xxxx,yyyy,zzzz]):")))
+times_r200m = int(input("What search radius (increments of R200m)"))
+# snapshot_list = [190]
+# prim_only = True # TURN THIS TRUE if you want only 1 snapshot
 
 p_snap = snapshot_list[0]
 hdf5_file_path = "/home/zvladimi/MLOIS/SPARTA_data/" + curr_sparta_file + ".hdf5"
@@ -376,22 +382,24 @@ t4 = time.time()
 print("\n finish loading data: ", (t4- t3), " seconds")
 
 if prim_only == True:
-    save_location =  "/home/zvladimi/MLOIS/calculated_info/" + curr_sparta_file + "_" + str(snapshot_list[0]) + "/"
+    save_location =  "/home/zvladimi/MLOIS/calculated_info/" + curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(times_r200m) + "r200msearch/"
     print(save_location)
     if os.path.exists(save_location) != True:
         os.makedirs(save_location)
         
 if prim_only == False:
-    # calculate one dynamical time ago and set that as the comparison snap
-    curr_time = cosmol.age(p_red_shift)
-    past_time = curr_time - t_dyn
-    snapshot_list.append(find_closest_snap(cosmol, past_time))
-    print(snapshot_list)
+    if t_dyn_step > 0:
+        # calculate one dynamical time ago and set that as the comparison snap
+        curr_time = cosmol.age(p_red_shift)
+        past_time = curr_time - (t_dyn_step * t_dyn)
+        print(past_time)
+        snapshot_list.append(find_closest_snap(cosmol, past_time))
 
     # switch to comparison snap
     c_snap = snapshot_list[1]
     snapshot_path = "/home/zvladimi/MLOIS/particle_data/snapdir_" + "{:04d}".format(c_snap) + "/snapshot_" + "{:04d}".format(c_snap)
-    save_location =  "/home/zvladimi/MLOIS/calculated_info/" + curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[1]) + "/"
+    save_location =  "/home/zvladimi/MLOIS/calculated_info/" + curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[1]) + "_" + str(times_r200m) + "r200msearch/"
+    
     if os.path.exists(save_location) != True:
         os.makedirs(save_location)
         
@@ -404,13 +412,13 @@ if prim_only == False:
     c_box_size = c_box_size * 10**3 * c_scale_factor * little_h #convert to Kpc physical
     
     # load particle data and SPARTA data for the comparison snap
-    c_particles_pid, c_particles_vel, c_particles_pos, mass = load_or_pickle_ptl_data(save_location, str(c_snap), snapshot_path, c_scale_factor, little_h)
-    c_halos_pos, c_halos_vel, c_halos_r200m, c_halos_id, c_density_prf_all, c_density_prf_1halo, c_halos_status, c_halos_last_snap = load_or_pickle_SPARTA_data(save_location, curr_sparta_file, hdf5_file_path, c_scale_factor, little_h, c_snap)
-
+    c_particles_pid, c_particles_vel, c_particles_pos, mass = load_or_pickle_ptl_data(str(c_snap), snapshot_path, c_scale_factor, little_h)
+    c_halos_pos, c_halos_vel, c_halos_r200m, c_halos_id, c_density_prf_all, c_density_prf_1halo, c_halos_status, c_halos_last_snap = load_or_pickle_SPARTA_data(curr_sparta_file, hdf5_file_path, c_scale_factor, little_h, c_snap)
+print(snapshot_list)
 # load particle data and SPARTA data for the primary snap
 snapshot_path = "/home/zvladimi/MLOIS/particle_data/snapdir_" + "{:04d}".format(p_snap) + "/snapshot_" + "{:04d}".format(p_snap)
-p_particles_pid, p_particles_vel, p_particles_pos, mass = load_or_pickle_ptl_data(save_location, str(p_snap), snapshot_path, p_scale_factor, little_h)
-p_halos_pos, p_halos_vel, p_halos_r200m, p_halos_id, p_density_prf_all, p_density_prf_1halo, p_halos_status, p_halos_last_snap = load_or_pickle_SPARTA_data(save_location, curr_sparta_file, hdf5_file_path, p_scale_factor, little_h, p_snap)
+p_particles_pid, p_particles_vel, p_particles_pos, mass = load_or_pickle_ptl_data(str(p_snap), snapshot_path, p_scale_factor, little_h)
+p_halos_pos, p_halos_vel, p_halos_r200m, p_halos_id, p_density_prf_all, p_density_prf_1halo, p_halos_status, p_halos_last_snap = load_or_pickle_SPARTA_data(curr_sparta_file, hdf5_file_path, p_scale_factor, little_h, p_snap)
 
 
 # only take halos that are hosts in primary snap and exist past the p_snap and exist in some form at the comparison snap
@@ -451,11 +459,11 @@ p_particle_tree = cKDTree(data = p_particles_pos, leafsize = 3, balanced_tree = 
 
 if prim_only == False:
     c_particle_tree = cKDTree(data = c_particles_pos, leafsize = 3, balanced_tree = False, boxsize = c_box_size)                    
-    split_halo_by_mass(num_bins, num_save_ptl_params, start_nu, num_iter, nu_step, times_r200, p_halos_pos, p_halos_r200m, p_density_prf_all, p_density_prf_1halo, p_halos_id, sparta_file_path = hdf5_file_path, sparta_file_name = curr_sparta_file, snapshot_list = snapshot_list, new_file = True, all_halo_idxs = match_halo_idxs, train = True, train_indices = train_indices, test_indices = test_indices, c_halos_pos = c_halos_pos, c_halos_r200m = c_halos_r200m, c_density_prf_all = c_density_prf_all, c_density_prf_1halo = c_density_prf_1halo, c_halos_id = c_halos_id)    
-    split_halo_by_mass(num_bins, num_save_ptl_params, start_nu, num_iter, nu_step, times_r200, p_halos_pos, p_halos_r200m, p_density_prf_all, p_density_prf_1halo, p_halos_id, sparta_file_path = hdf5_file_path, sparta_file_name = curr_sparta_file, snapshot_list = snapshot_list, new_file = True, all_halo_idxs = match_halo_idxs, train = False, train_indices = train_indices, test_indices = test_indices, c_halos_pos = c_halos_pos, c_halos_r200m = c_halos_r200m, c_density_prf_all = c_density_prf_all, c_density_prf_1halo = c_density_prf_1halo, c_halos_id = c_halos_id)    
+    split_halo_by_mass(num_bins, num_save_ptl_params, start_nu, num_iter, nu_step, times_r200m, p_halos_pos, p_halos_r200m, p_density_prf_all, p_density_prf_1halo, p_halos_id, sparta_file_path = hdf5_file_path, sparta_file_name = curr_sparta_file, snapshot_list = snapshot_list, new_file = True, all_halo_idxs = match_halo_idxs, train = True, train_indices = train_indices, test_indices = test_indices, c_halos_pos = c_halos_pos, c_halos_r200m = c_halos_r200m, c_density_prf_all = c_density_prf_all, c_density_prf_1halo = c_density_prf_1halo, c_halos_id = c_halos_id)    
+    split_halo_by_mass(num_bins, num_save_ptl_params, start_nu, num_iter, nu_step, times_r200m, p_halos_pos, p_halos_r200m, p_density_prf_all, p_density_prf_1halo, p_halos_id, sparta_file_path = hdf5_file_path, sparta_file_name = curr_sparta_file, snapshot_list = snapshot_list, new_file = True, all_halo_idxs = match_halo_idxs, train = False, train_indices = train_indices, test_indices = test_indices, c_halos_pos = c_halos_pos, c_halos_r200m = c_halos_r200m, c_density_prf_all = c_density_prf_all, c_density_prf_1halo = c_density_prf_1halo, c_halos_id = c_halos_id)    
 if prim_only == True:
-    split_halo_by_mass(num_bins, num_save_ptl_params, start_nu, num_iter, nu_step, times_r200, p_halos_pos, p_halos_r200m, p_density_prf_all, p_density_prf_1halo, p_halos_id, sparta_file_path = hdf5_file_path, sparta_file_name = curr_sparta_file, snapshot_list = snapshot_list, new_file = True, all_halo_idxs = match_halo_idxs, train = True, train_indices = train_indices, test_indices = test_indices)    
-    split_halo_by_mass(num_bins, num_save_ptl_params, start_nu, num_iter, nu_step, times_r200, p_halos_pos, p_halos_r200m, p_density_prf_all, p_density_prf_1halo, p_halos_id, sparta_file_path = hdf5_file_path, sparta_file_name = curr_sparta_file, snapshot_list = snapshot_list, new_file = True, all_halo_idxs = match_halo_idxs, train = False, train_indices = train_indices, test_indices = test_indices)    
+    split_halo_by_mass(num_bins, num_save_ptl_params, start_nu, num_iter, nu_step, times_r200m, p_halos_pos, p_halos_r200m, p_density_prf_all, p_density_prf_1halo, p_halos_id, sparta_file_path = hdf5_file_path, sparta_file_name = curr_sparta_file, snapshot_list = snapshot_list, new_file = True, all_halo_idxs = match_halo_idxs, train = True, train_indices = train_indices, test_indices = test_indices)    
+    split_halo_by_mass(num_bins, num_save_ptl_params, start_nu, num_iter, nu_step, times_r200m, p_halos_pos, p_halos_r200m, p_density_prf_all, p_density_prf_1halo, p_halos_id, sparta_file_path = hdf5_file_path, sparta_file_name = curr_sparta_file, snapshot_list = snapshot_list, new_file = True, all_halo_idxs = match_halo_idxs, train = False, train_indices = train_indices, test_indices = test_indices)    
 
 t5 = time.time()
 print("finish calculations: ", np.round((t5- t3)/60,2), "minutes,", (t5- t3), " seconds" + "\n")

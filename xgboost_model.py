@@ -21,14 +21,15 @@ from visualization_functions import *
 cosmol = cosmology.setCosmology("bolshoi")
 
 # SHOULD BE DESCENDING
-snapshot_list = [190,176]
+snapshot_list = [190,160]
+times_r200m = 6
 p_snap = snapshot_list[0]
 curr_sparta_file = "sparta_cbol_l0063_n0256"
 
 if len(snapshot_list) > 1:
-    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "/"
+    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "_" + str(times_r200m) + "r200msearch/"
 else:
-    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "/"
+    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(times_r200m) + "r200msearch/"
     
 sparta_location = "/home/zvladimi/MLOIS/SPARTA_data/" + curr_sparta_file + ".hdf5"
 if len(snapshot_list) > 1:
@@ -44,7 +45,7 @@ create_directory(save_location)
 
 snapshot_path = "/home/zvladimi/MLOIS/particle_data/snapdir_" + "{:04d}".format(snapshot_list[0]) + "/snapshot_" + "{:04d}".format(snapshot_list[0])
 
-ptl_mass = check_pickle_exist_gadget(data_location, "mass", str(snapshot_list[0]), snapshot_path)
+ptl_mass = check_pickle_exist_gadget("mass", str(snapshot_list[0]), snapshot_path)
 mass = ptl_mass[0] * 10**10 #units M_sun/h
 
 np.random.seed(11)
@@ -59,7 +60,7 @@ dataset_df = pd.DataFrame(train_dataset[:,2:], columns = train_all_keys[2:])
 test_dataset_df = pd.DataFrame(test_dataset[:,2:], columns = test_all_keys[2:])
 print(dataset_df)
 print(test_dataset_df)
-#graph_correlation_matrix(dataset_df, np.array(all_keys[2:]))
+graph_correlation_matrix(dataset_df, save_location, show = False, save = True)
 t2 = time.time()
 print("Loaded data", t2 - t1, "seconds")
 
@@ -125,8 +126,8 @@ def train_model(X, y, rad_range, num_params, snapshots, graph_feat_imp, save_loc
         pickle.dump(model, open(model_location, "wb"))
         t5 = time.time()
         print("Total time:", t5-t0, "seconds")
-    # if graph_feat_imp:
-    #     graph_feature_importance(np.array(train_all_keys[2:]), model.feature_importances_, rad_range, False, True, save_location)
+    if graph_feat_imp:
+        graph_feature_importance(np.array(train_all_keys[2:]), model.feature_importances_, rad_range, False, True, save_location)
        
     return model
 
@@ -216,7 +217,6 @@ for k in range(num_iter):
         for l, idx in enumerate(curr_test_halo_idxs):
             density_prf_all_within = density_prf_all_within + test_density_prf_all[l]
             density_prf_1halo_within = density_prf_1halo_within + test_density_prf_1halo[l]
-            print(idx)
             if l == 0:
                 test_halos_within = test_dataset[np.where(test_halo_idxs == idx)]
                 break
@@ -224,7 +224,6 @@ for k in range(num_iter):
                 curr_test_halo = test_dataset[np.where(test_halo_idxs == idx)]
                 test_halos_within = np.row_stack((test_halos_within, curr_test_halo))
         
-        print(test_halos_within)
         predicts_below = model_below_r200m.predict_proba(test_halos_within[:,2:])
         predicts_at = model_at_r200m.predict_proba(test_halos_within[:,2:])
         predicts_beyond = model_beyond_r200m.predict_proba(test_halos_within[:,2:])
@@ -234,9 +233,8 @@ for k in range(num_iter):
         classification = classification_report(actual_labels, test_predict, output_dict=True)
 
         all_accuracy.append(classification["accuracy"])
-        compare_density_prf(test_halos_within[:,2+scaled_radii_loc], density_prf_all_within, density_prf_1halo_within, mass, test_predict, k, "", "", show_graph = True, save_graph = False)
-        plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "ML Predictions", num_bins, start_nu, end_nu, plot = True, save = True, save_location=save_location)
-        
+        compare_density_prf(test_halos_within[:,2+scaled_radii_loc], density_prf_all_within, density_prf_1halo_within, mass, test_predict, k, start_nu, end_nu, show_graph = False, save_graph = True, save_location = save_location)
+        plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "ML Predictions", num_bins, start_nu, end_nu, show = False, save = True, save_location=save_location)
         graph_err_by_bin(test_predict, actual_labels, test_halos_within[:,2+scaled_radii_loc], num_bins, start_nu, end_nu, plot = False, save = True, save_location = save_location)
     
     start_nu = end_nu
