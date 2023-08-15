@@ -92,17 +92,53 @@ def normalize(values):
 def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapshot_list):
     save_path = save_path + "datasets/"
     create_directory(save_path)
-    dataset_path = save_path + dataset_name + "_dataset_" + sparta_name 
+    dataset_path_2snap = save_path + dataset_name + "_dataset_" + sparta_name 
+    dataset_path_1snap = save_path + dataset_name + "_dataset_" + sparta_name 
     
     for snap in snapshot_list:
-        dataset_path = dataset_path + "_" + str(snap)
-    dataset_path = dataset_path + ".pickle"
+        dataset_path_2snap = dataset_path_2snap + "_6_param_" + str(snap)
+        dataset_path_1snap = dataset_path_1snap + "_3_param_" + str(snap)
+    dataset_path_2snap = dataset_path_2snap + ".pickle"
+    dataset_path_1snap = dataset_path_1snap + ".pickle"
 
     # if the directory for this hdf5 file exists if not make it
     if os.path.exists(save_path) != True:
         os.makedirs(save_path)
+    
+    if os.path.exists(dataset_path_1snap) != True:
+        num_cols = 0
+        all_keys = []
+        with h5py.File((data_location + dataset_name + "_all_particle_properties_" + sparta_name + ".hdf5"), 'r') as all_ptl_properties: 
+            num_cols = len(all_ptl_properties.keys())
+            num_rows = all_ptl_properties[list(all_ptl_properties.keys())[0]].shape[0]
 
-    if os.path.exists(dataset_path) != True:
+            full_dataset_1snap = np.zeros((num_rows, num_cols))
+            curr_col = 0
+            for key in all_ptl_properties.keys():
+                if all_ptl_properties[key].ndim > 1:
+                    full_dataset_1snap[:,curr_col] = all_ptl_properties[key][np.where(all_ptl_properties[key][:,1] == 0)[0],0]
+                    all_keys.append(key + str(snapshot_list[row]))
+                    curr_col += 1
+                else:
+                    full_dataset_1snap[:,curr_col] = all_ptl_properties[key]
+                    all_keys.append(key + str(snapshot_list[0]))
+                    curr_col += 1
+
+        # once all the halos are gone through save them as pickles for later  
+        with open(dataset_path_1snap, "wb") as pickle_file:
+            pickle.dump(full_dataset_1snap, pickle_file)
+        # with open(save_path + dataset_name + "_dataset_all_keys.pickle", "wb") as pickle_file:
+        #     pickle.dump(all_keys, pickle_file)
+
+    # if there are already pickle files just open them
+    else:
+        with open(dataset_path_1snap, "rb") as pickle_file:
+            full_dataset_2snap = pickle.load(pickle_file)
+        # with open(save_path + dataset_name + "_dataset_all_keys.pickle", "rb") as pickle_file:
+        #     all_keys = pickle.load(pickle_file)
+    
+    all_keys = []
+    if os.path.exists(dataset_path_2snap) != True and len(snapshot_list) > 1:
         num_cols = 0
         all_keys = []
         with h5py.File((data_location + dataset_name + "_all_particle_properties_" + sparta_name + ".hdf5"), 'r') as all_ptl_properties: 
@@ -112,36 +148,38 @@ def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapsh
                 else:
                     num_cols += 1
                 
-            num_rows = all_ptl_properties[key].shape[0]
-            print(num_cols)
-            full_dataset = np.zeros((num_rows, num_cols))
+            num_rows = np.where(all_ptl_properties["Scaled_radii_" + str(snapshot_list[-1])][:] != 0)[0].shape[0]
+
+            full_dataset_2snap = np.zeros((num_rows, num_cols))
             curr_col = 0
             for key in all_ptl_properties.keys():
                 if all_ptl_properties[key].ndim > 1:
                     for row in range(all_ptl_properties[key].ndim):
-                        full_dataset[:,curr_col] = all_ptl_properties[key][:,row]
+                        full_dataset_2snap[:,curr_col] = all_ptl_properties[key][np.where(all_ptl_properties[key][:,1] != 0),row]
                         all_keys.append(key + str(snapshot_list[row]))
                         curr_col += 1
                 else:
-                    full_dataset[:,curr_col] = all_ptl_properties[key]
+                    full_dataset_2snap[:,curr_col] = all_ptl_properties[key]
                     all_keys.append(key + str(snapshot_list[0]))
                     curr_col += 1
     
 
         # once all the halos are gone through save them as pickles for later  
-        with open(dataset_path, "wb") as pickle_file:
-            pickle.dump(full_dataset, pickle_file)
+        with open(dataset_path_2snap, "wb") as pickle_file:
+            pickle.dump(full_dataset_2snap, pickle_file)
         with open(save_path + dataset_name + "_dataset_all_keys.pickle", "wb") as pickle_file:
             pickle.dump(all_keys, pickle_file)
 
     # if there are already pickle files just open them
-    else:
-        with open(dataset_path, "rb") as pickle_file:
-            full_dataset = pickle.load(pickle_file)
+    elif os.path.exists(dataset_path_2snap) == True and len(snapshot_list) > 1:
+        with open(dataset_path_2snap, "rb") as pickle_file:
+            full_dataset_2snap = pickle.load(pickle_file)
         with open(save_path + dataset_name + "_dataset_all_keys.pickle", "rb") as pickle_file:
             all_keys = pickle.load(pickle_file)
+    else:
+        full_dataset_2snap = 0
 
-    return full_dataset, all_keys
+    return full_dataset_1snap, full_dataset_2snap, all_keys
 
 def save_to_hdf5(new_file, hdf5_file, data_name, dataset, chunk, max_shape, curr_idx, max_num_keys):
     if new_file and len(list(hdf5_file.keys())) < (max_num_keys):

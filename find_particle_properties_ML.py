@@ -281,6 +281,10 @@ def split_halo_by_mass(num_bins, num_ptl_params, start_nu, num_iter, nu_step, ti
             p_orbital_assign, p_rad_vel, p_scaled_radii, p_tang_vel = search_halos(p_particle_tree, use_halo_idxs, p_use_halo_pos, p_use_halo_r200m, times_r200m, p_total_num_use_particles, p_use_density_prf_all, p_use_density_prf_1halo, start_nu, end_nu, p_use_halo_id, sparta_file_path, snapshot_list, False, p_box_size, p_particles_pos, p_particles_vel, p_particles_pid, p_rho_m, p_halos_vel, p_red_shift, p_hubble_constant)
 
             if prim_only == False:
+                all_scaled_radii = np.zeros((p_total_num_use_particles,2))
+                all_rad_vel = np.zeros((p_total_num_use_particles,2))
+                all_tang_vel = np.zeros((p_total_num_use_particles,2))
+
                 c_use_halo_pos = c_halos_pos[halos_within_range]
                 c_use_halos_r200m = c_halos_r200m[halos_within_range]
                 c_use_density_prf_all = c_density_prf_all[halos_within_range]
@@ -293,18 +297,14 @@ def split_halo_by_mass(num_bins, num_ptl_params, start_nu, num_iter, nu_step, ti
                 c_orbital_assign, c_rad_vel, c_scaled_radii, c_tang_vel = search_halos(c_particle_tree, use_halo_idxs, c_use_halo_pos, c_use_halos_r200m, times_r200m, c_total_num_use_particles, c_use_density_prf_all, c_use_density_prf_1halo, start_nu, end_nu, c_use_halo_id, sparta_file_path, snapshot_list, True, c_box_size, c_particles_pos, c_particles_vel, c_particles_pid, c_rho_m, c_halos_vel, c_red_shift, c_hubble_constant)
                 match_pidh_idx = np.intersect1d(p_orbital_assign[:,0], c_orbital_assign[:,0], return_indices=True)
 
-                p_orbital_assign = p_orbital_assign[match_pidh_idx[1]]
-                p_scaled_radii = p_scaled_radii[match_pidh_idx[1]]
-                p_rad_vel = p_rad_vel[match_pidh_idx[1]]
-                p_tang_vel = p_tang_vel[match_pidh_idx[1]]
 
-                c_scaled_radii = c_scaled_radii[match_pidh_idx[2]]
-                c_rad_vel = c_rad_vel[match_pidh_idx[2]]
-                c_tang_vel = c_tang_vel[match_pidh_idx[2]]
+                all_scaled_radii[:,0] = p_scaled_radii
+                all_scaled_radii[match_pidh_idx[1],1] = c_scaled_radii[match_pidh_idx[2]]
+                all_rad_vel[:,0] = p_rad_vel
+                all_rad_vel[match_pidh_idx[1],1] = c_rad_vel[match_pidh_idx[2]]
+                all_tang_vel[:,0] = p_tang_vel
+                all_tang_vel[match_pidh_idx[1],1] = c_tang_vel[match_pidh_idx[2]]
                 
-                all_scaled_radii = np.column_stack((p_scaled_radii, c_scaled_radii))
-                all_rad_vel = np.column_stack((p_rad_vel, c_rad_vel))
-                all_tang_vel = np.column_stack((p_tang_vel, c_tang_vel))
                 use_max_shape = (p_total_num_particles,2)
             
             if prim_only == True:

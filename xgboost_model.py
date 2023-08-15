@@ -53,11 +53,11 @@ np.random.seed(11)
 t1 = time.time()
 num_splits = 1
 
-train_dataset, train_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "train", snapshot_list = snapshot_list)
-test_dataset, test_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "test", snapshot_list = snapshot_list)
+train_dataset_1snap, train_dataset_2snap, train_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "train", snapshot_list = snapshot_list)
+test_dataset_1snap, test_dataset_2snap, test_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "test", snapshot_list = snapshot_list)
 print(test_all_keys)
-dataset_df = pd.DataFrame(train_dataset[:,2:], columns = train_all_keys[2:])
-test_dataset_df = pd.DataFrame(test_dataset[:,2:], columns = test_all_keys[2:])
+dataset_df = pd.DataFrame(train_dataset_2snap[:,2:], columns = train_all_keys[2:])
+test_dataset_df = pd.DataFrame(test_dataset_2snap[:,2:], columns = test_all_keys[2:])
 print(dataset_df)
 print(test_dataset_df)
 graph_correlation_matrix(dataset_df, save_location, show = False, save = True)
@@ -68,20 +68,27 @@ print("Loaded data", t2 - t1, "seconds")
 # ros = over_sampling.RandomOverSampler(random_state=0)
 t0 = time.time()
 
-feature_dist(train_dataset[:,2:], train_all_keys[2:], "orig_data", False, True, save_location)
+feature_dist(train_dataset_2snap[:,2:], train_all_keys[2:], "orig_data", False, True, save_location)
 # train_dataset[:,2:] = normalize(train_dataset[:,2:])
 # test_dataset[:,2:] = normalize(test_dataset[:,2:])
 # feature_dist(train_dataset[:,2:], train_all_keys[2:], "norm_data", False, True)
 
-X_train, X_val, y_train, y_val = train_test_split(train_dataset[:,2:], train_dataset[:,1], test_size=0.20, random_state=0)
+X_train_1snap, X_val_1snap, y_train_1snap, y_val_1snap = train_test_split(train_dataset_1snap[:,2:], train_dataset_1snap[:,1], test_size=0.20, random_state=0)
+X_train_2snap, X_val_2snap, y_train_2snap, y_val_2snap = train_test_split(train_dataset_2snap[:,2:], train_dataset_2snap[:,1], test_size=0.20, random_state=0)
 
-train_rand_idxs = np.random.permutation(X_train.shape[0])
-val_rand_idxs = np.random.permutation(X_val.shape[0])
-X_train = X_train[train_rand_idxs]
-y_train = y_train[train_rand_idxs]
-X_val = X_val[val_rand_idxs]
-y_val = y_val[val_rand_idxs]
+def mix_data(X_train, X_val, y_train, y_val):
+    train_rand_idxs = np.random.permutation(X_train.shape[0])
+    val_rand_idxs = np.random.permutation(X_val.shape[0])
+    X_train = X_train[train_rand_idxs]
+    y_train = y_train[train_rand_idxs]
+    X_val = X_val[val_rand_idxs]
+    y_val = y_val[val_rand_idxs]
+    return X_train, X_val, y_train, y_val
 
+X_train_1snap, X_val_1snap, y_train_1snap, y_val_1snap = mix_data(X_train_1snap, X_val_1snap, y_train_1snap, y_val_1snap)
+X_train_2snap, X_val_2snap, y_train_2snap, y_val_2snap = mix_data(X_train_2snap, X_val_2snap, y_train_2snap, y_val_2snap)
+
+print(train_all_keys)
 for i,key in enumerate(train_all_keys[2:]):
     if key == "Scaled_radii_" + str(p_snap):
         scaled_radii_loc = i
@@ -89,17 +96,28 @@ for i,key in enumerate(train_all_keys[2:]):
         rad_vel_loc = i
     elif key == "Tangential_vel_" + str(p_snap):
         tang_vel_loc = i
-
+print(scaled_radii_loc)
 low_cut_off = 0.8
-high_cutoff = 3
-X_train_below_r200m = X_train[np.where(X_train[:,scaled_radii_loc] < low_cut_off)[0]]
-y_train_below_r200m = y_train[np.where(X_train[:,scaled_radii_loc] < low_cut_off)[0]]
+high_cutoff = 1.3
 
-X_train_r200m = X_train[np.where((X_train[:,scaled_radii_loc] >= low_cut_off) & (X_train[:,scaled_radii_loc] < high_cutoff))[0]]
-y_train_r200m = y_train[np.where((X_train[:,scaled_radii_loc] >= low_cut_off) & (X_train[:,scaled_radii_loc] < high_cutoff))[0]]
+X_train_below_r200m_1snap = X_train_1snap[np.where(X_train_1snap[:,scaled_radii_loc] < low_cut_off)[0]]
+y_train_below_r200m_1snap = y_train_1snap[np.where(X_train_1snap[:,scaled_radii_loc] < low_cut_off)[0]]
 
-X_train_great_r200m = X_train[np.where(X_train[:,scaled_radii_loc] > high_cutoff)[0]]
-y_train_great_r200m = y_train[np.where(X_train[:,scaled_radii_loc] > high_cutoff)[0]]
+X_train_r200m_2snap = X_train_2snap[np.where((X_train_2snap[:,scaled_radii_loc] >= low_cut_off) & (X_train_2snap[:,scaled_radii_loc] < high_cutoff))[0]]
+y_train_r200m_2snap = y_train_2snap[np.where((X_train_2snap[:,scaled_radii_loc] >= low_cut_off) & (X_train_2snap[:,scaled_radii_loc] < high_cutoff))[0]]
+
+X_train_great_r200m_2snap = X_train_2snap[np.where(X_train_2snap[:,scaled_radii_loc] > high_cutoff)[0]]
+y_train_great_r200m_2snap = y_train_2snap[np.where(X_train_2snap[:,scaled_radii_loc] > high_cutoff)[0]]
+
+
+X_train_below_r200m_2snap = X_train_2snap[np.where(X_train_2snap[:,scaled_radii_loc] < low_cut_off)[0]]
+y_train_below_r200m_2snap = y_train_2snap[np.where(X_train_2snap[:,scaled_radii_loc] < low_cut_off)[0]]
+
+X_train_r200m_2snap = X_train_2snap[np.where((X_train_2snap[:,scaled_radii_loc] >= low_cut_off) & (X_train_2snap[:,scaled_radii_loc] < high_cutoff))[0]]
+y_train_r200m_2snap = y_train_2snap[np.where((X_train_2snap[:,scaled_radii_loc] >= low_cut_off) & (X_train_2snap[:,scaled_radii_loc] < high_cutoff))[0]]
+
+X_train_great_r200m_2snap = X_train_2snap[np.where(X_train_2snap[:,scaled_radii_loc] > high_cutoff)[0]]
+y_train_great_r200m_2snap = y_train_2snap[np.where(X_train_2snap[:,scaled_radii_loc] > high_cutoff)[0]]
 
 
 def train_model(X, y, rad_range, num_params, snapshots, graph_feat_imp, save_location):
@@ -204,14 +222,13 @@ num_iter = 7
 
 for k in range(num_iter):
     end_nu = start_nu + nu_step
-    
+
     idx_within_nu = np.where((peak_heights >= start_nu) & (peak_heights < end_nu))[0]
     curr_test_halo_idxs = test_indices[idx_within_nu]
     print(start_nu, "to", end_nu, ":", idx_within_nu.shape, "halos")
 
     #curr_halo_idx = test_indices[k]
     if curr_test_halo_idxs.shape[0] != 0:
-        print(test_density_prf_all.shape)
         density_prf_all_within = np.zeros(test_density_prf_all.shape[1])
         density_prf_1halo_within = np.zeros(test_density_prf_1halo.shape[1])
         for l, idx in enumerate(curr_test_halo_idxs):
@@ -219,11 +236,11 @@ for k in range(num_iter):
             density_prf_1halo_within = density_prf_1halo_within + test_density_prf_1halo[l]
             if l == 0:
                 test_halos_within = test_dataset[np.where(test_halo_idxs == idx)]
-                break
+                continue
             else:
                 curr_test_halo = test_dataset[np.where(test_halo_idxs == idx)]
                 test_halos_within = np.row_stack((test_halos_within, curr_test_halo))
-        
+
         predicts_below = model_below_r200m.predict_proba(test_halos_within[:,2:])
         predicts_at = model_at_r200m.predict_proba(test_halos_within[:,2:])
         predicts_beyond = model_beyond_r200m.predict_proba(test_halos_within[:,2:])
@@ -235,7 +252,7 @@ for k in range(num_iter):
         all_accuracy.append(classification["accuracy"])
         compare_density_prf(test_halos_within[:,2+scaled_radii_loc], density_prf_all_within, density_prf_1halo_within, mass, test_predict, k, start_nu, end_nu, show_graph = False, save_graph = True, save_location = save_location)
         plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "ML Predictions", num_bins, start_nu, end_nu, show = False, save = True, save_location=save_location)
-        graph_err_by_bin(test_predict, actual_labels, test_halos_within[:,2+scaled_radii_loc], num_bins, start_nu, end_nu, plot = False, save = True, save_location = save_location)
+        graph_acc_by_bin(test_predict, actual_labels, test_halos_within[:,2+scaled_radii_loc], num_bins, start_nu, end_nu, plot = False, save = True, save_location = save_location)
     
     start_nu = end_nu
     

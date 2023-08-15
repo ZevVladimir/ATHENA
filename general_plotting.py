@@ -87,8 +87,9 @@ class plot_determiner:
 
             if self.colorbar:
                 axcb = fig.colorbar(mpl.cm.ScalarMappable(norm=norm,cmap=self.kwargs["cmap"]), ax=axs.ravel().tolist(), pad=0.04, aspect = 30)
-
-        plt.legend()
+        
+        if self.line_labels != None:
+            plt.legend()
         self.fig = fig
 
         # if self.save:

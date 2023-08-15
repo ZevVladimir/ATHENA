@@ -56,23 +56,36 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     prf_bins = np.insert(prf_bins,0,0)
     middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
 
-    fig, ax = plt.subplots(1,1)
+    fig, ax = plt.subplots(1,2)
 
-    ax.step(middle_bins, calculated_prf_all/actual_prf_all, 'r', label = "my code / SPARTA profile all")
+    ax[0].plot(middle_bins, calculated_prf_all/actual_prf_all, 'r', label = "ML / SPARTA prf all")
     #ax.plot(middle_bins, actual_prf_all, 'c--', label = "SPARTA profile all")
 
-    ax.step(middle_bins, calculated_prf_orb/actual_prf_1halo, 'b', label = "my code / SPARTA profile orb")
-    ax.step(middle_bins, calculated_prf_inf/(actual_prf_all - actual_prf_1halo), 'g', label = "my code / SPARTA profile inf")
+    ax[0].plot(middle_bins, calculated_prf_orb/actual_prf_1halo, 'b', label = "ML / SPARTA profile orb")
+    ax[0].plot(middle_bins, calculated_prf_inf/(actual_prf_all - actual_prf_1halo), 'g', label = "ML / SPARTA profile inf")
     
     #ax.plot(middle_bins, actual_prf_1halo, 'm--', label = "SPARTA profile orbit")
     #ax.plot(middle_bins, actual_prf_all - actual_prf_1halo, 'y--', label = "SPARTA profile inf")
     
-    ax.set_title("ML Predicted  / Actual Density Profile for nu: " + str(start_nu) + "-" + str(end_nu))
-    ax.set_xlabel("radius $r/R_{200m}$")
-    ax.set_ylabel("ML Dens Prf / Act Dens Prf")
-    ax.set_xscale("log")
-    ax.set_yscale("log")
-    ax.legend()
+    ax[0].set_title("ML Predicted  / Actual Density Profile for nu: " + str(start_nu) + "-" + str(end_nu))
+    ax[0].set_xlabel("radius $r/R_{200m}$")
+    ax[0].set_ylabel("ML Dens Prf / Act Dens Prf")
+    ax[0].set_xscale("log")
+    ax[0].set_yscale("log")
+    ax[0].legend()
+
+    ax[1].plot(middle_bins, calculated_prf_all, 'r-', label = "ML prf all")
+    ax[1].plot(middle_bins, calculated_prf_orb, 'b-', label = "ML prf orb")
+    ax[1].plot(middle_bins, calculated_prf_inf, 'g-', label = "ML prf inf")
+    ax[1].plot(middle_bins, actual_prf_all, 'r--', label = "SPARTA prf all")
+    ax[1].plot(middle_bins, actual_prf_1halo, 'b--', label = "SPARTA prf orb")
+    ax[1].plot(middle_bins, (actual_prf_all - actual_prf_1halo), 'g--', label = "SPARTA prf inf")
+    ax[1].set_title("ML Predicted vs Actual Density Profile for nu: " + str(start_nu) + "-" + str(end_nu))
+    ax[1].set_xlabel("radius $r/R_{200m}$")
+    ax[1].set_ylabel("Mass $M_/odot$")
+    ax[1].set_xscale("log")
+    ax[1].set_yscale("log")
+    ax[1].legend()
     
     if save_graph:
         fig.savefig(save_location + "dens_prfl_ratio/" + str(start_nu) + "-" + str(end_nu) + ".png")
@@ -168,9 +181,7 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     min_rad_vel = np.min(radial_vel)
     max_tang_vel = np.max(tang_vel)
     min_tang_vel = np.min(tang_vel)
-    
-    
-    ptl_min = 20
+  
     cmap = plt.get_cmap("inferno")
 
     sub_fig_titles = ["Orbiting Particles", "Infalling Particles"]
@@ -220,7 +231,7 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     x_labels = ["$r/R_{200m}$","$r/R_{200m}$","$v_r/v_{200m}$","$r/R_{200m}$","$r/R_{200m}$","$v_r/v_{200m}$"]
     y_labels =["$v_r/v_{200m}$","$v_t/v_{200m}$","$v_t/v_{200m}$","$v_r/v_{200m}$","$v_t/v_{200m}$","$v_t/v_{200m}$"]
     
-    ml_plotter = gp.plot_determiner(plot_types=plot_types,plot_size=(2,3),X=ml_x_data,Y=ml_y_data, x_label=x_labels, y_label=y_labels, fig_title = "ML Predictions nu:" + str(start_nu) + " to " + str(end_nu), subplot_title = sub_fig_titles, constrained=True, save_location = (save_location + "/2dhist/nu:" + str(start_nu) + " to " + str(end_nu) + "_ML Predictions.png"), args = args, kwargs=kwargs)
+    ml_plotter = gp.plot_determiner(plot_types=plot_types,plot_size=(2,3),X=ml_x_data,Y=ml_y_data, x_label=x_labels, y_label=y_labels, fig_title = "ML Predictions nu:" + str(start_nu) + " to " + str(end_nu), subplot_title = sub_fig_titles, colorbar=True, constrained=True, save_location = (save_location + "/2dhist/nu:" + str(start_nu) + " to " + str(end_nu) + "_ML Predictions.png"), args = args, kwargs=kwargs)
     ml_plotter.plot()   
     
     if save:
@@ -228,7 +239,7 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     if show:
         ml_plotter.show()
 
-    act_plotter = gp.plot_determiner(plot_types=plot_types,plot_size=(2,3),X=act_x_data,Y=act_y_data, x_label=x_labels, y_label=y_labels, fig_title = "Actual Labels nu:" + str(start_nu) + " to " + str(end_nu), subplot_title = sub_fig_titles, constrained=True, save_location = (save_location + "/2dhist/nu:" + str(start_nu) + " to " + str(end_nu) + "_Actual Labels.png"), args = args, kwargs=kwargs)
+    act_plotter = gp.plot_determiner(plot_types=plot_types,plot_size=(2,3),X=act_x_data,Y=act_y_data, x_label=x_labels, y_label=y_labels, fig_title = "Actual Labels nu:" + str(start_nu) + " to " + str(end_nu), subplot_title = sub_fig_titles, colorbar=True, constrained=True, save_location = (save_location + "/2dhist/nu:" + str(start_nu) + " to " + str(end_nu) + "_Actual Labels.png"), args = args, kwargs=kwargs)
     act_plotter.plot()   
     
     if save:
@@ -270,7 +281,7 @@ def graph_correlation_matrix(data, save_location, show, save):
         fig.savefig(save_location + "/corr_matrix/corr_matrix.png")
         plt.close()
     
-def graph_err_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, start_nu, end_nu, plot, save, save_location):
+def graph_acc_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, start_nu, end_nu, plot, save, save_location):
     bin_width = (np.max(radius) - 0) / num_bins
     print("max radius:", np.max(radius))
     inf_radius = radius[np.where(corr_orb_inf == 0)]
