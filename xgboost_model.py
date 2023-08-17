@@ -136,10 +136,10 @@ class model_creator:
             
             X, y = self.split_by_dist(low_cutoff, high_cutoff)
         
-            model_location = model_location + "_" + str(low_cutoff) + "_" + str(high_cutoff) + "_" + str(self.num_params) + "_" + curr_sparta_file + ".pickle"
+            curr_model_location = model_location + "_range_" + str(low_cutoff) + "_" + str(np.round(high_cutoff,2)) + "_params_" + str(self.num_params) + "_" + curr_sparta_file + ".pickle"
 
-            if os.path.exists(model_location):
-                with open(model_location, "rb") as pickle_file:
+            if os.path.exists(curr_model_location):
+                with open(curr_model_location, "rb") as pickle_file:
                     model = pickle.load(pickle_file)
             else:
                 model = None
@@ -152,7 +152,7 @@ class model_creator:
                 t4 = time.time()
                 print("Fitted model", t4 - t3, "seconds")
 
-                pickle.dump(model, open(model_location, "wb"))
+                pickle.dump(model, open(curr_model_location, "wb"))
             
             sub_models.append(model)
         # if graph_feat_imp:
@@ -193,6 +193,7 @@ class model_creator:
 t0 = time.time()
 all_models = []
 num_params_per_snap = (len(train_all_keys) - 2) / len(snapshot_list)
+print(train_dataset.shape)
 for i in range(len(snapshot_list)):
     curr_dataset = train_dataset[:,:int(2 + (num_params_per_snap * (i+1)))]
     curr_dataset = curr_dataset[np.where(curr_dataset[:,-1] != 0)]
@@ -271,13 +272,22 @@ for k in range(num_iter):
             else:
                 curr_test_halo = test_dataset[np.where(test_halo_idxs == idx)]
                 test_halos_within = np.row_stack((test_halos_within, curr_test_halo))
+            if l == 1 or l == 5:
+                
+                test_predict = np.ones(curr_test_halo.shape[0]) * -1
+                for i in range(len(snapshot_list)):
+                    curr_dataset = curr_test_halo[:,:int(2 + (num_params_per_snap * (i+1)))]
+                    poss_ptl = np.where(curr_dataset[:,-1] != 0)[0]
+                    curr_dataset = curr_dataset[poss_ptl]
+                    all_models[i].predict(curr_dataset)
+                    test_predict[poss_ptl] = all_models[i].get_predicts()
 
-        test_predict = np.ones(curr_test_halo.shape[0]) * -1
+                compare_density_prf(curr_test_halo[:,2+scaled_radii_loc], test_density_prf_all[l], test_density_prf_1halo[l], mass, test_predict, k, start_nu, end_nu, show_graph = True, save_graph = True, save_location = save_location)
+        
+        test_predict = np.ones(test_halos_within.shape[0]) * -1
 
         for i in range(len(snapshot_list)):
-            print(i)
-            print(len(snapshot_list))
-            curr_dataset = curr_test_halo[:,:int(2 + (num_params_per_snap * (i+1)))]
+            curr_dataset = test_halos_within[:,:int(2 + (num_params_per_snap * (i+1)))]
             poss_ptl = np.where(curr_dataset[:,-1] != 0)[0]
             curr_dataset = curr_dataset[poss_ptl]
             print(curr_dataset.shape)
@@ -287,10 +297,10 @@ for k in range(num_iter):
         print(np.where(test_predict == -1))
 
         actual_labels = test_halos_within[:,1]
+
         classification = classification_report(actual_labels, test_predict, output_dict=True)
 
         all_accuracy.append(classification["accuracy"])
-        compare_density_prf(test_halos_within[:,2+scaled_radii_loc], density_prf_all_within, density_prf_1halo_within, mass, test_predict, k, start_nu, end_nu, show_graph = False, save_graph = True, save_location = save_location)
         plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "ML Predictions", num_bins, start_nu, end_nu, show = False, save = True, save_location=save_location)
         graph_acc_by_bin(test_predict, actual_labels, test_halos_within[:,2+scaled_radii_loc], num_bins, start_nu, end_nu, plot = False, save = True, save_location = save_location)
     

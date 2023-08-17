@@ -52,7 +52,10 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
             calculated_prf_all[i] = calculated_prf_all[i - 1]
 
         start_bin = end_bin
-
+    print(calculated_prf_all[-1])
+    print(calculated_prf_all[-1] / mass)
+    print(actual_prf_all[-1])
+    print(actual_prf_all[-1]/mass)
     prf_bins = np.insert(prf_bins,0,0)
     middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
 
@@ -89,10 +92,9 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     
     if save_graph:
         fig.savefig(save_location + "dens_prfl_ratio/" + str(start_nu) + "-" + str(end_nu) + ".png")
-        plt.close()
     if show_graph:
         plt.show()
-        plt.close()
+    plt.close()
 
 
 def brute_force(curr_particles_pos, r200, halo_x, halo_y, halo_z):
@@ -246,6 +248,7 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
         act_plotter.save()
     if show:
         act_plotter.show()
+    plt.close()
 
 def graph_feature_importance(feature_names, feature_importance, model_name, plot, save, save_location):
     mpl.rcParams.update({'font.size': 8})
@@ -259,11 +262,10 @@ def graph_feature_importance(feature_names, feature_importance, model_name, plot
     
     if plot:
         plt.show()
-        plt.close()
     if save:
         create_directory(save_location + "feature_importance_plots/")
         fig2.savefig(save_location + "feature_importance_plots/" + "feat_imp_" + model_name + ".png", bbox_inches="tight")
-        plt.close()
+    plt.close()
 
 def graph_correlation_matrix(data, save_location, show, save):
     create_directory(save_location + "/corr_matrix/")
@@ -274,11 +276,10 @@ def graph_correlation_matrix(data, save_location, show, save):
 
     if show:
         plt.show()
-        plt.close()
     if save:
         fig = heatmap.get_figure()
         fig.savefig(save_location + "/corr_matrix/corr_matrix.png")
-        plt.close()
+    plt.close()
     
 def graph_acc_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, start_nu, end_nu, plot, save, save_location):
     bin_width = (np.max(radius) - 0) / num_bins
@@ -435,10 +436,9 @@ def feature_dist(features, labels, save_name, plot, save, save_location):
     
     if plot:
         plt.show()
-        plt.close()
     if save:
         create_directory(save_location + "feature_dist_hists")
         fig.savefig(save_location + "feature_dist_hists/feature_dist_" + save_name + ".png")
-        plt.close()
+    plt.close()
         
         

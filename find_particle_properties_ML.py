@@ -158,7 +158,7 @@ def search_halos(particle_tree, halo_idxs, halo_positions, halo_r200m, search_ra
         all_orbit_assn[start:start+num_new_particles] = current_orbit_assn_sparta
 
         # if i == 50 or i == 100 or i == 113:
-        #     compare_density_prf(particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], mass, current_orbit_assn_sparta[:,1], i, start_nu, end_nu)
+        #     compare_density_prf(particle_radii/halo_r200m[i], dens_prf_all[i], dens_prf_1halo[i], mass, current_orbit_assn_sparta[:,1], i, start_nu, end_nu, save_location = save_location, show_graph=True,save_graph=False)
 
         start += num_new_particles
 
