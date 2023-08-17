@@ -268,7 +268,6 @@ def graph_feature_importance(feature_names, feature_importance, model_name, plot
 def graph_correlation_matrix(data, save_location, show, save):
     create_directory(save_location + "/corr_matrix/")
     mpl.rcParams.update({'font.size': 8})
-    
 
     heatmap = sns.heatmap(data.corr(), annot = True, cbar = True)
     heatmap.set_title("Feature Correlation Heatmap")

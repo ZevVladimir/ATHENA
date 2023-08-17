@@ -51,42 +51,10 @@ mass = ptl_mass[0] * 10**10 #units M_sun/h
 np.random.seed(11)
 
 t1 = time.time()
-num_splits = 1
 
-train_dataset_1snap, train_dataset_2snap, train_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "train", snapshot_list = snapshot_list)
-test_dataset_1snap, test_dataset_2snap, test_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "test", snapshot_list = snapshot_list)
-print(test_all_keys)
-dataset_df = pd.DataFrame(train_dataset_2snap[:,2:], columns = train_all_keys[2:])
-test_dataset_df = pd.DataFrame(test_dataset_2snap[:,2:], columns = test_all_keys[2:])
-print(dataset_df)
-print(test_dataset_df)
-graph_correlation_matrix(dataset_df, save_location, show = False, save = True)
-t2 = time.time()
-print("Loaded data", t2 - t1, "seconds")
 
-# rus = under_sampling.RandomUnderSampler(random_state=0)
-# ros = over_sampling.RandomOverSampler(random_state=0)
-t0 = time.time()
-
-feature_dist(train_dataset_2snap[:,2:], train_all_keys[2:], "orig_data", False, True, save_location)
-# train_dataset[:,2:] = normalize(train_dataset[:,2:])
-# test_dataset[:,2:] = normalize(test_dataset[:,2:])
-# feature_dist(train_dataset[:,2:], train_all_keys[2:], "norm_data", False, True)
-
-X_train_1snap, X_val_1snap, y_train_1snap, y_val_1snap = train_test_split(train_dataset_1snap[:,2:], train_dataset_1snap[:,1], test_size=0.20, random_state=0)
-X_train_2snap, X_val_2snap, y_train_2snap, y_val_2snap = train_test_split(train_dataset_2snap[:,2:], train_dataset_2snap[:,1], test_size=0.20, random_state=0)
-
-def mix_data(X_train, X_val, y_train, y_val):
-    train_rand_idxs = np.random.permutation(X_train.shape[0])
-    val_rand_idxs = np.random.permutation(X_val.shape[0])
-    X_train = X_train[train_rand_idxs]
-    y_train = y_train[train_rand_idxs]
-    X_val = X_val[val_rand_idxs]
-    y_val = y_val[val_rand_idxs]
-    return X_train, X_val, y_train, y_val
-
-X_train_1snap, X_val_1snap, y_train_1snap, y_val_1snap = mix_data(X_train_1snap, X_val_1snap, y_train_1snap, y_val_1snap)
-X_train_2snap, X_val_2snap, y_train_2snap, y_val_2snap = mix_data(X_train_2snap, X_val_2snap, y_train_2snap, y_val_2snap)
+train_dataset, train_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "train", snapshot_list = snapshot_list)
+test_dataset, test_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "test", snapshot_list = snapshot_list)
 
 print(train_all_keys)
 for i,key in enumerate(train_all_keys[2:]):
@@ -97,80 +65,143 @@ for i,key in enumerate(train_all_keys[2:]):
     elif key == "Tangential_vel_" + str(p_snap):
         tang_vel_loc = i
 print(scaled_radii_loc)
-low_cut_off = 0.8
-high_cutoff = 1.3
 
-X_train_below_r200m_1snap = X_train_1snap[np.where(X_train_1snap[:,scaled_radii_loc] < low_cut_off)[0]]
-y_train_below_r200m_1snap = y_train_1snap[np.where(X_train_1snap[:,scaled_radii_loc] < low_cut_off)[0]]
+class model_creator:
+    def __init__(self, dataset, keys, snapshot_list, num_params_per_snap, save_location, scaled_radii_loc, rad_vel_loc, tang_vel_loc, radii_splits):
+        self.dataset = dataset
+        self.keys = keys
+        self.snapshot_list = snapshot_list
+        self.num_params = num_params_per_snap
+        self.save_location = save_location
+        self.scaled_radii_loc = scaled_radii_loc
+        self.rad_vel_loc = rad_vel_loc
+        self.tang_vel_loc = tang_vel_loc
+        self.radii_splits = radii_splits
+        print(self.keys)
+        self.dataset_df = pd.DataFrame(dataset[:,2:], columns = keys[2:])
+        self.train_val_split()
 
-X_train_r200m_2snap = X_train_2snap[np.where((X_train_2snap[:,scaled_radii_loc] >= low_cut_off) & (X_train_2snap[:,scaled_radii_loc] < high_cutoff))[0]]
-y_train_r200m_2snap = y_train_2snap[np.where((X_train_2snap[:,scaled_radii_loc] >= low_cut_off) & (X_train_2snap[:,scaled_radii_loc] < high_cutoff))[0]]
-
-X_train_great_r200m_2snap = X_train_2snap[np.where(X_train_2snap[:,scaled_radii_loc] > high_cutoff)[0]]
-y_train_great_r200m_2snap = y_train_2snap[np.where(X_train_2snap[:,scaled_radii_loc] > high_cutoff)[0]]
-
-
-X_train_below_r200m_2snap = X_train_2snap[np.where(X_train_2snap[:,scaled_radii_loc] < low_cut_off)[0]]
-y_train_below_r200m_2snap = y_train_2snap[np.where(X_train_2snap[:,scaled_radii_loc] < low_cut_off)[0]]
-
-X_train_r200m_2snap = X_train_2snap[np.where((X_train_2snap[:,scaled_radii_loc] >= low_cut_off) & (X_train_2snap[:,scaled_radii_loc] < high_cutoff))[0]]
-y_train_r200m_2snap = y_train_2snap[np.where((X_train_2snap[:,scaled_radii_loc] >= low_cut_off) & (X_train_2snap[:,scaled_radii_loc] < high_cutoff))[0]]
-
-X_train_great_r200m_2snap = X_train_2snap[np.where(X_train_2snap[:,scaled_radii_loc] > high_cutoff)[0]]
-y_train_great_r200m_2snap = y_train_2snap[np.where(X_train_2snap[:,scaled_radii_loc] > high_cutoff)[0]]
-
-
-def train_model(X, y, rad_range, num_params, snapshots, graph_feat_imp, save_location):
-    create_directory(save_location + "models/")
-    model_location = save_location + "models/" + "xgb_model"
-    for snap in snapshots:
-        model_location = model_location + "_" + str(snap)
-    model_location = model_location + "_" + rad_range + "_" + str(num_params) + "_" + curr_sparta_file + ".pickle"
-
-    if os.path.exists(model_location):
-        with open(model_location, "rb") as pickle_file:
-            model = pickle.load(pickle_file)
-    else:
-        model = None
-
-        t3 = time.time()
-        
-        model = XGBClassifier(tree_method='gpu_hist', eta = 0.01, n_estimators = 100)
-        model = model.fit(X, y)
-
-        t4 = time.time()
-        print("Fitted model", t4 - t3, "seconds")
-
-        pickle.dump(model, open(model_location, "wb"))
-        t5 = time.time()
-        print("Total time:", t5-t0, "seconds")
-    if graph_feat_imp:
-        graph_feature_importance(np.array(train_all_keys[2:]), model.feature_importances_, rad_range, False, True, save_location)
-       
-    return model
-
-def det_class(below, at, beyond):
-    all_pred_prob = np.column_stack((below,at))
-    all_pred_prob = np.column_stack((all_pred_prob,beyond))
-    pred_loc = np.argmax(all_pred_prob, axis = 1)
-
-    predicts = np.zeros(below.shape[0])
-    predicts[np.where((pred_loc % 2) != 0)] = 1
+    def train_val_split(self):
+        X_train, X_val, y_train, y_val = train_test_split(self.dataset[:,2:], self.dataset[:,1], test_size=0.20, random_state=0)
+        self.X_train = X_train
+        self.X_val = X_val
+        self.y_train = y_train
+        self.y_val = y_val
+        self.mix_data()
     
-    return predicts
+    def mix_data(self):
+        train_rand_idxs = np.random.permutation(self.X_train.shape[0])
+        val_rand_idxs = np.random.permutation(self.X_val.shape[0])
+        self.X_train = self.X_train[train_rand_idxs]
+        self.y_train = self.y_train[train_rand_idxs]
+        self.X_val = self.X_val[val_rand_idxs]
+        self.y_val = self.y_val[val_rand_idxs]
 
-model_below_r200m = train_model(X_train_below_r200m, y_train_below_r200m, "below_r200m", len(train_all_keys), snapshot_list, True, save_location)
-model_at_r200m = train_model(X_train_r200m, y_train_r200m, "at_r200m", len(train_all_keys), snapshot_list, True, save_location)
-model_beyond_r200m = train_model(X_train_great_r200m, y_train_great_r200m, "beyond_r200m", len(train_all_keys), snapshot_list, True, save_location)
+    def over_sample():
+        return
+    
+    def under_sample():
+        return
+    
+    def normalize():
+        return
+    
+    def standardisze():
+        return
+    
+    def split_by_dist(self, low_cutoff, high_cutoff):
+        X_train_within = self.X_train[np.where((self.X_train[:,scaled_radii_loc] > low_cutoff) & (self.X_train[:,scaled_radii_loc] < high_cutoff))[0]]
+        y_train_within = self.y_train[np.where((self.X_train[:,scaled_radii_loc] > low_cutoff) & (self.X_train[:,scaled_radii_loc] < high_cutoff))[0]]
 
-predicts_below = model_below_r200m.predict_proba(X_val)
-predicts_at = model_at_r200m.predict_proba(X_val)
-predicts_beyond = model_beyond_r200m.predict_proba(X_val)
+        return X_train_within, y_train_within
 
-final_predicts = det_class(predicts_below, predicts_at, predicts_beyond)
+    def train_model(self):
+        create_directory(self.save_location + "models/")
+        model_location = self.save_location + "models/" + "xgb_model"
 
-classification = classification_report(y_val, final_predicts)
-print(classification)
+        sub_models = []
+
+        for snap in self.snapshot_list:
+            model_location = model_location + "_" + str(snap)
+
+        for i in range(len(self.radii_splits) + 1):
+            if i == 0:
+                low_cutoff = 0
+            else:
+                low_cutoff = self.radii_splits[i - 1]
+            if i == len(self.radii_splits):
+                high_cutoff = np.max(self.X_train[:,self.scaled_radii_loc])
+            else:
+                high_cutoff = self.radii_splits[i]
+            
+            X, y = self.split_by_dist(low_cutoff, high_cutoff)
+        
+            model_location = model_location + "_" + str(low_cutoff) + "_" + str(high_cutoff) + "_" + str(self.num_params) + "_" + curr_sparta_file + ".pickle"
+
+            if os.path.exists(model_location):
+                with open(model_location, "rb") as pickle_file:
+                    model = pickle.load(pickle_file)
+            else:
+                model = None
+
+                t3 = time.time()
+                
+                model = XGBClassifier(tree_method='gpu_hist', eta = 0.01, n_estimators = 100)
+                model = model.fit(X, y)
+
+                t4 = time.time()
+                print("Fitted model", t4 - t3, "seconds")
+
+                pickle.dump(model, open(model_location, "wb"))
+            
+            sub_models.append(model)
+        # if graph_feat_imp:
+        #     graph_feature_importance(np.array(self.keys), model.feature_importances_, rad_range, False, True, self.save_location)
+        
+        self.sub_models = sub_models
+
+    def predict(self, dataset):
+        if np.all(dataset):
+            use_dataset = self.X_val
+            use_labels = self.y_val
+        else:
+            use_dataset = dataset[:,2:]
+            use_labels = dataset[:,1]
+
+        all_predicts = np.zeros((use_dataset.shape[0],(len(self.sub_models)*2)))
+        for i,model in enumerate(self.sub_models):
+            all_predicts[:,2*i:(2*i+2)] = model.predict_proba(use_dataset)
+
+        self.det_class(all_predicts)
+        print(classification_report(use_labels, self.predicts))
+    
+    def det_class(self, predicts):
+        pred_loc = np.argmax(predicts, axis = 1)
+
+        final_predicts = np.zeros(predicts.shape[0])
+        final_predicts[np.where((pred_loc % 2) != 0)] = 1
+
+        self.predicts = final_predicts
+
+    def graph(self, corr_matrix = False,):
+        if corr_matrix:
+            graph_correlation_matrix(self.dataset_df, self.save_location, show = False, save = True)
+        
+    def get_predicts(self):
+        return self.predicts
+
+t0 = time.time()
+all_models = []
+num_params_per_snap = (len(train_all_keys) - 2) / len(snapshot_list)
+for i in range(len(snapshot_list)):
+    curr_dataset = train_dataset[:,:int(2 + (num_params_per_snap * (i+1)))]
+    curr_dataset = curr_dataset[np.where(curr_dataset[:,-1] != 0)]
+    all_models.append(model_creator(dataset=curr_dataset, keys=train_all_keys[:int(2+num_params_per_snap*(i+1))], snapshot_list=snapshot_list, num_params_per_snap=int((num_params_per_snap * (i+1))+2), save_location=save_location, scaled_radii_loc=scaled_radii_loc, rad_vel_loc=rad_vel_loc, tang_vel_loc=tang_vel_loc, radii_splits=[0.8,1.3]))
+    all_models[i].train_model()
+    all_models[i].predict(1)
+
+t5 = time.time()  
+print("Total time:", t5-t0, "seconds")
 
 num_bins = 30
 
@@ -241,10 +272,19 @@ for k in range(num_iter):
                 curr_test_halo = test_dataset[np.where(test_halo_idxs == idx)]
                 test_halos_within = np.row_stack((test_halos_within, curr_test_halo))
 
-        predicts_below = model_below_r200m.predict_proba(test_halos_within[:,2:])
-        predicts_at = model_at_r200m.predict_proba(test_halos_within[:,2:])
-        predicts_beyond = model_beyond_r200m.predict_proba(test_halos_within[:,2:])
-        test_predict = det_class(predicts_below, predicts_at, predicts_below)
+        test_predict = np.ones(curr_test_halo.shape[0]) * -1
+
+        for i in range(len(snapshot_list)):
+            print(i)
+            print(len(snapshot_list))
+            curr_dataset = curr_test_halo[:,:int(2 + (num_params_per_snap * (i+1)))]
+            poss_ptl = np.where(curr_dataset[:,-1] != 0)[0]
+            curr_dataset = curr_dataset[poss_ptl]
+            print(curr_dataset.shape)
+            all_models[i].predict(curr_dataset)
+            test_predict[poss_ptl] = all_models[i].get_predicts()
+            
+        print(np.where(test_predict == -1))
 
         actual_labels = test_halos_within[:,1]
         classification = classification_report(actual_labels, test_predict, output_dict=True)
