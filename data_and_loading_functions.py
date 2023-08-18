@@ -50,8 +50,8 @@ def load_or_pickle_ptl_data(snapshot, snapshot_path, scale_factor, little_h):
     ptl_pos = check_pickle_exist_gadget("pos", snapshot, snapshot_path)
     ptl_mass = check_pickle_exist_gadget("mass", snapshot, snapshot_path)
 
-    ptl_pos = ptl_pos * 10**3 * scale_factor * little_h #convert to kpc and physical
-    ptl_mass = ptl_mass[0] * 10**10 #units M_sun/h
+    ptl_pos = ptl_pos * 10**3 * scale_factor * little_h # convert to kpc and physical
+    ptl_mass = ptl_mass[0] * 10**10 # units M_sun/h
 
     return ptl_pid, ptl_vel, ptl_pos, ptl_mass
 
@@ -74,7 +74,7 @@ def load_or_pickle_SPARTA_data(sparta_name, hdf5_path, scale_factor, little_h, s
     density_prf_all = density_prf_all[:,snap,:]
     density_prf_1halo = density_prf_1halo[:,snap,:]
     
-    halos_pos = halos_pos * 10**3 * scale_factor * little_h #convert to kpc and physical
+    halos_pos = halos_pos * 10**3 * scale_factor * little_h # convert to kpc and physical
     halos_r200m = halos_r200m * little_h # convert to kpc
 
     return halos_pos, halos_vel, halos_r200m, halo_id, density_prf_all, density_prf_1halo, halo_status, halo_last_snap

@@ -52,10 +52,13 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
             calculated_prf_all[i] = calculated_prf_all[i - 1]
 
         start_bin = end_bin
-    print(calculated_prf_all[-1])
-    print(calculated_prf_all[-1] / mass)
+    # print(calculated_prf_all[-1])
+    # print(calculated_prf_all[-1] / mass)
+    # print(actual_prf_all[-1])
+    # print(actual_prf_all[-1]/mass)
+
+    print(np.where((radii > 0.00001) & (radii < 3))[0].shape[0] * mass)
     print(actual_prf_all[-1])
-    print(actual_prf_all[-1]/mass)
     prf_bins = np.insert(prf_bins,0,0)
     middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
 
