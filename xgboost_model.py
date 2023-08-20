@@ -55,7 +55,7 @@ t1 = time.time()
 
 train_dataset, train_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "train", snapshot_list = snapshot_list)
 test_dataset, test_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "test", snapshot_list = snapshot_list)
-
+print(test_all_keys)
 print(train_all_keys)
 for i,key in enumerate(train_all_keys[2:]):
     if key == "Scaled_radii_" + str(p_snap):
@@ -224,8 +224,6 @@ with open(data_location + "test_indices.pickle", "rb") as pickle_file:
 
 # test indices are the indices of the match halo idxs used (see find_particle_properties_ML.py to see how test_indices are created)
 num_test_halos = test_indices.shape[0]
-test_density_prf_all = density_prf_all[test_indices]
-test_density_prf_1halo = density_prf_1halo[test_indices]
 
 # for every halo idx and pid paired in the test dataset get the halo idxs
 test_halo_idxs = np.zeros(test_dataset.shape[0])
@@ -246,90 +244,74 @@ snapshot_path = "/home/zvladimi/MLOIS/particle_data/snapdir_" + "{:04d}".format(
 p_red_shift = readheader(snapshot_path, 'redshift')
 peak_heights = peaks.peakHeight(halo_masses, p_red_shift)
 
-for i,idx in enumerate(test_indices):
-    curr_test_halo = test_dataset[np.where(test_halo_idxs == idx)]
+# for i,idx in enumerate(test_indices):
+#     curr_test_halo = test_dataset[np.where(test_halo_idxs == idx)]
 
-    test_predict = np.ones(curr_test_halo.shape[0]) * -1
-    for i in range(len(snapshot_list)):
-        curr_dataset = curr_test_halo[:,:int(2 + (num_params_per_snap * (i+1)))]
+#     test_predict = np.ones(curr_test_halo.shape[0]) * -1
+#     for i in range(len(snapshot_list)):
+#         curr_dataset = curr_test_halo[:,:int(2 + (num_params_per_snap * (i+1)))]
 
-        if i == (len(snapshot_list)-1):
-            use_ptls = np.where(curr_test_halo[:,-1]!= 0)[0]
-        else:
-            use_ptls = np.where(curr_test_halo[:,int(2 + (num_params_per_snap * (i+1)))] == 0)[0]
+#         if i == (len(snapshot_list)-1):
+#             use_ptls = np.where(curr_test_halo[:,-1]!= 0)[0]
+#         else:
+#             use_ptls = np.where(curr_test_halo[:,int(2 + (num_params_per_snap * (i+1)))] == 0)[0]
 
-        curr_dataset = curr_dataset[use_ptls]
-        all_models[i].predict(curr_dataset)
-        test_predict[use_ptls] = all_models[i].get_predicts()
-    print(np.where(test_predict == -1))
-    compare_density_prf(curr_test_halo[:,2+scaled_radii_loc], test_density_prf_all[i], test_density_prf_1halo[i], mass, test_predict, i, "", "", show_graph = True, save_graph = True, save_location = save_location)
+#         curr_dataset = curr_dataset[use_ptls]
+#         all_models[i].predict(curr_dataset)
+#         test_predict[use_ptls] = all_models[i].get_predicts()
+
+#     compare_density_prf(curr_test_halo[:,2+scaled_radii_loc], density_prf_all[idx], density_prf_1halo[idx], mass, test_predict, title = str(idx), show_graph = True, save_graph = True, save_location = save_location)
                 
 
 
-# start_nu = 0 
-# nu_step = 0.5
-# num_iter = 7
+start_nu = 0 
+nu_step = 0.5
+num_iter = 7
 
-# for k in range(num_iter):
-#     end_nu = start_nu + nu_step
+for i in range(num_iter):
+    end_nu = start_nu + nu_step
 
-#     idx_within_nu = np.where((peak_heights >= start_nu) & (peak_heights < end_nu))[0]
-#     curr_test_halo_idxs = use_test_indices[idx_within_nu]
-#     print(start_nu, "to", end_nu, ":", idx_within_nu.shape, "halos")
+    idx_within_nu = np.where((peak_heights >= start_nu) & (peak_heights < end_nu))[0]
+    curr_test_halo_idxs = test_indices[idx_within_nu]
+    print(start_nu, "to", end_nu, ":", idx_within_nu.shape, "halos")
 
-#     if curr_test_halo_idxs.shape[0] != 0:
-#         density_prf_all_within = np.zeros(test_density_prf_all.shape[1])
-#         density_prf_1halo_within = np.zeros(test_density_prf_1halo.shape[1])
-#         for l, idx in enumerate(curr_test_halo_idxs):
-#             density_prf_all_within = density_prf_all_within + test_density_prf_all[l]
-#             density_prf_1halo_within = density_prf_1halo_within + test_density_prf_1halo[l]
-#             if l == 0:
-#                 test_halos_within = test_dataset[np.where(test_halo_idxs == idx)]
-#                 continue
-#             else:
-#                 curr_test_halo = test_dataset[np.where(test_halo_idxs == idx)]
-#                 test_halos_within = np.row_stack((test_halos_within, curr_test_halo))
-#             if l == 2 or l == 5:
-#                 test_predict = np.ones(curr_test_halo.shape[0]) * -1
-#                 for i in range(len(snapshot_list)):
-#                     curr_dataset = curr_test_halo[:,:int(2 + (num_params_per_snap * (i+1)))]
+    if curr_test_halo_idxs.shape[0] != 0:
+        density_prf_all_within = np.zeros(density_prf_all.shape[1])
+        density_prf_1halo_within = np.zeros(density_prf_1halo.shape[1])
+        for j, idx in enumerate(curr_test_halo_idxs):
+            density_prf_all_within = density_prf_all_within + density_prf_all[curr_test_halo_idxs[j]]
+            density_prf_1halo_within = density_prf_1halo_within + density_prf_1halo[curr_test_halo_idxs[j]]
+            if j == 0:
+                test_halos_within = test_dataset[np.where(test_halo_idxs == idx)]
+                continue
+            else:
+                curr_test_halo = test_dataset[np.where(test_halo_idxs == idx)]
+                test_halos_within = np.row_stack((test_halos_within, curr_test_halo))
 
-#                     if i == (len(snapshot_list)-1):
-#                         use_ptls = np.where(curr_test_halo[:,-1]!= 0)[0]
-#                     else:
-#                         use_ptls = np.where(curr_test_halo[:,int(2 + (num_params_per_snap * (i+1)))] == 0)[0]
+        test_predict = np.ones(test_halos_within.shape[0]) * -1
 
-#                     curr_dataset = curr_dataset[use_ptls]
-#                     all_models[i].predict(curr_dataset)
-#                     test_predict[use_ptls] = all_models[i].get_predicts()
+        for i in range(len(snapshot_list)):
+            curr_dataset = test_halos_within[:,:int(2 + (num_params_per_snap * (i+1)))]
 
-#                 compare_density_prf(curr_test_halo[:,2+scaled_radii_loc], test_density_prf_all[l], test_density_prf_1halo[l], mass, test_predict, k, start_nu, end_nu, show_graph = True, save_graph = True, save_location = save_location)
-                
-#         test_predict = np.ones(test_halos_within.shape[0]) * -1
+            if i == (len(snapshot_list)-1):
+                use_ptls = np.where(test_halos_within[:,-1]!= 0)[0]
+            else:
+                use_ptls = np.where(test_halos_within[:,int(2 + (num_params_per_snap * (i+1)))] == 0)[0]
 
-#         for i in range(len(snapshot_list)):
-#             curr_dataset = curr_test_halo[:,:int(2 + (num_params_per_snap * (i+1)))]
+            curr_dataset = curr_dataset[use_ptls]
+            all_models[i].predict(curr_dataset)
+            test_predict[use_ptls] = all_models[i].get_predicts()
 
-#             if i == (len(snapshot_list)-1):
-#                 use_ptls = np.where(curr_test_halo[:,-1]!= 0)[0]
-#             else:
-#                 use_ptls = np.where(curr_test_halo[:,int(2 + (num_params_per_snap * (i+1)))] == 0)[0]
+        actual_labels = test_halos_within[:,1]
 
-#             curr_dataset = curr_dataset[use_ptls]
-#             all_models[i].predict(curr_dataset)
-#             test_predict[use_ptls] = all_models[i].get_predicts()
-            
-#         print(np.where(test_predict == -1))
+        classification = classification_report(actual_labels, test_predict, output_dict=True)
 
-#         actual_labels = test_halos_within[:,1]
-
-#         classification = classification_report(actual_labels, test_predict, output_dict=True)
-
-#         all_accuracy.append(classification["accuracy"])
-#         plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "ML Predictions", num_bins, start_nu, end_nu, show = False, save = True, save_location=save_location)
-#         graph_acc_by_bin(test_predict, actual_labels, test_halos_within[:,2+scaled_radii_loc], num_bins, start_nu, end_nu, plot = False, save = True, save_location = save_location)
+        all_accuracy.append(classification["accuracy"])
+        compare_density_prf(test_halos_within[:,2+scaled_radii_loc], density_prf_all_within, density_prf_1halo_within, mass, test_predict, title = str(start_nu) + "-" + str(end_nu), show_graph = True, save_graph = True, save_location = save_location)
+        plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "ML Predictions", num_bins, start_nu, end_nu, show = False, save = True, save_location=save_location)
+        #graph_acc_by_bin(test_predict, actual_labels, test_halos_within[:,2+scaled_radii_loc], num_bins, start_nu, end_nu, plot = False, save = True, save_location = save_location)
     
-#     start_nu = end_nu
+    start_nu = end_nu
     
 print(all_accuracy)
 fig, ax = plt.subplots(1,1)

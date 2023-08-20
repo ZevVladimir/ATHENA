@@ -7,8 +7,9 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from sklearn.metrics import classification_report
 from data_and_loading_functions import check_pickle_exist_gadget, create_directory
 import general_plotting as gp
+from textwrap import wrap
 
-def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_assn, num, start_nu, end_nu, save_location, show_graph = False, save_graph = False):
+def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_assn, title, save_location, show_graph = False, save_graph = False):
     create_directory(save_location + "dens_prfl_ratio/")
     # Create bins for the density profile calculation
     num_prf_bins = actual_prf_all.shape[0]
@@ -20,7 +21,7 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     calculated_prf_inf = np.zeros(num_prf_bins)
     calculated_prf_all = np.zeros(num_prf_bins)
     start_bin = 0
-    
+
     orbit_radii = radii[np.where(orbit_assn == 1)[0]]
     infall_radii = radii[np.where(orbit_assn == 0)[0]]
 
@@ -52,17 +53,11 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
             calculated_prf_all[i] = calculated_prf_all[i - 1]
 
         start_bin = end_bin
-    # print(calculated_prf_all[-1])
-    # print(calculated_prf_all[-1] / mass)
-    # print(actual_prf_all[-1])
-    # print(actual_prf_all[-1]/mass)
 
-    print(np.where((radii > 0.00001) & (radii < 3))[0].shape[0] * mass)
-    print(actual_prf_all[-1])
     prf_bins = np.insert(prf_bins,0,0)
     middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
 
-    fig, ax = plt.subplots(1,2)
+    fig, ax = plt.subplots(1,2, layout = "tight")
 
     ax[0].plot(middle_bins, calculated_prf_all/actual_prf_all, 'r', label = "ML / SPARTA prf all")
     #ax.plot(middle_bins, actual_prf_all, 'c--', label = "SPARTA profile all")
@@ -73,7 +68,7 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     #ax.plot(middle_bins, actual_prf_1halo, 'm--', label = "SPARTA profile orbit")
     #ax.plot(middle_bins, actual_prf_all - actual_prf_1halo, 'y--', label = "SPARTA profile inf")
     
-    ax[0].set_title("ML Predicted  / Actual Density Profile for nu: " + str(start_nu) + "-" + str(end_nu))
+    ax[0].set_title(wrap("ML Predicted  / Actual Density Profile for nu: " + title))
     ax[0].set_xlabel("radius $r/R_{200m}$")
     ax[0].set_ylabel("ML Dens Prf / Act Dens Prf")
     ax[0].set_xscale("log")
@@ -86,7 +81,7 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     ax[1].plot(middle_bins, actual_prf_all, 'r--', label = "SPARTA prf all")
     ax[1].plot(middle_bins, actual_prf_1halo, 'b--', label = "SPARTA prf orb")
     ax[1].plot(middle_bins, (actual_prf_all - actual_prf_1halo), 'g--', label = "SPARTA prf inf")
-    ax[1].set_title("ML Predicted vs Actual Density Profile for nu: " + str(start_nu) + "-" + str(end_nu))
+    ax[1].set_title(wrap("ML Predicted vs Actual Density Profile for nu: " + title))
     ax[1].set_xlabel("radius $r/R_{200m}$")
     ax[1].set_ylabel("Mass $M_/odot$")
     ax[1].set_xscale("log")
@@ -94,7 +89,7 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     ax[1].legend()
     
     if save_graph:
-        fig.savefig(save_location + "dens_prfl_ratio/" + str(start_nu) + "-" + str(end_nu) + ".png")
+        fig.savefig(save_location + "dens_prfl_ratio/" + title + ".png", bbox_inches='tight')
     if show_graph:
         plt.show()
     plt.close()
