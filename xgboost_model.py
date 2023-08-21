@@ -55,8 +55,7 @@ t1 = time.time()
 
 train_dataset, train_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "train", snapshot_list = snapshot_list)
 test_dataset, test_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "test", snapshot_list = snapshot_list)
-print(test_all_keys)
-print(train_all_keys)
+
 for i,key in enumerate(train_all_keys[2:]):
     if key == "Scaled_radii_" + str(p_snap):
         scaled_radii_loc = i
@@ -64,7 +63,6 @@ for i,key in enumerate(train_all_keys[2:]):
         rad_vel_loc = i
     elif key == "Tangential_vel_" + str(p_snap):
         tang_vel_loc = i
-print(scaled_radii_loc)
 
 class model_creator:
     def __init__(self, dataset, keys, snapshot_list, num_params_per_snap, save_location, scaled_radii_loc, rad_vel_loc, tang_vel_loc, radii_splits):
@@ -77,7 +75,6 @@ class model_creator:
         self.rad_vel_loc = rad_vel_loc
         self.tang_vel_loc = tang_vel_loc
         self.radii_splits = radii_splits
-        print(self.keys)
         self.dataset_df = pd.DataFrame(dataset[:,2:], columns = keys[2:])
         self.train_val_split()
 
@@ -106,7 +103,7 @@ class model_creator:
     def normalize():
         return
     
-    def standardisze():
+    def standardize():
         return
     
     def split_by_dist(self, low_cutoff, high_cutoff):
@@ -155,8 +152,6 @@ class model_creator:
                 pickle.dump(model, open(curr_model_location, "wb"))
             
             sub_models.append(model)
-        # if graph_feat_imp:
-        #     graph_feature_importance(np.array(self.keys), model.feature_importances_, rad_range, False, True, self.save_location)
         
         self.sub_models = sub_models
 
@@ -183,9 +178,20 @@ class model_creator:
 
         self.predicts = final_predicts
 
-    def graph(self, corr_matrix = False,):
+    def graph(self, corr_matrix = False, feat_imp = False):
         if corr_matrix:
-            graph_correlation_matrix(self.dataset_df, self.save_location, show = False, save = True)
+            graph_correlation_matrix(self.dataset_df, self.save_location, title = "model_num_params_" + str(len(self.keys) - 2),show = False, save = True)
+        if feat_imp:
+            for i, model in enumerate(self.sub_models):
+                if i == 0:
+                    low_cutoff = 0
+                else:
+                    low_cutoff = self.radii_splits[i - 1]
+                if i == len(self.radii_splits):
+                    high_cutoff = np.max(self.X_train[:,self.scaled_radii_loc])
+                else:
+                    high_cutoff = self.radii_splits[i]
+                graph_feature_importance(np.array(self.keys[2:]), model.feature_importances_, "num_params_" + str(len(self.keys) - 2) +  "_radii: " + str(low_cutoff) + "_" + str(np.round(high_cutoff,2)), False, True, self.save_location)
         
     def get_predicts(self):
         return self.predicts
@@ -193,13 +199,14 @@ class model_creator:
 t0 = time.time()
 all_models = []
 num_params_per_snap = (len(train_all_keys) - 2) / len(snapshot_list)
-print(train_dataset.shape)
+
 for i in range(len(snapshot_list)):
     curr_dataset = train_dataset[:,:int(2 + (num_params_per_snap * (i+1)))]
     curr_dataset = curr_dataset[np.where(curr_dataset[:,-1] != 0)]
     all_models.append(model_creator(dataset=curr_dataset, keys=train_all_keys[:int(2+num_params_per_snap*(i+1))], snapshot_list=snapshot_list, num_params_per_snap=int((num_params_per_snap * (i+1))+2), save_location=save_location, scaled_radii_loc=scaled_radii_loc, rad_vel_loc=rad_vel_loc, tang_vel_loc=tang_vel_loc, radii_splits=[0.8,1.3]))
     all_models[i].train_model()
     all_models[i].predict(1)
+    all_models[i].graph(corr_matrix = True, feat_imp = True)
 
 t5 = time.time()  
 print("Total time:", t5-t0, "seconds")
@@ -262,10 +269,8 @@ peak_heights = peaks.peakHeight(halo_masses, p_red_shift)
 
 #     compare_density_prf(curr_test_halo[:,2+scaled_radii_loc], density_prf_all[idx], density_prf_1halo[idx], mass, test_predict, title = str(idx), show_graph = True, save_graph = True, save_location = save_location)
                 
-
-
 start_nu = 0 
-nu_step = 0.5
+nu_step = .5
 num_iter = 7
 
 for i in range(num_iter):
@@ -307,7 +312,7 @@ for i in range(num_iter):
         classification = classification_report(actual_labels, test_predict, output_dict=True)
 
         all_accuracy.append(classification["accuracy"])
-        compare_density_prf(test_halos_within[:,2+scaled_radii_loc], density_prf_all_within, density_prf_1halo_within, mass, test_predict, title = str(start_nu) + "-" + str(end_nu), show_graph = True, save_graph = True, save_location = save_location)
+        compare_density_prf(test_halos_within[:,2+scaled_radii_loc], density_prf_all_within, density_prf_1halo_within, mass, test_predict, title = str(start_nu) + "-" + str(end_nu), show_graph = False, save_graph = True, save_location = save_location)
         plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "ML Predictions", num_bins, start_nu, end_nu, show = False, save = True, save_location=save_location)
         #graph_acc_by_bin(test_predict, actual_labels, test_halos_within[:,2+scaled_radii_loc], num_bins, start_nu, end_nu, plot = False, save = True, save_location = save_location)
     

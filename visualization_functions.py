@@ -89,6 +89,7 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     ax[1].legend()
     
     if save_graph:
+        fig.set_size_inches(21, 13)
         fig.savefig(save_location + "dens_prfl_ratio/" + title + ".png", bbox_inches='tight')
     if show_graph:
         plt.show()
@@ -184,54 +185,58 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
   
     cmap = plt.get_cmap("inferno")
 
-    sub_fig_titles = ["Orbiting Particles", "Infalling Particles"]
+    sub_fig_titles = ["ML Predictions", "Actual Labels"]
 
     plot_types = ["hist2d","hist2d","hist2d","hist2d","hist2d","hist2d"]
-    ml_x_data = np.zeros((orb_inf.shape[0],1,6))
-    ml_y_data = np.zeros((orb_inf.shape[0],1,6))
+    plot_1_x_data = np.zeros((orb_inf.shape[0],1,6))
+    plot_1_y_data = np.zeros((orb_inf.shape[0],1,6))
 
-    ml_x_data[:ml_orb_radius.shape[0],0,0] = ml_orb_radius
-    ml_x_data[:ml_orb_radius.shape[0],0,1] = ml_orb_radius
-    ml_x_data[:ml_orb_tang_vel.shape[0],0,2] = ml_orb_tang_vel
-    ml_x_data[:ml_inf_radius.shape[0],0,3] = ml_inf_radius
-    ml_x_data[:ml_inf_radius.shape[0],0,4] = ml_inf_radius
-    ml_x_data[:ml_inf_tang_vel.shape[0],0,5] = ml_inf_tang_vel
+    plot_1_x_data[:ml_orb_radius.shape[0],0,0] = ml_orb_radius
+    plot_1_x_data[:ml_orb_radius.shape[0],0,1] = ml_orb_radius
+    plot_1_x_data[:ml_orb_tang_vel.shape[0],0,2] = ml_orb_tang_vel
+    plot_1_x_data[:act_orb_radius.shape[0],0,3] = act_orb_radius
+    plot_1_x_data[:act_orb_radius.shape[0],0,4] = act_orb_radius
+    plot_1_x_data[:act_orb_tang_vel.shape[0],0,5] = act_orb_tang_vel
 
-    ml_y_data[:ml_orb_rad_vel.shape[0],0,0] = ml_orb_rad_vel
-    ml_y_data[:ml_orb_tang_vel.shape[0],0,1] = ml_orb_tang_vel
-    ml_y_data[:ml_orb_rad_vel.shape[0],0,2] = ml_orb_rad_vel
-    ml_y_data[:ml_inf_rad_vel.shape[0],0,3] = ml_inf_rad_vel
-    ml_y_data[:ml_inf_tang_vel.shape[0],0,4] = ml_inf_tang_vel
-    ml_y_data[:ml_inf_rad_vel.shape[0],0,5] = ml_inf_rad_vel
+    plot_1_y_data[:ml_orb_rad_vel.shape[0],0,0] = ml_orb_rad_vel
+    plot_1_y_data[:ml_orb_tang_vel.shape[0],0,1] = ml_orb_tang_vel
+    plot_1_y_data[:ml_orb_rad_vel.shape[0],0,2] = ml_orb_rad_vel
+    plot_1_y_data[:act_orb_rad_vel.shape[0],0,3] = act_orb_rad_vel
+    plot_1_y_data[:act_orb_tang_vel.shape[0],0,4] = act_orb_tang_vel
+    plot_1_y_data[:act_orb_rad_vel.shape[0],0,5] = act_orb_rad_vel
+    
 
-    ml_x_data[ml_x_data == 0] = np.NaN
-    ml_y_data[ml_y_data == 0] = np.NaN
+    plot_1_x_data[plot_1_x_data == 0] = np.NaN
+    plot_1_y_data[plot_1_y_data == 0] = np.NaN
 
-    act_x_data = np.zeros((orb_inf.shape[0],1,6))
-    act_y_data = np.zeros((orb_inf.shape[0],1,6))
-    act_x_data[:act_orb_radius.shape[0],0,0] = act_orb_radius
-    act_x_data[:act_orb_radius.shape[0],0,1] = act_orb_radius
-    act_x_data[:act_orb_tang_vel.shape[0],0,2] = act_orb_tang_vel
-    act_x_data[:act_inf_radius.shape[0],0,3] = act_inf_radius
-    act_x_data[:act_inf_radius.shape[0],0,4] = act_inf_radius
-    act_x_data[:act_inf_tang_vel.shape[0],0,5] = act_inf_tang_vel
-    act_y_data[:act_orb_rad_vel.shape[0],0,0] = act_orb_rad_vel
-    act_y_data[:act_orb_tang_vel.shape[0],0,1] = act_orb_tang_vel
-    act_y_data[:act_orb_rad_vel.shape[0],0,2] = act_orb_rad_vel
-    act_y_data[:act_inf_rad_vel.shape[0],0,3] = act_inf_rad_vel
-    act_y_data[:act_inf_tang_vel.shape[0],0,4] = act_inf_tang_vel
-    act_y_data[:act_inf_rad_vel.shape[0],0,5] = act_inf_rad_vel
+    plot_2_x_data = np.zeros((orb_inf.shape[0],1,6))
+    plot_2_y_data = np.zeros((orb_inf.shape[0],1,6))
 
-    act_x_data[act_x_data == 0] = np.NaN
-    act_y_data[act_y_data == 0] = np.NaN
+    plot_2_x_data[:ml_inf_radius.shape[0],0,0] = ml_inf_radius
+    plot_2_x_data[:ml_inf_radius.shape[0],0,1] = ml_inf_radius
+    plot_2_x_data[:ml_inf_tang_vel.shape[0],0,2] = ml_inf_tang_vel
+    plot_2_x_data[:act_inf_radius.shape[0],0,3] = act_inf_radius
+    plot_2_x_data[:act_inf_radius.shape[0],0,4] = act_inf_radius
+    plot_2_x_data[:act_inf_tang_vel.shape[0],0,5] = act_inf_tang_vel
+
+    plot_2_y_data[:ml_inf_rad_vel.shape[0],0,0] = ml_inf_rad_vel
+    plot_2_y_data[:ml_inf_tang_vel.shape[0],0,1] = ml_inf_tang_vel
+    plot_2_y_data[:ml_inf_rad_vel.shape[0],0,2] = ml_inf_rad_vel
+    plot_2_y_data[:act_inf_rad_vel.shape[0],0,3] = act_inf_rad_vel
+    plot_2_y_data[:act_inf_tang_vel.shape[0],0,4] = act_inf_tang_vel
+    plot_2_y_data[:act_inf_rad_vel.shape[0],0,5] = act_inf_rad_vel
+
+    plot_2_x_data[plot_2_x_data == 0] = np.NaN
+    plot_2_y_data[plot_2_y_data == 0] = np.NaN
 
     args = [[num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]]], [num_bins, [[0,max_radius],[min_tang_vel,max_tang_vel]]], [num_bins, [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]]],
             [num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]]], [num_bins, [[0,max_radius],[min_tang_vel,max_tang_vel]]], [num_bins, [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]]]]
-    kwargs = {"cmap": cmap, "vmin":0, "vmax":max_ptl}
+ 
+    kwargs = {"cmap": cmap, "norm": "log", "vmin":0.001, "vmax":max_ptl}
     x_labels = ["$r/R_{200m}$","$r/R_{200m}$","$v_r/v_{200m}$","$r/R_{200m}$","$r/R_{200m}$","$v_r/v_{200m}$"]
     y_labels =["$v_r/v_{200m}$","$v_t/v_{200m}$","$v_t/v_{200m}$","$v_r/v_{200m}$","$v_t/v_{200m}$","$v_t/v_{200m}$"]
     
-    ml_plotter = gp.plot_determiner(plot_types=plot_types,plot_size=(2,3),X=ml_x_data,Y=ml_y_data, x_label=x_labels, y_label=y_labels, fig_title = "ML Predictions nu:" + str(start_nu) + " to " + str(end_nu), subplot_title = sub_fig_titles, colorbar=True, constrained=True, save_location = (save_location + "/2dhist/nu:" + str(start_nu) + " to " + str(end_nu) + "_ML Predictions.png"), args = args, kwargs=kwargs)
+    ml_plotter = gp.plot_determiner(plot_types=plot_types,plot_size=(2,3),X=plot_1_x_data,Y=plot_1_y_data, x_label=x_labels, y_label=y_labels, fig_title = "Orbiting Particles nu:" + str(start_nu) + " to " + str(end_nu), subplot_title = sub_fig_titles, colorbar=True, constrained=True, save_location = (save_location + "/2dhist/nu:" + str(start_nu) + " to " + str(end_nu) + "_ptls_orbiting.png"), args = args, kwargs=kwargs)
     ml_plotter.plot()   
     
     if save:
@@ -239,7 +244,7 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     if show:
         ml_plotter.show()
 
-    act_plotter = gp.plot_determiner(plot_types=plot_types,plot_size=(2,3),X=act_x_data,Y=act_y_data, x_label=x_labels, y_label=y_labels, fig_title = "Actual Labels nu:" + str(start_nu) + " to " + str(end_nu), subplot_title = sub_fig_titles, colorbar=True, constrained=True, save_location = (save_location + "/2dhist/nu:" + str(start_nu) + " to " + str(end_nu) + "_Actual Labels.png"), args = args, kwargs=kwargs)
+    act_plotter = gp.plot_determiner(plot_types=plot_types,plot_size=(2,3),X=plot_2_x_data,Y=plot_2_y_data, x_label=x_labels, y_label=y_labels, fig_title = "Infalling Particles nu:" + str(start_nu) + " to " + str(end_nu), subplot_title = sub_fig_titles, colorbar=True, constrained=True, save_location = (save_location + "/2dhist/nu:" + str(start_nu) + " to " + str(end_nu) + "_ptls_infalling.png"), args = args, kwargs=kwargs)
     act_plotter.plot()   
     
     if save:
@@ -248,40 +253,41 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
         act_plotter.show()
     plt.close()
 
-def graph_feature_importance(feature_names, feature_importance, model_name, plot, save, save_location):
+def graph_feature_importance(feature_names, feature_importance, title, plot, save, save_location):
     mpl.rcParams.update({'font.size': 8})
     fig2, (plot1) = plt.subplots(1,1)
     fig2.tight_layout()
     import_idxs = np.argsort(feature_importance)
     plot1.barh(feature_names[import_idxs], feature_importance[import_idxs])
     plot1.set_xlabel("XGBoost feature importance")
-    plot1.set_title("Feature Importance for model: " + model_name)
+    plot1.set_title("Feature Importance for model: " + title)
     plot1.set_xlim(0,1)
     
     if plot:
         plt.show()
     if save:
         create_directory(save_location + "feature_importance_plots/")
-        fig2.savefig(save_location + "feature_importance_plots/" + "feat_imp_" + model_name + ".png", bbox_inches="tight")
+        fig2.savefig(save_location + "feature_importance_plots/" + title + ".png", bbox_inches="tight")
     plt.close()
 
-def graph_correlation_matrix(data, save_location, show, save):
+def graph_correlation_matrix(data, save_location, title, show, save):
     create_directory(save_location + "/corr_matrix/")
-    mpl.rcParams.update({'font.size': 8})
+    mpl.rcParams.update({'font.size': 12})
 
     heatmap = sns.heatmap(data.corr(), annot = True, cbar = True)
     heatmap.set_title("Feature Correlation Heatmap")
+    heatmap.set_xticklabels(heatmap.get_xticklabels(),rotation=45)
 
     if show:
         plt.show()
     if save:
         fig = heatmap.get_figure()
-        fig.savefig(save_location + "/corr_matrix/corr_matrix.png")
+        fig.set_size_inches(21, 13)
+        fig.savefig(save_location + "/corr_matrix/" + title + ".png")
     plt.close()
     
 def graph_acc_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, start_nu, end_nu, plot, save, save_location):
     bin_width = (np.max(radius) - 0) / num_bins
-    print("max radius:", np.max(radius))
     inf_radius = radius[np.where(corr_orb_inf == 0)]
     orb_radius = radius[np.where(corr_orb_inf == 1)]
 
@@ -341,9 +347,7 @@ def graph_acc_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, start_nu, end
 
     # x_data = np.zeros((num_bins,3,4))
     # y_data = np.zeros((num_bins,3,4))
-    # print(len(all_accuracy))
-    # print(num_bins)
-    # print(len(bins))
+
     # x_data[:,0,0] = all_accuracy
     # x_data[:,1,0] = inf_accuracy
     # x_data[:,2,0] = orb_accuracy

@@ -2,18 +2,9 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-
-# Take in:
-# 1. Type of plot (list of funcs)
-# 2. Data (as np array or pd dataframe)
-# 3. Labels (as lists to allow compatibility for subplots)
-#   a. x axis
-#   b. y axis
-#   c. title
-# 4. Subplot layout (tuple)
-# 5. Colors
-# 6. Cmap (if needed)
-# 7. Bins (if needed)
+mpl.use('TkAgg')
+manager = plt.get_current_fig_manager()
+manager.resize(*manager.window.maxsize())
 
 class plot_determiner:
     def __init__(self, plot_types, plot_size, X, Y, xlim = None, ylim = None, x_label = None, y_label = None, line_labels = None, fig_title = None, subplot_title = None, colorbar = False, constrained = False, save_location = None, args = [], kwargs = {}):
@@ -36,7 +27,6 @@ class plot_determiner:
         self.fig = None
     
     def plot(self):
-        norm = mpl.colors.Normalize(vmin=self.kwargs["vmin"], vmax=self.kwargs["vmax"])
         if self.constrained:
             fig = plt.figure(constrained_layout=True)
         else:
@@ -74,6 +64,7 @@ class plot_determiner:
                             graph = ax.__getattribute__(self.plot_types[curr_plot_num])(self.X[:,line,curr_plot_num], self.Y[:,line,curr_plot_num], label = self.line_labels[curr_line_num], *self.args[curr_plot_num], **self.kwargs) 
                         else:
                             graph = ax.__getattribute__(self.plot_types[curr_plot_num])(self.X[:,line,curr_plot_num], self.Y[:,line,curr_plot_num], *self.args[curr_plot_num], **self.kwargs)
+
                         if self.xlim != None:
                             ax.set_xlim(self.xlim)
                         if self.ylim != None:
@@ -86,7 +77,7 @@ class plot_determiner:
                 curr_plot_num += 1
 
             if self.colorbar:
-                axcb = fig.colorbar(mpl.cm.ScalarMappable(norm=norm,cmap=self.kwargs["cmap"]), ax=axs.ravel().tolist(), pad=0.04, aspect = 30)
+                axcb = fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=self.kwargs["vmin"], vmax=self.kwargs["vmax"]),cmap=self.kwargs["cmap"]), ax=axs.ravel().tolist(), pad=0.04, aspect = 30)
         
         if self.line_labels != None:
             plt.legend()
