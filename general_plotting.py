@@ -2,9 +2,9 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-mpl.use('TkAgg')
-manager = plt.get_current_fig_manager()
-manager.resize(*manager.window.maxsize())
+# mpl.use('TkAgg')
+# manager = plt.get_current_fig_manager()
+# manager.resize(*manager.window.maxsize())
 
 class plot_determiner:
     def __init__(self, plot_types, plot_size, X, Y, xlim = None, ylim = None, x_label = None, y_label = None, line_labels = None, fig_title = None, subplot_title = None, colorbar = False, constrained = False, save_location = None, args = [], kwargs = {}):
@@ -83,21 +83,23 @@ class plot_determiner:
             plt.legend()
         self.fig = fig
 
-        # if self.save:
-        #     fig.savefig(self.save_location)
-        # if self.show:
-        #     plt.show()
-
         return fig
     
-    def save(self):
-        if self.fig != None:
+    def save(self, new_fig = None):
+        if new_fig != None:
+            self.fig = new_fig
+            self.fig.savefig(self.save_location)
+        elif self.fig != None:
             self.fig.savefig(self.save_location)
         else:
             print("No figure to save, try calling .plot()")
     
-    def show(self):
-        if self.fig != None:
+    def show(self, new_fig = None):
+        if new_fig != None:
+            self.fig = new_fig
+            fig.show()
+            plt.close()
+        elif self.fig != None:
             fig = self.fig
             fig.show()
             plt.close()
