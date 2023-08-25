@@ -21,7 +21,7 @@ from visualization_functions import *
 cosmol = cosmology.setCosmology("bolshoi")
 
 # SHOULD BE DESCENDING
-snapshot_list = [190,160]
+snapshot_list = [190,176]
 times_r200m = 6
 p_snap = snapshot_list[0]
 curr_sparta_file = "sparta_cbol_l0063_n0256"
@@ -270,8 +270,8 @@ peak_heights = peaks.peakHeight(halo_masses, p_red_shift)
 #     compare_density_prf(curr_test_halo[:,2+scaled_radii_loc], density_prf_all[idx], density_prf_1halo[idx], mass, test_predict, title = str(idx), show_graph = True, save_graph = True, save_location = save_location)
                 
 start_nu = 0 
-nu_step = .5
-num_iter = 7
+nu_step = 3
+num_iter = 1
 
 for i in range(num_iter):
     end_nu = start_nu + nu_step
@@ -279,7 +279,7 @@ for i in range(num_iter):
     idx_within_nu = np.where((peak_heights >= start_nu) & (peak_heights < end_nu))[0]
     curr_test_halo_idxs = test_indices[idx_within_nu]
     print(start_nu, "to", end_nu, ":", idx_within_nu.shape, "halos")
-
+    
     if curr_test_halo_idxs.shape[0] != 0:
         density_prf_all_within = np.zeros(density_prf_all.shape[1])
         density_prf_1halo_within = np.zeros(density_prf_1halo.shape[1])
