@@ -21,11 +21,12 @@ from visualization_functions import *
 cosmol = cosmology.setCosmology("bolshoi")
 
 # SHOULD BE DESCENDING
-snapshot_list = [190,176]
+snapshot_list = [190,160]
 times_r200m = 6
 p_snap = snapshot_list[0]
 curr_sparta_file = "sparta_cbol_l0063_n0256"
 
+# set what the paths should be for saving and getting the data
 if len(snapshot_list) > 1:
     specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "_" + str(times_r200m) + "r200msearch/"
 else:
@@ -52,10 +53,11 @@ np.random.seed(11)
 
 t1 = time.time()
 
-
+# Create the separate datasets for training and testing
 train_dataset, train_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "train", snapshot_list = snapshot_list)
 test_dataset, test_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "test", snapshot_list = snapshot_list)
 
+# Determine where the scaled radii, rad vel, and tang vel are located within the dtaset
 for i,key in enumerate(train_all_keys[2:]):
     if key == "Scaled_radii_" + str(p_snap):
         scaled_radii_loc = i
@@ -79,14 +81,16 @@ class model_creator:
         self.train_val_split()
 
     def train_val_split(self):
+        # Split the dataset inputted into training and validation sets
         X_train, X_val, y_train, y_val = train_test_split(self.dataset[:,2:], self.dataset[:,1], test_size=0.20, random_state=0)
         self.X_train = X_train
         self.X_val = X_val
         self.y_train = y_train
         self.y_val = y_val
-        self.mix_data()
+        self.mix_data() # mix the data to eliminate any connections 
     
     def mix_data(self):
+        # generate random indices and then mix the training and validation sets
         train_rand_idxs = np.random.permutation(self.X_train.shape[0])
         val_rand_idxs = np.random.permutation(self.X_val.shape[0])
         self.X_train = self.X_train[train_rand_idxs]
@@ -95,18 +99,23 @@ class model_creator:
         self.y_val = self.y_val[val_rand_idxs]
 
     def over_sample():
+        #TODO implement
         return
     
     def under_sample():
+        #TODO implement
         return
     
     def normalize():
+        #TODO implement
         return
     
     def standardize():
+        #TODO implement
         return
     
     def split_by_dist(self, low_cutoff, high_cutoff):
+        # Get the values of X and y within the specified range
         X_train_within = self.X_train[np.where((self.X_train[:,scaled_radii_loc] > low_cutoff) & (self.X_train[:,scaled_radii_loc] < high_cutoff))[0]]
         y_train_within = self.y_train[np.where((self.X_train[:,scaled_radii_loc] > low_cutoff) & (self.X_train[:,scaled_radii_loc] < high_cutoff))[0]]
 
@@ -121,6 +130,7 @@ class model_creator:
         for snap in self.snapshot_list:
             model_location = model_location + "_" + str(snap)
 
+        # Create a sub model for each radii split determined
         for i in range(len(self.radii_splits) + 1):
             if i == 0:
                 low_cutoff = 0
@@ -143,6 +153,7 @@ class model_creator:
 
                 t3 = time.time()
                 
+                # Train and fit each model with gpu
                 model = XGBClassifier(tree_method='gpu_hist', eta = 0.01, n_estimators = 100)
                 model = model.fit(X, y)
 
@@ -156,6 +167,7 @@ class model_creator:
         self.sub_models = sub_models
 
     def predict(self, dataset):
+        # If there is no dataset submitted then just use the validation sets otherwise predict on the inputted one
         if np.all(dataset):
             use_dataset = self.X_val
             use_labels = self.y_val
@@ -163,14 +175,18 @@ class model_creator:
             use_dataset = dataset[:,2:]
             use_labels = dataset[:,1]
 
+        # for each submodel get the predictions
         all_predicts = np.zeros((use_dataset.shape[0],(len(self.sub_models)*2)))
         for i,model in enumerate(self.sub_models):
             all_predicts[:,2*i:(2*i+2)] = model.predict_proba(use_dataset)
 
+        # Then determine which class each particle belongs to based of each model's prediction
         self.det_class(all_predicts)
         print(classification_report(use_labels, self.predicts))
     
     def det_class(self, predicts):
+        # Determine which class a particle is based off which model gave the highest probability
+        #TODO add option to use an average of predictions instead
         pred_loc = np.argmax(predicts, axis = 1)
 
         final_predicts = np.zeros(predicts.shape[0])
@@ -179,6 +195,7 @@ class model_creator:
         self.predicts = final_predicts
 
     def graph(self, corr_matrix = False, feat_imp = False):
+        # implement functionality to create graphs of data if wanted
         if corr_matrix:
             graph_correlation_matrix(self.dataset_df, self.save_location, title = "model_num_params_" + str(len(self.keys) - 2),show = False, save = True)
         if feat_imp:
@@ -200,6 +217,7 @@ t0 = time.time()
 all_models = []
 num_params_per_snap = (len(train_all_keys) - 2) / len(snapshot_list)
 
+# Train the models based off the number of snaps (create an object for each snapshot, adding one each loop as to cover all info)
 for i in range(len(snapshot_list)):
     curr_dataset = train_dataset[:,:int(2 + (num_params_per_snap * (i+1)))]
     curr_dataset = curr_dataset[np.where(curr_dataset[:,-1] != 0)]
@@ -270,8 +288,8 @@ peak_heights = peaks.peakHeight(halo_masses, p_red_shift)
 #     compare_density_prf(curr_test_halo[:,2+scaled_radii_loc], density_prf_all[idx], density_prf_1halo[idx], mass, test_predict, title = str(idx), show_graph = True, save_graph = True, save_location = save_location)
                 
 start_nu = 0 
-nu_step = 3
-num_iter = 1
+nu_step = .5
+num_iter = 7
 
 for i in range(num_iter):
     end_nu = start_nu + nu_step

@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import matplotlib.gridspec as gridspec
 from calculation_functions import calculate_distance
 import seaborn as sns
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -238,171 +239,124 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     cmap = plt.get_cmap("inferno")
     per_err_cmap = plt.get_cmap("inferno")
 
+    widths = [4,4,4,.5]
+    heights = [4,4,4]
+    
     inf_fig = plt.figure(constrained_layout=True)
     inf_fig.suptitle("Infalling Particles nu:" + str(start_nu) + " to " + str(end_nu))
-    inf_subfigs = inf_fig.subfigures(nrows=3, ncols=1)
-    x_labels = ["$v_r/v_{200m}$","$r/R_{200m}$","$r/R_{200m}$","$v_r/v_{200m}$"]
-    # y_labels =["$v_r/v_{200m}$","$v_t/v_{200m}$","$v_t/v_{200m}$","$v_r/v_{200m}$","$v_t/v_{200m}$","$v_t/v_{200m}$"]
-    inf_subfigs[0].suptitle("ML Predictions")
-    ml_inf_axs = inf_subfigs[0].subplots(nrows=1, ncols=3)
-    ml_inf_axs[0].hist2d(ml_inf_radius, ml_inf_rad_vel, num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
-    ml_inf_axs[0].set_xlabel("$r/R_{200m}$")
-    ml_inf_axs[0].set_ylabel("$v_r/v_{200m}$")
-    ml_inf_axs[1].hist2d(ml_inf_radius, ml_inf_tang_vel, num_bins, [[0,max_radius],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
-    ml_inf_axs[1].set_xlabel("$r/R_{200m}$")
-    ml_inf_axs[1].set_ylabel("$v_t/v_{200m}$")
-    ml_inf_axs[2].hist2d(ml_inf_rad_vel, ml_inf_tang_vel, num_bins, [[min_rad_vel,max_rad_vel],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
-    ml_inf_axs[2].set_xlabel("$v_r/v_{200m}$")
-    ml_inf_axs[2].set_ylabel("$v_t/v_{200m}$")
-    inf_subfigs[0].colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), ax = ml_inf_axs.ravel().tolist())
-
-    inf_subfigs[1].suptitle("Actual Labels")
-    act_inf_axs = inf_subfigs[1].subplots(nrows=1, ncols=3)
-    act_inf_axs[0].hist2d(act_inf_radius, act_inf_rad_vel, num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
-    act_inf_axs[0].set_xlabel("$r/R_{200m}$")
-    act_inf_axs[0].set_ylabel("$v_r/v_{200m}$")
-    act_inf_axs[1].hist2d(act_inf_radius, act_inf_tang_vel, num_bins, [[0,max_radius],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
-    act_inf_axs[1].set_xlabel("$r/R_{200m}$")
-    act_inf_axs[1].set_ylabel("$v_t/v_{200m}$")
-    act_inf_axs[2].hist2d(act_inf_rad_vel, act_inf_tang_vel, num_bins, [[min_rad_vel,max_rad_vel],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
-    act_inf_axs[2].set_xlabel("$v_r/v_{200m}$")
-    act_inf_axs[2].set_ylabel("$v_t/v_{200m}$")
-    inf_subfigs[1].colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), ax = act_inf_axs.ravel().tolist())
+    gs = inf_fig.add_gridspec(3,4,width_ratios = widths, height_ratios = heights)
     
-    inf_subfigs[2].suptitle("Percent Error")
-    inf_rel_dif_axs = inf_subfigs[2].subplots(nrows=1, ncols=3)
-    inf_imshow_img = inf_rel_dif_axs[0].imshow(per_err_1, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [0,max_radius,min_rad_vel,max_rad_vel])
-    inf_rel_dif_axs[0].set_xlabel("$r/R_{200m}$")
-    inf_rel_dif_axs[0].set_ylabel("$v_r/v_{200m}$")
-    inf_rel_dif_axs[1].imshow(per_err_2, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [0,max_radius,min_tang_vel,max_tang_vel])
-    inf_rel_dif_axs[1].set_xlabel("$r/R_{200m}$")
-    inf_rel_dif_axs[1].set_ylabel("$v_t/v_{200m}$")
-    inf_rel_dif_axs[2].imshow(per_err_3, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [min_rad_vel,max_rad_vel,min_tang_vel,max_tang_vel])
-    inf_rel_dif_axs[2].set_xlabel("$v_r/v_{200m}$")
-    inf_rel_dif_axs[2].set_ylabel("$v_t/v_{200m}$")
-    inf_subfigs[2].colorbar(inf_imshow_img, ax=inf_rel_dif_axs.ravel().tolist(), pad=0.04, aspect = 30)
+    ml_inf_r_rv = inf_fig.add_subplot(gs[0,0])
+    ml_inf_r_rv.hist2d(ml_inf_radius, ml_inf_rad_vel, num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    ml_inf_r_rv.set_xlabel("$r/R_{200m}$")
+    ml_inf_r_rv.set_ylabel("$v_r/v_{200m}$")
+    
+    ml_inf_r_tv = inf_fig.add_subplot(gs[0,1])
+    ml_inf_r_tv.hist2d(ml_inf_radius, ml_inf_tang_vel, num_bins, [[0,max_radius],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    ml_inf_r_tv.set_xlabel("$r/R_{200m}$")
+    ml_inf_r_tv.set_ylabel("$v_t/v_{200m}$")
+    ml_inf_r_tv.set_title("ML Predictions")
+    
+    ml_inf_rv_tv = inf_fig.add_subplot(gs[0,2])
+    ml_inf_rv_tv.hist2d(ml_inf_rad_vel, ml_inf_tang_vel, num_bins, [[min_rad_vel,max_rad_vel],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    ml_inf_rv_tv.set_xlabel("$v_r/v_{200m}$")
+    ml_inf_rv_tv.set_ylabel("$v_t/v_{200m}$")
+    
+    act_inf_r_rv = inf_fig.add_subplot(gs[1,0])
+    act_inf_r_rv.hist2d(act_inf_radius, act_inf_rad_vel, num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    act_inf_r_rv.set_xlabel("$r/R_{200m}$")
+    act_inf_r_rv.set_ylabel("$v_r/v_{200m}$")
+    
+    act_inf_r_tv = inf_fig.add_subplot(gs[1,1])
+    act_inf_r_tv.hist2d(act_inf_radius, act_inf_tang_vel, num_bins, [[0,max_radius],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    act_inf_r_tv.set_xlabel("$r/R_{200m}$")
+    act_inf_r_tv.set_ylabel("$v_t/v_{200m}$")
+    act_inf_r_tv.set_title("Actual Labels")
+    
+    act_inf_rv_tv = inf_fig.add_subplot(gs[1,2])
+    act_inf_rv_tv.hist2d(act_inf_rad_vel, act_inf_tang_vel, num_bins, [[min_rad_vel,max_rad_vel],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    act_inf_rv_tv.set_xlabel("$v_r/v_{200m}$")
+    act_inf_rv_tv.set_ylabel("$v_t/v_{200m}$")
+    
+    inf_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]))
+    
+    perr_inf_r_rv = inf_fig.add_subplot(gs[2,0])
+    inf_imshow_img = perr_inf_r_rv.imshow(per_err_1, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [0,max_radius,min_rad_vel,max_rad_vel])
+    perr_inf_r_rv.set_xlabel("$r/R_{200m}$")
+    perr_inf_r_rv.set_ylabel("$v_r/v_{200m}$")
+    
+    perr_inf_r_tv = inf_fig.add_subplot(gs[2,1])
+    perr_inf_r_tv.imshow(per_err_2, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [0,max_radius,min_tang_vel,max_tang_vel])
+    perr_inf_r_tv.set_xlabel("$r/R_{200m}$")
+    perr_inf_r_tv.set_ylabel("$v_t/v_{200m}$")
+    perr_inf_r_tv.set_title("Percent Error")
+    
+    perr_inf_rv_tv = inf_fig.add_subplot(gs[2,2])
+    perr_inf_rv_tv.imshow(per_err_3, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [min_rad_vel,max_rad_vel,min_tang_vel,max_tang_vel])
+    perr_inf_rv_tv.set_xlabel("$v_r/v_{200m}$")
+    perr_inf_rv_tv.set_ylabel("$v_t/v_{200m}$")
+    
+    inf_perr_color_bar = plt.colorbar(inf_imshow_img, cax=plt.subplot(gs[2,-1]))
+    
     inf_fig.savefig(save_location + "/2dhist/nu:" + str(start_nu) + " to " + str(end_nu) + "_ptls_inf.png")
-
+###################################################
     orb_fig = plt.figure(constrained_layout=True)
     orb_fig.suptitle("Orbiting Particles nu:" + str(start_nu) + " to " + str(end_nu))
-    orb_subfigs = orb_fig.subfigures(nrows=3, ncols=1)
-
-    orb_subfigs[0].suptitle("ML Predictions")
-    ml_orb_axs = orb_subfigs[0].subplots(nrows=1, ncols=3)
-    ml_orb_axs[0].hist2d(ml_orb_radius, ml_orb_rad_vel, num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
-    ml_orb_axs[1].hist2d(ml_orb_radius, ml_orb_tang_vel, num_bins, [[0,max_radius],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
-    ml_orb_axs[2].hist2d(ml_orb_rad_vel, ml_orb_tang_vel, num_bins, [[min_rad_vel,max_rad_vel],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
-    orb_subfigs[0].colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), ax=ml_orb_axs.ravel().tolist(), pad=0.04, aspect = 30)
+    gs = orb_fig.add_gridspec(3,4,width_ratios = widths, height_ratios = heights)
     
-    orb_subfigs[1].suptitle("Actual Predictions")
-    act_orb_axs = orb_subfigs[1].subplots(nrows=1, ncols=3)
-    act_orb_axs[0].hist2d(act_orb_radius, act_orb_rad_vel, num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
-    act_orb_axs[1].hist2d(act_orb_radius, act_orb_tang_vel, num_bins, [[0,max_radius],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
-    act_orb_axs[2].hist2d(act_orb_rad_vel, act_orb_tang_vel, num_bins, [[min_rad_vel,max_rad_vel],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
-    orb_subfigs[1].colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), ax=act_orb_axs.ravel().tolist(), pad=0.04, aspect = 30)
-
-    orb_subfigs[2].suptitle("Percent Error")
-    orb_rel_dif_axs = orb_subfigs[2].subplots(nrows=1, ncols=3)
-    orb_imshow_img = orb_rel_dif_axs[0].imshow(per_err_4, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [0,max_radius,min_rad_vel,max_rad_vel])
-    orb_rel_dif_axs[1].imshow(per_err_5, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [0,max_radius,min_tang_vel,max_tang_vel])
-    orb_rel_dif_axs[2].imshow(per_err_6, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [min_rad_vel,max_rad_vel,min_tang_vel,max_tang_vel])
-    orb_fig.colorbar(orb_imshow_img, ax=orb_rel_dif_axs.ravel().tolist(), pad=0.04, aspect = 30)
-    orb_fig.savefig(save_location + "/2dhist/nu:" + str(start_nu) + " to " + str(end_nu) + "_ptls_orb.png")
+    ml_orb_r_rv = orb_fig.add_subplot(gs[0,0])
+    ml_orb_r_rv.hist2d(ml_orb_radius, ml_orb_rad_vel, num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    ml_orb_r_rv.set_xlabel("$r/R_{200m}$")
+    ml_orb_r_rv.set_ylabel("$v_r/v_{200m}$")
     
-    plt.show()
+    ml_orb_r_tv = orb_fig.add_subplot(gs[0,1])
+    ml_orb_r_tv.hist2d(ml_orb_radius, ml_orb_tang_vel, num_bins, [[0,max_radius],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    ml_orb_r_tv.set_xlabel("$r/R_{200m}$")
+    ml_orb_r_tv.set_ylabel("$v_t/v_{200m}$")
+    ml_orb_r_tv.set_title("ML Predictions")
     
-    # norm = mpl.colors.Normalize(vmin=-1, vmax=1)
-
-    # sub_fig_titles = ["ML Predictions", "Actual Labels", "Percent Error"]
-
-    # plot_types = ["hist2d","hist2d","hist2d","hist2d","hist2d","hist2d","imshow","imshow","imshow"]
-    # plot_1_x_data = np.zeros((orb_inf.shape[0],1,6))
-    # plot_1_y_data = np.zeros((orb_inf.shape[0],1,6))
-
-    # plot_1_x_data[:ml_orb_radius.shape[0],0,0] = ml_orb_radius
-    # plot_1_x_data[:ml_orb_radius.shape[0],0,1] = ml_orb_radius
-    # plot_1_x_data[:ml_orb_tang_vel.shape[0],0,2] = ml_orb_tang_vel
-    # plot_1_x_data[:act_orb_radius.shape[0],0,3] = act_orb_radius
-    # plot_1_x_data[:act_orb_radius.shape[0],0,4] = act_orb_radius
-    # plot_1_x_data[:act_orb_tang_vel.shape[0],0,5] = act_orb_tang_vel
-
-    # plot_1_y_data[:ml_orb_rad_vel.shape[0],0,0] = ml_orb_rad_vel
-    # plot_1_y_data[:ml_orb_tang_vel.shape[0],0,1] = ml_orb_tang_vel
-    # plot_1_y_data[:ml_orb_rad_vel.shape[0],0,2] = ml_orb_rad_vel
-    # plot_1_y_data[:act_orb_rad_vel.shape[0],0,3] = act_orb_rad_vel
-    # plot_1_y_data[:act_orb_tang_vel.shape[0],0,4] = act_orb_tang_vel
-    # plot_1_y_data[:act_orb_rad_vel.shape[0],0,5] = act_orb_rad_vel
-
-    # plot_2_x_data = np.zeros((orb_inf.shape[0],1,6))
-    # plot_2_y_data = np.zeros((orb_inf.shape[0],1,6))
-
-    # plot_2_x_data[:ml_inf_radius.shape[0],0,0] = ml_inf_radius
-    # plot_2_x_data[:ml_inf_radius.shape[0],0,1] = ml_inf_radius
-    # plot_2_x_data[:ml_inf_tang_vel.shape[0],0,2] = ml_inf_tang_vel
-    # plot_2_x_data[:act_inf_radius.shape[0],0,3] = act_inf_radius
-    # plot_2_x_data[:act_inf_radius.shape[0],0,4] = act_inf_radius
-    # plot_2_x_data[:act_inf_tang_vel.shape[0],0,5] = act_inf_tang_vel
-
-    # plot_2_y_data[:ml_inf_rad_vel.shape[0],0,0] = ml_inf_rad_vel
-    # plot_2_y_data[:ml_inf_tang_vel.shape[0],0,1] = ml_inf_tang_vel
-    # plot_2_y_data[:ml_inf_rad_vel.shape[0],0,2] = ml_inf_rad_vel
-    # plot_2_y_data[:act_inf_rad_vel.shape[0],0,3] = act_inf_rad_vel
-    # plot_2_y_data[:act_inf_tang_vel.shape[0],0,4] = act_inf_tang_vel
-    # plot_2_y_data[:act_inf_rad_vel.shape[0],0,5] = act_inf_rad_vel
-
-    # args = [[num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl], [num_bins, [[0,max_radius],[min_tang_vel,max_tang_vel]], False, None, min_ptl],
-    #         [num_bins, [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]], False, None, min_ptl], [num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl], 
-    #         [num_bins, [[0,max_radius],[min_tang_vel,max_tang_vel]], False, None, min_ptl], [num_bins, [[min_tang_vel,max_tang_vel], [min_rad_vel,max_rad_vel]], False, None, min_ptl]]
- 
-    # kwargs = {"cmap": cmap, "norm": "log", "vmin":min_ptl, "vmax":max_ptl}
-    # x_labels = ["$r/R_{200m}$","$r/R_{200m}$","$v_r/v_{200m}$","$r/R_{200m}$","$r/R_{200m}$","$v_r/v_{200m}$"]
-    # y_labels =["$v_r/v_{200m}$","$v_t/v_{200m}$","$v_t/v_{200m}$","$v_r/v_{200m}$","$v_t/v_{200m}$","$v_t/v_{200m}$"]
+    ml_orb_rv_tv = orb_fig.add_subplot(gs[0,2])
+    ml_orb_rv_tv.hist2d(ml_orb_rad_vel, ml_orb_tang_vel, num_bins, [[min_rad_vel,max_rad_vel],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    ml_orb_rv_tv.set_xlabel("$v_r/v_{200m}$")
+    ml_orb_rv_tv.set_ylabel("$v_t/v_{200m}$")
     
-    # ml_plotter = gp.plot_determiner(plot_types=plot_types,plot_size=(2,3),X=plot_1_x_data,Y=plot_1_y_data, x_label=x_labels, y_label=y_labels, fig_title = "Orbiting Particles nu:" + str(start_nu) + " to " + str(end_nu), subplot_title = sub_fig_titles, colorbar=True, constrained=True, save_location = (save_location + "/2dhist/nu:" + str(start_nu) + " to " + str(end_nu) + "_ptls_orbiting.png"), args = args, kwargs=kwargs)
-    # ml_plot = ml_plotter.plot()   
+    act_orb_r_rv = orb_fig.add_subplot(gs[1,0])
+    act_orb_r_rv.hist2d(act_orb_radius, act_orb_rad_vel, num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    act_orb_r_rv.set_xlabel("$r/R_{200m}$")
+    act_orb_r_rv.set_ylabel("$v_r/v_{200m}$")
     
-    # subfig = ml_plot.add_subfigure()
-    # new_axs = subfig.subplots(nrows=1, ncols=3)
-
-    # per_err_graph1 = np.column_stack((ml_x_edge1, ml_y_edge1))
-    # per_err_graph1 = np.column_stack((per_err_graph1, per_err_1))
-    # per_err_graph2 = np.column_stack((ml_x_edge2, ml_y_edge2))
-    # per_err_graph2 = np.column_stack((per_err_graph2, per_err_2))
-    # per_err_graph3 = np.column_stack((ml_x_edge3, ml_y_edge3))
-    # per_err_graph3 = np.column_stack((per_err_graph3, per_err_3))
-
-    # new_axs[0].imshow(per_err_graph1)
-    # new_axs[1].imshow(per_err_graph2)
-    # new_axs[2].imshow(per_err_graph3)
+    act_orb_r_tv = orb_fig.add_subplot(gs[1,1])
+    act_orb_r_tv.hist2d(act_orb_radius, act_orb_tang_vel, num_bins, [[0,max_radius],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    act_orb_r_tv.set_xlabel("$r/R_{200m}$")
+    act_orb_r_tv.set_ylabel("$v_t/v_{200m}$")
+    act_orb_r_tv.set_title("Actual Labels")
     
-    # if save:
-    #     ml_plotter.save(ml_plot)
-    # if show:
-    #     ml_plotter.show(ml_plot)
-
-    # act_plotter = gp.plot_determiner(plot_types=plot_types,plot_size=(2,3),X=plot_2_x_data,Y=plot_2_y_data, x_label=x_labels, y_label=y_labels, fig_title = "Infalling Particles nu:" + str(start_nu) + " to " + str(end_nu), subplot_title = sub_fig_titles, colorbar=True, constrained=True, save_location = (save_location + "/2dhist/nu:" + str(start_nu) + " to " + str(end_nu) + "_ptls_infalling.png"), args = args, kwargs=kwargs)
-    # act_plot = act_plotter.plot()   
+    act_orb_rv_tv = orb_fig.add_subplot(gs[1,2])
+    act_orb_rv_tv.hist2d(act_orb_rad_vel, act_orb_tang_vel, num_bins, [[min_rad_vel,max_rad_vel],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    act_orb_rv_tv.set_xlabel("$v_r/v_{200m}$")
+    act_orb_rv_tv.set_ylabel("$v_t/v_{200m}$")
     
-    # #subfig = act_plot.add_subfigure()
-    # subfigs = act_plot.subfig(nrows=1, ncols=1)
-    # new_axs = subfig.subplots(nrows=1, ncols=3)
+    inf_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]), pad = 0.1)
+    
+    perr_orb_r_rv = orb_fig.add_subplot(gs[2,0])
+    orb_imshow_img = perr_orb_r_rv.imshow(per_err_4, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [0,max_radius,min_rad_vel,max_rad_vel])
+    perr_orb_r_rv.set_xlabel("$r/R_{200m}$")
+    perr_orb_r_rv.set_ylabel("$v_r/v_{200m}$")
+    
+    perr_orb_r_tv = orb_fig.add_subplot(gs[2,1])
+    perr_orb_r_tv.imshow(per_err_5, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [0,max_radius,min_tang_vel,max_tang_vel])
+    perr_orb_r_tv.set_xlabel("$r/R_{200m}$")
+    perr_orb_r_tv.set_ylabel("$v_t/v_{200m}$")
+    perr_orb_r_tv.set_title("Percent Error")
 
-    # per_err_graph4 = np.column_stack((ml_x_edge4, ml_y_edge4))
-    # per_err_graph4 = np.column_stack((per_err_graph4, per_err_4))
-    # per_err_graph5 = np.column_stack((ml_x_edge5, ml_y_edge5))
-    # per_err_graph5 = np.column_stack((per_err_graph5, per_err_5))
-    # per_err_graph6 = np.column_stack((ml_x_edge6, ml_y_edge6))
-    # per_err_graph6 = np.column_stack((per_err_graph6, per_err_6))
-
-    # new_axs[0].imshow(per_err_graph4)
-    # new_axs[1].imshow(per_err_graph5)
-    # new_axs[2].imshow(per_err_graph6)
-
-    # if save:
-    #     act_plotter.save(act_plot)
-    # if show:
-    #     act_plotter.show(act_plot)
-    # plt.close()
+    perr_orb_rv_tv = orb_fig.add_subplot(gs[2,2])
+    perr_orb_rv_tv.imshow(per_err_6, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [min_rad_vel,max_rad_vel,min_tang_vel,max_tang_vel])
+    perr_orb_rv_tv.set_xlabel("$v_r/v_{200m}$")
+    perr_orb_rv_tv.set_ylabel("$v_t/v_{200m}$")
+    
+    orb_perr_color_bar = plt.colorbar(orb_imshow_img, cax=plt.subplot(gs[2,-1]), pad = 0.1)
+    
+    orb_fig.savefig(save_location + "/2dhist/nu:" + str(start_nu) + " to " + str(end_nu) + "_ptls_orb.png")    
 
 def graph_feature_importance(feature_names, feature_importance, title, plot, save, save_location):
     mpl.rcParams.update({'font.size': 8})
