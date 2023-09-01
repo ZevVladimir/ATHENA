@@ -196,7 +196,7 @@ def smaller(new,old):
 def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf, title, num_bins, start_nu, end_nu, show, save, save_location):
     create_directory(save_location + "/2dhist/")
     mpl.rcParams.update({'font.size': 8})
-    min_ptl = 10
+    min_ptl = 30
 
     max_radius = np.max(radius)
     max_rad_vel = np.max(radial_vel)
