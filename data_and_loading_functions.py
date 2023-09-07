@@ -108,7 +108,6 @@ def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapsh
                     num_cols += all_ptl_properties[key].shape[1]
                 else:
                     num_cols += 1
-
             num_params_per_snap = (num_cols - 2) / len(snapshot_list)    
             num_rows = all_ptl_properties[key].shape[0]
             full_dataset = np.zeros((num_rows, num_cols))
@@ -166,10 +165,10 @@ def choose_halo_split(indices, snap, halo_props, particle_props, num_features):
 
     return dataset
 
-def find_closest_snap(cosmology, time_find):
+def find_closest_snap(cosmology, time_find, num_snaps):
     closest_time = 0
     closest_snap = 0
-    for i in range(193):
+    for i in range(num_snaps):
         red_shift = readheader("/home/zvladimi/MLOIS/particle_data/snapdir_" + "{:04d}".format(i) + "/snapshot_" + "{:04d}".format(i), 'redshift')
         comp_time = cosmology.age(red_shift)
         
