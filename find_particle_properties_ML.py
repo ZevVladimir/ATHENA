@@ -3,7 +3,6 @@ sys.path.insert(0, '/home/zvladimi/MLOIS/pygadgetreader')
 sys.path.insert(0, '/home/zvladimi/MLOIS/sparta/analysis')
 import numexpr as ne
 import numpy as np
-from pairing import depair
 from pygadgetreader import readsnap, readheader
 from scipy.spatial import cKDTree
 from colossus.cosmology import cosmology
@@ -25,7 +24,7 @@ from sparta import sparta
 global halo_start_idx 
 curr_sparta_file = "sparta_cbol_l0063_n0256"
 prim_only = False
-t_dyn_step = 1
+t_dyn_step = 0.5
 snapshot_list = [190]
 times_r200m = 6
 total_num_snaps = 193
@@ -36,7 +35,7 @@ num_test_halos = 1500
 
 # Params for splitting up the search
 num_bins = 50        
-start_nu = 0 
+start_nu = 1.5 
 nu_step = 0.5
 num_iter = 7
 cosmol = cosmology.setCosmology("bolshoi")
@@ -72,7 +71,7 @@ def initial_search(halo_positions, search_radius, halo_r200m, tree, red_shift):
     
     return particles_per_halo, all_halo_mass, t_dyn
 
-def search_halos(particle_tree, halo_idxs, halo_positions, halo_r200m, search_radius, total_particles, dens_prf_all, dens_prf_1halo, start_nu, end_nu, curr_halo_id, sparta_file_path, snapshot_list, comp_snap, box_size, particles_pos, particles_vel, particles_pid, rho_m, halos_vel, red_shift, hubble_constant):
+def search_halos(particle_tree, sparta_output, halo_idxs, halo_positions, halo_r200m, search_radius, total_particles, dens_prf_all, dens_prf_1halo, start_nu, end_nu, curr_halo_id, sparta_file_path, snapshot_list, comp_snap, box_size, particles_pos, particles_vel, particles_pid, rho_m, halos_vel, red_shift, hubble_constant):
     p_snap = snapshot_list[0]
     global halo_start_idx
     num_halos = halo_positions.shape[0]
@@ -91,7 +90,7 @@ def search_halos(particle_tree, halo_idxs, halo_positions, halo_r200m, search_ra
     all_pericenters = np.zeros(total_particles, dtype = np.int32)
 
     start = 0
-    t_start = time.time()
+    t_start = time.time()        
 
     for i in range(num_halos):
         # find the indices of the particles within the expected r200 radius multiplied by times_r200 
@@ -122,15 +121,15 @@ def search_halos(particle_tree, halo_idxs, halo_positions, halo_r200m, search_ra
         #calculate the radii of each particle based on the distance formula
         unsorted_particle_radii, unsorted_coord_dist = calculate_distance(current_halos_pos[0], current_halos_pos[1], current_halos_pos[2], current_particles_pos[:,0],
                                     current_particles_pos[:,1], current_particles_pos[:,2], num_new_particles, box_size)         
-
+        
         if comp_snap == False:
-            sparta_output = sparta.load(filename = sparta_file_path, halo_ids = curr_halo_id[i], log_level = 0)['tcr_ptl']['res_oct'] # last_pericenter_snap, n_is_lower_limit, n_pericenter, tracer_id
-            sparta_last_pericenter_snap = sparta_output['last_pericenter_snap']
-            sparta_n_pericenter = sparta_output['n_pericenter']
+            curr_halo_idxs = np.where(sparta_output['halos']['id'] == curr_halo_id[i])[0]
+            sparta_last_pericenter_snap = sparta_output['tcr_ptl']['res_oct']['last_pericenter_snap'][curr_halo_idxs]
+            sparta_n_pericenter = sparta_output['tcr_ptl']['res_oct']['n_pericenter'][curr_halo_idxs]
             # only want pericenters that have occurred at or before this snapshot
             sparta_n_pericenter[np.where(sparta_last_pericenter_snap > p_snap)[0]] = 0
-            sparta_tracer_ids = sparta_output['tracer_id']
-            sparta_n_is_lower_limit = sparta_output['n_is_lower_limit']
+            sparta_tracer_ids = sparta_output['tcr_ptl']['res_oct']['tracer_id'][curr_halo_idxs]
+            sparta_n_is_lower_limit = sparta_output['tcr_ptl']['res_oct']['n_is_lower_limit'][curr_halo_idxs]
             
             orbit_assn_sparta = np.zeros((sparta_tracer_ids.size, 2), dtype = np.int64)
             orbit_assn_sparta[:,0] = sparta_tracer_ids
@@ -323,6 +322,7 @@ def split_halo_by_mass(num_bins, num_ptl_params, start_nu, num_iter, nu_step, ti
         
     file_counter = 0
     all_p_n_pericenters = np.zeros(p_total_num_particles)
+    
     # For how many mass bin splits
     for j in range(num_iter):
         t_start = time.time()
@@ -346,7 +346,9 @@ def split_halo_by_mass(num_bins, num_ptl_params, start_nu, num_iter, nu_step, ti
             p_total_num_use_particles = np.sum(p_use_num_particles)
             print("Num particles primary: ", p_total_num_use_particles)
             
-            p_orbital_assign, p_rad_vel, p_scaled_radii, p_tang_vel, p_n_pericenters = search_halos(p_particle_tree, use_halo_idxs, p_use_halo_pos, p_use_halo_r200m, times_r200m, p_total_num_use_particles, p_use_density_prf_all, p_use_density_prf_1halo, start_nu, end_nu, p_use_halo_id, sparta_file_path, snapshot_list, False, p_box_size, p_particles_pos, p_particles_vel, p_particles_pid, p_rho_m, p_halos_vel, p_red_shift, p_hubble_constant)
+            print(p_use_halo_id.shape)
+            sparta_output = sparta.load(filename = sparta_file_path, halo_ids = p_use_halo_id, log_level = 1)
+            p_orbital_assign, p_rad_vel, p_scaled_radii, p_tang_vel, p_n_pericenters = search_halos(p_particle_tree, sparta_output, use_halo_idxs, p_use_halo_pos, p_use_halo_r200m, times_r200m, p_total_num_use_particles, p_use_density_prf_all, p_use_density_prf_1halo, start_nu, end_nu, p_use_halo_id, sparta_file_path, snapshot_list, False, p_box_size, p_particles_pos, p_particles_vel, p_particles_pid, p_rho_m, p_halos_vel, p_red_shift, p_hubble_constant)
             all_p_n_pericenters[file_counter:file_counter+p_total_num_use_particles] = p_n_pericenters
 
             if prim_only == False:
@@ -363,7 +365,7 @@ def split_halo_by_mass(num_bins, num_ptl_params, start_nu, num_iter, nu_step, ti
                 c_total_num_use_particles = np.sum(c_use_num_particles)
                 print("Num particles compare: ", c_total_num_use_particles)
                          
-                c_orbital_assign, c_rad_vel, c_scaled_radii, c_tang_vel, c_n_pericenters = search_halos(c_particle_tree, use_halo_idxs, c_use_halo_pos, c_use_halos_r200m, times_r200m, c_total_num_use_particles, c_use_density_prf_all, c_use_density_prf_1halo, start_nu, end_nu, c_use_halo_id, sparta_file_path, snapshot_list, True, c_box_size, c_particles_pos, c_particles_vel, c_particles_pid, c_rho_m, c_halos_vel, c_red_shift, c_hubble_constant)
+                c_orbital_assign, c_rad_vel, c_scaled_radii, c_tang_vel, c_n_pericenters = search_halos(c_particle_tree, sparta_output, use_halo_idxs, c_use_halo_pos, c_use_halos_r200m, times_r200m, c_total_num_use_particles, c_use_density_prf_all, c_use_density_prf_1halo, start_nu, end_nu, c_use_halo_id, sparta_file_path, snapshot_list, True, c_box_size, c_particles_pos, c_particles_vel, c_particles_pid, c_rho_m, c_halos_vel, c_red_shift, c_hubble_constant)
 
                 match_pidh_idx = np.intersect1d(p_orbital_assign[:,0], c_orbital_assign[:,0], return_indices=True)
                 all_scaled_radii[:,0] = p_scaled_radii
@@ -423,8 +425,6 @@ p_rho_m = cosmol.rho_m(p_red_shift)
 p_hubble_constant = cosmol.Hz(p_red_shift) * 0.001 # convert to units km/s/kpc
 p_box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
 p_box_size = p_box_size * 10**3 * p_scale_factor * little_h #convert to Kpc physical
-
-
 
 if prim_only == True:
     save_location =  "/home/zvladimi/MLOIS/calculated_info/" + curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(times_r200m) + "r200msearch/"
