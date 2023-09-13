@@ -33,7 +33,7 @@ total_num_snaps = 193
 #TODO have these params set automatically
 num_save_ptl_params = 5
 num_save_halo_params = 3
-num_test_halos = 1500
+test_halos_ratio = 0.25
 p_snap = snapshot_list[0]
 
 #TODO make general snapshot path and sparta path for zaratan
@@ -70,10 +70,7 @@ def initial_search(halo_positions, search_radius, halo_r200m, tree, red_shift):
                 t_dyn = (2*halo_r200m[i])/curr_v200m
                 print("t_dyn:", t_dyn)
                 t_dyn_flag = True
-
-    print("Total num particles: ", np.sum(particles_per_halo))
-    print("Total num halos: ", num_halos)
-    
+                
     return particles_per_halo, all_halo_mass, t_dyn
 
 def search_halos(particle_tree, sparta_output, halo_idxs, halo_positions, halo_r200m, search_radius, total_particles, dens_prf_all, dens_prf_1halo, curr_halo_id, sparta_file_path, snapshot_list, comp_snap, box_size, particles_pos, particles_vel, particles_pid, rho_m, halos_vel, red_shift, hubble_constant):
@@ -460,6 +457,10 @@ if prim_only == True:
     match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_snap))[0]
 total_num_halos = match_halo_idxs.shape[0]
 
+num_test_halos = int(np.ceil(total_num_halos * test_halos_ratio))
+print("Total num halos:", total_num_halos)
+print("Num train halos:", total_num_halos - num_test_halos)
+print("Num test halos:", num_test_halos)
 
 # choose how many test halos we want to take out and which indices belong to which dataset
 rng = np.random.default_rng(seed = 100)
