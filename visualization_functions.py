@@ -124,64 +124,50 @@ def rad_vel_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = No
     
     return ax.plot(hubble_vel[:,0], hubble_vel[:,1], color = "purple", alpha = 0.5, linestyle = "dashed", label = r"Hubble Flow")
 
-def create_hist_max_ptl(min_ptl, radius, radial_vel, tang_vel, labels, num_bins, max_radius, max_rad_vel, min_rad_vel, max_tang_vel, min_tang_vel):
-    inf_radius = radius[np.where(labels == 0)]
-    orb_radius = radius[np.where(labels == 1)]
-    inf_rad_vel = radial_vel[np.where(labels == 0)]
-    orb_rad_vel = radial_vel[np.where(labels == 1)]
-    inf_tang_vel = tang_vel[np.where(labels == 0)]
-    orb_tang_vel = tang_vel[np.where(labels == 1)]
+def create_hist_max_ptl(min_ptl, inf_radius, orb_radius, inf_rad_vel, orb_rad_vel, inf_tang_vel, orb_tang_vel, num_bins, max_radius, max_rad_vel, min_rad_vel, max_tang_vel, min_tang_vel):
+    np_hist1 = np.histogram2d(orb_radius, orb_rad_vel, bins=num_bins, range=[[0,max_radius],[min_rad_vel,max_rad_vel]])
+    np_hist2 = np.histogram2d(orb_radius, orb_tang_vel, bins=num_bins, range=[[0,max_radius],[min_tang_vel,max_tang_vel]])
+    np_hist3 = np.histogram2d(orb_tang_vel, orb_rad_vel, bins=num_bins, range=[[min_tang_vel,max_tang_vel],[min_rad_vel,max_rad_vel]])
+    np_hist4 = np.histogram2d(inf_radius, inf_rad_vel, bins=num_bins, range=[[0,max_radius],[min_rad_vel,max_rad_vel]])
+    np_hist5 = np.histogram2d(inf_radius, inf_tang_vel, bins=num_bins, range=[[0,max_radius],[min_tang_vel,max_tang_vel]])
+    np_hist6 = np.histogram2d(inf_tang_vel, inf_rad_vel, bins=num_bins, range=[[min_tang_vel,max_tang_vel],[min_rad_vel,max_rad_vel]])
 
-    np_hist1, x_edge1, y_edge1 = np.histogram2d(orb_radius, orb_rad_vel, bins=num_bins, range=[[0,max_radius],[min_rad_vel,max_rad_vel]])
-    np_hist2, x_edge2, y_edge2 = np.histogram2d(orb_radius, orb_tang_vel, bins=num_bins, range=[[0,max_radius],[min_tang_vel,max_tang_vel]])
-    np_hist3, x_edge3, y_edge3 = np.histogram2d(orb_tang_vel, orb_rad_vel, bins=num_bins, range=[[min_tang_vel,max_tang_vel],[min_rad_vel,max_rad_vel]])
-    np_hist4, x_edge4, y_edge4 = np.histogram2d(inf_radius, inf_rad_vel, bins=num_bins, range=[[0,max_radius],[min_rad_vel,max_rad_vel]])
-    np_hist5, x_edge5, y_edge5 = np.histogram2d(inf_radius, inf_tang_vel, bins=num_bins, range=[[0,max_radius],[min_tang_vel,max_tang_vel]])
-    np_hist6, x_edge6, y_edge6 = np.histogram2d(inf_tang_vel, inf_rad_vel, bins=num_bins, range=[[min_tang_vel,max_tang_vel],[min_rad_vel,max_rad_vel]])
-    np_hist7, x_edge7, y_edge7 = np.histogram2d(radius, radial_vel, bins=num_bins, range=[[0,max_radius],[min_rad_vel,max_rad_vel]])
-    np_hist8, x_edge8, y_edge8 = np.histogram2d(radius, tang_vel, bins=num_bins, range=[[0,max_radius],[min_tang_vel,max_tang_vel]])
-    np_hist9, x_edge9, y_edge9 = np.histogram2d(tang_vel, radial_vel, bins=num_bins, range=[[min_tang_vel,max_tang_vel],[min_rad_vel,max_rad_vel]])
-
-    np_hist1[np_hist1 < min_ptl] = min_ptl
-    np_hist2[np_hist2 < min_ptl] = min_ptl
-    np_hist3[np_hist3 < min_ptl] = min_ptl
-    np_hist4[np_hist4 < min_ptl] = min_ptl
-    np_hist5[np_hist5 < min_ptl] = min_ptl
-    np_hist6[np_hist6 < min_ptl] = min_ptl
-    np_hist7[np_hist7 < min_ptl] = min_ptl
-    np_hist8[np_hist8 < min_ptl] = min_ptl
-    np_hist9[np_hist9 < min_ptl] = min_ptl
+    np_hist1[0][np_hist1[0] < min_ptl] = min_ptl
+    np_hist2[0][np_hist2[0] < min_ptl] = min_ptl
+    np_hist3[0][np_hist3[0] < min_ptl] = min_ptl
+    np_hist4[0][np_hist4[0] < min_ptl] = min_ptl
+    np_hist5[0][np_hist5[0] < min_ptl] = min_ptl
+    np_hist6[0][np_hist6[0] < min_ptl] = min_ptl
 
     #orbital divided by infall
-    ratio_rad_rvel = np_hist1/(np_hist1 + np_hist4)
+    ratio_rad_rvel = np_hist1[0]/(np_hist1[0] + np_hist4[0])
     ratio_rad_rvel[(np.isnan(ratio_rad_rvel))] = 0
     ratio_rad_rvel = np.round(ratio_rad_rvel,2)
 
-    ratio_rad_tvel = np_hist2/(np_hist2 + np_hist5)
+    ratio_rad_tvel = np_hist2[0]/(np_hist2[0] + np_hist5[0])
     ratio_rad_tvel[(np.isnan(ratio_rad_tvel))] = 0
     ratio_rad_tvel = np.round(ratio_rad_tvel,2)
 
-    ratio_rvel_tvel = np_hist3/(np_hist3 + np_hist6)
+    ratio_rvel_tvel = np_hist3[0]/(np_hist3[0] + np_hist6[0])
     ratio_rvel_tvel[(np.isnan(ratio_rvel_tvel))] = 0
     ratio_rvel_tvel = np.round(ratio_rvel_tvel,2)
 
-    max_ptl = np.max(np_hist1)
-    if np.max(np_hist2) > max_ptl:
-        max_ptl = np.max(np_hist2)
-    if np.max(np_hist3) > max_ptl:
-        max_ptl = np.max(np_hist3)
-    if np.max(np_hist4) > max_ptl:
-        max_ptl = np.max(np_hist4)
-    if np.max(np_hist5) > max_ptl:
-        max_ptl = np.max(np_hist5)    
-    if np.max(np_hist6) > max_ptl:
-        max_ptl = np.max(np_hist6)
+    max_ptl = np.max(np_hist1[0])
+    if np.max(np_hist2[0]) > max_ptl:
+        max_ptl = np.max(np_hist2[0])
+    if np.max(np_hist3[0]) > max_ptl:
+        max_ptl = np.max(np_hist3[0])
+    if np.max(np_hist4[0]) > max_ptl:
+        max_ptl = np.max(np_hist4[0])
+    if np.max(np_hist5[0]) > max_ptl:
+        max_ptl = np.max(np_hist5[0])    
+    if np.max(np_hist6[0]) > max_ptl:
+        max_ptl = np.max(np_hist6[0])
     
-    return max_ptl, inf_radius, orb_radius, inf_rad_vel, orb_rad_vel, inf_tang_vel, orb_tang_vel, np_hist1, np_hist2, np_hist3, np_hist4, np_hist5, np_hist6, np_hist7, np_hist8, np_hist9
+    return max_ptl, np_hist1, np_hist2, np_hist3, np_hist4, np_hist5, np_hist6
 
 def percent_error(pred, act):
-    return ((pred - act))/act
-
+    return (((pred - act))/act) * 100
 def bigger(new, old):
     if new > old:
         return new
@@ -193,7 +179,90 @@ def smaller(new,old):
     else:
         return old
 
-def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf, title, num_bins, start_nu, end_nu, show, save, save_location):
+def check_high_per_err(per_err, floor, n_pericenter, x_data, y_data, hist_edges):
+    x_edges = hist_edges[1]
+    y_edges = hist_edges[2]
+
+    check_idxs = np.where(np.abs(per_err) > floor)
+    # check_idxs[0] = row # and check_idxs[1] = col #
+    if check_idxs[0].size > 0:
+        for i in range(check_idxs[0].size):
+            x_min = x_edges[check_idxs[1][i]]
+            x_max = x_edges[check_idxs[1][i]+1]
+            y_min = y_edges[check_idxs[0][i]]
+            y_max = y_edges[check_idxs[0][i]+1]
+
+            peri_in_box = n_pericenter[np.where((x_data > x_min) & (x_data < x_max) & (y_data > y_min) & (y_data < y_max))]
+
+def plot_incorrectly_classified(correct_labels, ml_labels, radii, rad_vel, tang_vel, num_bins, start_nu, end_nu, save_location): 
+    min_ptl = 30
+    max_radius = np.max(radii)
+    max_rad_vel = np.max(rad_vel)
+    min_rad_vel = np.min(rad_vel)
+    max_tang_vel = np.max(tang_vel)
+    min_tang_vel = np.min(tang_vel)
+       
+    incorrect_orbit = np.where((ml_labels == 1) & (correct_labels == 0))[0]
+    print("num incorrect orb", incorrect_orbit.shape)
+    incorrect_infall = np.where((ml_labels == 0) & (correct_labels == 1))[0]
+    print("num incorrect inf", incorrect_infall.shape)
+    
+    incorrect_orb_radii = radii[incorrect_orbit]
+    incorrect_inf_radii = radii[incorrect_infall]
+    incorrect_orb_rad_vel = rad_vel[incorrect_orbit]
+    incorrect_inf_rad_vel = rad_vel[incorrect_infall]
+    incorrect_orb_tang_vel = tang_vel[incorrect_orbit]
+    incorrect_inf_tang_vel = tang_vel[incorrect_infall]
+    
+    max_ptl, np_hist1, np_hist2, np_hist3, np_hist4, np_hist5, np_hist6 = create_hist_max_ptl(min_ptl, incorrect_inf_radii, incorrect_orb_radii, incorrect_inf_rad_vel, incorrect_orb_rad_vel, incorrect_inf_tang_vel, incorrect_orb_tang_vel, num_bins, max_radius, max_rad_vel, min_rad_vel, max_tang_vel, min_tang_vel)
+    
+    cmap = plt.get_cmap("inferno")
+
+    widths = [4,4,4,.5]
+    heights = [4,4]
+    
+    miss_class_fig = plt.figure(constrained_layout=True)
+    miss_class_fig.suptitle("Misclassified Particles as")
+    gs = miss_class_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
+    
+    r_rv = miss_class_fig.add_subplot(gs[0,0])
+    r_rv.hist2d(incorrect_inf_radii, incorrect_inf_rad_vel, num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    r_rv.set_xlabel("$r/R_{200m}$")
+    r_rv.set_ylabel("$v_r/v_{200m}$")
+    
+    r_tv = miss_class_fig.add_subplot(gs[0,1])
+    r_tv.hist2d(incorrect_inf_radii, incorrect_inf_tang_vel, num_bins, [[0,max_radius],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    r_tv.set_xlabel("$r/R_{200m}$")
+    r_tv.set_ylabel("$v_t/v_{200m}$")
+    r_tv.set_title("Infalling Particles")
+    
+    rv_tv = miss_class_fig.add_subplot(gs[0,2])
+    rv_tv.hist2d(incorrect_inf_rad_vel, incorrect_inf_tang_vel, num_bins, [[min_rad_vel,max_rad_vel],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    rv_tv.set_xlabel("$v_r/v_{200m}$")
+    rv_tv.set_ylabel("$v_t/v_{200m}$")
+    
+    r_rv = miss_class_fig.add_subplot(gs[1,0])
+    r_rv.hist2d(incorrect_orb_radii, incorrect_orb_rad_vel, num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    r_rv.set_xlabel("$r/R_{200m}$")
+    r_rv.set_ylabel("$v_r/v_{200m}$")
+    
+    r_tv = miss_class_fig.add_subplot(gs[1,1])
+    r_tv.hist2d(incorrect_orb_radii, incorrect_orb_tang_vel, num_bins, [[0,max_radius],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    r_tv.set_xlabel("$r/R_{200m}$")
+    r_tv.set_ylabel("$v_t/v_{200m}$")
+    r_tv.set_title("Orbiting Particles")
+    
+    rv_tv = miss_class_fig.add_subplot(gs[1,2])
+    rv_tv.hist2d(incorrect_orb_rad_vel, incorrect_orb_tang_vel, num_bins, [[min_rad_vel,max_rad_vel],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    rv_tv.set_xlabel("$v_r/v_{200m}$")
+    rv_tv.set_ylabel("$v_t/v_{200m}$")
+    
+    color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]))
+    
+    miss_class_fig.savefig(save_location + "/2dhist/nu_" + str(start_nu) + "_to_" + str(end_nu) + "_miss_class.png")
+    
+
+def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf, n_pericenter, title, num_bins, start_nu, end_nu, show, save, save_location):
     create_directory(save_location + "/2dhist/")
     mpl.rcParams.update({'font.size': 8})
     min_ptl = 30
@@ -203,19 +272,38 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     min_rad_vel = np.min(radial_vel)
     max_tang_vel = np.max(tang_vel)
     min_tang_vel = np.min(tang_vel)
-
-    ml_max_ptl, ml_inf_radius, ml_orb_radius, ml_inf_rad_vel, ml_orb_rad_vel, ml_inf_tang_vel, ml_orb_tang_vel, ml_hist1, ml_hist2, ml_hist3, ml_hist4, ml_hist5, ml_hist6, ml_hist7, ml_hist8, ml_hist9 = create_hist_max_ptl(min_ptl, radius, radial_vel, tang_vel, orb_inf, num_bins, max_radius, max_rad_vel, min_rad_vel, max_tang_vel, min_tang_vel)
-    act_max_ptl, act_inf_radius, act_orb_radius, act_inf_rad_vel, act_orb_rad_vel, act_inf_tang_vel, act_orb_tang_vel, act_hist1, act_hist2, act_hist3, act_hist4, act_hist5, act_hist6, act_hist7, act_hist8, act_hist9 = create_hist_max_ptl(min_ptl, radius, radial_vel, tang_vel, correct_orb_inf, num_bins, max_radius, max_rad_vel, min_rad_vel, max_tang_vel, min_tang_vel)    
     
-    per_err_1 = percent_error(ml_hist1, act_hist1)
-    per_err_2 = percent_error(ml_hist2, act_hist2)
-    per_err_3 = percent_error(ml_hist3, act_hist3)
-    per_err_4 = percent_error(ml_hist4, act_hist4)
-    per_err_5 = percent_error(ml_hist5, act_hist5)
-    per_err_6 = percent_error(ml_hist6, act_hist6)
-    per_err_7 = percent_error(ml_hist7, act_hist7)
-    per_err_8 = percent_error(ml_hist8, act_hist8)
-    per_err_9 = percent_error(ml_hist9, act_hist9)
+    ml_inf_radius = radius[np.where(orb_inf == 0)]
+    ml_orb_radius = radius[np.where(orb_inf == 1)]
+    ml_inf_rad_vel = radial_vel[np.where(orb_inf == 0)]
+    ml_orb_rad_vel = radial_vel[np.where(orb_inf == 1)]
+    ml_inf_tang_vel = tang_vel[np.where(orb_inf == 0)]
+    ml_orb_tang_vel = tang_vel[np.where(orb_inf == 1)]
+    
+    act_inf_radius = radius[np.where(correct_orb_inf == 0)]
+    act_orb_radius = radius[np.where(correct_orb_inf == 1)]
+    act_inf_rad_vel = radial_vel[np.where(correct_orb_inf == 0)]
+    act_orb_rad_vel = radial_vel[np.where(correct_orb_inf == 1)]
+    act_inf_tang_vel = tang_vel[np.where(correct_orb_inf == 0)]
+    act_orb_tang_vel = tang_vel[np.where(correct_orb_inf == 1)]
+
+    ml_max_ptl, ml_hist1, ml_hist2, ml_hist3, ml_hist4, ml_hist5, ml_hist6 = create_hist_max_ptl(min_ptl, ml_inf_radius, ml_orb_radius, ml_inf_rad_vel, ml_orb_rad_vel, ml_inf_tang_vel, ml_orb_tang_vel, num_bins, max_radius, max_rad_vel, min_rad_vel, max_tang_vel, min_tang_vel)
+    act_max_ptl, act_hist1, act_hist2, act_hist3, act_hist4, act_hist5, act_hist6 = create_hist_max_ptl(min_ptl, act_inf_radius, act_orb_radius, act_inf_rad_vel, act_orb_rad_vel, act_inf_tang_vel, act_orb_tang_vel, num_bins, max_radius, max_rad_vel, min_rad_vel, max_tang_vel, min_tang_vel)    
+    
+    floor = 200
+    per_err_1 = percent_error(ml_hist1[0], act_hist1[0])
+    per_err_2 = percent_error(ml_hist2[0], act_hist2[0])
+    per_err_3 = percent_error(ml_hist3[0], act_hist3[0])
+    per_err_4 = percent_error(ml_hist4[0], act_hist4[0])
+    per_err_5 = percent_error(ml_hist5[0], act_hist5[0])
+    per_err_6 = percent_error(ml_hist6[0], act_hist6[0])
+
+    check_high_per_err(per_err_1, floor, n_pericenter, act_orb_radius, act_orb_rad_vel, act_hist1)
+    check_high_per_err(per_err_2, floor, n_pericenter, act_orb_radius, act_orb_tang_vel, act_hist2)
+    check_high_per_err(per_err_3, floor, n_pericenter, act_orb_tang_vel, act_orb_rad_vel, act_hist3)
+    check_high_per_err(per_err_4, floor, n_pericenter, act_inf_radius, act_inf_rad_vel, act_hist4)
+    check_high_per_err(per_err_5, floor, n_pericenter, act_inf_radius, act_inf_tang_vel, act_hist5)
+    check_high_per_err(per_err_6, floor, n_pericenter, act_inf_tang_vel, act_inf_rad_vel, act_hist6)
 
     max_err = np.max(per_err_1)
     max_err = bigger(np.max(per_err_2), max_err)
@@ -243,7 +331,7 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     heights = [4,4,4]
     
     inf_fig = plt.figure(constrained_layout=True)
-    inf_fig.suptitle("Infalling Particles nu:" + str(start_nu) + " to " + str(end_nu))
+    inf_fig.suptitle("Infalling Particles nu:" + str(start_nu) + "_to_" + str(end_nu))
     gs = inf_fig.add_gridspec(3,4,width_ratios = widths, height_ratios = heights)
     
     ml_inf_r_rv = inf_fig.add_subplot(gs[0,0])
@@ -298,10 +386,10 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     
     inf_perr_color_bar = plt.colorbar(inf_imshow_img, cax=plt.subplot(gs[2,-1]))
     
-    inf_fig.savefig(save_location + "/2dhist/nu:" + str(start_nu) + " to " + str(end_nu) + "_ptls_inf.png")
+    inf_fig.savefig(save_location + "/2dhist/nu_" + str(start_nu) + "_to_" + str(end_nu) + "_ptls_inf.png")
 ###################################################
     orb_fig = plt.figure(constrained_layout=True)
-    orb_fig.suptitle("Orbiting Particles nu:" + str(start_nu) + " to " + str(end_nu))
+    orb_fig.suptitle("Orbiting Particles nu:" + str(start_nu) + "_to_" + str(end_nu))
     gs = orb_fig.add_gridspec(3,4,width_ratios = widths, height_ratios = heights)
     
     ml_orb_r_rv = orb_fig.add_subplot(gs[0,0])
@@ -356,7 +444,7 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     
     orb_perr_color_bar = plt.colorbar(orb_imshow_img, cax=plt.subplot(gs[2,-1]), pad = 0.1)
     
-    orb_fig.savefig(save_location + "/2dhist/nu:" + str(start_nu) + " to " + str(end_nu) + "_ptls_orb.png")    
+    orb_fig.savefig(save_location + "/2dhist/nu_" + str(start_nu) + "_to_" + str(end_nu) + "_ptls_orb.png")    
 
 def graph_feature_importance(feature_names, feature_importance, title, plot, save, save_location):
     mpl.rcParams.update({'font.size': 8})

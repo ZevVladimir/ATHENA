@@ -10,11 +10,11 @@ import time
 import pickle
 import os
 from imblearn import under_sampling, over_sampling
-import shap
 from pairing import depair
 from pygadgetreader import readsnap, readheader
 from colossus.cosmology import cosmology
 from colossus.lss import peaks
+from sparta import sparta
 from data_and_loading_functions import build_ml_dataset, check_pickle_exist_gadget, check_pickle_exist_hdf5_prop, choose_halo_split, create_directory
 from visualization_functions import *
 
@@ -22,7 +22,7 @@ cosmol = cosmology.setCosmology("bolshoi")
 
 # SHOULD BE DESCENDING
 #TODO add functionality to just read snaps from saved data 
-snapshot_list = [190,176]
+snapshot_list = [190,183]
 times_r200m = 6
 p_snap = snapshot_list[0]
 curr_sparta_file = "sparta_cbol_l0063_n0256"
@@ -238,6 +238,8 @@ density_prf_all = check_pickle_exist_hdf5_prop(data_location, "anl_prf", "M_all"
 density_prf_1halo = check_pickle_exist_hdf5_prop(data_location, "anl_prf", "M_1halo", "", hdf5_file_path, curr_sparta_file)
 halos_status = check_pickle_exist_hdf5_prop(data_location, "halos", "status", "", hdf5_file_path, curr_sparta_file)
 halos_last_snap = check_pickle_exist_hdf5_prop(data_location, "halos", "last_snap", "", hdf5_file_path, curr_sparta_file)
+with open(data_location + "test_n_pericenters.pickle", "rb") as pickle_file:
+    n_pericenter = pickle.load(pickle_file)
 
 # choose the halos for the primary snap to compare against
 p_halos_status = halos_status[:,p_snap]
@@ -253,9 +255,12 @@ num_test_halos = test_indices.shape[0]
 
 # for every halo idx and pid paired in the test dataset get the halo idxs
 test_halo_idxs = np.zeros(test_dataset.shape[0])
+use_ptl_ids = np.zeros(test_dataset.shape[0])
 for i,id in enumerate(test_dataset[:,0]):
-    test_halo_idxs[i] = depair(id)[1]
-
+    depaired = depair(id)
+    use_ptl_ids[i] = depaired[0]
+    test_halo_idxs[i] = depaired[1]
+    
 halo_masses = np.zeros(num_test_halos)
 
 start = 0
@@ -269,24 +274,6 @@ for j in range(num_test_halos):
 snapshot_path = "/home/zvladimi/MLOIS/particle_data/snapdir_" + "{:04d}".format(p_snap) + "/snapshot_" + "{:04d}".format(p_snap)
 p_red_shift = readheader(snapshot_path, 'redshift')
 peak_heights = peaks.peakHeight(halo_masses, p_red_shift)
-
-# for i,idx in enumerate(test_indices):
-#     curr_test_halo = test_dataset[np.where(test_halo_idxs == idx)]
-
-#     test_predict = np.ones(curr_test_halo.shape[0]) * -1
-#     for i in range(len(snapshot_list)):
-#         curr_dataset = curr_test_halo[:,:int(2 + (num_params_per_snap * (i+1)))]
-
-#         if i == (len(snapshot_list)-1):
-#             use_ptls = np.where(curr_test_halo[:,-1]!= 0)[0]
-#         else:
-#             use_ptls = np.where(curr_test_halo[:,int(2 + (num_params_per_snap * (i+1)))] == 0)[0]
-
-#         curr_dataset = curr_dataset[use_ptls]
-#         all_models[i].predict(curr_dataset)
-#         test_predict[use_ptls] = all_models[i].get_predicts()
-
-#     compare_density_prf(curr_test_halo[:,2+scaled_radii_loc], density_prf_all[idx], density_prf_1halo[idx], mass, test_predict, title = str(idx), show_graph = True, save_graph = True, save_location = save_location)
                 
 start_nu = 0 
 nu_step = 3
@@ -305,12 +292,16 @@ for i in range(num_iter):
         for j, idx in enumerate(curr_test_halo_idxs):
             density_prf_all_within = density_prf_all_within + density_prf_all[curr_test_halo_idxs[j]]
             density_prf_1halo_within = density_prf_1halo_within + density_prf_1halo[curr_test_halo_idxs[j]]
+            use_ptl_idxs = np.where(test_halo_idxs == idx)
             if j == 0:
-                test_halos_within = test_dataset[np.where(test_halo_idxs == idx)]
+                test_halos_within = test_dataset[use_ptl_idxs]
+                n_pericenter_within = n_pericenter[use_ptl_idxs]
                 continue
             else:
-                curr_test_halo = test_dataset[np.where(test_halo_idxs == idx)]
+                curr_test_halo = test_dataset[use_ptl_idxs]
+                curr_n_pericenter = n_pericenter[use_ptl_idxs]
                 test_halos_within = np.row_stack((test_halos_within, curr_test_halo))
+                n_pericenter_within = np.concatenate((n_pericenter_within, curr_n_pericenter))
 
         test_predict = np.ones(test_halos_within.shape[0]) * -1
 
@@ -331,10 +322,11 @@ for i in range(num_iter):
         classification = classification_report(actual_labels, test_predict, output_dict=True)
 
         all_accuracy.append(classification["accuracy"])
-        #compare_density_prf(test_halos_within[:,2+scaled_radii_loc], density_prf_all_within, density_prf_1halo_within, mass, test_predict, title = str(start_nu) + "-" + str(end_nu), show_graph = False, save_graph = True, save_location = save_location)
-        plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "ML Predictions", num_bins, start_nu, end_nu, show = False, save = True, save_location=save_location)
-        #graph_acc_by_bin(test_predict, actual_labels, test_halos_within[:,2+scaled_radii_loc], num_bins, start_nu, end_nu, plot = False, save = True, save_location = save_location)
-    
+        compare_density_prf(test_halos_within[:,2+scaled_radii_loc], density_prf_all_within, density_prf_1halo_within, mass, test_predict, title = str(start_nu) + "-" + str(end_nu), show_graph = False, save_graph = True, save_location = save_location)
+        plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, n_pericenter_within, "ML Predictions", num_bins, start_nu, end_nu, show = False, save = True, save_location=save_location)
+        graph_acc_by_bin(test_predict, actual_labels, test_halos_within[:,2+scaled_radii_loc], num_bins, start_nu, end_nu, plot = False, save = True, save_location = save_location)
+        plot_incorrectly_classified(actual_labels, test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], num_bins, start_nu, end_nu, save_location)
+        
     start_nu = end_nu
     
 print(all_accuracy)
