@@ -1,14 +1,10 @@
-import sys
-sys.path.insert(0, '/home/zvladimi/MLOIS/pygadgetreader')
-sys.path.insert(0, '/home/zvladimi/MLOIS/sparta/analysis')
 import numexpr as ne
 import numpy as np
-from pygadgetreader import readsnap, readheader
 from scipy.spatial import cKDTree
 from colossus.cosmology import cosmology
-import matplotlib.pyplot as plt
 from colossus.halo import mass_so
 from colossus.lss import peaks
+import matplotlib.pyplot as plt
 from matplotlib.pyplot import cm
 import time
 import h5py
@@ -16,17 +12,17 @@ import pickle
 import os
 from data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5, find_closest_snap
 from calculation_functions import *
-from visualization_functions import compare_density_prf, rad_vel_vs_radius_plot
-from sparta import sparta
-
 ##################################################################################################################
 # General params
 global halo_start_idx 
 curr_sparta_file = "sparta_cbol_l0063_n0256"
 path_to_MLOIS = "/home/zvladimi/MLOIS/"
+path_to_snapshot = "/home/zvladimi/MLOIS/particle_data/"
+path_to_hdf5 = "/home/zvladimi/MLOIS/SPARTA_data/"
+path_to_pickle = "/home/zvladimi/MLOIS/pickle_data/"
 halo_start_idx = 0
 prim_only = False
-t_dyn_step = 2
+t_dyn_step = 0.5
 snapshot_list = [190]
 times_r200m = 6
 total_num_snaps = 193
@@ -36,9 +32,9 @@ num_save_halo_params = 3
 test_halos_ratio = 0.25
 p_snap = snapshot_list[0]
 
-#TODO make general snapshot path and sparta path for zaratan
-hdf5_file_path = path_to_MLOIS +  "SPARTA_data/" + curr_sparta_file + ".hdf5"
-snapshot_path = path_to_MLOIS + "particle_data/snapdir_" + "{:04d}".format(p_snap) + "/snapshot_" + "{:04d}".format(p_snap)
+snap_format = "{:04d}" # how are the snapshots formatted with 0s
+hdf5_file_path = path_to_hdf5 + curr_sparta_file + ".hdf5"
+snapshot_path = path_to_snapshot + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
 
 # Params for splitting up the search
 num_bins = 50        
@@ -46,6 +42,13 @@ num_iter = 20
 num_halo_per_split = 1000
 cosmol = cosmology.setCosmology("bolshoi")
 little_h = cosmol.h 
+##################################################################################################################
+# import pygadgetreader and sparta
+import sys
+sys.path.insert(0, path_to_MLOIS + "pygadgetreader")
+sys.path.insert(0, path_to_MLOIS + "sparta/analysis")
+from pygadgetreader import readsnap, readheader
+from sparta import sparta
 ##################################################################################################################
 
 def initial_search(halo_positions, search_radius, halo_r200m, tree, red_shift):
@@ -258,12 +261,12 @@ def get_comp_snap(t_dyn, t_dyn_step):
     # calculate one dynamical time ago and set that as the comparison snap
     curr_time = cosmol.age(p_red_shift)
     past_time = curr_time - (t_dyn_step * t_dyn)
-    c_snap = find_closest_snap(cosmol, past_time, num_snaps = total_num_snaps)
+    c_snap = find_closest_snap(cosmol, past_time, num_snaps = total_num_snaps, path_to_snap=path_to_snapshot, snap_format = snap_format)
     snapshot_list.append(c_snap)
 
     # switch to comparison snap
     c_snap = snapshot_list[1]
-    snapshot_path = path_to_MLOIS + "particle_data/snapdir_" + "{:04d}".format(c_snap) + "/snapshot_" + "{:04d}".format(c_snap)
+    snapshot_path = path_to_snapshot + "/snapdir_" + snap_format.format(c_snap) + "/snapshot_" + snap_format.format(c_snap)
     save_location =  path_to_MLOIS + "calculated_info/" + curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[1]) + "_" + str(times_r200m) + "r200msearch/"
     
     if os.path.exists(save_location) != True:
@@ -278,8 +281,8 @@ def get_comp_snap(t_dyn, t_dyn_step):
     c_box_size = c_box_size * 10**3 * c_scale_factor * little_h #convert to Kpc physical
     
     # load particle data and SPARTA data for the comparison snap
-    c_particles_pid, c_particles_vel, c_particles_pos, mass = load_or_pickle_ptl_data(str(c_snap), snapshot_path, c_scale_factor, little_h)
-    c_halos_pos, c_halos_vel, c_halos_r200m, c_halos_id, c_density_prf_all, c_density_prf_1halo, c_halos_status, c_halos_last_snap = load_or_pickle_SPARTA_data(curr_sparta_file, hdf5_file_path, c_scale_factor, little_h, c_snap)
+    c_particles_pid, c_particles_vel, c_particles_pos, mass = load_or_pickle_ptl_data(str(c_snap), snapshot_path, c_scale_factor, little_h, path_to_pickle)
+    c_halos_pos, c_halos_vel, c_halos_r200m, c_halos_id, c_density_prf_all, c_density_prf_1halo, c_halos_status, c_halos_last_snap = load_or_pickle_SPARTA_data(curr_sparta_file, hdf5_file_path, c_scale_factor, little_h, c_snap, path_to_pickle)
 
     return save_location, c_snap, c_box_size, c_rho_m, c_red_shift, c_hubble_constant, c_particles_pid, c_particles_vel, c_particles_pos, c_halos_pos, c_halos_vel, c_halos_r200m, c_halos_id, c_density_prf_all, c_density_prf_1halo, c_halos_status, c_halos_last_snap 
     
@@ -439,8 +442,8 @@ if prim_only == True:
     if os.path.exists(save_location) != True:
         os.makedirs(save_location)
         
-p_particles_pid, p_particles_vel, p_particles_pos, mass = load_or_pickle_ptl_data(str(p_snap), snapshot_path, p_scale_factor, little_h)
-p_halos_pos, p_halos_vel, p_halos_r200m, p_halos_id, p_density_prf_all, p_density_prf_1halo, p_halos_status, p_halos_last_snap = load_or_pickle_SPARTA_data(curr_sparta_file, hdf5_file_path, p_scale_factor, little_h, p_snap)
+p_particles_pid, p_particles_vel, p_particles_pos, mass = load_or_pickle_ptl_data(str(p_snap), snapshot_path, p_scale_factor, little_h, path_to_pickle)
+p_halos_pos, p_halos_vel, p_halos_r200m, p_halos_id, p_density_prf_all, p_density_prf_1halo, p_halos_status, p_halos_last_snap = load_or_pickle_SPARTA_data(curr_sparta_file, hdf5_file_path, p_scale_factor, little_h, p_snap, path_to_pickle)
 # construct search trees for each snapshot
 p_particle_tree = cKDTree(data = p_particles_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size)
 
@@ -461,6 +464,7 @@ num_test_halos = int(np.ceil(total_num_halos * test_halos_ratio))
 print("Total num halos:", total_num_halos)
 print("Num train halos:", total_num_halos - num_test_halos)
 print("Num test halos:", num_test_halos)
+print("Total num ptls:", np.sum(p_num_particles_per_halo))
 
 # choose how many test halos we want to take out and which indices belong to which dataset
 rng = np.random.default_rng(seed = 100)

@@ -8,10 +8,10 @@ def create_directory(path):
     if os.path.exists(path) != True:
         os.makedirs(path)
 
-def check_pickle_exist_gadget(ptl_property, snapshot, snapshot_path):
+def check_pickle_exist_gadget(ptl_property, snapshot, snapshot_path, pickle_path):
     # save to folder containing pickled data to be accessed easily later
-    file_path = "/home/zvladimi/MLOIS/pickle_data/" + str(snapshot) + "/" + ptl_property + "_" + snapshot + ".pickle" 
-    create_directory("/home/zvladimi/MLOIS/pickle_data/" + str(snapshot) + "/")
+    file_path = pickle_path + str(snapshot) + "/" + ptl_property + "_" + snapshot + ".pickle" 
+    create_directory(pickle_path + str(snapshot) + "/")
     
     # check if the file has already been pickled if so just load it
     if os.path.isfile(file_path):
@@ -24,10 +24,10 @@ def check_pickle_exist_gadget(ptl_property, snapshot, snapshot_path):
             pickle.dump(particle_info, pickle_file)
     return particle_info
 
-def check_pickle_exist_hdf5_prop(snapshot, first_group, second_group, third_group, hdf5_path, sparta_name):
+def check_pickle_exist_hdf5_prop(snapshot, first_group, second_group, third_group, hdf5_path, sparta_name, pickle_path):
     # save to folder containing pickled data to be accessed easily later
-    file_path = "/home/zvladimi/MLOIS/pickle_data/" + str(snapshot) + "/" + first_group + "_" + second_group + "_" + third_group + "_" + sparta_name + ".pickle" 
-    create_directory("/home/zvladimi/MLOIS/pickle_data/" + str(snapshot) + "/")
+    file_path = pickle_path + str(snapshot) + "/" + first_group + "_" + second_group + "_" + third_group + "_" + sparta_name + ".pickle" 
+    create_directory(pickle_path + str(snapshot) + "/")
     
     # check if the file has already been pickled if so just load it
     if os.path.isfile(file_path):
@@ -44,27 +44,27 @@ def check_pickle_exist_hdf5_prop(snapshot, first_group, second_group, third_grou
             pickle.dump(halo_info, pickle_file)
     return halo_info
 
-def load_or_pickle_ptl_data(snapshot, snapshot_path, scale_factor, little_h):
-    ptl_pid = check_pickle_exist_gadget("pid", snapshot, snapshot_path)
-    ptl_vel = check_pickle_exist_gadget("vel", snapshot, snapshot_path)
-    ptl_pos = check_pickle_exist_gadget("pos", snapshot, snapshot_path)
-    ptl_mass = check_pickle_exist_gadget("mass", snapshot, snapshot_path)
+def load_or_pickle_ptl_data(snapshot, snapshot_path, scale_factor, little_h, pickle_path):
+    ptl_pid = check_pickle_exist_gadget("pid", snapshot, snapshot_path, pickle_path)
+    ptl_vel = check_pickle_exist_gadget("vel", snapshot, snapshot_path, pickle_path)
+    ptl_pos = check_pickle_exist_gadget("pos", snapshot, snapshot_path, pickle_path)
+    ptl_mass = check_pickle_exist_gadget("mass", snapshot, snapshot_path, pickle_path)
 
     ptl_pos = ptl_pos * 10**3 * scale_factor * little_h # convert to kpc and physical
     ptl_mass = ptl_mass[0] * 10**10 # units M_sun/h
 
     return ptl_pid, ptl_vel, ptl_pos, ptl_mass
 
-def load_or_pickle_SPARTA_data(sparta_name, hdf5_path, scale_factor, little_h, snap):
-    halos_pos = check_pickle_exist_hdf5_prop(snap, "halos", "position", "", hdf5_path, sparta_name)
-    halos_vel = check_pickle_exist_hdf5_prop(snap, "halos", "velocity", "", hdf5_path, sparta_name)
-    halo_last_snap = check_pickle_exist_hdf5_prop(snap, "halos", "last_snap", "", hdf5_path, sparta_name)
-    halos_r200m = check_pickle_exist_hdf5_prop(snap, "halos", "R200m", "", hdf5_path, sparta_name)
-    halo_id = check_pickle_exist_hdf5_prop(snap, "halos", "id", "", hdf5_path, sparta_name)
-    halo_status = check_pickle_exist_hdf5_prop(snap, "halos", "status", "", hdf5_path, sparta_name)
+def load_or_pickle_SPARTA_data(sparta_name, hdf5_path, scale_factor, little_h, snap, pickle_path):
+    halos_pos = check_pickle_exist_hdf5_prop(snap, "halos", "position", "", hdf5_path, sparta_name, pickle_path)
+    halos_vel = check_pickle_exist_hdf5_prop(snap, "halos", "velocity", "", hdf5_path, sparta_name, pickle_path)
+    halo_last_snap = check_pickle_exist_hdf5_prop(snap, "halos", "last_snap", "", hdf5_path, sparta_name, pickle_path)
+    halos_r200m = check_pickle_exist_hdf5_prop(snap, "halos", "R200m", "", hdf5_path, sparta_name, pickle_path)
+    halo_id = check_pickle_exist_hdf5_prop(snap, "halos", "id", "", hdf5_path, sparta_name, pickle_path)
+    halo_status = check_pickle_exist_hdf5_prop(snap, "halos", "status", "", hdf5_path, sparta_name, pickle_path)
     
-    density_prf_all = check_pickle_exist_hdf5_prop(snap, "anl_prf", "M_all", "", hdf5_path, sparta_name)
-    density_prf_1halo = check_pickle_exist_hdf5_prop(snap, "anl_prf", "M_1halo", "", hdf5_path, sparta_name)
+    density_prf_all = check_pickle_exist_hdf5_prop(snap, "anl_prf", "M_all", "", hdf5_path, sparta_name, pickle_path)
+    density_prf_1halo = check_pickle_exist_hdf5_prop(snap, "anl_prf", "M_1halo", "", hdf5_path, sparta_name, pickle_path)
     
     halos_pos = halos_pos[:,snap,:]
     halos_vel = halos_vel[:,snap,:]
@@ -165,11 +165,11 @@ def choose_halo_split(indices, snap, halo_props, particle_props, num_features):
 
     return dataset
 
-def find_closest_snap(cosmology, time_find, num_snaps):
+def find_closest_snap(cosmology, time_find, num_snaps, path_to_snap, snap_format):
     closest_time = 0
     closest_snap = 0
     for i in range(num_snaps):
-        red_shift = readheader("/home/zvladimi/MLOIS/particle_data/snapdir_" + "{:04d}".format(i) + "/snapshot_" + "{:04d}".format(i), 'redshift')
+        red_shift = readheader(path_to_snap + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift')
         comp_time = cosmology.age(red_shift)
         
         if np.abs(time_find - comp_time) < np.abs(time_find - closest_time):
