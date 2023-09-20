@@ -66,6 +66,9 @@ def load_or_pickle_SPARTA_data(sparta_name, hdf5_path, scale_factor, little_h, s
     density_prf_all = check_pickle_exist_hdf5_prop(snap, "anl_prf", "M_all", "", hdf5_path, sparta_name, pickle_path)
     density_prf_1halo = check_pickle_exist_hdf5_prop(snap, "anl_prf", "M_1halo", "", hdf5_path, sparta_name, pickle_path)
     
+    halo_n = check_pickle_exist_hdf5_prop(snap, "tcr_ptl", "res_oct", "halo_n", hdf5_path, sparta_name, pickle_path)
+    halo_first = check_pickle_exist_hdf5_prop(snap, "tcr_ptl", "res_oct", "halo_first", hdf5_path, sparta_name, pickle_path)
+    
     halos_pos = halos_pos[:,snap,:]
     halos_vel = halos_vel[:,snap,:]
     halos_r200m = halos_r200m[:,snap]
@@ -77,7 +80,7 @@ def load_or_pickle_SPARTA_data(sparta_name, hdf5_path, scale_factor, little_h, s
     halos_pos = halos_pos * 10**3 * scale_factor * little_h # convert to kpc and physical
     halos_r200m = halos_r200m * little_h # convert to kpc
 
-    return halos_pos, halos_vel, halos_r200m, halo_id, density_prf_all, density_prf_1halo, halo_status, halo_last_snap
+    return halos_pos, halos_vel, halos_r200m, halo_id, density_prf_all, density_prf_1halo, halo_status, halo_last_snap, halo_n, halo_first
 
 def standardize(values):
     for col in range(values.shape[1]):
@@ -176,3 +179,9 @@ def find_closest_snap(cosmology, time_find, num_snaps, path_to_snap, snap_format
             closest_time = comp_time
             closest_snap = i
     return closest_snap
+
+def conv_halo_id_spid(my_halo_ids, sdata, snapshot):
+    sparta_idx = np.zeros(my_halo_ids.shape[0], dtype = np.int32)
+    for i, my_id in enumerate(my_halo_ids):
+        sparta_idx[i] = int(np.where(my_id == sdata['halos']['id'][:,snapshot])[0])
+    return sparta_idx

@@ -10,8 +10,6 @@ import time
 import h5py
 import pickle
 import os
-from data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5, find_closest_snap
-from calculation_functions import *
 ##################################################################################################################
 # General params
 global halo_start_idx 
@@ -29,7 +27,7 @@ total_num_snaps = 193
 #TODO have these params set automatically
 num_save_ptl_params = 5
 num_save_halo_params = 3
-test_halos_ratio = 0.25
+test_halos_ratio = .25
 p_snap = snapshot_list[0]
 
 snap_format = "{:04d}" # how are the snapshots formatted with 0s
@@ -38,8 +36,8 @@ snapshot_path = path_to_snapshot + "snapdir_" + snap_format.format(p_snap) + "/s
 
 # Params for splitting up the search
 num_bins = 50        
-num_iter = 20
 num_halo_per_split = 1000
+num_print_per_split = 5
 cosmol = cosmology.setCosmology("bolshoi")
 little_h = cosmol.h 
 ##################################################################################################################
@@ -49,6 +47,9 @@ sys.path.insert(0, path_to_MLOIS + "pygadgetreader")
 sys.path.insert(0, path_to_MLOIS + "sparta/analysis")
 from pygadgetreader import readsnap, readheader
 from sparta import sparta
+from data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5, find_closest_snap, conv_halo_id_spid
+from visualization_functions import compare_density_prf
+from calculation_functions import *
 ##################################################################################################################
 
 def initial_search(halo_positions, search_radius, halo_r200m, tree, red_shift):
@@ -76,7 +77,7 @@ def initial_search(halo_positions, search_radius, halo_r200m, tree, red_shift):
                 
     return particles_per_halo, all_halo_mass, t_dyn
 
-def search_halos(particle_tree, sparta_output, halo_idxs, halo_positions, halo_r200m, search_radius, total_particles, dens_prf_all, dens_prf_1halo, curr_halo_id, sparta_file_path, snapshot_list, comp_snap, box_size, particles_pos, particles_vel, particles_pid, rho_m, halos_vel, red_shift, hubble_constant):
+def search_halos(particle_tree, sparta_output, halo_idxs, use_halo_first, use_halo_n, halo_positions, halo_r200m, search_radius, total_particles, dens_prf_all, dens_prf_1halo, curr_halo_id, sparta_file_path, snapshot_list, comp_snap, box_size, particles_pos, particles_vel, particles_pid, rho_m, halos_vel, red_shift, hubble_constant):
     p_snap = snapshot_list[0]
     global halo_start_idx
     num_halos = halo_positions.shape[0]
@@ -92,10 +93,11 @@ def search_halos(particle_tree, sparta_output, halo_idxs, halo_positions, halo_r
     all_scaled_radii = np.zeros(total_particles, dtype = np.float32)
     r200m_per_part = np.zeros(total_particles, dtype = np.float32)
     all_orbit_assn = np.zeros((total_particles,2), dtype = np.int64)
-    all_pericenters = np.zeros(total_particles, dtype = np.int32)
-
+    
     start = 0
     t_start = time.time()        
+
+    start_halo_index = 0
 
     for i in range(num_halos):
         # find the indices of the particles within the expected r200 radius multiplied by times_r200 
@@ -128,14 +130,18 @@ def search_halos(particle_tree, sparta_output, halo_idxs, halo_positions, halo_r
                                     current_particles_pos[:,1], current_particles_pos[:,2], num_new_particles, box_size)         
         
         if comp_snap == False:
-            curr_halo_idxs = np.where(sparta_output['halos']['id'] == curr_halo_id[i])[0]
-            sparta_last_pericenter_snap = sparta_output['tcr_ptl']['res_oct']['last_pericenter_snap'][curr_halo_idxs]
-            sparta_n_pericenter = sparta_output['tcr_ptl']['res_oct']['n_pericenter'][curr_halo_idxs]
+            curr_halo_n = use_halo_n[i]
+            
+            sparta_last_pericenter_snap = sparta_output['tcr_ptl']['res_oct']['last_pericenter_snap'][start_halo_index:start_halo_index+curr_halo_n]
+            sparta_n_pericenter = sparta_output['tcr_ptl']['res_oct']['n_pericenter'][start_halo_index:start_halo_index+curr_halo_n]
             # only want pericenters that have occurred at or before this snapshot
             sparta_n_pericenter[np.where(sparta_last_pericenter_snap > p_snap)[0]] = 0
-            sparta_tracer_ids = sparta_output['tcr_ptl']['res_oct']['tracer_id'][curr_halo_idxs]
-            sparta_n_is_lower_limit = sparta_output['tcr_ptl']['res_oct']['n_is_lower_limit'][curr_halo_idxs]
-            
+            sparta_tracer_ids = sparta_output['tcr_ptl']['res_oct']['tracer_id'][start_halo_index:start_halo_index+curr_halo_n]
+            sparta_n_is_lower_limit = sparta_output['tcr_ptl']['res_oct']['n_is_lower_limit'][start_halo_index:start_halo_index+curr_halo_n]
+
+            # only want pericenters that have occurred at or before this snapshot
+            sparta_n_pericenter[np.where(sparta_last_pericenter_snap > p_snap)[0]] = 0
+
             orbit_assn_sparta = np.zeros((sparta_tracer_ids.size, 2), dtype = np.int64)
             orbit_assn_sparta[:,0] = sparta_tracer_ids
 
@@ -152,11 +158,9 @@ def search_halos(particle_tree, sparta_output, halo_idxs, halo_positions, halo_r
             mask = np.ones(current_particles_pid.size, dtype = bool) 
             mask[poss_pids[1]] = False
             current_orbit_assn_sparta[mask,1] = 0 # set every pid that didn't have a match to infalling  
-        
-            use_pericenters = np.zeros(num_new_particles)
-            use_pericenters[poss_pids[1]] = sparta_n_pericenter[poss_pid_match[2]]
             
-        
+            start_halo_index = start_halo_index + curr_halo_n
+            
         #sort the radii, positions, velocities, coord separations to allow for creation of plots and to correctly assign how much mass there is
         arrsortrad = unsorted_particle_radii.argsort()
         particle_radii = unsorted_particle_radii[arrsortrad]
@@ -165,9 +169,6 @@ def search_halos(particle_tree, sparta_output, halo_idxs, halo_positions, halo_r
         #current_orbit_assn = current_orbit_assn[arrsortrad]
         current_orbit_assn_sparta = current_orbit_assn_sparta[arrsortrad]
         coord_dist = unsorted_coord_dist[arrsortrad]
-        if comp_snap == False:
-            use_pericenters = use_pericenters[arrsortrad]
-            all_pericenters[start:start+num_new_particles] = use_pericenters
 
         #calculate the density at each particle
         calculated_densities = np.zeros(num_new_particles)
@@ -185,7 +186,6 @@ def search_halos(particle_tree, sparta_output, halo_idxs, halo_positions, halo_r
         #if multiple indices choose the first two and average them
         else:
             calculated_r200m[i] = (particle_radii[indices_r200_met[0][0]] + particle_radii[indices_r200_met[0][1]])/2
-        
         
         # calculate peculiar, radial, and tangential velocity
         peculiar_velocity = calc_pec_vel(current_particles_vel, halos_vel[i])
@@ -205,14 +205,18 @@ def search_halos(particle_tree, sparta_output, halo_idxs, halo_positions, halo_r
 
         start += num_new_particles
 
-        if i % 250 == 0 and i != 0:
+        # if i % 250 == 0 and i != 0 and comp_snap == False:
+        #     compare_density_prf(radii = particle_radii/halo_r200m[i], actual_prf_all=dens_prf_all[i], actual_prf_1halo=dens_prf_1halo[i], mass=mass, orbit_assn=current_orbit_assn_sparta, title = str(halo_idxs[i]), save_location="/home/zvladimi/MLOIS/Random_figures/", show_graph=False, save_graph=True)
+        
+        print_at = int(np.ceil((num_halo_per_split/num_print_per_split)))
+        if i % print_at == 0 and i != 0:
             t_lap = time.time()
             tot_time = t_lap - t_start
-            t_remain = (num_halos - i)/250 * tot_time
-            print("Halos:", (i-250), "to", i, "time taken:", np.round(tot_time,2), "seconds" , "time remaining:", np.round(t_remain/60,2), "minutes,",  np.round((t_remain),2), "seconds")
+            t_remain = (num_halos - i)/print_at * tot_time
+            print("Halos:", (i-print_at), "to", i, "time taken:", np.round(tot_time,2), "seconds" , "time remaining:", np.round(t_remain/60,2), "minutes,",  np.round((t_remain),2), "seconds")
             t_start = t_lap
-    
-    return all_orbit_assn, calculated_radial_velocities, all_scaled_radii, calculated_tangential_velocities, all_pericenters
+            
+    return all_orbit_assn, calculated_radial_velocities, all_scaled_radii, calculated_tangential_velocities
     
 def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r200_per_part, red_shift, hubble_constant):
     start_bin_val = 0.001
@@ -282,11 +286,11 @@ def get_comp_snap(t_dyn, t_dyn_step):
     
     # load particle data and SPARTA data for the comparison snap
     c_particles_pid, c_particles_vel, c_particles_pos, mass = load_or_pickle_ptl_data(str(c_snap), snapshot_path, c_scale_factor, little_h, path_to_pickle)
-    c_halos_pos, c_halos_vel, c_halos_r200m, c_halos_id, c_density_prf_all, c_density_prf_1halo, c_halos_status, c_halos_last_snap = load_or_pickle_SPARTA_data(curr_sparta_file, hdf5_file_path, c_scale_factor, little_h, c_snap, path_to_pickle)
+    c_halos_pos, c_halos_vel, c_halos_r200m, c_halos_id, c_density_prf_all, c_density_prf_1halo, c_halos_status, c_halos_last_snap, c_halo_n, c_halo_first = load_or_pickle_SPARTA_data(curr_sparta_file, hdf5_file_path, c_scale_factor, little_h, c_snap, path_to_pickle)
 
     return save_location, c_snap, c_box_size, c_rho_m, c_red_shift, c_hubble_constant, c_particles_pid, c_particles_vel, c_particles_pos, c_halos_pos, c_halos_vel, c_halos_r200m, c_halos_id, c_density_prf_all, c_density_prf_1halo, c_halos_status, c_halos_last_snap 
-    
-def split_halo_by_mass(num_bins, num_ptl_params, num_iter, times_r200m, p_halo_masses, p_num_particles_per_halo, p_halos_pos, p_halos_vel, p_halos_r200m, p_density_prf_all, p_density_prf_1halo, p_halos_id, sparta_file_path, sparta_file_name, snapshot_list, new_file, train, train_indices, test_indices, c_halos_pos = None, c_halos_r200m = None, c_density_prf_all = None, c_density_prf_1halo = None, c_halos_id = None, c_redshift = None, t_dyn_step = 0):
+
+def split_halo_by_mass(num_bins, num_ptl_params, times_r200m, p_halo_masses, p_num_particles_per_halo, p_halos_pos, p_halos_vel, p_halos_r200m, p_density_prf_all, p_density_prf_1halo, p_halos_id, p_halos_first, p_halos_n, sparta_file_path, sparta_file_name, snapshot_list, new_file, train, train_indices, test_indices, c_halos_pos = None, c_halos_r200m = None, c_density_prf_all = None, c_density_prf_1halo = None, c_halos_id = None, c_redshift = None, t_dyn_step = 0):
     #TODO have it so you don't have to delete the .hdf5 file each time
     prim_only = False
     if c_halos_pos is None or c_halos_r200m is None or c_density_prf_all is None or c_density_prf_1halo is None or c_halos_id is None:
@@ -298,7 +302,7 @@ def split_halo_by_mass(num_bins, num_ptl_params, num_iter, times_r200m, p_halo_m
         dataset_idxs = train_indices
     else:
         dataset_idxs = test_indices
-
+           
     # choose all of these halos information
     p_halos_pos = p_halos_pos[dataset_idxs]
     p_halos_vel = p_halos_vel[dataset_idxs]
@@ -308,8 +312,8 @@ def split_halo_by_mass(num_bins, num_ptl_params, num_iter, times_r200m, p_halo_m
     p_density_prf_1halo = p_density_prf_1halo[dataset_idxs]
     p_halo_masses = p_halo_masses[dataset_idxs]
     p_num_particles_per_halo = p_num_particles_per_halo[dataset_idxs]
-
-    
+    p_halos_first = p_halos_first[dataset_idxs]
+    p_halos_n = p_halos_n[dataset_idxs]
     p_total_num_particles = np.sum(p_num_particles_per_halo)
     # convert masses to peaks
     p_scaled_halo_mass = p_halo_masses/little_h # units M⊙/h
@@ -324,12 +328,6 @@ def split_halo_by_mass(num_bins, num_ptl_params, num_iter, times_r200m, p_halo_m
         c_num_particles_per_halo, c_halo_masses, c_t_dyn = initial_search(c_halos_pos, times_r200m, c_halos_r200m, c_particle_tree, c_red_shift)
         
     file_counter = 0
-    all_p_n_pericenters = np.zeros(p_total_num_particles)
-    
-    # start_nu = np.min(peak_heights)
-    # max_nu = np.max(peak_heights)
-    # nu_split = (max_nu - start_nu)/num_iter
-
     num_iter = int(np.ceil(peak_heights.shape[0] / num_halo_per_split))
     print("Total num bins:",num_iter)
     color = iter(cm.rainbow(np.linspace(0, 1, num_iter)))
@@ -338,13 +336,10 @@ def split_halo_by_mass(num_bins, num_ptl_params, num_iter, times_r200m, p_halo_m
     for j in range(num_iter):
         t_start = time.time()
         c = next(color)
-        #end_nu = start_nu + nu_split
-        #print("\nStart split:", start_nu, "to", end_nu)
+        #Get the indices of the halos that are within the desired peaks in the primary snapsho
+        # halos_within_range = np.where((peak_heights >= start_nu) & (peak_heights < end_nu))[0]
+        # print("Num halos: ", halos_within_range.shape[0])
         
-        # Get the indices of the halos that are within the desired peaks in the primary snapsho
-        #halos_within_range = np.where((peak_heights >= start_nu) & (peak_heights < end_nu))[0]
-        #print("Num halos: ", halos_within_range.shape[0])
-
         if j < num_iter - 1:
             halos_within_range = np.arange((j * num_halo_per_split), ((j+1) * num_halo_per_split))
         else:
@@ -354,17 +349,32 @@ def split_halo_by_mass(num_bins, num_ptl_params, num_iter, times_r200m, p_halo_m
         if halos_within_range.shape[0] > 0:
             use_halo_idxs = dataset_idxs[halos_within_range]
             p_use_halo_pos = p_halos_pos[halos_within_range]
+            p_use_halo_vel = p_halos_vel[halos_within_range]
             p_use_halo_r200m = p_halos_r200m[halos_within_range]
             p_use_density_prf_all = p_density_prf_all[halos_within_range]
             p_use_density_prf_1halo = p_density_prf_1halo[halos_within_range]
             p_use_num_particles = p_num_particles_per_halo[halos_within_range]
             p_use_halo_id = p_halos_id[halos_within_range]
+            p_use_halo_first = p_halos_first[halos_within_range]
+            p_use_halo_n = p_halos_n[halos_within_range]
             p_total_num_use_particles = np.sum(p_use_num_particles)
             print("Num particles primary: ", p_total_num_use_particles)
             
-            sparta_output = sparta.load(filename = sparta_file_path, halo_ids = p_use_halo_id, log_level = 0)
-            p_orbital_assign, p_rad_vel, p_scaled_radii, p_tang_vel, p_n_pericenters = search_halos(p_particle_tree, sparta_output, use_halo_idxs, p_use_halo_pos, p_use_halo_r200m, times_r200m, p_total_num_use_particles, p_use_density_prf_all, p_use_density_prf_1halo, p_use_halo_id, sparta_file_path, snapshot_list, False, p_box_size, p_particles_pos, p_particles_vel, p_particles_pid, p_rho_m, p_halos_vel, p_red_shift, p_hubble_constant)
-            all_p_n_pericenters[file_counter:file_counter+p_total_num_use_particles] = p_n_pericenters
+            sparta_output = sparta.load(filename=hdf5_file_path, halo_ids=p_use_halo_id, load_halo_data=True, results = ['oct'], log_level=0)
+            new_idxs = conv_halo_id_spid(p_use_halo_id, sparta_output, p_snap)
+
+            use_halo_idxs = use_halo_idxs[new_idxs]
+            p_use_halo_pos = p_use_halo_pos[new_idxs]
+            p_use_halo_vel = p_use_halo_vel[new_idxs]
+            p_use_halo_r200m = p_use_halo_r200m[new_idxs]
+            p_use_density_prf_all = p_use_density_prf_all[new_idxs]
+            p_use_density_prf_1halo = p_use_density_prf_1halo[new_idxs]
+            p_use_num_particles = p_use_num_particles[new_idxs]
+            p_use_halo_id = p_use_halo_id[new_idxs]
+            p_use_halo_first = p_use_halo_first[new_idxs]
+            p_use_halo_n = p_use_halo_n[new_idxs]
+
+            p_orbital_assign, p_rad_vel, p_scaled_radii, p_tang_vel = search_halos(p_particle_tree, sparta_output, use_halo_idxs, p_use_halo_first, p_use_halo_n, p_use_halo_pos, p_use_halo_r200m, times_r200m, p_total_num_use_particles, p_use_density_prf_all, p_use_density_prf_1halo, p_use_halo_id, sparta_file_path, snapshot_list, False, p_box_size, p_particles_pos, p_particles_vel, p_particles_pid, p_rho_m, p_use_halo_vel, p_red_shift, p_hubble_constant)
 
             if prim_only == False:
                 all_scaled_radii = np.zeros((p_total_num_use_particles,2))
@@ -380,7 +390,7 @@ def split_halo_by_mass(num_bins, num_ptl_params, num_iter, times_r200m, p_halo_m
                 c_total_num_use_particles = np.sum(c_use_num_particles)
                 print("Num particles compare: ", c_total_num_use_particles)
                          
-                c_orbital_assign, c_rad_vel, c_scaled_radii, c_tang_vel, c_n_pericenters = search_halos(c_particle_tree, sparta_output, use_halo_idxs, c_use_halo_pos, c_use_halos_r200m, times_r200m, c_total_num_use_particles, c_use_density_prf_all, c_use_density_prf_1halo, c_use_halo_id, sparta_file_path, snapshot_list, True, c_box_size, c_particles_pos, c_particles_vel, c_particles_pid, c_rho_m, c_halos_vel, c_red_shift, c_hubble_constant)
+                c_orbital_assign, c_rad_vel, c_scaled_radii, c_tang_vel = search_halos(c_particle_tree, sparta_output, use_halo_idxs, p_use_halo_first, p_use_halo_n, c_use_halo_pos, c_use_halos_r200m, times_r200m, c_total_num_use_particles, c_use_density_prf_all, c_use_density_prf_1halo, c_use_halo_id, sparta_file_path, snapshot_list, True, c_box_size, c_particles_pos, c_particles_vel, c_particles_pid, c_rho_m, c_halos_vel, c_red_shift, c_hubble_constant)
 
                 match_pidh_idx = np.intersect1d(p_orbital_assign[:,0], c_orbital_assign[:,0], return_indices=True)
                 all_scaled_radii[:,0] = p_scaled_radii
@@ -415,12 +425,8 @@ def split_halo_by_mass(num_bins, num_ptl_params, num_iter, times_r200m, p_halo_m
                     save_to_hdf5(new_file, all_particle_properties, "Tangential_vel_", dataset = all_tang_vel, chunk = True, max_shape = use_max_shape, curr_idx = file_counter, max_num_keys = num_ptl_params)
 
             file_counter = file_counter + all_scaled_radii.shape[0]
-        if train:
-            with open(save_location + "train_n_pericenters.pickle", "wb") as pickle_file:
-                pickle.dump(all_p_n_pericenters, pickle_file)
-        else:
-            with open(save_location + "test_n_pericenters.pickle", "wb") as pickle_file:
-                pickle.dump(all_p_n_pericenters, pickle_file)
+
+
         t_end = time.time()
         print("finished bin:", j, "in", np.round((t_end- t_start)/60,2), "minutes,", np.round((t_end- t_start),2), "seconds")
         # print("finished bin:", start_nu, "to", end_nu, "in", np.round((t_end- t_start)/60,2), "minutes,", np.round((t_end- t_start),2), "seconds")
@@ -443,7 +449,7 @@ if prim_only == True:
         os.makedirs(save_location)
         
 p_particles_pid, p_particles_vel, p_particles_pos, mass = load_or_pickle_ptl_data(str(p_snap), snapshot_path, p_scale_factor, little_h, path_to_pickle)
-p_halos_pos, p_halos_vel, p_halos_r200m, p_halos_id, p_density_prf_all, p_density_prf_1halo, p_halos_status, p_halos_last_snap = load_or_pickle_SPARTA_data(curr_sparta_file, hdf5_file_path, p_scale_factor, little_h, p_snap, path_to_pickle)
+p_halos_pos, p_halos_vel, p_halos_r200m, p_halos_id, p_density_prf_all, p_density_prf_1halo, p_halos_status, p_halos_last_snap, p_halos_n, p_halos_first = load_or_pickle_SPARTA_data(curr_sparta_file, hdf5_file_path, p_scale_factor, little_h, p_snap, path_to_pickle)
 # construct search trees for each snapshot
 p_particle_tree = cKDTree(data = p_particles_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size)
 
@@ -460,20 +466,11 @@ if prim_only == True:
     match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_snap))[0]
 total_num_halos = match_halo_idxs.shape[0]
 
-num_test_halos = int(np.ceil(total_num_halos * test_halos_ratio))
+train_indices, test_indices = np.split(match_halo_idxs, [int((1-test_halos_ratio) * total_num_halos)])
 print("Total num halos:", total_num_halos)
-print("Num train halos:", total_num_halos - num_test_halos)
-print("Num test halos:", num_test_halos)
+print("Num train halos:", train_indices.shape[0])
+print("Num test halos:", test_indices.shape[0])
 print("Total num ptls:", np.sum(p_num_particles_per_halo))
-
-# choose how many test halos we want to take out and which indices belong to which dataset
-rng = np.random.default_rng(seed = 100)
-all_indices = np.arange(0,total_num_halos)
-test_indices = rng.choice(all_indices, size = num_test_halos, replace = False)
-train_indices = np.delete(all_indices, test_indices)
-
-train_indices = match_halo_idxs[train_indices]
-test_indices = match_halo_idxs[test_indices]
 
 with open(save_location + "test_indices.pickle", "wb") as pickle_file:
     pickle.dump(test_indices, pickle_file)
@@ -484,12 +481,16 @@ t4 = time.time()
 print("\nFinish setup:", (t4- t3), "seconds using snapshots:",snapshot_list)
 
 if prim_only == False:
-    c_particle_tree = cKDTree(data = c_particles_pos, leafsize = 3, balanced_tree = False, boxsize = c_box_size)                    
-    split_halo_by_mass(num_bins, num_save_ptl_params, num_iter, times_r200m, p_halo_masses, p_num_particles_per_halo, p_halos_pos, p_halos_vel, p_halos_r200m, p_density_prf_all, p_density_prf_1halo, p_halos_id, sparta_file_path = hdf5_file_path, sparta_file_name = curr_sparta_file, snapshot_list = snapshot_list, new_file = True, train = True, train_indices = train_indices, test_indices = test_indices, c_halos_pos = c_halos_pos, c_halos_r200m = c_halos_r200m, c_density_prf_all = c_density_prf_all, c_density_prf_1halo = c_density_prf_1halo, c_halos_id = c_halos_id, c_redshift=c_red_shift, t_dyn_step=t_dyn_step)    
-    split_halo_by_mass(num_bins, num_save_ptl_params, num_iter, times_r200m, p_halo_masses, p_num_particles_per_halo, p_halos_pos, p_halos_vel, p_halos_r200m, p_density_prf_all, p_density_prf_1halo, p_halos_id, sparta_file_path = hdf5_file_path, sparta_file_name = curr_sparta_file, snapshot_list = snapshot_list, new_file = True, train = False, train_indices = train_indices, test_indices = test_indices, c_halos_pos = c_halos_pos, c_halos_r200m = c_halos_r200m, c_density_prf_all = c_density_prf_all, c_density_prf_1halo = c_density_prf_1halo, c_halos_id = c_halos_id, c_redshift=c_red_shift, t_dyn_step=t_dyn_step)    
+    c_particle_tree = cKDTree(data = c_particles_pos, leafsize = 3, balanced_tree = False, boxsize = c_box_size) 
+    print("Start train set")                   
+    split_halo_by_mass(num_bins, num_save_ptl_params, times_r200m, p_halo_masses, p_num_particles_per_halo, p_halos_pos, p_halos_vel, p_halos_r200m, p_density_prf_all, p_density_prf_1halo, p_halos_id, p_halos_first, p_halos_n, sparta_file_path = hdf5_file_path, sparta_file_name = curr_sparta_file, snapshot_list = snapshot_list, new_file = True, train = True, train_indices = train_indices, test_indices = test_indices, c_halos_pos = c_halos_pos, c_halos_r200m = c_halos_r200m, c_density_prf_all = c_density_prf_all, c_density_prf_1halo = c_density_prf_1halo, c_halos_id = c_halos_id, c_redshift=c_red_shift, t_dyn_step=t_dyn_step)    
+    print("Start test set")
+    split_halo_by_mass(num_bins, num_save_ptl_params, times_r200m, p_halo_masses, p_num_particles_per_halo, p_halos_pos, p_halos_vel, p_halos_r200m, p_density_prf_all, p_density_prf_1halo, p_halos_id, p_halos_first, p_halos_n, sparta_file_path = hdf5_file_path, sparta_file_name = curr_sparta_file, snapshot_list = snapshot_list, new_file = True, train = False, train_indices = train_indices, test_indices = test_indices, c_halos_pos = c_halos_pos, c_halos_r200m = c_halos_r200m, c_density_prf_all = c_density_prf_all, c_density_prf_1halo = c_density_prf_1halo, c_halos_id = c_halos_id, c_redshift=c_red_shift, t_dyn_step=t_dyn_step)    
 if prim_only == True:
-    split_halo_by_mass(num_bins, num_save_ptl_params, num_iter, times_r200m, p_halo_masses, p_num_particles_per_halo, p_halos_pos, p_halos_vel, p_halos_r200m, p_density_prf_all, p_density_prf_1halo, p_halos_id, sparta_file_path = hdf5_file_path, sparta_file_name = curr_sparta_file, snapshot_list = snapshot_list, new_file = True, train = True, train_indices = train_indices, test_indices = test_indices)    
-    split_halo_by_mass(num_bins, num_save_ptl_params, num_iter, times_r200m, p_halo_masses, p_num_particles_per_halo, p_halos_pos, p_halos_vel, p_halos_r200m, p_density_prf_all, p_density_prf_1halo, p_halos_id, sparta_file_path = hdf5_file_path, sparta_file_name = curr_sparta_file, snapshot_list = snapshot_list, new_file = True, train = False, train_indices = train_indices, test_indices = test_indices)    
+    print("Start train set")
+    split_halo_by_mass(num_bins, num_save_ptl_params, times_r200m, p_halo_masses, p_num_particles_per_halo, p_halos_pos, p_halos_vel, p_halos_r200m, p_density_prf_all, p_density_prf_1halo, p_halos_id, p_halos_first, p_halos_n, sparta_file_path = hdf5_file_path, sparta_file_name = curr_sparta_file, snapshot_list = snapshot_list, new_file = True, train = True, train_indices = train_indices, test_indices = test_indices)    
+    print("Start test set")
+    split_halo_by_mass(num_bins, num_save_ptl_params, times_r200m, p_halo_masses, p_num_particles_per_halo, p_halos_pos, p_halos_vel, p_halos_r200m, p_density_prf_all, p_density_prf_1halo, p_halos_id, p_halos_first, p_halos_n, sparta_file_path = hdf5_file_path, sparta_file_name = curr_sparta_file, snapshot_list = snapshot_list, new_file = True, train = False, train_indices = train_indices, test_indices = test_indices)    
 
 t5 = time.time()
 print("finish calculations:", np.round((t5- t3)/60,2), "minutes,", (t5- t3), "seconds" + "\n")

@@ -179,21 +179,6 @@ def smaller(new,old):
     else:
         return old
 
-def check_high_per_err(per_err, floor, n_pericenter, x_data, y_data, hist_edges):
-    x_edges = hist_edges[1]
-    y_edges = hist_edges[2]
-
-    check_idxs = np.where(np.abs(per_err) > floor)
-    # check_idxs[0] = row # and check_idxs[1] = col #
-    if check_idxs[0].size > 0:
-        for i in range(check_idxs[0].size):
-            x_min = x_edges[check_idxs[1][i]]
-            x_max = x_edges[check_idxs[1][i]+1]
-            y_min = y_edges[check_idxs[0][i]]
-            y_max = y_edges[check_idxs[0][i]+1]
-
-            peri_in_box = n_pericenter[np.where((x_data > x_min) & (x_data < x_max) & (y_data > y_min) & (y_data < y_max))]
-
 def plot_incorrectly_classified(correct_labels, ml_labels, radii, rad_vel, tang_vel, num_bins, start_nu, end_nu, save_location): 
     min_ptl = 30
     max_radius = np.max(radii)
@@ -262,7 +247,7 @@ def plot_incorrectly_classified(correct_labels, ml_labels, radii, rad_vel, tang_
     miss_class_fig.savefig(save_location + "/2dhist/nu_" + str(start_nu) + "_to_" + str(end_nu) + "_miss_class.png")
     
 
-def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf, n_pericenter, title, num_bins, start_nu, end_nu, show, save, save_location):
+def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf, title, num_bins, start_nu, end_nu, show, save, save_location):
     create_directory(save_location + "/2dhist/")
     mpl.rcParams.update({'font.size': 8})
     min_ptl = 30
@@ -297,13 +282,6 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     per_err_4 = percent_error(ml_hist4[0], act_hist4[0])
     per_err_5 = percent_error(ml_hist5[0], act_hist5[0])
     per_err_6 = percent_error(ml_hist6[0], act_hist6[0])
-
-    check_high_per_err(per_err_1, floor, n_pericenter, act_orb_radius, act_orb_rad_vel, act_hist1)
-    check_high_per_err(per_err_2, floor, n_pericenter, act_orb_radius, act_orb_tang_vel, act_hist2)
-    check_high_per_err(per_err_3, floor, n_pericenter, act_orb_tang_vel, act_orb_rad_vel, act_hist3)
-    check_high_per_err(per_err_4, floor, n_pericenter, act_inf_radius, act_inf_rad_vel, act_hist4)
-    check_high_per_err(per_err_5, floor, n_pericenter, act_inf_radius, act_inf_tang_vel, act_hist5)
-    check_high_per_err(per_err_6, floor, n_pericenter, act_inf_tang_vel, act_inf_rad_vel, act_hist6)
 
     max_err = np.max(per_err_1)
     max_err = bigger(np.max(per_err_2), max_err)
