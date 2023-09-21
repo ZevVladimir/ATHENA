@@ -35,6 +35,7 @@ from pygadgetreader import readsnap, readheader
 from sparta import sparta
 from data_and_loading_functions import build_ml_dataset, check_pickle_exist_gadget, check_pickle_exist_hdf5_prop, choose_halo_split, create_directory
 from visualization_functions import *
+from xgboost_model_creator import model_creator
 ##################################################################################################################
 
 # set what the paths should be for saving and getting the data
