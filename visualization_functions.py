@@ -7,7 +7,7 @@ import seaborn as sns
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from sklearn.metrics import classification_report
 from data_and_loading_functions import check_pickle_exist_gadget, create_directory
-import general_plotting as gp
+# import general_plotting as gp
 from textwrap import wrap
 
 def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_assn, title, save_location, show_graph = False, save_graph = False):
