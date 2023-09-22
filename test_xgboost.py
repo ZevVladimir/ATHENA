@@ -75,8 +75,8 @@ all_file_names.sort()
 for filename in all_file_names:
     with open("/home/zvladimi/MLOIS/xgboost_datasets_plots/sparta_cbol_l0063_n0256_190to183_6r200msearch/models/" + filename, "rb") as pickle_file:
         model = pickle.load(pickle_file)
+    model.load_models()
     all_models.append(model)
-    print(model.get_sub_models())
     
 # Determine where the scaled radii, rad vel, and tang vel are located within the dtaset
 for i,key in enumerate(test_all_keys[2:]):
@@ -165,7 +165,6 @@ for i in range(num_iter):
                 use_ptls = np.where(test_halos_within[:,int(2 + (num_params_per_snap * (i+1)))] == 0)[0]
 
             curr_dataset = curr_dataset[use_ptls]
-            print(curr_dataset)
             all_models[i].predict(curr_dataset)
             test_predict[use_ptls] = all_models[i].get_predicts()
 

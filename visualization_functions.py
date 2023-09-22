@@ -6,9 +6,54 @@ from calculation_functions import calculate_distance
 import seaborn as sns
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from sklearn.metrics import classification_report
+from colossus.halo import mass_so
 from data_and_loading_functions import check_pickle_exist_gadget, create_directory
+from calculation_functions import calc_v200m
 # import general_plotting as gp
 from textwrap import wrap
+
+def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r200_per_part, red_shift, hubble_constant, little_h):
+    start_bin_val = 0.001
+    finish_bin_val = np.max(scaled_radii)
+    
+    bins = np.logspace(np.log10(start_bin_val), np.log10(finish_bin_val), num_bins)
+    
+    bin_start = 0
+    average_val_part = np.zeros((num_bins,2), dtype = np.float32)
+    average_val_hubble = np.zeros((num_bins,2), dtype = np.float32)
+    
+    # For each bin
+    for i in range(num_bins - 1):
+        bin_end = bins[i]
+        
+        # Find which particle belong in that bin
+        indices_in_bin = np.where((scaled_radii >= bin_start) & (scaled_radii < bin_end))[0]
+ 
+        if indices_in_bin.size != 0:
+            # Get all the scaled radii within this bin and average it
+            use_scaled_particle_radii = scaled_radii[indices_in_bin]
+            average_val_part[i, 0] = np.average(use_scaled_particle_radii)
+            
+            # Get all the radial velocities within this bin and average it
+            use_vel_rad = radial_vel[indices_in_bin]
+            average_val_part[i, 1] = np.average(use_vel_rad)
+            
+            # get all the radii within this bin
+            hubble_radius = particle_radii[indices_in_bin]
+
+            # Find the median value and then the median value for the corresponding R200m values
+            median_hubble_radius = np.median(hubble_radius)
+            median_hubble_r200 = np.median(halo_r200_per_part[indices_in_bin])
+            median_scaled_hubble = median_hubble_radius/median_hubble_r200
+            
+            # Calculate the v200m value for the corresponding R200m value found
+            average_val_hubble[i,0] = median_scaled_hubble
+            corresponding_hubble_m200m = mass_so.R_to_M(median_hubble_r200, red_shift, "200c") * little_h # convert to M⊙
+            average_val_hubble[i,1] = (median_hubble_radius * hubble_constant)/calc_v200m(corresponding_hubble_m200m, median_hubble_r200)
+            
+        bin_start = bin_end
+    
+    return average_val_part, average_val_hubble 
 
 def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_assn, title, save_location, show_graph = False, save_graph = False):
     create_directory(save_location + "dens_prfl_ratio/")
@@ -60,25 +105,25 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
 
     fig, ax = plt.subplots(1,2, layout = "tight")
 
-    ax[0].plot(middle_bins, calculated_prf_all/actual_prf_all, 'r', label = "ML / SPARTA prf all")
+    ax[0].plot(middle_bins, calculated_prf_all/actual_prf_all, 'r', label = "My prf / SPARTA prf all")
     #ax.plot(middle_bins, actual_prf_all, 'c--', label = "SPARTA profile all")
 
-    ax[0].plot(middle_bins, calculated_prf_orb/actual_prf_1halo, 'b', label = "ML / SPARTA profile orb")
-    ax[0].plot(middle_bins, calculated_prf_inf/(actual_prf_all - actual_prf_1halo), 'g', label = "ML / SPARTA profile inf")
+    ax[0].plot(middle_bins, calculated_prf_orb/actual_prf_1halo, 'b', label = "My prf / SPARTA profile orb")
+    ax[0].plot(middle_bins, calculated_prf_inf/(actual_prf_all - actual_prf_1halo), 'g', label = "My prf / SPARTA profile inf")
     
     #ax.plot(middle_bins, actual_prf_1halo, 'm--', label = "SPARTA profile orbit")
     #ax.plot(middle_bins, actual_prf_all - actual_prf_1halo, 'y--', label = "SPARTA profile inf")
     
-    ax[0].set_title(wrap("ML Predicted  / Actual Density Profile for nu: " + title))
+    ax[0].set_title(wrap("My Predicted  / Actual Density Profile for nu: " + title))
     ax[0].set_xlabel("radius $r/R_{200m}$")
-    ax[0].set_ylabel("ML Dens Prf / Act Dens Prf")
+    ax[0].set_ylabel("My Dens Prf / Act Dens Prf")
     ax[0].set_xscale("log")
     ax[0].set_yscale("log")
     ax[0].legend()
 
-    ax[1].plot(middle_bins, calculated_prf_all, 'r-', label = "ML prf all")
-    ax[1].plot(middle_bins, calculated_prf_orb, 'b-', label = "ML prf orb")
-    ax[1].plot(middle_bins, calculated_prf_inf, 'g-', label = "ML prf inf")
+    ax[1].plot(middle_bins, calculated_prf_all, 'r-', label = "My prf all")
+    ax[1].plot(middle_bins, calculated_prf_orb, 'b-', label = "My prf orb")
+    ax[1].plot(middle_bins, calculated_prf_inf, 'g-', label = "My prf inf")
     ax[1].plot(middle_bins, actual_prf_all, 'r--', label = "SPARTA prf all")
     ax[1].plot(middle_bins, actual_prf_1halo, 'b--', label = "SPARTA prf orb")
     ax[1].plot(middle_bins, (actual_prf_all - actual_prf_1halo), 'g--', label = "SPARTA prf inf")

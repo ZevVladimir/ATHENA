@@ -6,6 +6,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report  
 import time 
 import pickle
+import re
 import os
 from imblearn import under_sampling, over_sampling
 from data_and_loading_functions import build_ml_dataset, check_pickle_exist_gadget, check_pickle_exist_hdf5_prop, choose_halo_split, create_directory
@@ -67,6 +68,14 @@ class model_creator:
         y_train_within = self.y_train[np.where((self.X_train[:,self.scaled_radii_loc] > low_cutoff) & (self.X_train[:,self.scaled_radii_loc] < high_cutoff))[0]]
 
         return X_train_within, y_train_within
+    
+    def load_models(self):
+        for filename in os.listdir(self.save_location + "/sub_models/"):
+            if int(re.search(r'\d+', filename).group()) == self.num_params:
+                with open(self.save_location + "/sub_models/" + filename, "rb") as pickle_file:
+                    model = pickle.load(pickle_file)
+                    self.sub_models.append(model)
+                
 
     def train_model(self):
         model_location = self.save_location + "/sub_models/"
@@ -119,11 +128,9 @@ class model_creator:
             use_dataset = dataset[:,2:]
             use_labels = dataset[:,1]
 
-        print(len(self.sub_models))
         # for each submodel get the predictions
         all_predicts = np.zeros((use_dataset.shape[0],(len(self.sub_models)*2)))
         for i,model in enumerate(self.sub_models):
-            print(model)
             all_predicts[:,2*i:(2*i+2)] = model.predict_proba(use_dataset)
 
         # Then determine which class each particle belongs to based of each model's prediction

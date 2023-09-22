@@ -57,30 +57,20 @@ def load_or_pickle_ptl_data(snapshot, snapshot_path, scale_factor, little_h, pic
 
 def load_or_pickle_SPARTA_data(sparta_name, hdf5_path, scale_factor, little_h, snap, pickle_path):
     halos_pos = check_pickle_exist_hdf5_prop(snap, "halos", "position", "", hdf5_path, sparta_name, pickle_path)
-    halos_vel = check_pickle_exist_hdf5_prop(snap, "halos", "velocity", "", hdf5_path, sparta_name, pickle_path)
     halo_last_snap = check_pickle_exist_hdf5_prop(snap, "halos", "last_snap", "", hdf5_path, sparta_name, pickle_path)
     halos_r200m = check_pickle_exist_hdf5_prop(snap, "halos", "R200m", "", hdf5_path, sparta_name, pickle_path)
     halo_id = check_pickle_exist_hdf5_prop(snap, "halos", "id", "", hdf5_path, sparta_name, pickle_path)
     halo_status = check_pickle_exist_hdf5_prop(snap, "halos", "status", "", hdf5_path, sparta_name, pickle_path)
     
-    density_prf_all = check_pickle_exist_hdf5_prop(snap, "anl_prf", "M_all", "", hdf5_path, sparta_name, pickle_path)
-    density_prf_1halo = check_pickle_exist_hdf5_prop(snap, "anl_prf", "M_1halo", "", hdf5_path, sparta_name, pickle_path)
-    
-    halo_n = check_pickle_exist_hdf5_prop(snap, "tcr_ptl", "res_oct", "halo_n", hdf5_path, sparta_name, pickle_path)
-    halo_first = check_pickle_exist_hdf5_prop(snap, "tcr_ptl", "res_oct", "halo_first", hdf5_path, sparta_name, pickle_path)
-    
     halos_pos = halos_pos[:,snap,:]
-    halos_vel = halos_vel[:,snap,:]
     halos_r200m = halos_r200m[:,snap]
     halo_id = halo_id[:,snap]
     halo_status = halo_status[:,snap]
-    density_prf_all = density_prf_all[:,snap,:]
-    density_prf_1halo = density_prf_1halo[:,snap,:]
     
     halos_pos = halos_pos * 10**3 * scale_factor * little_h # convert to kpc and physical
     halos_r200m = halos_r200m * little_h # convert to kpc
 
-    return halos_pos, halos_vel, halos_r200m, halo_id, density_prf_all, density_prf_1halo, halo_status, halo_last_snap, halo_n, halo_first
+    return halos_pos, halos_r200m, halo_id, halo_status, halo_last_snap
 
 def standardize(values):
     for col in range(values.shape[1]):
