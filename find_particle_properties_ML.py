@@ -74,11 +74,11 @@ def initial_search(halo_positions, search_radius, halo_r200m, tree, red_shift):
                 
     return particles_per_halo, all_halo_mass, t_dyn
 
-def search_halos(particle_tree, sparta_output, halo_idxs, search_radius, total_particles, curr_snap, box_size, particles_pos, particles_vel, particles_pid, rho_m, red_shift, hubble_constant, comp_snap):
+def search_halos(particle_tree, sparta_output, halo_idxs, search_radius, total_particles, curr_snap, box_size, particles_pos, particles_vel, particles_pid, rho_m, red_shift, scale_factor, hubble_constant, comp_snap):
     num_halos = halo_idxs.shape[0]
-    halos_pos = sparta_output['halos']['position'][:,curr_snap,:]
+    halos_pos = sparta_output['halos']['position'][:,curr_snap,:] * 10**3 * scale_factor * little_h
     halos_vel = sparta_output['halos']['velocity'][:,curr_snap,:]
-    halos_r200m = sparta_output['halos']['R200m'][:,curr_snap]
+    halos_r200m = sparta_output['halos']['R200m'][:,curr_snap] * little_h
     dens_prf_all = sparta_output['anl_prf']['M_all'][:,curr_snap,:]
     dens_prf_1halo = sparta_output['anl_prf']['M_1halo'][:,curr_snap,:]
 
@@ -97,20 +97,20 @@ def search_halos(particle_tree, sparta_output, halo_idxs, search_radius, total_p
     t_start = time.time()        
 
     for i in range(num_halos):
+        current_halo_pos = halos_pos[i]
+
         # find the indices of the particles within the expected r200 radius multiplied by times_r200 
-        indices = particle_tree.query_ball_point(halos_pos[i], r = search_radius * halos_r200m[i])
+        indices = particle_tree.query_ball_point(current_halo_pos, r = search_radius * halos_r200m[i])
         
-        #print(indices)
         #Only take the particle positions that where found with the tree
         current_particles_pos = particles_pos[indices,:]
         current_particles_vel = particles_vel[indices,:]
         current_particles_pid = particles_pid[indices]
         current_particles_pid = current_particles_pid.astype(np.int64)
         num_new_particles = len(indices)
-
+        
         # current_orbit_assn_sparta: halo_idx, PID, orb/inf
         current_orbit_assn_sparta = np.zeros((current_particles_pid.size, 2), dtype = np.uint64)
-        current_halos_pos = halos_pos[i,:]        
 
         # generate unique index for each particle according to it's id and the halo it belongs to
         curr_halo_idx = halo_idxs[i]
@@ -121,7 +121,7 @@ def search_halos(particle_tree, sparta_output, halo_idxs, search_radius, total_p
         all_part_vel[start:start+num_new_particles] = current_particles_vel
             
         #calculate the radii of each particle based on the distance formula
-        unsorted_particle_radii, unsorted_coord_dist = calculate_distance(current_halos_pos[0], current_halos_pos[1], current_halos_pos[2], current_particles_pos[:,0],current_particles_pos[:,1], current_particles_pos[:,2], num_new_particles, box_size)         
+        unsorted_particle_radii, unsorted_coord_dist = calculate_distance(current_halo_pos[0], current_halo_pos[1], current_halo_pos[2], current_particles_pos[:,0],current_particles_pos[:,1], current_particles_pos[:,2], num_new_particles, box_size)         
         
         # Assign particles to infalling or orbiting based off SPARTA output parameters for tracers
         if comp_snap == False:
@@ -132,7 +132,7 @@ def search_halos(particle_tree, sparta_output, halo_idxs, search_radius, total_p
             sparta_n_pericenter = sparta_output['tcr_ptl']['res_oct']['n_pericenter'][curr_halo_first:curr_halo_first+curr_halo_n]
             sparta_tracer_ids = sparta_output['tcr_ptl']['res_oct']['tracer_id'][curr_halo_first:curr_halo_first+curr_halo_n]
             sparta_n_is_lower_limit = sparta_output['tcr_ptl']['res_oct']['n_is_lower_limit'][curr_halo_first:curr_halo_first+curr_halo_n]
-            
+
             orbit_assn_sparta = np.zeros((sparta_tracer_ids.size, 2), dtype = np.int64)
             orbit_assn_sparta[:,0] = sparta_tracer_ids
 
@@ -189,7 +189,7 @@ def search_halos(particle_tree, sparta_output, halo_idxs, search_radius, total_p
 
         start += num_new_particles
 
-        if i % 100 == 0 and i != 0 and comp_snap == False:
+        if i % 250 == 0 and comp_snap == False:
             compare_density_prf(radii = particle_radii/halos_r200m[i], actual_prf_all=dens_prf_all[i], actual_prf_1halo=dens_prf_1halo[i], mass=mass, orbit_assn=current_orbit_assn_sparta, title = str(halo_idxs[i]), save_location="/home/zvladimi/MLOIS/Random_figures/", show_graph=False, save_graph=True)
         
         print_at = int(np.ceil((num_halo_per_split/num_print_per_split)))
@@ -252,27 +252,27 @@ def split_halo_by_mass(num_ptl_params, times_r200m, p_num_particles_per_halo, p_
     print("Total num bins:",num_iter)
         
     # For how many mass bin splits
-    for j in range(num_iter):
+    for i in range(num_iter):
         t_start = time.time()
 
-        if j < num_iter - 1:
-            halos_within_range = np.arange((j * num_halo_per_split), ((j+1) * num_halo_per_split))
+        if i < num_iter - 1:
+            halos_within_range = np.arange((i * num_halo_per_split), ((i+1) * num_halo_per_split))
         else:
-            halos_within_range = np.arange((j * num_halo_per_split), total_num_halos)
+            halos_within_range = np.arange((i * num_halo_per_split), total_num_halos)
 
         # only get the parameters we want for this specific halo bin
         use_halo_idxs = dataset_idxs[halos_within_range]
         p_use_num_particles = p_num_particles_per_halo[halos_within_range]
         p_total_num_use_particles = np.sum(p_use_num_particles)
         print("Num particles primary: ", p_total_num_use_particles)
-        
+
         p_use_halo_id = p_halos_id[use_halo_idxs]
+   
         sparta_output = sparta.load(filename=hdf5_file_path, halo_ids=p_use_halo_id, load_halo_data=True, results = ['oct'], log_level=0)
         new_idxs = conv_halo_id_spid(p_use_halo_id, sparta_output, p_snap)
-
         use_halo_idxs = use_halo_idxs[new_idxs]
                                     
-        p_orbital_assign, p_rad_vel, p_scaled_radii, p_tang_vel = search_halos(p_particle_tree, sparta_output, use_halo_idxs, times_r200m, p_total_num_use_particles, p_snap, p_box_size, p_particles_pos, p_particles_vel, p_particles_pid, p_rho_m, p_red_shift, p_hubble_constant, comp_snap = False)
+        p_orbital_assign, p_rad_vel, p_scaled_radii, p_tang_vel = search_halos(p_particle_tree, sparta_output, use_halo_idxs, times_r200m, p_total_num_use_particles, p_snap, p_box_size, p_particles_pos, p_particles_vel, p_particles_pid, p_rho_m, p_red_shift, p_scale_factor, p_hubble_constant, comp_snap = False)
 
         if prim_only == False:
             all_scaled_radii = np.zeros((p_total_num_use_particles,2))
@@ -283,7 +283,7 @@ def split_halo_by_mass(num_ptl_params, times_r200m, p_num_particles_per_halo, p_
             c_total_num_use_particles = np.sum(c_use_num_particles)
             print("Num particles compare: ", c_total_num_use_particles)
                         
-            c_orbital_assign, c_rad_vel, c_scaled_radii, c_tang_vel = search_halos(c_particle_tree, sparta_output, use_halo_idxs, times_r200m, c_total_num_use_particles, c_snap, c_box_size, c_particles_pos, c_particles_vel, c_particles_pid, c_rho_m, c_red_shift, c_hubble_constant, comp_snap = True)
+            c_orbital_assign, c_rad_vel, c_scaled_radii, c_tang_vel = search_halos(c_particle_tree, sparta_output, use_halo_idxs, times_r200m, c_total_num_use_particles, c_snap, c_box_size, c_particles_pos, c_particles_vel, c_particles_pid, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, comp_snap = True)
 
             match_pidh_idx = np.intersect1d(p_orbital_assign[:,0], c_orbital_assign[:,0], return_indices=True)
             all_scaled_radii[:,0] = p_scaled_radii
@@ -321,9 +321,7 @@ def split_halo_by_mass(num_ptl_params, times_r200m, p_num_particles_per_halo, p_
 
 
         t_end = time.time()
-        print("finished bin:", j, "in", np.round((t_end- t_start)/60,2), "minutes,", np.round((t_end- t_start),2), "seconds")
-        # print("finished bin:", start_nu, "to", end_nu, "in", np.round((t_end- t_start)/60,2), "minutes,", np.round((t_end- t_start),2), "seconds")
-        # start_nu = end_nu
+        print("finished bin:", (i+1), "in", np.round((t_end- t_start)/60,2), "minutes,", np.round((t_end- t_start),2), "seconds \n")
         
 t1 = time.time()
 t3 = time.time()
@@ -349,6 +347,7 @@ if prim_only == False:
     # get the halo_masses and number of particles for primary and comparison snap
     p_num_particles_per_halo, p_halo_masses, t_dyn = initial_search(p_halos_pos, times_r200m, p_halos_r200m, p_particle_tree, p_red_shift)
     save_location, c_snap, c_box_size, c_rho_m, c_red_shift, c_hubble_constant, c_particles_pid, c_particles_vel, c_particles_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap = get_comp_snap(t_dyn=t_dyn,t_dyn_step=t_dyn_step)
+c_scale_factor = 1/(1+c_red_shift)
 
 # only take halos that are hosts in primary snap and exist past the p_snap and exist in some form at the comparison snap
 if prim_only == False:
@@ -356,9 +355,17 @@ if prim_only == False:
     
 if prim_only == True:
     match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_snap))[0]
+
 total_num_halos = match_halo_idxs.shape[0]
 
+rng = np.random.default_rng(11)
+rng.shuffle(match_halo_idxs)
+# split all indices into train and test groups
 train_indices, test_indices = np.split(match_halo_idxs, [int((1-test_halos_ratio) * total_num_halos)])
+# need to sort indices otherwise sparta.load breaks...
+train_indices = np.sort(train_indices)
+test_indices = np.sort(test_indices)
+
 print("Total num halos:", total_num_halos)
 print("Num train halos:", train_indices.shape[0])
 print("Num test halos:", test_indices.shape[0])
@@ -385,7 +392,7 @@ if prim_only == True:
     split_halo_by_mass(num_save_ptl_params, times_r200m, p_num_particles_per_halo, p_halos_id, sparta_file_name = curr_sparta_file, p_snap = p_snap, new_file = True, train = False, dataset_idxs = test_indices)    
 
 t5 = time.time()
-print("finish calculations:", np.round((t5- t3)/60,2), "minutes,", (t5- t3), "seconds" + "\n")
+print("finish calculations:", np.round((t5- t4)/60,2), "minutes,", (t5- t3), "seconds")
 
 t2 = time.time()
 print("Total time:", np.round((t2- t1)/60,2), "minutes,", (t2- t1), "seconds")

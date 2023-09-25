@@ -111,9 +111,6 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     ax[0].plot(middle_bins, calculated_prf_orb/actual_prf_1halo, 'b', label = "My prf / SPARTA profile orb")
     ax[0].plot(middle_bins, calculated_prf_inf/(actual_prf_all - actual_prf_1halo), 'g', label = "My prf / SPARTA profile inf")
     
-    #ax.plot(middle_bins, actual_prf_1halo, 'm--', label = "SPARTA profile orbit")
-    #ax.plot(middle_bins, actual_prf_all - actual_prf_1halo, 'y--', label = "SPARTA profile inf")
-    
     ax[0].set_title(wrap("My Predicted  / Actual Density Profile for nu: " + title))
     ax[0].set_xlabel("radius $r/R_{200m}$")
     ax[0].set_ylabel("My Dens Prf / Act Dens Prf")

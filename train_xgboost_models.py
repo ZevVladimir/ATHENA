@@ -76,10 +76,10 @@ for i in range(len(snapshot_list)):
             pickle.dump(new_model, pickle_file, pickle.HIGHEST_PROTOCOL)
     all_models.append(new_model)
     t3 = time.time()
-    print("Start training model",i,)
+    print("Start training model",int((num_params_per_snap * (i+1))+2),"params")
     all_models[i].train_model()
     t4 = time.time()
-    print("Finished training model",i,"in",np.round(((t4-t3)/60),2),"minutes")
+    print("Finished training model",int((num_params_per_snap * (i+1))+2),"params in",np.round(((t4-t3)/60),2),"minutes")
     all_models[i].predict(1)
     all_models[i].graph(corr_matrix = True, feat_imp = True)
 
