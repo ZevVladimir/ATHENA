@@ -173,10 +173,9 @@ for i in range(num_iter):
         classification = classification_report(actual_labels, test_predict, output_dict=True)
 
         all_accuracy.append(classification["accuracy"])
-        compare_density_prf(test_halos_within[:,2+scaled_radii_loc], density_prf_all_within, density_prf_1halo_within, mass, test_predict, title = str(start_nu) + "-" + str(end_nu), show_graph = False, save_graph = True, save_location = save_location)
-        plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "ML Predictions", num_bins, start_nu, end_nu, show = False, save = True, save_location=save_location)
-        graph_acc_by_bin(test_predict, actual_labels, test_halos_within[:,2+scaled_radii_loc], num_bins, start_nu, end_nu, plot = False, save = True, save_location = save_location)
-        plot_incorrectly_classified(actual_labels, test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], num_bins, start_nu, end_nu, save_location)
+        compare_density_prf(test_halos_within[:,2+scaled_radii_loc], density_prf_all_within, density_prf_1halo_within, mass, test_predict, title = str(np.floor(start_nu)) + "-" + str(np.ceil(end_nu)), show_graph = False, save_graph = True, save_location = save_location)
+        plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "ML Predictions", num_bins, np.floor(start_nu), np.ceil(end_nu), show = False, save = True, save_location=save_location)
+        graph_acc_by_bin(test_predict, actual_labels, test_halos_within[:,2+scaled_radii_loc], num_bins, np.floor(start_nu), np.ceil(end_nu), plot = False, save = True, save_location = save_location)
         
     start_nu = end_nu
     

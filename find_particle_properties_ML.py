@@ -10,6 +10,7 @@ import time
 import h5py
 import pickle
 import os
+from pairing import depair
 ##################################################################################################################
 # General params
 curr_sparta_file = "sparta_cbol_l0063_n0256"
@@ -22,7 +23,7 @@ t_dyn_step = .5
 snapshot_list = [190]
 times_r200m = 6
 total_num_snaps = 193
-#TODO have these params set automatically
+
 num_save_ptl_params = 5
 num_save_halo_params = 3
 test_halos_ratio = .2
@@ -33,8 +34,8 @@ hdf5_file_path = path_to_hdf5 + curr_sparta_file + ".hdf5"
 snapshot_path = path_to_snapshot + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
 
 # Params for splitting up the search
-num_halo_per_split = 1000
-num_print_per_split = 5
+num_halo_per_split = 2000
+num_print_per_split = 4
 cosmol = cosmology.setCosmology("bolshoi")
 little_h = cosmol.h 
 ##################################################################################################################
@@ -98,7 +99,6 @@ def search_halos(particle_tree, sparta_output, halo_idxs, search_radius, total_p
 
     for i in range(num_halos):
         current_halo_pos = halos_pos[i]
-
         # find the indices of the particles within the expected r200 radius multiplied by times_r200 
         indices = particle_tree.query_ball_point(current_halo_pos, r = search_radius * halos_r200m[i])
         
@@ -132,18 +132,25 @@ def search_halos(particle_tree, sparta_output, halo_idxs, search_radius, total_p
             sparta_n_pericenter = sparta_output['tcr_ptl']['res_oct']['n_pericenter'][curr_halo_first:curr_halo_first+curr_halo_n]
             sparta_tracer_ids = sparta_output['tcr_ptl']['res_oct']['tracer_id'][curr_halo_first:curr_halo_first+curr_halo_n]
             sparta_n_is_lower_limit = sparta_output['tcr_ptl']['res_oct']['n_is_lower_limit'][curr_halo_first:curr_halo_first+curr_halo_n]
-
+            # sparta_tracer_ids = np.array([1706759,2,342018,4,473602])
+            # sparta_n_pericenter = np.array([0,0,0,1,1,1])
+            # sparta_last_pericenter_snap = np.array([187,193,190,191,186,189])
+            # sparta_n_is_lower_limit = np.array([0,1,1,1,0])
+            #should be (0,0,1,)
             orbit_assn_sparta = np.zeros((sparta_tracer_ids.size, 2), dtype = np.int64)
             orbit_assn_sparta[:,0] = sparta_tracer_ids
-
+            #print(orbit_assn_sparta)
             sparta_n_pericenter[np.where(sparta_last_pericenter_snap > curr_snap)[0]] = 0 # only want pericenters that have occurred at or before this snapshot
-            orbit_assn_sparta[np.where(sparta_n_pericenter > 0)[0],1] = 1 # if there is more than one pericenter count as orbiting (1) and if it isn't it is infalling (0)
-            orbit_assn_sparta[np.where(sparta_n_is_lower_limit == 1)[0],1] = 1 # However particle can also be orbiting if n_is_lower_limit is 1
-
+            sparta_n_is_lower_limit[np.where(sparta_last_pericenter_snap > curr_snap)[0]] = 0
+            orbit_assn_sparta[np.where((sparta_n_pericenter > 0) | (sparta_n_is_lower_limit == 1))[0],1] = 1 # if there is more than one pericenter count as orbiting (1) and if it isn't it is infalling (0)
+            #orbit_assn_sparta[np.where[0],1] = 1 # However particle can also be orbiting if n_is_lower_limit is 1
+            #print(orbit_assn_sparta)
             poss_pids = np.intersect1d(current_particles_pid, orbit_assn_sparta[:,0], return_indices = True) # only check pids that are within the tracers for this halo (otherwise infall)
-            #poss_pid_match = np.intersect1d(current_particles_pid[poss_pids[1]], orbit_assn_sparta[:,0], return_indices = True) # get the corresponding indices for the pids and their infall/orbit assn
+            # print(current_particles_pid)
+            # print(current_orbit_assn_sparta[poss_pids[1]])
+            # print(orbit_assn_sparta[poss_pids[2]])
             current_orbit_assn_sparta[poss_pids[1],1] = orbit_assn_sparta[poss_pids[2],1] # create a mask to then set any particle that is not identified as orbiting to be infalling
-        
+            # print(current_orbit_assn_sparta[poss_pids[1]])
 
         #sort the radii, positions, velocities, coord separations to allow for creation of plots and to correctly assign how much mass there is
         arrsortrad = unsorted_particle_radii.argsort()
@@ -189,7 +196,7 @@ def search_halos(particle_tree, sparta_output, halo_idxs, search_radius, total_p
 
         start += num_new_particles
 
-        if i % 250 == 0 and comp_snap == False:
+        if i == 0 and comp_snap == False:
             compare_density_prf(radii = particle_radii/halos_r200m[i], actual_prf_all=dens_prf_all[i], actual_prf_1halo=dens_prf_1halo[i], mass=mass, orbit_assn=current_orbit_assn_sparta, title = str(halo_idxs[i]), save_location="/home/zvladimi/MLOIS/Random_figures/", show_graph=False, save_graph=True)
         
         print_at = int(np.ceil((num_halo_per_split/num_print_per_split)))
