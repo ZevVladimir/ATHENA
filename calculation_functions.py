@@ -11,14 +11,9 @@ def calculate_distance(halo_x, halo_y, halo_z, particle_x, particle_y, particle_
     z_dist = particle_z - halo_z
     
     coord_diff = np.zeros((new_particles, 3))
-    coord_diff[:,0] = x_dist
-    coord_diff[:,1] = y_dist
-    coord_diff[:,2] = z_dist
-
     half_box_size = box_size/2
     
-    #handles periodic boundary conditions by checking if you were to add or subtract a boxsize would it then
-    #be within half a box size of the halo
+    #handles periodic boundary conditions by checking if you were to add or subtract a boxsize would it then be within half a box size of the halo
     #do this for x, y, and z coords
     x_within_plus = np.where((x_dist + box_size) < half_box_size)
     x_within_minus = np.where((x_dist - box_size) > -half_box_size)
@@ -115,3 +110,28 @@ def calc_tang_vel(radial_vel, physical_vel, rhat):
     tangential_vel = physical_vel - component_rad_vel
     
     return tangential_vel
+
+def initial_search(halo_positions, search_radius, halo_r200m, tree, red_shift):
+    t_dyn_flag = False
+    num_halos = halo_positions.shape[0]
+    particles_per_halo = np.zeros(num_halos, dtype = np.int32)
+    all_halo_mass = np.zeros(num_halos, dtype = np.float32)
+    
+    for i in range(num_halos):
+        if halo_r200m[i] > 0:
+            #find how many particles we are finding
+            indices = tree.query_ball_point(halo_positions[i,:], r = search_radius * halo_r200m[i])
+
+            # how many new particles being added and correspondingly how massive the halo is
+            num_new_particles = len(indices)
+            all_halo_mass[i] = num_new_particles * mass
+            particles_per_halo[i] = num_new_particles
+            
+            if t_dyn_flag == False:
+                corresponding_hubble_m200m = mass_so.R_to_M(halo_r200m[i], red_shift, "200c") * little_h
+                curr_v200m = calc_v200m(corresponding_hubble_m200m, halo_r200m[np.where(halo_r200m>0)[0][0]])
+                t_dyn = (2*halo_r200m[i])/curr_v200m
+                print("t_dyn:", t_dyn)
+                t_dyn_flag = True
+                
+    return particles_per_halo, all_halo_mass, t_dyn

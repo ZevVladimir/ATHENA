@@ -175,3 +175,27 @@ def conv_halo_id_spid(my_halo_ids, sdata, snapshot):
     for i, my_id in enumerate(my_halo_ids):
         sparta_idx[i] = int(np.where(my_id == sdata['halos']['id'][:,snapshot])[0])
     return sparta_idx
+
+def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, total_num_snaps, path_dict, snap_format, little_h):
+    # calculate one dynamical time ago and set that as the comparison snap
+    curr_time = cosmol.age(p_red_shift)
+    past_time = curr_time - (t_dyn_step * t_dyn)
+    c_snap = find_closest_snap(cosmol, past_time, num_snaps = total_num_snaps, path_to_snap=path_dict['path_to_snaps'], snap_format = snap_format)
+    snapshot_list.append(c_snap)
+
+    # switch to comparison snap
+    snapshot_path = path_dict['path_to_snaps'] + "/snapdir_" + snap_format.format(c_snap) + "/snapshot_" + snap_format.format(c_snap)
+        
+    # get constants from pygadgetreader
+    c_red_shift = readheader(snapshot_path, 'redshift')
+    c_scale_factor = 1/(1+c_red_shift)
+    c_rho_m = cosmol.rho_m(c_red_shift)
+    c_hubble_constant = cosmol.Hz(c_red_shift) * 0.001 # convert to units km/s/kpc
+    c_box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
+    c_box_size = c_box_size * 10**3 * c_scale_factor * little_h #convert to Kpc physical
+    
+    # load particle data and SPARTA data for the comparison snap
+    c_particles_pid, c_particles_vel, c_particles_pos, mass = load_or_pickle_ptl_data(str(c_snap), snapshot_path, c_scale_factor, little_h, path_dict["path_to_pickle"])
+    c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap = load_or_pickle_SPARTA_data(path_dict["curr_sparta_file"], path_dict["path_to_hdf5_file"], c_scale_factor, little_h, c_snap, path_dict["path_to_pickle"])
+
+    return c_snap, c_box_size, c_rho_m, c_red_shift, c_hubble_constant, c_particles_pid, c_particles_vel, c_particles_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap
