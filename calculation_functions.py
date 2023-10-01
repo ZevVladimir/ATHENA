@@ -103,7 +103,7 @@ def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200, red_shift, l
     #radial_vel = radial_component_vel + v_hubble
 
     # scale all the radial velocities by v200m of the halo
-    return radial_vel, radial_vel_comp, curr_v200m, physical_vel, rhat
+    return radial_vel, curr_v200m, physical_vel, rhat
 
 def calc_tang_vel(radial_vel, physical_vel, rhat):
     component_rad_vel = rhat * radial_vel[:, np.newaxis] 
@@ -111,8 +111,15 @@ def calc_tang_vel(radial_vel, physical_vel, rhat):
     
     return tangential_vel
 
-def initial_search(halo_positions, search_radius, halo_r200m, tree, red_shift):
-    t_dyn_flag = False
+def calc_t_dyn(halo_r200m, red_shift, little_h,):
+    corresponding_hubble_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200c") * little_h
+    curr_v200m = calc_v200m(corresponding_hubble_m200m, halo_r200m)
+    t_dyn = (2*halo_r200m)/curr_v200m
+
+    return t_dyn
+
+def initial_search(halo_positions, search_radius, halo_r200m, tree, red_shift, mass, little_h, find_ptl_indices):
+    start = True
     num_halos = halo_positions.shape[0]
     particles_per_halo = np.zeros(num_halos, dtype = np.int32)
     all_halo_mass = np.zeros(num_halos, dtype = np.float32)
@@ -127,11 +134,14 @@ def initial_search(halo_positions, search_radius, halo_r200m, tree, red_shift):
             all_halo_mass[i] = num_new_particles * mass
             particles_per_halo[i] = num_new_particles
             
-            if t_dyn_flag == False:
-                corresponding_hubble_m200m = mass_so.R_to_M(halo_r200m[i], red_shift, "200c") * little_h
-                curr_v200m = calc_v200m(corresponding_hubble_m200m, halo_r200m[np.where(halo_r200m>0)[0][0]])
-                t_dyn = (2*halo_r200m[i])/curr_v200m
-                print("t_dyn:", t_dyn)
-                t_dyn_flag = True
-                
-    return particles_per_halo, all_halo_mass, t_dyn
+            if find_ptl_indices:
+                if start:
+                    all_ptl_indices = np.array(indices)
+                    start = False
+                else:
+                    all_ptl_indices = np.concatenate((all_ptl_indices, indices))
+
+    if find_ptl_indices:
+        return particles_per_halo, all_halo_mass, all_ptl_indices
+    else:
+        return particles_per_halo, all_halo_mass
