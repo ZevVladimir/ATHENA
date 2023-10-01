@@ -13,11 +13,16 @@ snapshot_list = [190,183] # SHOULD BE DESCENDING
 p_snap = snapshot_list[0]
 times_r200m = 6
 curr_sparta_file = "sparta_cbol_l0063_n0256"
-path_to_MLOIS = "/home/zvladimi/MLOIS/"
-path_to_snapshot = "/home/zvladimi/MLOIS/particle_data/"
-path_to_hdf5 = "/home/zvladimi/MLOIS/SPARTA_data/"
-path_to_pickle = "/home/zvladimi/MLOIS/pickle_data/"
-path_to_model_plots = "/home/zvladimi/MLOIS/xgboost_datasets_plots/"
+path_to_hdf5_file = "/home/zvladimi/MLOIS/SPARTA_data/" + curr_sparta_file + ".hdf5"
+path_dict = {
+    "curr_sparta_file": curr_sparta_file,
+    "path_to_MLOIS": "/home/zvladimi/MLOIS/",
+    "path_to_snaps": "/home/zvladimi/MLOIS/particle_data/",
+    "path_to_hdf5_file": path_to_hdf5_file,
+    "path_to_pickle": "/home/zvladimi/MLOIS/pickle_data/",
+    "path_to_datasets": "/home/zvladimi/MLOIS/calculated_info/",
+    "path_to_model_plots": "/home/zvladimi/MLOIS/xgboost_datasets_plots/"
+}
 snap_format = "{:04d}" # how are the snapshots formatted with 0s
 ##################################################################################################################
 from data_and_loading_functions import create_directory
@@ -30,8 +35,8 @@ if len(snapshot_list) > 1:
 else:
     specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(times_r200m) + "r200msearch/"
 
-save_location = path_to_model_plots + specific_save
-path_to_datasets = path_to_model_plots + specific_save + "datasets/"
+save_location = path_dict["path_to_model_plots"] + specific_save
+path_to_datasets = path_dict["path_to_model_plots"] + specific_save + "datasets/"
 
 with open(path_to_datasets + "train_dataset_all_keys.pickle", "rb") as pickle_file:
     train_all_keys = pickle.load(pickle_file)
@@ -43,7 +48,7 @@ if len(snapshot_list) > 1:
 else:
     specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(times_r200m) + "r200msearch/"
     
-save_location = path_to_model_plots + specific_save
+save_location = path_dict["path_to_model_plots"] + specific_save
 
 create_directory(save_location)
 

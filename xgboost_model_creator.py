@@ -9,7 +9,7 @@ import pickle
 import re
 import os
 from imblearn import under_sampling, over_sampling
-from data_and_loading_functions import build_ml_dataset, check_pickle_exist_gadget, check_pickle_exist_hdf5_prop, choose_halo_split, create_directory
+from data_and_loading_functions import build_ml_dataset, check_pickle_exist_gadget, choose_halo_split, create_directory
 from visualization_functions import *
 
 class model_creator:
