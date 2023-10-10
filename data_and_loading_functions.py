@@ -34,7 +34,7 @@ def load_or_pickle_ptl_data(sparta_name, snapshot, snapshot_path, scale_factor, 
     ptl_pos = check_pickle_exist_gadget(sparta_name, "pos", snapshot, snapshot_path, path_dict)
     ptl_mass = check_pickle_exist_gadget(sparta_name, "mass", snapshot, snapshot_path, path_dict)
     
-    ptl_pos = ptl_pos * 10**3 * scale_factor * little_h # convert to kpc and physical
+    ptl_pos = ptl_pos * 10**3 * scale_factor # convert to kpc/h and physical
     ptl_mass = ptl_mass[0] * 10**10 # units M_sun/h
     
     return ptl_pid, ptl_vel, ptl_pos, ptl_mass
@@ -81,9 +81,9 @@ def load_or_pickle_SPARTA_data(sparta_name, hdf5_path, scale_factor, little_h, s
     
     if reload_sparta:
         sparta_output = sparta.load(filename=path_dict["path_to_hdf5_file"], log_level= 0)
-        halos_pos = sparta_output['halos']['position'][:,snap,:] * 10**3 * scale_factor * little_h # convert to kpc and physical
+        halos_pos = sparta_output['halos']['position'][:,snap,:] * 10**3 * scale_factor # convert to kpc/h and physical
         halos_last_snap = sparta_output['halos']['last_snap'][:]
-        halos_r200m = sparta_output['halos']['R200m'][:,snap] * little_h # convert to kpc
+        halos_r200m = sparta_output['halos']['R200m'][:,snap] 
         halos_id = sparta_output['halos']['id'][:,snap]
         halos_status = sparta_output['halos']['status'][:,snap]
 
@@ -209,7 +209,7 @@ def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, total_n
     c_rho_m = cosmol.rho_m(c_red_shift)
     c_hubble_constant = cosmol.Hz(c_red_shift) * 0.001 # convert to units km/s/kpc
     c_box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
-    c_box_size = c_box_size * 10**3 * c_scale_factor * little_h #convert to Kpc physical
+    c_box_size = c_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
     
     # load particle data and SPARTA data for the comparison snap
     c_particles_pid, c_particles_vel, c_particles_pos, mass = load_or_pickle_ptl_data(path_dict["curr_sparta_file"], str(c_snap), snapshot_path, c_scale_factor, little_h, path_dict)

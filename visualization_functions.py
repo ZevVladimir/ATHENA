@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+mpl.use('agg')
 import matplotlib.gridspec as gridspec
 from calculation_functions import calculate_distance
 import seaborn as sns
@@ -56,6 +57,7 @@ def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r20
     return average_val_part, average_val_hubble 
 
 def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_assn, title, save_location, show_graph = False, save_graph = False):
+    print("Hi")
     create_directory(save_location + "dens_prfl_ratio/")
     # Create bins for the density profile calculation
     num_prf_bins = actual_prf_all.shape[0]
@@ -99,17 +101,20 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
             calculated_prf_all[i] = calculated_prf_all[i - 1]
 
         start_bin = end_bin
-
+    
     prf_bins = np.insert(prf_bins,0,0)
     middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
 
     fig, ax = plt.subplots(1,2, layout = "tight")
 
-    ax[0].plot(middle_bins, calculated_prf_all/actual_prf_all, 'r', label = "My prf / SPARTA prf all")
-    #ax.plot(middle_bins, actual_prf_all, 'c--', label = "SPARTA profile all")
+    with np.errstate(divide='ignore', invalid='ignore'):
+        all_ratio = np.divide(calculated_prf_all,actual_prf_all)
+        inf_ratio = np.divide(calculated_prf_inf,(actual_prf_all - actual_prf_1halo))
+        orb_ratio = np.divide(calculated_prf_orb,actual_prf_1halo)
 
-    ax[0].plot(middle_bins, calculated_prf_orb/actual_prf_1halo, 'b', label = "My prf / SPARTA profile orb")
-    ax[0].plot(middle_bins, calculated_prf_inf/(actual_prf_all - actual_prf_1halo), 'g', label = "My prf / SPARTA profile inf")
+    ax[0].plot(middle_bins, all_ratio, 'r', label = "My prf / SPARTA prf all")
+    ax[0].plot(middle_bins, orb_ratio, 'b', label = "My prf / SPARTA profile orb")
+    ax[0].plot(middle_bins, inf_ratio, 'g', label = "My prf / SPARTA profile inf")
     
     ax[0].set_title(wrap("My Predicted  / Actual Density Profile for nu: " + title))
     ax[0].set_xlabel("radius $r/R_{200m}$")
@@ -133,6 +138,7 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     
     if save_graph:
         fig.set_size_inches(21, 13)
+        print(save_location + "dens_prfl_ratio/" + title + ".png")
         fig.savefig(save_location + "dens_prfl_ratio/" + title + ".png", bbox_inches='tight')
     if show_graph:
         plt.show()

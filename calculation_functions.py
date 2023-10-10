@@ -76,12 +76,12 @@ def calc_v200m(mass, radius):
     # calculate the v200m for a halo based on its mass and radius
     return np.sqrt((G * mass)/radius)
 
-def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200, red_shift, little_h, hubble_constant):
+def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200m, red_shift, little_h, hubble_constant):
     
     # Get the corresponding components, distances, and halo v200m for every particle
     v_hubble = np.zeros(particle_dist.size, dtype = np.float32)
-    corresponding_hubble_m200m = mass_so.R_to_M(halo_r200, red_shift, "200c") * little_h # convert to M⊙
-    curr_v200m = calc_v200m(corresponding_hubble_m200m, halo_r200)
+    corresponding_hubble_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200c") 
+    curr_v200m = calc_v200m(corresponding_hubble_m200m, halo_r200m)
         
     # calculate the unit vector of the halo to the particle  
     rhat = calc_rhat(coord_sep[:,0], coord_sep[:,1], coord_sep[:,2])
@@ -112,7 +112,7 @@ def calc_tang_vel(radial_vel, physical_vel, rhat):
     return tangential_vel
 
 def calc_t_dyn(halo_r200m, red_shift, little_h,):
-    corresponding_hubble_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200c") * little_h
+    corresponding_hubble_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200c")
     curr_v200m = calc_v200m(corresponding_hubble_m200m, halo_r200m)
     t_dyn = (2*halo_r200m)/curr_v200m
 
@@ -128,15 +128,15 @@ def initial_search(halo_positions, search_radius, halo_r200m, tree, red_shift, m
         if halo_r200m[i] > 0:
             #find how many particles we are finding
             indices = tree.query_ball_point(halo_positions[i,:], r = search_radius * halo_r200m[i])
-
+            indices = np.array(indices,dtype = np.int32)
             # how many new particles being added and correspondingly how massive the halo is
-            num_new_particles = len(indices)
+            num_new_particles = indices.shape[0]
             all_halo_mass[i] = num_new_particles * mass
             particles_per_halo[i] = num_new_particles
             
             if find_ptl_indices:
                 if start:
-                    all_ptl_indices = np.array(indices)
+                    all_ptl_indices = indices
                     start = False
                 else:
                     all_ptl_indices = np.concatenate((all_ptl_indices, indices))
