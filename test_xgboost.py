@@ -15,25 +15,29 @@ from colossus.cosmology import cosmology
 from colossus.lss import peaks
 ##################################################################################################################
 # General params
-snapshot_list = [190,183] # SHOULD BE DESCENDING
+snapshot_list = [190,184] # SHOULD BE DESCENDING
 p_snap = snapshot_list[0]
 times_r200m = 6
 curr_sparta_file = "sparta_cbol_l0063_n0256"
-path_to_MLOIS = "/home/zvladimi/MLOIS/"
-path_to_snapshot = "/home/zvladimi/MLOIS/particle_data/"
-path_to_hdf5 = "/home/zvladimi/MLOIS/SPARTA_data/"
-path_to_pickle = "/home/zvladimi/MLOIS/pickle_data/"
-path_to_ptl_prop = "/home/zvladimi/MLOIS/calculated_info/"
-path_to_model_plots = "/home/zvladimi/MLOIS/xgboost_datasets_plots/"
+path_to_hdf5_file = "/home/zvladimi/MLOIS/SPARTA_data/" + curr_sparta_file + ".hdf5"
+path_dict = {
+    "curr_sparta_file": curr_sparta_file,
+    "path_to_MLOIS": "/home/zvladimi/MLOIS/",
+    "path_to_snaps": "/home/zvladimi/MLOIS/particle_data/",
+    "path_to_hdf5_file": path_to_hdf5_file,
+    "path_to_pickle": "/home/zvladimi/MLOIS/pickle_data/",
+    "path_to_datasets": "/home/zvladimi/MLOIS/calculated_info/",
+    "path_to_model_plots": "/home/zvladimi/MLOIS/xgboost_datasets_plots/"
+}
 snap_format = "{:04d}" # how are the snapshots formatted with 0s
 ##################################################################################################################
 # import pygadgetreader and sparta
 import sys
-sys.path.insert(0, path_to_MLOIS + "pygadgetreader")
-sys.path.insert(0, path_to_MLOIS + "sparta/analysis")
+sys.path.insert(0, path_dict["path_to_MLOIS"] + "pygadgetreader")
+sys.path.insert(0, path_dict["path_to_MLOIS"] + "sparta/analysis")
 from pygadgetreader import readsnap, readheader
 from sparta import sparta
-from data_and_loading_functions import build_ml_dataset, check_pickle_exist_gadget, check_pickle_exist_hdf5_prop, choose_halo_split, create_directory
+from data_and_loading_functions import build_ml_dataset, check_pickle_exist_gadget, choose_halo_split, create_directory, load_or_pickle_SPARTA_data
 from visualization_functions import *
 #from train_xgboost_models import model_creator
 ##################################################################################################################
@@ -42,19 +46,18 @@ if len(snapshot_list) > 1:
     specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "_" + str(times_r200m) + "r200msearch/"
 else:
     specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(times_r200m) + "r200msearch/"
-    
-sparta_location = path_to_hdf5 + curr_sparta_file + ".hdf5"
 
-path_to_datasets = path_to_model_plots + specific_save + "datasets/"
-data_location = path_to_ptl_prop + specific_save
-save_location = path_to_model_plots + specific_save
+path_to_datasets = path_dict["path_to_model_plots"] + specific_save + "datasets/"
+data_location = path_dict["path_to_datasets"] + specific_save
+save_location = path_dict["path_to_model_plots"] + specific_save
 
 create_directory(save_location)
 
-snapshot_path = path_to_snapshot + "snapdir_" + snap_format.format(snapshot_list[0]) + "/snapshot_" + snap_format.format(snapshot_list[0])
+p_snapshot_path = path_dict["path_to_snaps"] + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
 
-ptl_mass = check_pickle_exist_gadget("mass", str(snapshot_list[0]), snapshot_path,path_to_pickle)
-mass = ptl_mass[0] * 10**10 #units M_sun/h
+p_red_shift = readheader(p_snapshot_path, 'redshift')
+p_scale_factor = 1/(1+p_red_shift)
+halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, ptl_mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, path_dict)
 cosmol = cosmology.setCosmology("bolshoi")
 
 with open(path_to_datasets + "test_dataset_all_keys.pickle", "rb") as pickle_file:
@@ -73,7 +76,7 @@ for filename in os.listdir(save_location + "/models/"):
 all_file_names.sort()
 
 for filename in all_file_names:
-    with open("/home/zvladimi/MLOIS/xgboost_datasets_plots/sparta_cbol_l0063_n0256_190to183_6r200msearch/models/" + filename, "rb") as pickle_file:
+    with open(save_location + "/models/" + filename, "rb") as pickle_file:
         model = pickle.load(pickle_file)
     model.load_models()
     all_models.append(model)
@@ -87,21 +90,13 @@ for i,key in enumerate(test_all_keys[2:]):
     elif key == "Tangential_vel_" + str(p_snap):
         tang_vel_loc = i
 
-# load halo information for comparison
-hdf5_file_path = path_to_hdf5 + curr_sparta_file + ".hdf5"
-density_prf_all = check_pickle_exist_hdf5_prop(p_snap, "anl_prf", "M_all", "", hdf5_file_path, curr_sparta_file, path_to_pickle)
-density_prf_1halo = check_pickle_exist_hdf5_prop(p_snap, "anl_prf", "M_1halo", "", hdf5_file_path, curr_sparta_file,path_to_pickle)
-halos_status = check_pickle_exist_hdf5_prop(p_snap, "halos", "status", "", hdf5_file_path, curr_sparta_file, path_to_pickle)
-halos_last_snap = check_pickle_exist_hdf5_prop(p_snap, "halos", "last_snap", "", hdf5_file_path, curr_sparta_file,path_to_pickle)
-
-# choose the halos for the primary snap to compare against
-p_halos_status = halos_status[:,p_snap]
-density_prf_all = density_prf_all[:,p_snap,:]
-density_prf_1halo = density_prf_1halo[:,p_snap,:]
-
     
 with open(data_location + "test_indices.pickle", "rb") as pickle_file:
     test_indices = pickle.load(pickle_file)
+use_halo_ids = halos_id[test_indices]
+sparta_output = sparta.load(filename=path_dict["path_to_hdf5_file"], halo_ids=use_halo_ids)
+dens_prf_all = sparta_output['anl_prf']['M_all'][:,p_snap,:]
+dens_prf_1halo = sparta_output['anl_prf']['M_1halo'][:,p_snap,:]
 
 # test indices are the indices of the match halo idxs used (see find_particle_properties_ML.py to see how test_indices are created)
 num_test_halos = test_indices.shape[0]
@@ -123,10 +118,9 @@ all_accuracy = []
 for j in range(num_test_halos):
     curr_halo_idx = test_indices[j]
     curr_test_halo = test_dataset[np.where(test_halo_idxs == curr_halo_idx)]
-    halo_masses[j] = curr_test_halo.shape[0] * mass
+    halo_masses[j] = curr_test_halo.shape[0] * ptl_mass
 
-snapshot_path = path_to_snapshot + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
-p_red_shift = readheader(snapshot_path, 'redshift')
+p_red_shift = readheader(p_snapshot_path, 'redshift')
 peak_heights = peaks.peakHeight(halo_masses, p_red_shift)
                 
 start_nu = np.min(peak_heights) 
@@ -141,11 +135,11 @@ for i in range(num_iter):
     print(start_nu, "to", end_nu, ":", idx_within_nu.shape, "halos")
     
     if curr_test_halo_idxs.shape[0] != 0:
-        density_prf_all_within = np.zeros(density_prf_all.shape[1])
-        density_prf_1halo_within = np.zeros(density_prf_1halo.shape[1])
+        density_prf_all_within = np.zeros(dens_prf_all.shape[1])
+        density_prf_1halo_within = np.zeros(dens_prf_1halo.shape[1])
         for j, idx in enumerate(curr_test_halo_idxs):
-            density_prf_all_within = density_prf_all_within + density_prf_all[curr_test_halo_idxs[j]]
-            density_prf_1halo_within = density_prf_1halo_within + density_prf_1halo[curr_test_halo_idxs[j]]
+            density_prf_all_within = density_prf_all_within + dens_prf_all[j]
+            density_prf_1halo_within = density_prf_1halo_within + dens_prf_1halo[j]
             use_ptl_idxs = np.where(test_halo_idxs == idx)
             if j == 0:
                 test_halos_within = test_dataset[use_ptl_idxs]
@@ -173,7 +167,9 @@ for i in range(num_iter):
         classification = classification_report(actual_labels, test_predict, output_dict=True)
 
         all_accuracy.append(classification["accuracy"])
-        compare_density_prf(test_halos_within[:,2+scaled_radii_loc], density_prf_all_within, density_prf_1halo_within, mass, test_predict, title = str(np.floor(start_nu)) + "-" + str(np.ceil(end_nu)), show_graph = False, save_graph = True, save_location = save_location)
+        bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
+        bins = np.insert(bins, 0, 0)
+        compare_density_prf(radii=test_halos_within[:,2+scaled_radii_loc], actual_prf_all=density_prf_all_within, actual_prf_1halo=density_prf_1halo_within, mass=ptl_mass, orbit_assn=test_predict, prf_bins=bins, title = str(np.floor(start_nu)) + "-" + str(np.ceil(end_nu)), show_graph = False, save_graph = True, save_location = save_location)
         plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "ML Predictions", num_bins, np.floor(start_nu), np.ceil(end_nu), show = False, save = True, save_location=save_location)
         graph_acc_by_bin(test_predict, actual_labels, test_halos_within[:,2+scaled_radii_loc], num_bins, np.floor(start_nu), np.ceil(end_nu), plot = False, save = True, save_location = save_location)
         

@@ -9,7 +9,7 @@ import os
 from imblearn import under_sampling, over_sampling
 ##################################################################################################################
 # General params
-snapshot_list = [190,183] # SHOULD BE DESCENDING
+snapshot_list = [190,184] # SHOULD BE DESCENDING
 p_snap = snapshot_list[0]
 times_r200m = 6
 curr_sparta_file = "sparta_cbol_l0063_n0256"
