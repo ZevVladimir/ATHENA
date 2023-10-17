@@ -3,7 +3,7 @@ import time
 from colossus.cosmology import cosmology
 ##################################################################################################################
 # General params
-snapshot_list = [190,183] # SHOULD BE DESCENDING
+snapshot_list = [190,184] # SHOULD BE DESCENDING
 p_snap = snapshot_list[0]
 times_r200m = 6
 

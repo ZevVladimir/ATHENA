@@ -32,14 +32,12 @@ def load_or_pickle_ptl_data(sparta_name, snapshot, snapshot_path, scale_factor, 
     ptl_pid = check_pickle_exist_gadget(sparta_name, "pid", snapshot, snapshot_path, path_dict)
     ptl_vel = check_pickle_exist_gadget(sparta_name, "vel", snapshot, snapshot_path, path_dict)
     ptl_pos = check_pickle_exist_gadget(sparta_name, "pos", snapshot, snapshot_path, path_dict)
-    ptl_mass = check_pickle_exist_gadget(sparta_name, "mass", snapshot, snapshot_path, path_dict)
     
     ptl_pos = ptl_pos * 10**3 * scale_factor # convert to kpc/h and physical
-    ptl_mass = ptl_mass[0] * 10**10 # units M_sun/h
-    
-    return ptl_pid, ptl_vel, ptl_pos, ptl_mass
 
-def load_or_pickle_SPARTA_data(sparta_name, hdf5_path, scale_factor, little_h, snap, path_dict):
+    return ptl_pid, ptl_vel, ptl_pos
+
+def load_or_pickle_SPARTA_data(sparta_name, scale_factor, snap, path_dict):
     create_directory(path_dict["path_to_pickle"] + str(snap) +  "_" + str(sparta_name) + "/")
     reload_sparta = False
 
@@ -78,6 +76,12 @@ def load_or_pickle_SPARTA_data(sparta_name, hdf5_path, scale_factor, little_h, s
             halos_status = pickle.load(pickle_file)
     else:
         reload_sparta = True
+        
+    if os.path.isfile(path_dict["path_to_pickle"] + str(snap) + "_" + str(sparta_name) + "_ptl_mass.pickle"):
+        with open(path_dict["path_to_pickle"] + str(snap) + "_" + str(sparta_name) + "_ptl_mass.pickle", "rb") as pickle_file:
+            halos_status = pickle.load(pickle_file)
+    else:
+        reload_sparta = True
     
     if reload_sparta:
         sparta_output = sparta.load(filename=path_dict["path_to_hdf5_file"], log_level= 0)
@@ -86,8 +90,9 @@ def load_or_pickle_SPARTA_data(sparta_name, hdf5_path, scale_factor, little_h, s
         halos_r200m = sparta_output['halos']['R200m'][:,snap] 
         halos_id = sparta_output['halos']['id'][:,snap]
         halos_status = sparta_output['halos']['status'][:,snap]
+        ptl_mass = sparta_output["simulation"]["particle_mass"]
 
-    return halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap
+    return halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, ptl_mass
 
 def standardize(values):
     for col in range(values.shape[1]):
@@ -212,7 +217,7 @@ def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, total_n
     c_box_size = c_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
     
     # load particle data and SPARTA data for the comparison snap
-    c_particles_pid, c_particles_vel, c_particles_pos, mass = load_or_pickle_ptl_data(path_dict["curr_sparta_file"], str(c_snap), snapshot_path, c_scale_factor, little_h, path_dict)
-    c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap = load_or_pickle_SPARTA_data(path_dict["curr_sparta_file"], path_dict["path_to_hdf5_file"], c_scale_factor, little_h, c_snap, path_dict)
+    c_particles_pid, c_particles_vel, c_particles_pos = load_or_pickle_ptl_data(path_dict["curr_sparta_file"], str(c_snap), snapshot_path, c_scale_factor, little_h, path_dict)
+    c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap, mass = load_or_pickle_SPARTA_data(path_dict["curr_sparta_file"], c_scale_factor, c_snap, path_dict)
 
     return c_snap, c_box_size, c_rho_m, c_red_shift, c_hubble_constant, c_particles_pid, c_particles_vel, c_particles_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap

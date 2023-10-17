@@ -128,7 +128,7 @@ def initial_search(halo_positions, search_radius, halo_r200m, tree, red_shift, m
         if halo_r200m[i] > 0:
             #find how many particles we are finding
             indices = tree.query_ball_point(halo_positions[i,:], r = search_radius * halo_r200m[i])
-            indices = np.array(indices,dtype = np.int32)
+            indices = np.array(indices)
             # how many new particles being added and correspondingly how massive the halo is
             num_new_particles = indices.shape[0]
             all_halo_mass[i] = num_new_particles * mass

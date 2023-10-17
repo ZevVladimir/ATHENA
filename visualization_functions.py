@@ -49,60 +49,77 @@ def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r20
             
             # Calculate the v200m value for the corresponding R200m value found
             average_val_hubble[i,0] = median_scaled_hubble
-            corresponding_hubble_m200m = mass_so.R_to_M(median_hubble_r200, red_shift, "200c") * little_h # convert to M⊙
+            corresponding_hubble_m200m = mass_so.R_to_M(median_hubble_r200, red_shift, "200c")
             average_val_hubble[i,1] = (median_hubble_radius * hubble_constant)/calc_v200m(corresponding_hubble_m200m, median_hubble_r200)
             
         bin_start = bin_end
     
     return average_val_part, average_val_hubble 
 
-def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_assn, title, save_location, show_graph = False, save_graph = False):
-    print("Hi")
+def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_assn, prf_bins, title, save_location, show_graph = False, save_graph = False):
     create_directory(save_location + "dens_prfl_ratio/")
     # Create bins for the density profile calculation
     num_prf_bins = actual_prf_all.shape[0]
-    start_prf_bins = 0.01 # set by parameters in SPARTA
-    end_prf_bins = 3.0 # set by parameters in SPARTA
-    prf_bins = np.logspace(np.log10(start_prf_bins), np.log10(end_prf_bins), num_prf_bins)
-    
+
     calculated_prf_orb = np.zeros(num_prf_bins)
     calculated_prf_inf = np.zeros(num_prf_bins)
     calculated_prf_all = np.zeros(num_prf_bins)
-    start_bin = 0
-
+    diff_n_inf_ptls = np.zeros(num_prf_bins)
+    diff_n_orb_ptls = np.zeros(num_prf_bins)
+    diff_n_tot_ptls = np.zeros(num_prf_bins)
+    
     orbit_radii = radii[np.where(orbit_assn == 1)[0]]
     infall_radii = radii[np.where(orbit_assn == 0)[0]]
+    # print(radii.shape)
+    # print(orbit_radii.shape)
+    # print(infall_radii.shape)
 
     for i in range(num_prf_bins):
-        end_bin = prf_bins[i]  
-        
+        start_bin = prf_bins[i]
+        end_bin = prf_bins[i+1]  
+       
         orb_radii_within_range = np.where((orbit_radii >= start_bin) & (orbit_radii < end_bin))[0]
         if orb_radii_within_range.size != 0 and i != 0:
             calculated_prf_orb[i] = calculated_prf_orb[i - 1] + orb_radii_within_range.size * mass
-        elif i == 0:
+            diff_n_orb_ptls[i] = ((actual_prf_1halo[i] - actual_prf_1halo[i-1])/mass) - orb_radii_within_range.size
+        elif orb_radii_within_range.size != 0 and i == 0:
             calculated_prf_orb[i] = orb_radii_within_range.size * mass
+            diff_n_orb_ptls[i] = actual_prf_1halo[i]/mass - orb_radii_within_range.size
+        elif radii_within_range.size == 0 and i != 0:
+            calculated_prf_orb[i] = calculated_prf_orb[i - 1]
+            diff_n_orb_ptls[i] = (actual_prf_1halo[i] - actual_prf_1halo[i-1])/mass   
         else:
             calculated_prf_orb[i] = calculated_prf_orb[i - 1]
+            diff_n_orb_ptls[i] = (actual_prf_1halo[i])/mass          
             
         inf_radii_within_range = np.where((infall_radii >= start_bin) & (infall_radii < end_bin))[0]
         if inf_radii_within_range.size != 0 and i != 0:
             calculated_prf_inf[i] = calculated_prf_inf[i - 1] + inf_radii_within_range.size * mass
-        elif i == 0:
+            diff_n_inf_ptls[i] = (((actual_prf_all[i] - actual_prf_1halo[i])-(actual_prf_all[i-1] - actual_prf_1halo[i-1]))/mass) - inf_radii_within_range.size
+        elif inf_radii_within_range.size != 0 and i == 0:
             calculated_prf_inf[i] = inf_radii_within_range.size * mass
+            diff_n_inf_ptls[i] = (actual_prf_all[i] - actual_prf_1halo[i])/mass - inf_radii_within_range.size
+        elif radii_within_range.size == 0 and i != 0:
+            calculated_prf_inf[i] = calculated_prf_inf[i - 1]
+            diff_n_inf_ptls[i] =((actual_prf_all[i] - actual_prf_1halo[i]) - (actual_prf_all[i-1] - actual_prf_1halo[i-1]))/mass
         else:
             calculated_prf_inf[i] = calculated_prf_inf[i - 1]
+            diff_n_inf_ptls[i] =(actual_prf_all[i] - actual_prf_1halo[i])/mass            
             
         radii_within_range = np.where((radii >= start_bin) & (radii < end_bin))[0]
         if radii_within_range.size != 0 and i != 0:
             calculated_prf_all[i] = calculated_prf_all[i - 1] + radii_within_range.size * mass
-        elif i == 0:
+            diff_n_tot_ptls[i] = ((actual_prf_all[i] - actual_prf_all[i-1])/mass) - radii_within_range.size
+            
+        elif radii_within_range.size != 0 and i == 0:
             calculated_prf_all[i] = radii_within_range.size * mass
+            diff_n_tot_ptls[i] = np.floor(actual_prf_all[i]/mass) - radii_within_range.size
+        elif radii_within_range.size == 0 and i != 0:
+            calculated_prf_all[i] = calculated_prf_all[i - 1]
+            diff_n_tot_ptls[i] = np.floor((actual_prf_all[i] - actual_prf_all[i-1])/mass)
         else:
             calculated_prf_all[i] = calculated_prf_all[i - 1]
-
-        start_bin = end_bin
-    
-    prf_bins = np.insert(prf_bins,0,0)
+            diff_n_tot_ptls[i] = np.floor((actual_prf_all[i])/mass)
     middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
 
     fig, ax = plt.subplots(1,2, layout = "tight")
@@ -116,7 +133,7 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     ax[0].plot(middle_bins, orb_ratio, 'b', label = "My prf / SPARTA profile orb")
     ax[0].plot(middle_bins, inf_ratio, 'g', label = "My prf / SPARTA profile inf")
     
-    ax[0].set_title(wrap("My Predicted  / Actual Density Profile for nu: " + title))
+    ax[0].set_title(wrap("My Predicted  / Actual Density Profile for halo idx: " + title))
     ax[0].set_xlabel("radius $r/R_{200m}$")
     ax[0].set_ylabel("My Dens Prf / Act Dens Prf")
     ax[0].set_xscale("log")
@@ -129,7 +146,7 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     ax[1].plot(middle_bins, actual_prf_all, 'r--', label = "SPARTA prf all")
     ax[1].plot(middle_bins, actual_prf_1halo, 'b--', label = "SPARTA prf orb")
     ax[1].plot(middle_bins, (actual_prf_all - actual_prf_1halo), 'g--', label = "SPARTA prf inf")
-    ax[1].set_title(wrap("ML Predicted vs Actual Density Profile for nu: " + title))
+    ax[1].set_title(wrap("ML Predicted vs Actual Density Profile for halo idx: " + title))
     ax[1].set_xlabel("radius $r/R_{200m}$")
     ax[1].set_ylabel("Mass $M_/odot$")
     ax[1].set_xscale("log")
@@ -143,7 +160,8 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     if show_graph:
         plt.show()
     plt.close()
-
+    return diff_n_inf_ptls, diff_n_orb_ptls, diff_n_tot_ptls, middle_bins
+    
 def brute_force(curr_particles_pos, r200, halo_x, halo_y, halo_z):
     within_box = curr_particles_pos[np.where((curr_particles_pos[:,0] < r200 + halo_x) & (curr_particles_pos[:,0] > r200 - halo_x) & (curr_particles_pos[:,1] < r200 + halo_y) & (curr_particles_pos[:,1] > r200 - halo_y) & (curr_particles_pos[:,2] < r200 + halo_z) & (curr_particles_pos[:,2] > r200 - halo_z))]
     brute_radii = calculate_distance(halo_x, halo_y, halo_z, within_box[:,0], within_box[:,1], within_box[:,2], within_box.shape[0])

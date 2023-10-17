@@ -18,7 +18,7 @@ snap_format = "{:04d}" # how are the snapshots formatted with 0s
 # Search params
 global prim_only
 prim_only = False
-t_dyn_step = 0.5
+t_dyn_step = .5
 global p_snap
 p_snap = 190
 global search_rad
@@ -104,6 +104,7 @@ def search_halos(slice, comp_snap, curr_halo_idx, curr_sparta_idx):
     halo_r200m = sparta_output['halos']['R200m'][curr_sparta_idx,snap]
     dens_prf_all = sparta_output['anl_prf']['M_all'][curr_sparta_idx,snap,:]
     dens_prf_1halo = sparta_output['anl_prf']['M_1halo'][curr_sparta_idx,snap,:]
+    prf_status = sparta_output['anl_prf']['status'][curr_sparta_idx,snap]
 
     ptl_indices = curr_ptl_indices[slice[0]:slice[1]]
 
@@ -116,7 +117,7 @@ def search_halos(slice, comp_snap, curr_halo_idx, curr_sparta_idx):
     fnd_HPIDs = ne.evaluate("0.5 * (curr_ptl_pids + curr_halo_idx) * (curr_ptl_pids + curr_halo_idx + 1) + curr_halo_idx")
     
     #calculate the radii of each particle based on the distance formula
-    unsort_ptl_rad, unsort_coord_dist = calculate_distance(halo_pos[0], halo_pos[1], halo_pos[2], curr_ptl_pos[:,0], curr_ptl_pos[:,1], curr_ptl_pos[:,2], num_new_ptls, box_size)         
+    ptl_rad, coord_dist = calculate_distance(halo_pos[0], halo_pos[1], halo_pos[2], curr_ptl_pos[:,0], curr_ptl_pos[:,1], curr_ptl_pos[:,2], num_new_ptls, box_size)         
     
     if comp_snap == False:
         # Get the range of indices for the SPARTA particles for this halo
@@ -139,36 +140,80 @@ def search_halos(slice, comp_snap, curr_halo_idx, curr_sparta_idx):
         adj_sparta_n_is_lower_limit = sparta_n_is_lower_limit
         adj_sparta_n_is_lower_limit[future_peri] = 0
         # If a particle has a pericenter of the lower limit is 1 then it is orbiting
-        compare_sparta_assn[np.where((adj_sparta_n_pericenter > 0) | (adj_sparta_n_is_lower_limit == 1))[0]] = 1
-
+        compare_sparta_assn[np.where((adj_sparta_n_pericenter >= 1) | (adj_sparta_n_is_lower_limit == 1))[0]] = 1
         # Compare the ids between SPARTA and the found prtl ids and match the SPARTA results
         matched_ids = np.intersect1d(curr_ptl_pids, sparta_tracer_ids, return_indices = True)
         curr_orb_assn[matched_ids[1]] = compare_sparta_assn[matched_ids[2]]
-        
+          
     #sort the radii, positions, velocities, coord separations to allow for creation of plots and to correctly assign how much mass there is
-    arrsortrad = unsort_ptl_rad.argsort()
-    ptl_rad = unsort_ptl_rad[arrsortrad]
-    curr_ptl_pos = curr_ptl_pos[arrsortrad]
-    curr_ptl_vel = curr_ptl_vel[arrsortrad]
-    coord_dist = unsort_coord_dist[arrsortrad]
-    if curr_halo_idx == 9512:
-        curr_orb_assn = curr_orb_assn[arrsortrad]
-        compare_density_prf(radii = ptl_rad / halo_r200m, actual_prf_all=dens_prf_all, actual_prf_1halo=dens_prf_1halo, mass=mass, orbit_assn=curr_orb_assn, title = str(curr_halo_idx), save_location="/home/zvladimi/MLOIS/Random_figures/", show_graph=False, save_graph=True)
+    # arrsortrad = unsort_ptl_rad.argsort()
+    # ptl_rad = unsort_ptl_rad[arrsortrad]
+    # curr_ptl_pos = curr_ptl_pos[arrsortrad]
+    # curr_ptl_vel = curr_ptl_vel[arrsortrad]
+    # coord_dist = unsort_coord_dist[arrsortrad]
+    # if curr_sparta_idx < 10 and comp_snap == False:
+    #     #if curr_halo_idx == 9513:
+    #     bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
+    #     bins = np.insert(bins, 0, 0)
+    #     diff_inf, diff_orb, diff_tot, graph_bins = compare_density_prf(radii = ptl_rad / halo_r200m, actual_prf_all=dens_prf_all, actual_prf_1halo=dens_prf_1halo, mass=mass, orbit_assn=curr_orb_assn, prf_bins=bins, title = str(curr_halo_idx), save_location="/home/zvladimi/MLOIS/Random_figures/", show_graph=False, save_graph=True)
+    #     diff_inf = np.round(diff_inf)
+    #     diff_orb = np.round(diff_orb)
+    #     diff_tot = np.round(diff_tot)
+        
+    #     # print("infall")
+    #     # print("where inf wrong", np.where(diff_inf != 0), diff_inf[np.where(diff_inf != 0)])
+    #     # print("num inf ptls wrong / tot ptls", np.max(diff_inf)/ptl_rad.shape[0])
+    #     # for idx in np.where(diff_inf != 0)[0]:
+    #     #     print("bin:", idx, bins[idx], "to", bins[idx+1])
+    #     #     wrong_pids_loc = np.where(((ptl_rad / halo_r200m) >= bins[idx]) & ((ptl_rad / halo_r200m) < bins[idx + 1]))[0]
+    #     #     wrong_pids = curr_ptl_pids[wrong_pids_loc]
+    #     #     new_match_ids = np.intersect1d(wrong_pids, sparta_tracer_ids, return_indices = True)
+    #     #     for i in range(new_match_ids[0].shape[0]):
+    #     #         print("last_pericenter_snap:",sparta_last_pericenter_snap[new_match_ids[2][i]], "n_pericenter", adj_sparta_n_pericenter[new_match_ids[2][i]], 
+    #     #               "n_is_lower_limit", adj_sparta_n_is_lower_limit[new_match_ids[2][i]], "orb_assn", curr_orb_assn[wrong_pids_loc[new_match_ids[1][i]]],
+    #     #               "radius", ptl_rad[wrong_pids_loc[new_match_ids[1][i]]], "radius/r200m", ptl_rad[wrong_pids_loc[new_match_ids[1][i]]]/halo_r200m)
+    #     # print("orbit")
+    #     # print("where orb wrong", np.where(diff_orb != 0), diff_orb[np.where(diff_orb != 0)])
+    #     # print("num orb ptls wrong / tot ptls", np.max(diff_orb)/ptl_rad.shape[0])
+    #     # for idx in np.where(diff_orb != 0)[0]:
+    #     #     print("bin:", idx, bins[idx], "to", bins[idx+1])
+    #     #     wrong_pids_loc = np.where(((ptl_rad / halo_r200m) >= bins[idx]) & ((ptl_rad / halo_r200m) < bins[idx + 1]))[0]
+    #     #     wrong_pids = curr_ptl_pids[wrong_pids_loc]
+    #     #     new_match_ids = np.intersect1d(wrong_pids, sparta_tracer_ids, return_indices = True)
+    #     #     for i in range(new_match_ids[0].shape[0]):
+    #     #         print("last_pericenter_snap:",sparta_last_pericenter_snap[new_match_ids[2][i]], "n_pericenter", adj_sparta_n_pericenter[new_match_ids[2][i]], 
+    #     #               "n_is_lower_limit", adj_sparta_n_is_lower_limit[new_match_ids[2][i]], "orb_assn", curr_orb_assn[wrong_pids_loc[new_match_ids[1][i]]],
+    #     #               "radius", ptl_rad[wrong_pids_loc[new_match_ids[1][i]]], "radius/r200m", ptl_rad[wrong_pids_loc[new_match_ids[1][i]]]/halo_r200m)
+        
+    #     # print("total")
+    #     # print("where tot wrong", np.where(diff_tot != 0), diff_tot[np.where(diff_tot != 0)])
+    #     # print("num tot ptls wrong / tot ptls", np.max(diff_tot)/ptl_rad.shape[0])
+    #     # for idx in np.where(diff_tot != 0)[0]:
+    #     #     print("bin:", idx, bins[idx], "to", bins[idx+1])
+    #     #     wrong_pids_loc = np.where(((ptl_rad / halo_r200m) >= bins[idx]) & ((ptl_rad / halo_r200m) < bins[idx + 1]))[0]
+    #     #     wrong_pids = curr_ptl_pids[wrong_pids_loc]
+    #     #     new_match_ids = np.intersect1d(wrong_pids, sparta_tracer_ids, return_indices = True)
+    #     #     for i in range(new_match_ids[0].shape[0]):
+    #     #         print("last_pericenter_snap:",sparta_last_pericenter_snap[new_match_ids[2][i]], "n_pericenter", adj_sparta_n_pericenter[new_match_ids[2][i]], 
+    #     #               "n_is_lower_limit", adj_sparta_n_is_lower_limit[new_match_ids[2][i]], "orb_assn", curr_orb_assn[wrong_pids_loc[new_match_ids[1][i]]],
+    #     #               "radius", ptl_rad[wrong_pids_loc[new_match_ids[1][i]]], "radius/r200m", ptl_rad[wrong_pids_loc[new_match_ids[1][i]]]/halo_r200m)
+
+    #     fig,ax = plt.subplots(1, layout = "tight")
+    #     ax.scatter(graph_bins,diff_inf, c = 'g', alpha = 0.5, label = "infall ptls")
+    #     ax.scatter(graph_bins,diff_orb, c = 'b', alpha = 0.5, label = "orb ptls")
+    #     ax.scatter(graph_bins,diff_tot, c = 'r', alpha = 0.5, label = "tot ptls")
+    #     ax.set_title("Num of Ptls SPARTA - Num Ptls Code; Halo idx: " + str(curr_halo_idx))
+    #     ax.set_xlabel("radius $r/R_{200m}$")
+    #     ax.set_ylabel("Number of ptls")
+    #     ax.set_xscale("log")
+    #     ax.legend()
+    #     fig.savefig("/home/zvladimi/MLOIS/Random_figures/" + str(curr_halo_idx) + "_num_ptls_wrong_class.png")
+
         # fig = plt.figure()
         # ax = fig.add_subplot(projection='3d')
         # ax.scatter(halo_pos[0],halo_pos[1],halo_pos[2],s = 10, marker="*")
         # ax.scatter(curr_ptl_pos[matched_ids[1],0], curr_ptl_pos[matched_ids[1],1],curr_ptl_pos[matched_ids[1],2], s = 2, marker = ".")
         # fig.savefig("/home/zvladimi/MLOIS/Random_figures/" + str(curr_halo_idx) + "sparta_ptls.png")
-        curr_ptl_pids = curr_ptl_pids[arrsortrad]
-        start = 0.3
-        end = 0.8
-        within_range = np.where(((ptl_rad/halo_r200m) > start) & ((ptl_rad/halo_r200m) < end))[0]
-        new_matched_ids = np.intersect1d(curr_ptl_pids[within_range], sparta_tracer_ids, return_indices = True)
-        in_rng_orb_assn = curr_orb_assn[within_range]
-        # for i in range(new_matched_ids[0].shape[0]):
-        #     print("last_peri_snap", sparta_last_pericenter_snap[new_matched_ids[2]][i], "n_peri", adj_sparta_n_pericenter[new_matched_ids[2]][i], 
-        #         "lower_lim",adj_sparta_n_is_lower_limit[new_matched_ids[2]][i], "assn", in_rng_orb_assn[new_matched_ids[1]][i], "compare", compare_sparta_assn[new_matched_ids[2]][i])
-        print(np.where(in_rng_orb_assn[new_matched_ids[1]] != compare_sparta_assn[new_matched_ids[2]]))
     
 
     # calculate peculiar, radial, and tangential velocity
@@ -188,25 +233,15 @@ def search_halos(slice, comp_snap, curr_halo_idx, curr_sparta_idx):
     all_HPIDS[slice[0]:slice[1]] = fnd_HPIDs
 
     if comp_snap == False:
-        curr_orb_assn = curr_orb_assn[arrsortrad]
         all_orb_assn = to_np_arr(share_all_orb_assn)
         all_orb_assn[slice[0]:slice[1]] = curr_orb_assn
-
-    #if curr_sparta_idx > 4 and curr_sparta_idx < 10 and comp_snap == False:
-    # if comp_snap == False and curr_sparta_idx < 5:
-    #     # fig = plt.figure()
-    #     # ax = fig.add_subplot(projection='3d')
-    #     # ax.scatter(halo_pos[0],halo_pos[1],halo_pos[2],s = 10, marker="*")
-    #     # ax.scatter(curr_ptl_pos[matched_ids[1],0], curr_ptl_pos[matched_ids[1],1],curr_ptl_pos[matched_ids[1],2], s = 2, marker = ".")
-    #     # fig.savefig("/home/zvladimi/MLOIS/Random_figures/" + str(curr_halo_idx) + "sparta_ptls.png")
-
 
 
 def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_snap, p_scale_factor, p_ptl_tree, c_snap, c_scale_factor, c_ptl_tree):
     num_halos = indices.shape[0]
     num_iter = int(np.ceil(indices.shape[0] / num_halo_per_split))
     all_start_idx = 0
-
+    count_num_ptls = 0
     for i in range(num_iter):
         t3 = time.time()
 
@@ -229,8 +264,9 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_snap, p_scale_factor, 
         use_halos_pos = sparta_output['halos']['position'][:,p_snap] * 10**3 * p_scale_factor 
         use_halos_r200m = sparta_output['halos']['R200m'][:,p_snap]
         global p_curr_ptl_indices
+ 
         p_use_num_ptls, p_all_halo_mass, p_curr_ptl_indices = initial_search(use_halos_pos, search_rad, use_halos_r200m, p_ptl_tree, p_red_shift, mass, little_h, find_ptl_indices=True)
-
+        
         p_tot_num_use_ptls = int(np.sum(p_use_num_ptls))
         
         # Set up arrays that can be accessed by all processes
@@ -259,7 +295,6 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_snap, p_scale_factor, 
 
         p.join()
         p.close()
-        
         
         p_all_rad_vel = to_np_arr(p_share_calc_rad_vel)
         p_all_tang_vel = to_np_arr(p_share_calc_tang_vel)
@@ -326,7 +361,8 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_snap, p_scale_factor, 
             save_scale_radii = p_all_scal_rad
             save_rad_vel = p_all_rad_vel
             save_tang_vel = p_all_tang_vel
-    
+
+        count_num_ptls = count_num_ptls + int(p_all_HPIDs.shape[0])
         new_file = True
         all_start_idx += p_tot_num_use_ptls
         # Save all data in hdf5 file depending on if training or testing halos
@@ -369,10 +405,11 @@ p_box_size = p_box_size * 10**3 * p_scale_factor #convert to Kpc/h physical
 p_snapshot_path = path_dict["path_to_snaps"] + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
 
 # load all information needed for the primary snap
-global mass
-p_ptls_pid, p_ptls_vel, p_ptls_pos, mass = load_or_pickle_ptl_data(curr_sparta_file, str(p_snap), p_snapshot_path, p_scale_factor, little_h, path_dict)
 
-p_halos_pos, p_halos_r200m, p_halos_id, p_halos_status, p_halos_last_snap = load_or_pickle_SPARTA_data(curr_sparta_file, path_dict["path_to_hdf5_file"], p_scale_factor, little_h, p_snap, path_dict)
+p_ptls_pid, p_ptls_vel, p_ptls_pos = load_or_pickle_ptl_data(curr_sparta_file, str(p_snap), p_snapshot_path, p_scale_factor, little_h, path_dict)
+
+global mass
+p_halos_pos, p_halos_r200m, p_halos_id, p_halos_status, p_halos_last_snap, mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, path_dict)
 # p_halos_r200m = np.round(p_halos_r200m,1)
 p_ptl_tree = cKDTree(data = p_ptls_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size) # construct search trees for primary snap
 

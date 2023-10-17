@@ -76,7 +76,6 @@ class model_creator:
                     model = pickle.load(pickle_file)
                     self.sub_models.append(model)
                 
-
     def train_model(self):
         model_location = self.save_location + "/sub_models/"
         create_directory(model_location)
@@ -120,6 +119,7 @@ class model_creator:
         self.sub_models = sub_models
 
     def predict(self, dataset):
+        #TODO set dataset=None
         # If there is no dataset submitted then just use the validation sets otherwise predict on the inputted one
         if np.all(dataset):
             use_dataset = self.X_val
