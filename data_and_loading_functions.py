@@ -2,16 +2,20 @@ import pickle
 import h5py 
 import os
 import numpy as np
+import sys
+sys.path.insert(0, "/home/zvladimi/MLOIS/pygadgetreader")
+sys.path.insert(0,  "/home/zvladimi/MLOIS/sparta/analysis")
 from pygadgetreader import readsnap, readheader
+from sparta import sparta
 
 def create_directory(path):
     if os.path.exists(path) != True:
         os.makedirs(path)
 
-def check_pickle_exist_gadget(ptl_property, snapshot, snapshot_path, pickle_path):
+def check_pickle_exist_gadget(sparta_name, ptl_property, snapshot, snapshot_path, path_dict):
     # save to folder containing pickled data to be accessed easily later
-    file_path = pickle_path + str(snapshot) + "/" + ptl_property + "_" + snapshot + ".pickle" 
-    create_directory(pickle_path + str(snapshot) + "/")
+    file_path = path_dict["path_to_pickle"] + str(snapshot) + "_" + str(sparta_name) + "/" + ptl_property + "_" + str(snapshot) + ".pickle" 
+    create_directory(path_dict["path_to_pickle"] + str(snapshot) +  "_" + str(sparta_name) + "/")
     
     # check if the file has already been pickled if so just load it
     if os.path.isfile(file_path):
@@ -24,63 +28,71 @@ def check_pickle_exist_gadget(ptl_property, snapshot, snapshot_path, pickle_path
             pickle.dump(particle_info, pickle_file)
     return particle_info
 
-def check_pickle_exist_hdf5_prop(snapshot, first_group, second_group, third_group, hdf5_path, sparta_name, pickle_path):
-    # save to folder containing pickled data to be accessed easily later
-    file_path = pickle_path + str(snapshot) + "/" + first_group + "_" + second_group + "_" + third_group + "_" + sparta_name + ".pickle" 
-    create_directory(pickle_path + str(snapshot) + "/")
+def load_or_pickle_ptl_data(sparta_name, snapshot, snapshot_path, scale_factor, little_h, path_dict):
+    ptl_pid = check_pickle_exist_gadget(sparta_name, "pid", snapshot, snapshot_path, path_dict)
+    ptl_vel = check_pickle_exist_gadget(sparta_name, "vel", snapshot, snapshot_path, path_dict)
+    ptl_pos = check_pickle_exist_gadget(sparta_name, "pos", snapshot, snapshot_path, path_dict)
     
-    # check if the file has already been pickled if so just load it
-    if os.path.isfile(file_path):
-        with open(file_path, "rb") as pickle_file:
-            halo_info = pickle.load(pickle_file)
-    # otherwise load the specific information from the SPARTA hdf5 file and save it as a pickle file
+    ptl_pos = ptl_pos * 10**3 * scale_factor # convert to kpc/h and physical
+
+    return ptl_pid, ptl_vel, ptl_pos
+
+def load_or_pickle_SPARTA_data(sparta_name, scale_factor, snap, path_dict):
+    create_directory(path_dict["path_to_pickle"] + str(snap) +  "_" + str(sparta_name) + "/")
+    reload_sparta = False
+
+    if os.path.isfile(path_dict["path_to_pickle"] + str(snap) + "_" + str(sparta_name) + "_halos_pos.pickle"):
+        with open(path_dict["path_to_pickle"] + str(snap) + "_" + str(sparta_name) + "_halos_pos.pickle", "rb") as pickle_file:
+            halos_pos = pickle.load(pickle_file)
     else:
-        with h5py.File(hdf5_path, 'r') as file:
-            if third_group != "":
-                halo_info = file[first_group][second_group][third_group][:]
-            else:
-                halo_info = file[first_group][second_group][:]
-        with open(file_path, "wb") as pickle_file:
-            pickle.dump(halo_info, pickle_file)
-    return halo_info
-
-def load_or_pickle_ptl_data(snapshot, snapshot_path, scale_factor, little_h, pickle_path):
-    ptl_pid = check_pickle_exist_gadget("pid", snapshot, snapshot_path, pickle_path)
-    ptl_vel = check_pickle_exist_gadget("vel", snapshot, snapshot_path, pickle_path)
-    ptl_pos = check_pickle_exist_gadget("pos", snapshot, snapshot_path, pickle_path)
-    ptl_mass = check_pickle_exist_gadget("mass", snapshot, snapshot_path, pickle_path)
-
-    ptl_pos = ptl_pos * 10**3 * scale_factor * little_h # convert to kpc and physical
-    ptl_mass = ptl_mass[0] * 10**10 # units M_sun/h
-
-    return ptl_pid, ptl_vel, ptl_pos, ptl_mass
-
-def load_or_pickle_SPARTA_data(sparta_name, hdf5_path, scale_factor, little_h, snap, pickle_path):
-    halos_pos = check_pickle_exist_hdf5_prop(snap, "halos", "position", "", hdf5_path, sparta_name, pickle_path)
-    halos_vel = check_pickle_exist_hdf5_prop(snap, "halos", "velocity", "", hdf5_path, sparta_name, pickle_path)
-    halo_last_snap = check_pickle_exist_hdf5_prop(snap, "halos", "last_snap", "", hdf5_path, sparta_name, pickle_path)
-    halos_r200m = check_pickle_exist_hdf5_prop(snap, "halos", "R200m", "", hdf5_path, sparta_name, pickle_path)
-    halo_id = check_pickle_exist_hdf5_prop(snap, "halos", "id", "", hdf5_path, sparta_name, pickle_path)
-    halo_status = check_pickle_exist_hdf5_prop(snap, "halos", "status", "", hdf5_path, sparta_name, pickle_path)
+        reload_sparta = True
     
-    density_prf_all = check_pickle_exist_hdf5_prop(snap, "anl_prf", "M_all", "", hdf5_path, sparta_name, pickle_path)
-    density_prf_1halo = check_pickle_exist_hdf5_prop(snap, "anl_prf", "M_1halo", "", hdf5_path, sparta_name, pickle_path)
+    if os.path.isfile(path_dict["path_to_pickle"] + str(snap) + "_" + str(sparta_name) + "_halos_vel.pickle"):
+        with open(path_dict["path_to_pickle"] + str(snap) + "_" + str(sparta_name) + "_halos_vel.pickle", "rb") as pickle_file:
+            halos_vel = pickle.load(pickle_file)
+    else:
+        reload_sparta = True
     
-    halo_n = check_pickle_exist_hdf5_prop(snap, "tcr_ptl", "res_oct", "halo_n", hdf5_path, sparta_name, pickle_path)
-    halo_first = check_pickle_exist_hdf5_prop(snap, "tcr_ptl", "res_oct", "halo_first", hdf5_path, sparta_name, pickle_path)
-    
-    halos_pos = halos_pos[:,snap,:]
-    halos_vel = halos_vel[:,snap,:]
-    halos_r200m = halos_r200m[:,snap]
-    halo_id = halo_id[:,snap]
-    halo_status = halo_status[:,snap]
-    density_prf_all = density_prf_all[:,snap,:]
-    density_prf_1halo = density_prf_1halo[:,snap,:]
-    
-    halos_pos = halos_pos * 10**3 * scale_factor * little_h # convert to kpc and physical
-    halos_r200m = halos_r200m * little_h # convert to kpc
+    if os.path.isfile(path_dict["path_to_pickle"] + str(snap) + "_" + str(sparta_name) + "_halos_last_snap.pickle"):
+        with open(path_dict["path_to_pickle"] + str(snap) + "_" + str(sparta_name) + "_halos_last_snap.pickle", "rb") as pickle_file:
+            halos_last_snap = pickle.load(pickle_file)
+    else:
+        reload_sparta = True
 
-    return halos_pos, halos_vel, halos_r200m, halo_id, density_prf_all, density_prf_1halo, halo_status, halo_last_snap, halo_n, halo_first
+    if os.path.isfile(path_dict["path_to_pickle"] + str(snap) + "_" + str(sparta_name) + "_halos_r200m.pickle"):
+        with open(path_dict["path_to_pickle"] + str(snap) + "_" + str(sparta_name) + "_halos_r200m.pickle", "rb") as pickle_file:
+            halos_r200m = pickle.load(pickle_file)
+    else:
+        reload_sparta = True
+
+    if os.path.isfile(path_dict["path_to_pickle"] + str(snap) + "_" + str(sparta_name) + "_halos_id.pickle"):
+        with open(path_dict["path_to_pickle"] + str(snap) + "_" + str(sparta_name) + "_halos_id.pickle", "rb") as pickle_file:
+            halos_id = pickle.load(pickle_file)
+    else:
+        reload_sparta = True
+
+    if os.path.isfile(path_dict["path_to_pickle"] + str(snap) + "_" + str(sparta_name) + "_halos_status.pickle"):
+        with open(path_dict["path_to_pickle"] + str(snap) + "_" + str(sparta_name) + "_halos_status.pickle", "rb") as pickle_file:
+            halos_status = pickle.load(pickle_file)
+    else:
+        reload_sparta = True
+        
+    if os.path.isfile(path_dict["path_to_pickle"] + str(snap) + "_" + str(sparta_name) + "_ptl_mass.pickle"):
+        with open(path_dict["path_to_pickle"] + str(snap) + "_" + str(sparta_name) + "_ptl_mass.pickle", "rb") as pickle_file:
+            halos_status = pickle.load(pickle_file)
+    else:
+        reload_sparta = True
+    
+    if reload_sparta:
+        sparta_output = sparta.load(filename=path_dict["path_to_hdf5_file"], log_level= 0)
+        halos_pos = sparta_output['halos']['position'][:,snap,:] * 10**3 * scale_factor # convert to kpc/h and physical
+        halos_last_snap = sparta_output['halos']['last_snap'][:]
+        halos_r200m = sparta_output['halos']['R200m'][:,snap] 
+        halos_id = sparta_output['halos']['id'][:,snap]
+        halos_status = sparta_output['halos']['status'][:,snap]
+        ptl_mass = sparta_output["simulation"]["particle_mass"]
+
+    return halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, ptl_mass
 
 def standardize(values):
     for col in range(values.shape[1]):
@@ -185,3 +197,27 @@ def conv_halo_id_spid(my_halo_ids, sdata, snapshot):
     for i, my_id in enumerate(my_halo_ids):
         sparta_idx[i] = int(np.where(my_id == sdata['halos']['id'][:,snapshot])[0])
     return sparta_idx
+
+def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, total_num_snaps, path_dict, snap_format, little_h):
+    # calculate one dynamical time ago and set that as the comparison snap
+    curr_time = cosmol.age(p_red_shift)
+    past_time = curr_time - (t_dyn_step * t_dyn)
+    c_snap = find_closest_snap(cosmol, past_time, num_snaps = total_num_snaps, path_to_snap=path_dict['path_to_snaps'], snap_format = snap_format)
+    snapshot_list.append(c_snap)
+
+    # switch to comparison snap
+    snapshot_path = path_dict['path_to_snaps'] + "/snapdir_" + snap_format.format(c_snap) + "/snapshot_" + snap_format.format(c_snap)
+        
+    # get constants from pygadgetreader
+    c_red_shift = readheader(snapshot_path, 'redshift')
+    c_scale_factor = 1/(1+c_red_shift)
+    c_rho_m = cosmol.rho_m(c_red_shift)
+    c_hubble_constant = cosmol.Hz(c_red_shift) * 0.001 # convert to units km/s/kpc
+    c_box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
+    c_box_size = c_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
+    
+    # load particle data and SPARTA data for the comparison snap
+    c_particles_pid, c_particles_vel, c_particles_pos = load_or_pickle_ptl_data(path_dict["curr_sparta_file"], str(c_snap), snapshot_path, c_scale_factor, little_h, path_dict)
+    c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap, mass = load_or_pickle_SPARTA_data(path_dict["curr_sparta_file"], c_scale_factor, c_snap, path_dict)
+
+    return c_snap, c_box_size, c_rho_m, c_red_shift, c_hubble_constant, c_particles_pid, c_particles_vel, c_particles_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap

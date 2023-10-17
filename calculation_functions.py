@@ -11,14 +11,9 @@ def calculate_distance(halo_x, halo_y, halo_z, particle_x, particle_y, particle_
     z_dist = particle_z - halo_z
     
     coord_diff = np.zeros((new_particles, 3))
-    coord_diff[:,0] = x_dist
-    coord_diff[:,1] = y_dist
-    coord_diff[:,2] = z_dist
-
     half_box_size = box_size/2
     
-    #handles periodic boundary conditions by checking if you were to add or subtract a boxsize would it then
-    #be within half a box size of the halo
+    #handles periodic boundary conditions by checking if you were to add or subtract a boxsize would it then be within half a box size of the halo
     #do this for x, y, and z coords
     x_within_plus = np.where((x_dist + box_size) < half_box_size)
     x_within_minus = np.where((x_dist - box_size) > -half_box_size)
@@ -81,12 +76,12 @@ def calc_v200m(mass, radius):
     # calculate the v200m for a halo based on its mass and radius
     return np.sqrt((G * mass)/radius)
 
-def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200, red_shift, little_h, hubble_constant):
+def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200m, red_shift, little_h, hubble_constant):
     
     # Get the corresponding components, distances, and halo v200m for every particle
     v_hubble = np.zeros(particle_dist.size, dtype = np.float32)
-    corresponding_hubble_m200m = mass_so.R_to_M(halo_r200, red_shift, "200c") * little_h # convert to M⊙
-    curr_v200m = calc_v200m(corresponding_hubble_m200m, halo_r200)
+    corresponding_hubble_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200c") 
+    curr_v200m = calc_v200m(corresponding_hubble_m200m, halo_r200m)
         
     # calculate the unit vector of the halo to the particle  
     rhat = calc_rhat(coord_sep[:,0], coord_sep[:,1], coord_sep[:,2])
@@ -108,10 +103,45 @@ def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200, red_shift, l
     #radial_vel = radial_component_vel + v_hubble
 
     # scale all the radial velocities by v200m of the halo
-    return radial_vel, radial_vel_comp, curr_v200m, physical_vel, rhat
+    return radial_vel, curr_v200m, physical_vel, rhat
 
 def calc_tang_vel(radial_vel, physical_vel, rhat):
     component_rad_vel = rhat * radial_vel[:, np.newaxis] 
     tangential_vel = physical_vel - component_rad_vel
     
     return tangential_vel
+
+def calc_t_dyn(halo_r200m, red_shift, little_h,):
+    corresponding_hubble_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200c")
+    curr_v200m = calc_v200m(corresponding_hubble_m200m, halo_r200m)
+    t_dyn = (2*halo_r200m)/curr_v200m
+
+    return t_dyn
+
+def initial_search(halo_positions, search_radius, halo_r200m, tree, red_shift, mass, little_h, find_ptl_indices):
+    start = True
+    num_halos = halo_positions.shape[0]
+    particles_per_halo = np.zeros(num_halos, dtype = np.int32)
+    all_halo_mass = np.zeros(num_halos, dtype = np.float32)
+    
+    for i in range(num_halos):
+        if halo_r200m[i] > 0:
+            #find how many particles we are finding
+            indices = tree.query_ball_point(halo_positions[i,:], r = search_radius * halo_r200m[i])
+            indices = np.array(indices)
+            # how many new particles being added and correspondingly how massive the halo is
+            num_new_particles = indices.shape[0]
+            all_halo_mass[i] = num_new_particles * mass
+            particles_per_halo[i] = num_new_particles
+            
+            if find_ptl_indices:
+                if start:
+                    all_ptl_indices = indices
+                    start = False
+                else:
+                    all_ptl_indices = np.concatenate((all_ptl_indices, indices))
+
+    if find_ptl_indices:
+        return particles_per_halo, all_halo_mass, all_ptl_indices
+    else:
+        return particles_per_halo, all_halo_mass
