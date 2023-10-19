@@ -1,7 +1,6 @@
 import numpy as np
 from colossus.halo import mass_so
 from colossus.utils import constants
-
 G = constants.G
 
 #calculate distance of particle from halo
@@ -76,7 +75,7 @@ def calc_v200m(mass, radius):
     # calculate the v200m for a halo based on its mass and radius
     return np.sqrt((G * mass)/radius)
 
-def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200m, red_shift, little_h, hubble_constant):
+def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200m, red_shift, hubble_constant):
     
     # Get the corresponding components, distances, and halo v200m for every particle
     v_hubble = np.zeros(particle_dist.size, dtype = np.float32)
@@ -111,14 +110,14 @@ def calc_tang_vel(radial_vel, physical_vel, rhat):
     
     return tangential_vel
 
-def calc_t_dyn(halo_r200m, red_shift, little_h,):
+def calc_t_dyn(halo_r200m, red_shift):
     corresponding_hubble_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200c")
     curr_v200m = calc_v200m(corresponding_hubble_m200m, halo_r200m)
     t_dyn = (2*halo_r200m)/curr_v200m
 
     return t_dyn
 
-def initial_search(halo_positions, search_radius, halo_r200m, tree, red_shift, mass, little_h, find_ptl_indices):
+def initial_search(halo_positions, search_radius, halo_r200m, tree, mass, find_ptl_indices):
     start = True
     num_halos = halo_positions.shape[0]
     particles_per_halo = np.zeros(num_halos, dtype = np.int32)
