@@ -55,7 +55,8 @@ search_rad = config.getfloat("SEARCH","search_rad")
 total_num_snaps = config.getint("SEARCH","total_num_snaps")
 num_halo_per_split = config.getint("SEARCH","num_halo_per_split")
 test_halos_ratio = config.getfloat("SEARCH","test_halos_ratio")
-num_processes = config.getint("SEARCH","num_processes")
+#num_processes = config.getint("SEARCH","num_processes")
+num_processes = int(os.getenv('SLURM_CPUS_PER_TASK'))
 global num_save_ptl_params
 num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 ##################################################################################################################
