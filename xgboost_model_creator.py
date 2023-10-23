@@ -70,7 +70,7 @@ class model_creator:
         return X_train_within, y_train_within
     
     def load_models(self):
-        for filename in os.listdir(self.save_location + "/sub_models/"):
+        for filename in os.listdir(self.save_location + "sub_models/"):
             if int(re.search(r'\d+', filename).group()) == self.num_params:
                 with open(self.save_location + "/sub_models/" + filename, "rb") as pickle_file:
                     model = pickle.load(pickle_file)

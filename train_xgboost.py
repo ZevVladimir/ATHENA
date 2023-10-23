@@ -7,48 +7,61 @@ import time
 import pickle
 import os
 from imblearn import under_sampling, over_sampling
-##################################################################################################################
-# General params
-snapshot_list = [190,184] # SHOULD BE DESCENDING
-p_snap = snapshot_list[0]
-times_r200m = 6
-curr_sparta_file = "sparta_cbol_l0063_n0256"
-path_to_hdf5_file = "/home/zvladimi/MLOIS/SPARTA_data/" + curr_sparta_file + ".hdf5"
-path_dict = {
-    "curr_sparta_file": curr_sparta_file,
-    "path_to_MLOIS": "/home/zvladimi/MLOIS/",
-    "path_to_snaps": "/home/zvladimi/MLOIS/particle_data/",
-    "path_to_hdf5_file": path_to_hdf5_file,
-    "path_to_pickle": "/home/zvladimi/MLOIS/pickle_data/",
-    "path_to_datasets": "/home/zvladimi/MLOIS/calculated_info/",
-    "path_to_model_plots": "/home/zvladimi/MLOIS/xgboost_datasets_plots/"
-}
-snap_format = "{:04d}" # how are the snapshots formatted with 0s
-##################################################################################################################
-from data_and_loading_functions import create_directory
+from data_and_loading_functions import build_ml_dataset, check_pickle_exist_gadget, choose_halo_split, create_directory
 from visualization_functions import *
 from xgboost_model_creator import model_creator
 ##################################################################################################################
+# LOAD CONFIG PARAMETERS
+import configparser
+config = configparser.ConfigParser()
+config.read("config.ini")
+curr_sparta_file = config["MISC"]["curr_sparta_file"]
+path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
+path_to_snaps = config["PATHS"]["path_to_snaps"]
+path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
+path_to_hdf5_file = path_to_SPARTA_data + curr_sparta_file + ".hdf5"
+path_to_pickle = config["PATHS"]["path_to_pickle"]
+path_to_calc_info = config["PATHS"]["path_to_calc_info"]
+path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
+path_to_sparta = config["PATHS"]["path_to_sparta"]
+path_to_xgboost = config["PATHS"]["path_to_xgboost"]
+create_directory(path_to_MLOIS)
+create_directory(path_to_snaps)
+create_directory(path_to_SPARTA_data)
+create_directory(path_to_hdf5_file)
+create_directory(path_to_pickle)
+create_directory(path_to_calc_info)
+create_directory(path_to_xgboost)
+snap_format = config["MISC"]["snap_format"]
+global prim_only
+prim_only = config.getboolean("SEARCH","prim_only")
+t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
+global p_snap
+p_snap = config.getint("SEARCH","p_snap")
+c_snap = config.getint("XGBOOST","c_snap")
+snapshot_list = [p_snap, c_snap]
+global search_rad
+search_rad = config.getfloat("SEARCH","search_rad")
+total_num_snaps = config.getint("SEARCH","total_num_snaps")
+per_n_halo_per_split = config.getfloat("SEARCH","per_n_halo_per_split")
+test_halos_ratio = config.getfloat("SEARCH","test_halos_ratio")
+curr_chunk_size = 500
+global num_save_ptl_params
+num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
+##################################################################################################################
 # set what the paths should be for saving and getting the data
 if len(snapshot_list) > 1:
-    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "_" + str(times_r200m) + "r200msearch/"
+    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "_" + str(search_rad) + "r200msearch/"
 else:
-    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(times_r200m) + "r200msearch/"
+    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(search_rad) + "r200msearch/"
 
-save_location = path_dict["path_to_model_plots"] + specific_save
-path_to_datasets = path_dict["path_to_model_plots"] + specific_save + "datasets/"
+save_location = path_to_xgboost + specific_save
+path_to_datasets = path_to_xgboost + specific_save + "datasets/"
 
 with open(path_to_datasets + "train_dataset_all_keys.pickle", "rb") as pickle_file:
     train_all_keys = pickle.load(pickle_file)
 with open(path_to_datasets + "train_dataset_" + curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(snapshot_list[-1]) + ".pickle", "rb") as pickle_file:
     train_dataset = pickle.load(pickle_file)
-
-if len(snapshot_list) > 1:
-    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "_" + str(times_r200m) + "r200msearch/"
-else:
-    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(times_r200m) + "r200msearch/"
-    
-save_location = path_dict["path_to_model_plots"] + specific_save
 
 create_directory(save_location)
 
