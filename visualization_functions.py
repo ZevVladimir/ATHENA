@@ -13,7 +13,7 @@ from calculation_functions import calc_v200m
 # import general_plotting as gp
 from textwrap import wrap
 
-def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r200_per_part, red_shift, hubble_constant):
+def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r200_per_part, red_shift, hubble_constant, little_h):
     start_bin_val = 0.001
     finish_bin_val = np.max(scaled_radii)
     
@@ -85,12 +85,12 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
         elif orb_radii_within_range.size != 0 and i == 0:
             calculated_prf_orb[i] = orb_radii_within_range.size * mass
             diff_n_orb_ptls[i] = actual_prf_1halo[i]/mass - orb_radii_within_range.size
-        elif orb_radii_within_range.size == 0 and i != 0:
+        elif radii_within_range.size == 0 and i != 0:
             calculated_prf_orb[i] = calculated_prf_orb[i - 1]
             diff_n_orb_ptls[i] = (actual_prf_1halo[i] - actual_prf_1halo[i-1])/mass   
         else:
-            calculated_prf_orb[i] = 0
-            diff_n_orb_ptls[i] = np.floor((actual_prf_1halo[i])/mass)          
+            calculated_prf_orb[i] = calculated_prf_orb[i - 1]
+            diff_n_orb_ptls[i] = (actual_prf_1halo[i])/mass          
             
         inf_radii_within_range = np.where((infall_radii >= start_bin) & (infall_radii < end_bin))[0]
         if inf_radii_within_range.size != 0 and i != 0:
@@ -99,17 +99,18 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
         elif inf_radii_within_range.size != 0 and i == 0:
             calculated_prf_inf[i] = inf_radii_within_range.size * mass
             diff_n_inf_ptls[i] = (actual_prf_all[i] - actual_prf_1halo[i])/mass - inf_radii_within_range.size
-        elif inf_radii_within_range.size == 0 and i != 0:
+        elif radii_within_range.size == 0 and i != 0:
             calculated_prf_inf[i] = calculated_prf_inf[i - 1]
             diff_n_inf_ptls[i] =((actual_prf_all[i] - actual_prf_1halo[i]) - (actual_prf_all[i-1] - actual_prf_1halo[i-1]))/mass
         else:
-            calculated_prf_inf[i] = 0
-            diff_n_inf_ptls[i] = np.floor((actual_prf_all[i] - actual_prf_1halo[i])/mass)            
+            calculated_prf_inf[i] = calculated_prf_inf[i - 1]
+            diff_n_inf_ptls[i] =(actual_prf_all[i] - actual_prf_1halo[i])/mass            
             
         radii_within_range = np.where((radii >= start_bin) & (radii < end_bin))[0]
         if radii_within_range.size != 0 and i != 0:
             calculated_prf_all[i] = calculated_prf_all[i - 1] + radii_within_range.size * mass
             diff_n_tot_ptls[i] = ((actual_prf_all[i] - actual_prf_all[i-1])/mass) - radii_within_range.size
+            
         elif radii_within_range.size != 0 and i == 0:
             calculated_prf_all[i] = radii_within_range.size * mass
             diff_n_tot_ptls[i] = np.floor(actual_prf_all[i]/mass) - radii_within_range.size
@@ -117,10 +118,8 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
             calculated_prf_all[i] = calculated_prf_all[i - 1]
             diff_n_tot_ptls[i] = np.floor((actual_prf_all[i] - actual_prf_all[i-1])/mass)
         else:
-            calculated_prf_all[i] = 0
+            calculated_prf_all[i] = calculated_prf_all[i - 1]
             diff_n_tot_ptls[i] = np.floor((actual_prf_all[i])/mass)
-            
-            
     middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
 
     fig, ax = plt.subplots(1,2, layout = "tight")
