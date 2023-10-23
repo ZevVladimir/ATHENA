@@ -1,6 +1,7 @@
 import numpy as np
 from colossus.halo import mass_so
 from colossus.utils import constants
+
 G = constants.G
 
 #calculate distance of particle from halo
@@ -117,7 +118,7 @@ def calc_t_dyn(halo_r200m, red_shift):
 
     return t_dyn
 
-def initial_search(halo_positions, search_radius, halo_r200m, tree, mass, find_ptl_indices):
+def initial_search(halo_positions, search_radius, halo_r200m, tree, red_shift, mass, find_ptl_indices):
     start = True
     num_halos = halo_positions.shape[0]
     particles_per_halo = np.zeros(num_halos, dtype = np.int32)
