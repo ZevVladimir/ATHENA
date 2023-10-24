@@ -62,12 +62,13 @@ class model_creator:
         #TODO implement
         return
     
-    def split_by_dist(self, low_cutoff, high_cutoff):
+    def split_by_dist(self, low_cutoff, high_cutoff, x_dataset, y_dataset):
+        
         # Get the values of X and y within the specified range
-        X_train_within = self.X_train[np.where((self.X_train[:,self.scaled_radii_loc] > low_cutoff) & (self.X_train[:,self.scaled_radii_loc] < high_cutoff))[0]]
-        y_train_within = self.y_train[np.where((self.X_train[:,self.scaled_radii_loc] > low_cutoff) & (self.X_train[:,self.scaled_radii_loc] < high_cutoff))[0]]
+        X_within = x_dataset[np.where((x_dataset[:,self.scaled_radii_loc] > low_cutoff) & (x_dataset[:,self.scaled_radii_loc] < high_cutoff))[0]]
+        y_within = y_dataset[np.where((x_dataset[:,self.scaled_radii_loc] > low_cutoff) & (x_dataset[:,self.scaled_radii_loc] < high_cutoff))[0]]
 
-        return X_train_within, y_train_within
+        return X_within, y_within
     
     def load_models(self):
         for filename in os.listdir(self.save_location + "sub_models/"):
@@ -93,7 +94,7 @@ class model_creator:
             else:
                 high_cutoff = self.radii_splits[i]
             
-            X, y = self.split_by_dist(low_cutoff, high_cutoff)
+            X, y = self.split_by_dist(low_cutoff, high_cutoff, self.X_train, self.y_train)
         
             curr_model_location = model_location + str(self.num_params) + "_params_" + "_range_" + str(low_cutoff) + "_" + str(np.round(high_cutoff,2)) + "_" + self.curr_sparta_file + ".pickle"
 
@@ -118,7 +119,7 @@ class model_creator:
         
         self.sub_models = sub_models
 
-    def predict(self, dataset):
+    def predict_all_models(self, dataset):
         #TODO set dataset=None
         # If there is no dataset submitted then just use the validation sets otherwise predict on the inputted one
         if np.all(dataset):
@@ -135,10 +136,44 @@ class model_creator:
 
         # Then determine which class each particle belongs to based of each model's prediction
 
-        self.det_class(all_predicts)
+        self.det_class_argmax(all_predicts)
         print(classification_report(use_labels, self.predicts))
     
-    def det_class(self, predicts):
+    def predict_by_model(self, dataset):
+        if np.all(dataset):
+            use_dataset = self.X_val
+            use_labels = self.y_val
+        else:
+            use_dataset = dataset[:,2:]
+            use_labels = dataset[:,1]
+        all_preds = np.ones(use_dataset.shape[0]) * -1
+        
+        start = 0
+        for i in range(len(self.radii_splits) + 1):
+            if i == 0:
+                low_cutoff = 0
+            else:
+                low_cutoff = self.radii_splits[i - 1]
+            if i == len(self.radii_splits):
+                high_cutoff = np.max(self.X_train[:,self.scaled_radii_loc])
+            else:
+                high_cutoff = self.radii_splits[i]
+            
+            X, y = self.split_by_dist(low_cutoff, high_cutoff, use_dataset, use_labels)
+            
+            model_location = self.save_location + "/sub_models/"
+            curr_model_location = model_location + str(self.num_params) + "_params_" + "_range_" + str(low_cutoff) + "_" + str(np.round(high_cutoff,2)) + "_" + self.curr_sparta_file + ".pickle"
+            with open(curr_model_location, "rb") as pickle_file:
+                curr_model = pickle.load(pickle_file)
+            predicts = curr_model.predict_proba(X)
+            
+            all_preds[start:start+X.shape[0]] = self.det_class_by_model(predicts)
+            start = start + X.shape[0]
+        
+        self.predicts = all_preds
+        print(classification_report(use_labels, self.predicts))
+    
+    def det_class_argmax(self, predicts):
         # Determine which class a particle is based off which model gave the highest probability
         #TODO add option to use an average of predictions instead
         pred_loc = np.argmax(predicts, axis = 1)
@@ -147,6 +182,13 @@ class model_creator:
         final_predicts[np.where((pred_loc % 2) != 0)] = 1
 
         self.predicts = final_predicts
+        
+    def det_class_by_model(self, predicts):
+        pred = np.argmax(predicts, axis = 1)
+        print(pred)
+        return pred
+        
+        
 
     def graph(self, corr_matrix = False, feat_imp = False):
         # implement functionality to create graphs of data if wanted

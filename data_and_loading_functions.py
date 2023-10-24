@@ -194,17 +194,13 @@ def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapsh
             all_keys = pickle.load(pickle_file)
     return full_dataset, all_keys
 
-def save_to_hdf5(new_file, hdf5_file, data_name, dataset, chunk, max_shape, curr_idx, max_num_keys):
-    if new_file and len(list(hdf5_file.keys())) < (max_num_keys):
+def save_to_hdf5(hdf5_file, data_name, dataset, chunk, max_shape, curr_idx, max_num_keys):
+    if len(list(hdf5_file.keys())) < (max_num_keys):
         hdf5_file.create_dataset(data_name, data = dataset, chunks = chunk, maxshape = max_shape)
     # with a new file adding on additional data to the datasets
-    elif new_file and len(list(hdf5_file.keys())) == (max_num_keys):
+    elif len(list(hdf5_file.keys())) == (max_num_keys):
         hdf5_file[data_name].resize((hdf5_file[data_name].shape[0] + dataset.shape[0]), axis = 0)
         hdf5_file[data_name][-dataset.shape[0]:] = dataset   
-
-    # if not a new file and same num of particles will just replace the previous information
-    if not new_file:
-        hdf5_file[data_name][curr_idx:curr_idx + dataset.shape[0]] = dataset
         
 def choose_halo_split(indices, snap, halo_props, particle_props, num_features):
     start_idxs = halo_props["Halo_start_ind_" + snap].to_numpy()

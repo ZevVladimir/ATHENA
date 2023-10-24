@@ -182,7 +182,7 @@ for i in range(num_iter):
                 use_ptls = np.where(test_halos_within[:,int(2 + (num_params_per_snap * (i+1)))] == 0)[0]
 
             curr_dataset = curr_dataset[use_ptls]
-            all_models[i].predict(curr_dataset)
+            all_models[i].predict_all_models(curr_dataset)
             test_predict[use_ptls] = all_models[i].get_predicts()
 
         actual_labels = test_halos_within[:,1]

@@ -286,14 +286,14 @@ def plot_incorrectly_classified(correct_labels, ml_labels, radii, rad_vel, tang_
     gs = miss_class_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
     
     r_rv = miss_class_fig.add_subplot(gs[0,0])
-    scaled_inf_r_vr = rotate(scaled_inf_r_vr, angle = -90)
+    scaled_inf_r_vr = scaled_inf_r_vr.T
     r_rv.imshow(scaled_inf_r_vr, cmap = cmap, vmin = 0, vmax = max_diff, origin = 'lower', aspect = 'auto', extent = [0,max_radius,min_rad_vel,max_rad_vel])
     #r_rv.hist2d(incorrect_inf_radii, incorrect_inf_rad_vel, num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
     r_rv.set_xlabel("$r/R_{200m}$")
     r_rv.set_ylabel("$v_r/v_{200m}$")
     
     r_tv = miss_class_fig.add_subplot(gs[0,1])
-    scaled_inf_r_vt = rotate(scaled_inf_r_vt, angle = -90)
+    scaled_inf_r_vt = scaled_inf_r_vt.T
     r_tv.imshow(scaled_inf_r_vt, cmap = cmap, vmin = 0, vmax = max_diff, origin = 'lower', aspect = 'auto', extent = [0,max_radius,min_tang_vel,max_tang_vel])
     #r_tv.hist2d(incorrect_inf_radii, incorrect_inf_tang_vel, num_bins, [[0,max_radius],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
     r_tv.set_xlabel("$r/R_{200m}$")
@@ -301,21 +301,21 @@ def plot_incorrectly_classified(correct_labels, ml_labels, radii, rad_vel, tang_
     r_tv.set_title("Label: Infall Real: Orbit")
     
     rv_tv = miss_class_fig.add_subplot(gs[0,2])
-    scaled_inf_vr_vt = rotate(scaled_inf_vr_vt, angle = -90)
+    scaled_inf_vr_vt = scaled_inf_vr_vt.T
     rv_tv.imshow(scaled_inf_vr_vt, cmap = cmap, vmin = 0, vmax = max_diff, origin = 'lower', aspect = 'auto', extent = [min_rad_vel,max_rad_vel,min_tang_vel,max_tang_vel])
     #rv_tv.hist2d(incorrect_inf_rad_vel, incorrect_inf_tang_vel, num_bins, [[min_rad_vel,max_rad_vel],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
     rv_tv.set_xlabel("$v_r/v_{200m}$")
     rv_tv.set_ylabel("$v_t/v_{200m}$")
     
     r_rv = miss_class_fig.add_subplot(gs[1,0])
-    scaled_orb_r_vr = rotate(scaled_orb_r_vr, angle = -90)
+    scaled_orb_r_vr = scaled_orb_r_vr.T
     r_rv.imshow(scaled_orb_r_vr, cmap = cmap, vmin = 0, vmax = max_diff, origin = 'lower', aspect = 'auto', extent = [0,max_radius,min_rad_vel,max_rad_vel])
     #r_rv.hist2d(incorrect_orb_radii, incorrect_orb_rad_vel, num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
     r_rv.set_xlabel("$r/R_{200m}$")
     r_rv.set_ylabel("$v_r/v_{200m}$")
     
     r_tv = miss_class_fig.add_subplot(gs[1,1])
-    scaled_orb_r_vt = rotate(scaled_orb_r_vt, angle = -90)
+    scaled_orb_r_vt = scaled_orb_r_vt.T
     r_tv.imshow(scaled_orb_r_vt, cmap = cmap, vmin = 0, vmax = max_diff, origin = 'lower', aspect = 'auto', extent = [0,max_radius,min_tang_vel,max_tang_vel])
     #r_tv.hist2d(incorrect_orb_radii, incorrect_orb_tang_vel, num_bins, [[0,max_radius],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
     r_tv.set_xlabel("$r/R_{200m}$")
@@ -323,7 +323,7 @@ def plot_incorrectly_classified(correct_labels, ml_labels, radii, rad_vel, tang_
     r_tv.set_title("Label: Orbit Real: Infall")
     
     rv_tv = miss_class_fig.add_subplot(gs[1,2])
-    scaled_orb_vr_vt = rotate(scaled_orb_vr_vt, angle = -90)
+    scaled_orb_vr_vt = scaled_orb_vr_vt.T
     imshow_img = rv_tv.imshow(scaled_orb_vr_vt, cmap = cmap, vmin = 0, vmax = max_diff, origin = 'lower', aspect = 'auto', extent = [min_rad_vel,max_rad_vel,min_tang_vel,max_tang_vel])
     #rv_tv.hist2d(incorrect_orb_rad_vel, incorrect_orb_tang_vel, num_bins, [[min_rad_vel,max_rad_vel],[min_tang_vel,max_tang_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
     rv_tv.set_xlabel("$v_r/v_{200m}$")
@@ -350,7 +350,7 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     ml_orb_rad_vel = radial_vel[np.where(orb_inf == 1)]
     ml_inf_tang_vel = tang_vel[np.where(orb_inf == 0)]
     ml_orb_tang_vel = tang_vel[np.where(orb_inf == 1)]
-    
+
     act_inf_radius = radius[np.where(correct_orb_inf == 0)]
     act_orb_radius = radius[np.where(correct_orb_inf == 1)]
     act_inf_rad_vel = radial_vel[np.where(correct_orb_inf == 0)]
@@ -481,39 +481,39 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     gs = err_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
     
     perr_inf_r_rv = err_fig.add_subplot(gs[0,0])
-    per_err_1 = rotate(per_err_1, angle = -90)
+    per_err_1 = per_err_1.T
     perr_inf_r_rv.imshow(per_err_1, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [0,max_radius,min_rad_vel,max_rad_vel])
     perr_inf_r_rv.set_xlabel("$r/R_{200m}$")
     perr_inf_r_rv.set_ylabel("$v_r/v_{200m}$")
     
     perr_inf_r_tv = err_fig.add_subplot(gs[0,1])
-    per_err_2 = rotate(per_err_2, angle = -90)
+    per_err_2 = per_err_2.T
     perr_inf_r_tv.imshow(per_err_2, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [0,max_radius,min_tang_vel,max_tang_vel])
     perr_inf_r_tv.set_xlabel("$r/R_{200m}$")
     perr_inf_r_tv.set_ylabel("$v_t/v_{200m}$")
     perr_inf_r_tv.set_title("Percent Error Orbiting Ptls")
     
     perr_inf_rv_tv = err_fig.add_subplot(gs[0,2])
-    per_err_3 = rotate(per_err_3, angle = -90)
+    per_err_3 = per_err_3.T
     perr_inf_rv_tv.imshow(per_err_3, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [min_rad_vel,max_rad_vel,min_tang_vel,max_tang_vel])
     perr_inf_rv_tv.set_xlabel("$v_r/v_{200m}$")
     perr_inf_rv_tv.set_ylabel("$v_t/v_{200m}$")
     
     perr_orb_r_rv = err_fig.add_subplot(gs[1,0])
-    per_err_4 = rotate(per_err_4, angle = -90)
+    per_err_4 = per_err_4.T
     perr_imshow_img = perr_orb_r_rv.imshow(per_err_4, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [0,max_radius,min_rad_vel,max_rad_vel])
     perr_orb_r_rv.set_xlabel("$r/R_{200m}$")
     perr_orb_r_rv.set_ylabel("$v_r/v_{200m}$")
     
     perr_orb_r_tv = err_fig.add_subplot(gs[1,1])
-    per_err_5 = rotate(per_err_5, angle = -90)
+    per_err_5 = per_err_5.T
     perr_orb_r_tv.imshow(per_err_5, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [0,max_radius,min_tang_vel,max_tang_vel])
     perr_orb_r_tv.set_xlabel("$r/R_{200m}$")
     perr_orb_r_tv.set_ylabel("$v_t/v_{200m}$")
     perr_orb_r_tv.set_title("Percent Error Infalling Ptls")
 
     perr_orb_rv_tv = err_fig.add_subplot(gs[1,2])
-    per_err_6 = rotate(per_err_6, angle = -90)
+    per_err_6 = per_err_6.T
     perr_orb_rv_tv.imshow(per_err_6, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [min_rad_vel,max_rad_vel,min_tang_vel,max_tang_vel])
     perr_orb_rv_tv.set_xlabel("$v_r/v_{200m}$")
     perr_orb_rv_tv.set_ylabel("$v_t/v_{200m}$")
