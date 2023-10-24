@@ -118,30 +118,3 @@ def calc_t_dyn(halo_r200m, red_shift):
 
     return t_dyn
 
-def initial_search(halo_positions, search_radius, halo_r200m, tree, red_shift, mass, find_ptl_indices):
-    start = True
-    num_halos = halo_positions.shape[0]
-    particles_per_halo = np.zeros(num_halos, dtype = np.int32)
-    all_halo_mass = np.zeros(num_halos, dtype = np.float32)
-    
-    for i in range(num_halos):
-        if halo_r200m[i] > 0:
-            #find how many particles we are finding
-            indices = tree.query_ball_point(halo_positions[i,:], r = search_radius * halo_r200m[i])
-            indices = np.array(indices)
-            # how many new particles being added and correspondingly how massive the halo is
-            num_new_particles = indices.shape[0]
-            all_halo_mass[i] = num_new_particles * mass
-            particles_per_halo[i] = num_new_particles
-            
-            if find_ptl_indices:
-                if start:
-                    all_ptl_indices = indices
-                    start = False
-                else:
-                    all_ptl_indices = np.concatenate((all_ptl_indices, indices))
-
-    if find_ptl_indices:
-        return particles_per_halo, all_halo_mass, all_ptl_indices
-    else:
-        return particles_per_halo, all_halo_mass
