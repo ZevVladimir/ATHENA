@@ -13,51 +13,70 @@ from imblearn import under_sampling, over_sampling
 from pairing import depair
 from colossus.cosmology import cosmology
 from colossus.lss import peaks
+from data_and_loading_functions import conv_halo_id_spid, create_directory, load_or_pickle_SPARTA_data, create_directory
 ##################################################################################################################
-# General params
-snapshot_list = [190,184] # SHOULD BE DESCENDING
-p_snap = snapshot_list[0]
-times_r200m = 6
-curr_sparta_file = "sparta_cbol_l0063_n0256"
-path_to_hdf5_file = "/home/zvladimi/MLOIS/SPARTA_data/" + curr_sparta_file + ".hdf5"
-path_dict = {
-    "curr_sparta_file": curr_sparta_file,
-    "path_to_MLOIS": "/home/zvladimi/MLOIS/",
-    "path_to_snaps": "/home/zvladimi/MLOIS/particle_data/",
-    "path_to_hdf5_file": path_to_hdf5_file,
-    "path_to_pickle": "/home/zvladimi/MLOIS/pickle_data/",
-    "path_to_datasets": "/home/zvladimi/MLOIS/calculated_info/",
-    "path_to_model_plots": "/home/zvladimi/MLOIS/xgboost_datasets_plots/"
-}
-snap_format = "{:04d}" # how are the snapshots formatted with 0s
+# LOAD CONFIG PARAMETERS
+import configparser
+config = configparser.ConfigParser()
+config.read("config.ini")
+curr_sparta_file = config["MISC"]["curr_sparta_file"]
+path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
+path_to_snaps = config["PATHS"]["path_to_snaps"]
+path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
+path_to_hdf5_file = path_to_SPARTA_data + curr_sparta_file + ".hdf5"
+path_to_pickle = config["PATHS"]["path_to_pickle"]
+path_to_calc_info = config["PATHS"]["path_to_calc_info"]
+path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
+path_to_sparta = config["PATHS"]["path_to_sparta"]
+path_to_xgboost = config["PATHS"]["path_to_xgboost"]
+create_directory(path_to_MLOIS)
+create_directory(path_to_snaps)
+create_directory(path_to_SPARTA_data)
+create_directory(path_to_hdf5_file)
+create_directory(path_to_pickle)
+create_directory(path_to_calc_info)
+snap_format = config["MISC"]["snap_format"]
+global prim_only
+prim_only = config.getboolean("SEARCH","prim_only")
+t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
+global p_snap
+p_snap = config.getint("SEARCH","p_snap")
+c_snap = config.getint("XGBOOST","c_snap")
+snapshot_list = [p_snap, c_snap]
+global search_rad
+search_rad = config.getfloat("SEARCH","search_rad")
+total_num_snaps = config.getint("SEARCH","total_num_snaps")
+per_n_halo_per_split = config.getfloat("SEARCH","per_n_halo_per_split")
+test_halos_ratio = config.getfloat("SEARCH","test_halos_ratio")
+global num_save_ptl_params
+num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 ##################################################################################################################
 # import pygadgetreader and sparta
 import sys
-sys.path.insert(0, path_dict["path_to_MLOIS"] + "pygadgetreader")
-sys.path.insert(0, path_dict["path_to_MLOIS"] + "sparta/analysis")
+sys.path.insert(0, path_to_pygadgetreader)
+sys.path.insert(0, path_to_sparta)
 from pygadgetreader import readsnap, readheader
 from sparta import sparta
-from data_and_loading_functions import build_ml_dataset, check_pickle_exist_gadget, choose_halo_split, create_directory, load_or_pickle_SPARTA_data
 from visualization_functions import *
 #from train_xgboost_models import model_creator
 ##################################################################################################################
 # set what the paths should be for saving and getting the data
 if len(snapshot_list) > 1:
-    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "_" + str(times_r200m) + "r200msearch/"
+    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "_" + str(search_rad) + "r200msearch/"
 else:
-    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(times_r200m) + "r200msearch/"
+    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(search_rad) + "r200msearch/"
 
-path_to_datasets = path_dict["path_to_model_plots"] + specific_save + "datasets/"
-data_location = path_dict["path_to_datasets"] + specific_save
-save_location = path_dict["path_to_model_plots"] + specific_save
+path_to_datasets = path_to_xgboost + specific_save + "datasets/"
+data_location = path_to_calc_info + specific_save
+save_location = path_to_xgboost + specific_save
 
 create_directory(save_location)
 
-p_snapshot_path = path_dict["path_to_snaps"] + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
+p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
 
 p_red_shift = readheader(p_snapshot_path, 'redshift')
 p_scale_factor = 1/(1+p_red_shift)
-halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, ptl_mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, path_dict)
+halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, ptl_mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap)
 cosmol = cosmology.setCosmology("bolshoi")
 
 with open(path_to_datasets + "test_dataset_all_keys.pickle", "rb") as pickle_file:
@@ -94,9 +113,10 @@ for i,key in enumerate(test_all_keys[2:]):
 with open(data_location + "test_indices.pickle", "rb") as pickle_file:
     test_indices = pickle.load(pickle_file)
 use_halo_ids = halos_id[test_indices]
-sparta_output = sparta.load(filename=path_dict["path_to_hdf5_file"], halo_ids=use_halo_ids)
-dens_prf_all = sparta_output['anl_prf']['M_all'][:,p_snap,:]
-dens_prf_1halo = sparta_output['anl_prf']['M_1halo'][:,p_snap,:]
+sparta_output = sparta.load(filename=path_to_hdf5_file, halo_ids=use_halo_ids, log_level=0)
+new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_snap) # If the order changed by sparta resort the indices
+dens_prf_all = sparta_output['anl_prf']['M_all'][new_idxs,p_snap,:]
+dens_prf_1halo = sparta_output['anl_prf']['M_1halo'][new_idxs,p_snap,:]
 
 # test indices are the indices of the match halo idxs used (see find_particle_properties_ML.py to see how test_indices are created)
 num_test_halos = test_indices.shape[0]
@@ -137,13 +157,16 @@ for i in range(num_iter):
     if curr_test_halo_idxs.shape[0] != 0:
         density_prf_all_within = np.zeros(dens_prf_all.shape[1])
         density_prf_1halo_within = np.zeros(dens_prf_1halo.shape[1])
+        # loop through each test halo
         for j, idx in enumerate(curr_test_halo_idxs):
+            # add that halo's corresponding mass profile together
             density_prf_all_within = density_prf_all_within + dens_prf_all[j]
             density_prf_1halo_within = density_prf_1halo_within + dens_prf_1halo[j]
+            
+            # find the ptls within this halo
             use_ptl_idxs = np.where(test_halo_idxs == idx)
             if j == 0:
                 test_halos_within = test_dataset[use_ptl_idxs]
-                continue
             else:
                 curr_test_halo = test_dataset[use_ptl_idxs]
                 test_halos_within = np.row_stack((test_halos_within, curr_test_halo))
@@ -159,7 +182,7 @@ for i in range(num_iter):
                 use_ptls = np.where(test_halos_within[:,int(2 + (num_params_per_snap * (i+1)))] == 0)[0]
 
             curr_dataset = curr_dataset[use_ptls]
-            all_models[i].predict(curr_dataset)
+            all_models[i].predict_all_models(curr_dataset)
             test_predict[use_ptls] = all_models[i].get_predicts()
 
         actual_labels = test_halos_within[:,1]
