@@ -45,7 +45,7 @@ search_rad = config.getfloat("SEARCH","search_rad")
 total_num_snaps = config.getint("SEARCH","total_num_snaps")
 per_n_halo_per_split = config.getfloat("SEARCH","per_n_halo_per_split")
 test_halos_ratio = config.getfloat("SEARCH","test_halos_ratio")
-curr_chunk_size = 500
+curr_chunk_size = config.getint("SEARCH","chunk_size")
 global num_save_ptl_params
 num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 ##################################################################################################################
@@ -94,11 +94,11 @@ for i in range(len(snapshot_list)):
             pickle.dump(new_model, pickle_file, pickle.HIGHEST_PROTOCOL)
     all_models.append(new_model)
     t3 = time.time()
-    print("Start training model",int((num_params_per_snap * (i+1))+2),"params")
+    ("Start training model",int((num_params_per_snap * (i+1))+2),"params")
     all_models[i].train_model()
     t4 = time.time()
     print("Finished training model",int((num_params_per_snap * (i+1))+2),"params in",np.round(((t4-t3)/60),2),"minutes")
-    all_models[i].predict(1)
+    all_models[i].predict_all_models(1)
     all_models[i].graph(corr_matrix = True, feat_imp = True)
 
 t1 = time.time()  

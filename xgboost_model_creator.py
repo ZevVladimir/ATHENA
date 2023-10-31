@@ -1,6 +1,7 @@
 
 import numpy as np
 import pandas as pd
+import xgboost
 from xgboost import XGBClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report  
@@ -11,6 +12,43 @@ import os
 from imblearn import under_sampling, over_sampling
 from data_and_loading_functions import build_ml_dataset, check_pickle_exist_gadget, choose_halo_split, create_directory
 from visualization_functions import *
+from typing import List, Callable
+
+class Iterator(xgboost.DataIter):
+  def __init__(self, svm_file_paths: List[str]):
+    self._file_paths = svm_file_paths
+    self._it = 0
+    # XGBoost will generate some cache files under current directory with the prefix
+    # "cache"
+    super().__init__(cache_prefix=os.path.join(".", "cache"))
+
+  def next(self, input_data: Callable):
+    """Advance the iterator by 1 step and pass the data to XGBoost.  This function is
+    called by XGBoost during the construction of ``DMatrix``
+
+    """
+    if self._it == len(self._file_paths):
+      # return 0 to let XGBoost know this is the end of iteration
+      return 0
+
+    # input_data is a function passed in by XGBoost who has the exact same signature of
+    # ``DMatrix``
+    X, y = load_svmlight_file(self._file_paths[self._it])
+    input_data(data=X, label=y)
+    self._it += 1
+    # Return 1 to let XGBoost know we haven't seen all the files yet.
+    return 1
+
+  def reset(self):
+    """Reset the iterator to its beginning"""
+    self._it = 0
+
+it = Iterator(["file_0.svm", "file_1.svm", "file_2.svm"])
+Xy = xgboost.DMatrix(it)
+
+# The ``approx`` also work, but with low performance. GPU implementation is different from CPU.
+# as noted in following sections.
+booster = xgboost.train({"tree_method": "hist"}, Xy)
 
 class model_creator:
     def __init__(self, dataset, keys, snapshot_list, num_params_per_snap, save_location, scaled_radii_loc, rad_vel_loc, tang_vel_loc, radii_splits, curr_sparta_file):
@@ -54,13 +92,16 @@ class model_creator:
         #TODO implement
         return
     
-    def normalize():
-        #TODO implement
-        return
+    def normalize(values):
+        for col in range(values.shape[1]):
+            values[:,col] = (values[:,col] - values[:,col].min())/(values[:,col].max() - values[:,col].min())
+        return values
     
-    def standardize():
-        #TODO implement
-        return
+    def standardize(values):
+        for col in range(values.shape[1]):
+            values[:,col] = (values[:,col] - values[:,col].mean())/values[:,col].std()
+        return values
+    
     
     def split_by_dist(self, low_cutoff, high_cutoff, x_dataset, y_dataset):
         
