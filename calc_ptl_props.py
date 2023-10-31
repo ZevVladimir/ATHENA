@@ -111,10 +111,6 @@ def search_halos(halo_slice, comp_snap, curr_halo_idx, curr_sparta_idx):
         global c_ptls_pos
         global c_ptls_vel
         global c_curr_ptl_indices
-        global c_share_calc_rad_vel
-        global c_share_calc_tang_vel
-        global c_share_all_scal_rad
-        global c_share_all_HIPIDs
         snap = c_snap
         red_shift = c_red_shift
         scale_factor = c_scale_factor
@@ -124,10 +120,6 @@ def search_halos(halo_slice, comp_snap, curr_halo_idx, curr_sparta_idx):
         ptl_pos = c_ptls_pos
         ptl_vel = c_ptls_vel
         ptl_indices = c_curr_ptl_indices[curr_sparta_idx]
-        share_calc_rad_vel = c_share_calc_rad_vel
-        share_calc_tang_vel = c_share_calc_tang_vel
-        share_all_scal_rad = c_share_all_scal_rad
-        share_all_HIPIDs = c_share_all_HIPIDs
     else:
         global p_snap
         global p_red_shift
@@ -138,10 +130,6 @@ def search_halos(halo_slice, comp_snap, curr_halo_idx, curr_sparta_idx):
         global p_ptls_pos
         global p_ptls_vel
         global p_curr_ptl_indices
-        global p_share_calc_rad_vel
-        global p_share_calc_tang_vel
-        global p_share_all_scal_rad
-        global p_share_all_HIPIDs
         snap = p_snap
         red_shift = p_red_shift
         scale_factor = p_scale_factor
@@ -151,11 +139,6 @@ def search_halos(halo_slice, comp_snap, curr_halo_idx, curr_sparta_idx):
         ptl_pos = p_ptls_pos
         ptl_vel = p_ptls_vel
         ptl_indices = p_curr_ptl_indices[curr_sparta_idx]
-        share_calc_rad_vel = p_share_calc_rad_vel
-        share_calc_tang_vel = p_share_calc_tang_vel
-        share_all_scal_rad = p_share_all_scal_rad
-        share_all_HIPIDs = p_share_all_HIPIDs
-        share_all_orb_assn = p_share_all_orb_assn
 
     # get all the information for this specific halo
     halo_pos = sparta_output['halos']['position'][curr_sparta_idx,snap,:] * 10**3 * scale_factor
@@ -207,19 +190,14 @@ def search_halos(halo_slice, comp_snap, curr_halo_idx, curr_sparta_idx):
     fnd_tang_vel_comp = calc_tang_vel(fnd_rad_vel, physical_vel, rhat)/curr_v200m
     fnd_tang_vel = np.linalg.norm(fnd_tang_vel_comp, axis = 1)
     
-    all_rad_vel = to_np_arr(share_calc_rad_vel, "float32")
-    all_tang_vel = to_np_arr(share_calc_tang_vel, "float32")
-    all_scal_radii = to_np_arr(share_all_scal_rad, "float32")
-    all_HIPIDS = to_np_arr(share_all_HIPIDs, "uint32")
-    
-    all_rad_vel[halo_slice[0]:halo_slice[1]] = fnd_rad_vel / curr_v200m
-    all_tang_vel[halo_slice[0]:halo_slice[1]] = fnd_tang_vel
-    all_scal_radii[halo_slice[0]:halo_slice[1]] = (ptl_rad / halo_r200m)
-    all_HIPIDS[halo_slice[0]:halo_slice[1]] = fnd_HIPIDs
+    scaled_rad_vel = fnd_rad_vel / curr_v200m
+    scaled_tang_vel = fnd_tang_vel
+    scaled_radii = (ptl_rad / halo_r200m)
 
     if comp_snap == False:
-        all_orb_assn = to_np_arr(share_all_orb_assn, "uint32")
-        all_orb_assn[halo_slice[0]:halo_slice[1]] = curr_orb_assn
+        return fnd_HIPIDs, curr_orb_assn, scaled_rad_vel, scaled_tang_vel, scaled_radii
+    else:
+        return fnd_HIPIDs, scaled_rad_vel, scaled_tang_vel, scaled_radii
 
 def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_snap, p_scale_factor, p_ptl_tree, c_snap, c_scale_factor, c_ptl_tree):
     num_iter = int(np.ceil(indices.shape[0] / num_halo_per_split))
@@ -270,18 +248,6 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_snap, p_scale_factor, 
         p_start_num_ptls += hdf5_ptl_idx # scale to where we are in the hdf5 file
         
         p_tot_num_use_ptls = int(np.sum(p_use_num_ptls))
-        
-        # Set up arrays that can be accessed by all processes
-        global p_share_calc_rad_vel
-        global p_share_calc_tang_vel
-        global p_share_all_scal_rad
-        global p_share_all_HIPIDs
-        global p_share_all_orb_assn
-        p_share_calc_rad_vel = mp.Array(ctypes.c_float,p_tot_num_use_ptls)
-        p_share_calc_tang_vel  = mp.Array(ctypes.c_float,p_tot_num_use_ptls)
-        p_share_all_scal_rad = mp.Array(ctypes.c_float,p_tot_num_use_ptls)
-        p_share_all_HIPIDs = mp.Array(ctypes.c_uint,p_tot_num_use_ptls)
-        p_share_all_orb_assn = mp.Array(ctypes.c_float,p_tot_num_use_ptls)
 
         # Create an array of the indices for each halo's particels
         halo_split = np.zeros((curr_num_halos,2),dtype = np.int32)
@@ -293,15 +259,15 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_snap, p_scale_factor, 
         
         # Use multiprocessing to search multiple halos at the same time and add information to shared arrays
         with mp.Pool(processes=num_processes) as p:
-            p.starmap(search_halos, zip(halo_split, repeat(False), use_halo_idxs, np.arange(curr_num_halos)), chunksize=curr_chunk_size)
+            p_all_HIPIDs, p_all_orb_assn, p_all_rad_vel, p_all_tang_vel, p_all_scal_rad = zip(*p.starmap(search_halos, zip(halo_split, repeat(False), use_halo_idxs, np.arange(curr_num_halos)), chunksize=curr_chunk_size))
         p.close()
         p.join()
         
-        p_all_rad_vel = to_np_arr(p_share_calc_rad_vel, "float32")
-        p_all_tang_vel = to_np_arr(p_share_calc_tang_vel, "float32")
-        p_all_scal_rad = to_np_arr(p_share_all_scal_rad, "float32")
-        p_all_HIPIDs = to_np_arr(p_share_all_HIPIDs, "uint32")
-        p_all_orb_assn = to_np_arr(p_share_all_orb_assn, "float32") 
+        p_all_HIPIDs = np.concatenate(p_all_HIPIDs, axis = 0)
+        p_all_orb_assn = np.concatenate(p_all_orb_assn, axis = 0)
+        p_all_rad_vel = np.concatenate(p_all_rad_vel, axis = 0)
+        p_all_tang_vel = np.concatenate(p_all_tang_vel, axis = 0)
+        p_all_scal_rad = np.concatenate(p_all_scal_rad, axis = 0)
         
         # If multiple snaps also search the comparison snaps in the same manner as with the primary snap
         if prim_only == False:
@@ -316,15 +282,6 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_snap, p_scale_factor, 
             p.join() 
 
             c_tot_num_use_ptls = int(np.sum(c_use_num_ptls))
-
-            global c_share_calc_rad_vel
-            global c_share_calc_tang_vel
-            global c_share_all_scal_rad
-            global c_share_all_HIPIDs
-            c_share_calc_rad_vel = mp.Array(ctypes.c_float,c_tot_num_use_ptls)
-            c_share_calc_tang_vel  = mp.Array(ctypes.c_float,c_tot_num_use_ptls)
-            c_share_all_scal_rad = mp.Array(ctypes.c_float,c_tot_num_use_ptls)
-            c_share_all_HIPIDs = mp.Array(ctypes.c_uint,c_tot_num_use_ptls)
             
             halo_split = np.zeros((curr_num_halos,2),dtype = np.int32)
             for j in range(curr_num_halos):
@@ -334,34 +291,22 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_snap, p_scale_factor, 
                     halo_split[j] = np.array([int(np.sum(c_use_num_ptls[:j])),int(np.sum(c_use_num_ptls[:(j+1)]))])
             
             with mp.Pool(processes=num_processes) as p:
-                p.starmap(search_halos, zip(halo_split, repeat(True), use_halo_idxs, np.arange(curr_num_halos)), chunksize=curr_chunk_size)
+                c_all_HIPIDs, c_all_rad_vel, c_all_tang_vel, c_all_scal_rad = zip(*p.starmap(search_halos, zip(halo_split, repeat(True), use_halo_idxs, np.arange(curr_num_halos)), chunksize=curr_chunk_size))
             p.close()
             p.join()
-
-            # curr_halo_idx = use_halo_idxs[0]
-            # curr_ptl_indices = p_curr_ptl_indices[0]
-            # p_curr_ptl_pids = p_ptls_pid[curr_ptl_indices]
-            # p_curr_ptl_pids = p_curr_ptl_pids.astype(np.int64)
-            # p_hipids = ne.evaluate("0.5 * (p_curr_ptl_pids + curr_halo_idx) * (p_curr_ptl_pids + curr_halo_idx + 1) + curr_halo_idx")
-            # curr_ptl_indices = c_curr_ptl_indices[0]
-            # c_curr_ptl_pids = c_ptls_pid[curr_ptl_indices]
-            # c_curr_ptl_pids = c_curr_ptl_pids.astype(np.int64)
-            # c_hipids = ne.evaluate("0.5 * (c_curr_ptl_pids + curr_halo_idx) * (c_curr_ptl_pids + curr_halo_idx + 1) + curr_halo_idx")
-            # print(np.intersect1d(p_hipids, c_hipids, return_indices=True)[0].shape)
-            # print(np.intersect1d(p_curr_ptl_pids, c_curr_ptl_pids, return_indices=True)[0].shape)
-
-            c_all_rad_vel = to_np_arr(c_share_calc_rad_vel, "float32")
-            c_all_tang_vel = to_np_arr(c_share_calc_tang_vel, "float32")
-            c_all_scal_rad = to_np_arr(c_share_all_scal_rad, "float32")
-            c_all_HIPIDs = to_np_arr(c_share_all_HIPIDs, "uint32")
-                
+            
+            c_all_HIPIDs = np.concatenate(c_all_HIPIDs, axis = 0)
+            c_all_rad_vel = np.concatenate(c_all_rad_vel, axis = 0)
+            c_all_tang_vel = np.concatenate(c_all_tang_vel, axis = 0)
+            c_all_scal_rad = np.concatenate(c_all_scal_rad, axis = 0)
+            
             use_max_shape = (tot_num_ptls,2)                  
             save_scale_radii = np.zeros((p_tot_num_use_ptls,2))
             save_rad_vel = np.zeros((p_tot_num_use_ptls,2))
             save_tang_vel = np.zeros((p_tot_num_use_ptls,2))
 
             # Match the PIDs from primary snap to the secondary snap
-            # If they don't have a match just leave those as 0s
+            # If they don't have a match set those as np.NaN for xgboost 
             match_hipid_idx = np.intersect1d(p_all_HIPIDs, c_all_HIPIDs, return_indices=True)
             save_scale_radii[:,0] = p_all_scal_rad 
             save_scale_radii[match_hipid_idx[1],1] = c_all_scal_rad[match_hipid_idx[2]]
@@ -369,6 +314,10 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_snap, p_scale_factor, 
             save_rad_vel[match_hipid_idx[1],1] = c_all_rad_vel[match_hipid_idx[2]]
             save_tang_vel[:,0] = p_all_tang_vel
             save_tang_vel[match_hipid_idx[1],1] = c_all_tang_vel[match_hipid_idx[2]]
+            
+            save_scale_radii[save_scale_radii[:,1] == 0, 1] = np.NaN
+            save_rad_vel[save_rad_vel[:,1] == 0, 1] = np.NaN
+            save_tang_vel[save_tang_vel[:,1] == 0, 1] = np.NaN
         
         else:
             use_max_shape = (tot_num_ptls)  
