@@ -18,6 +18,7 @@ import logging
 import ctypes
 from itertools import repeat
 from contextlib import closing
+import pandas as pd
 from data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5, conv_halo_id_spid, get_comp_snap, create_directory
 from visualization_functions import compare_density_prf
 from calculation_functions import *
@@ -27,6 +28,7 @@ import configparser
 config = configparser.ConfigParser()
 config.read("config.ini")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
+rand_seed = config.getint("MISC","random_seed")
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
 path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
@@ -97,9 +99,18 @@ def initial_search(halo_positions, halo_r200m, comp_snap, find_mass = False, fin
     else:
         return num_new_particles, halo_mass, all_ptl_indices
     
-def search_halos(slice, comp_snap, curr_halo_idx, curr_sparta_idx):
+def search_halos(halo_slice, comp_snap, curr_halo_idx, curr_sparta_idx):
     # Doing this this way as otherwise will have to generate super large arrays for input from multiprocessing
     if comp_snap:
+        global c_snap
+        global c_red_shift
+        global c_scale_factor
+        global c_hubble_constant
+        global c_box_size
+        global c_ptls_pid
+        global c_ptls_pos
+        global c_ptls_vel
+        global c_curr_ptl_indices
         snap = c_snap
         red_shift = c_red_shift
         scale_factor = c_scale_factor
@@ -108,12 +119,17 @@ def search_halos(slice, comp_snap, curr_halo_idx, curr_sparta_idx):
         ptl_pids = c_ptls_pid
         ptl_pos = c_ptls_pos
         ptl_vel = c_ptls_vel
-        curr_ptl_indices = c_curr_ptl_indices[curr_sparta_idx]
-        share_calc_rad_vel = c_share_calc_rad_vel
-        share_calc_tang_vel = c_share_calc_tang_vel
-        share_all_scal_rad = c_share_all_scal_rad
-        share_all_HIPIDs = c_share_all_HIPIDs
+        ptl_indices = c_curr_ptl_indices[curr_sparta_idx]
     else:
+        global p_snap
+        global p_red_shift
+        global p_scale_factor
+        global p_hubble_constant
+        global p_box_size
+        global p_ptls_pid
+        global p_ptls_pos
+        global p_ptls_vel
+        global p_curr_ptl_indices
         snap = p_snap
         red_shift = p_red_shift
         scale_factor = p_scale_factor
@@ -122,12 +138,7 @@ def search_halos(slice, comp_snap, curr_halo_idx, curr_sparta_idx):
         ptl_pids = p_ptls_pid
         ptl_pos = p_ptls_pos
         ptl_vel = p_ptls_vel
-        curr_ptl_indices = p_curr_ptl_indices[curr_sparta_idx]
-        share_calc_rad_vel = p_share_calc_rad_vel
-        share_calc_tang_vel = p_share_calc_tang_vel
-        share_all_scal_rad = p_share_all_scal_rad
-        share_all_HIPIDs = p_share_all_HIPIDs
-        share_all_orb_assn = p_share_all_orb_assn
+        ptl_indices = p_curr_ptl_indices[curr_sparta_idx]
 
     # get all the information for this specific halo
     halo_pos = sparta_output['halos']['position'][curr_sparta_idx,snap,:] * 10**3 * scale_factor
@@ -137,14 +148,11 @@ def search_halos(slice, comp_snap, curr_halo_idx, curr_sparta_idx):
     dens_prf_1halo = sparta_output['anl_prf']['M_1halo'][curr_sparta_idx,snap,:]
     prf_status = sparta_output['anl_prf']['status'][curr_sparta_idx,snap]
 
-
-    ptl_indices = curr_ptl_indices
-    
     num_new_ptls = ptl_indices.shape[0]
     curr_ptl_pids = ptl_pids[ptl_indices]
     curr_ptl_pos = ptl_pos[ptl_indices]
     curr_ptl_vel = ptl_vel[ptl_indices]
-    
+
     curr_ptl_pids = curr_ptl_pids.astype(np.int64) # otherwise ne.evaluate doesn't work
     fnd_HIPIDs = ne.evaluate("0.5 * (curr_ptl_pids + curr_halo_idx) * (curr_ptl_pids + curr_halo_idx + 1) + curr_halo_idx")
     
@@ -182,25 +190,20 @@ def search_halos(slice, comp_snap, curr_halo_idx, curr_sparta_idx):
     fnd_tang_vel_comp = calc_tang_vel(fnd_rad_vel, physical_vel, rhat)/curr_v200m
     fnd_tang_vel = np.linalg.norm(fnd_tang_vel_comp, axis = 1)
     
-    all_rad_vel = to_np_arr(share_calc_rad_vel, "float32")
-    all_tang_vel = to_np_arr(share_calc_tang_vel, "float32")
-    all_scal_radii = to_np_arr(share_all_scal_rad, "float32")
-    all_HIPIDS = to_np_arr(share_all_HIPIDs, "float32")
-    
-    all_rad_vel[slice[0]:slice[1]] = fnd_rad_vel / curr_v200m
-    all_tang_vel[slice[0]:slice[1]] = fnd_tang_vel
-    all_scal_radii[slice[0]:slice[1]] = (ptl_rad / halo_r200m)
-    all_HIPIDS[slice[0]:slice[1]] = fnd_HIPIDs
+    scaled_rad_vel = fnd_rad_vel / curr_v200m
+    scaled_tang_vel = fnd_tang_vel
+    scaled_radii = (ptl_rad / halo_r200m)
 
     if comp_snap == False:
-        all_orb_assn = to_np_arr(share_all_orb_assn, "float32")
-        all_orb_assn[slice[0]:slice[1]] = curr_orb_assn
+        return fnd_HIPIDs, curr_orb_assn, scaled_rad_vel, scaled_tang_vel, scaled_radii
+    else:
+        return fnd_HIPIDs, scaled_rad_vel, scaled_tang_vel, scaled_radii
 
 def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_snap, p_scale_factor, p_ptl_tree, c_snap, c_scale_factor, c_ptl_tree):
     num_iter = int(np.ceil(indices.shape[0] / num_halo_per_split))
     print("Num halo per", num_iter, "splits:", num_halo_per_split)
-    all_start_idx = 0
-    count_num_ptls = 0
+    hdf5_ptl_idx = 0
+    hdf5_halo_idx = 0
     
     for i in range(num_iter):
         t3 = time.time()
@@ -221,29 +224,30 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_snap, p_scale_factor, 
         use_halo_idxs = use_indices[new_idxs]
 
         # Search around these halos and get the number of particles and the corresponding ptl indices for them
-        use_halos_pos = sparta_output['halos']['position'][:,p_snap] * 10**3 * p_scale_factor 
-        use_halos_r200m = sparta_output['halos']['R200m'][:,p_snap]
+        p_use_halos_pos = sparta_output['halos']['position'][:,p_snap] * 10**3 * p_scale_factor 
+        p_use_halos_r200m = sparta_output['halos']['R200m'][:,p_snap]
         global p_curr_ptl_indices
 
         with mp.Pool(processes=num_processes) as p:
             # halo position, halo r200m, if comparison snap, want mass?, want indices?
-            p_use_num_ptls, p_curr_ptl_indices = zip(*p.starmap(initial_search, zip(use_halos_pos, use_halos_r200m, repeat(False), repeat(False), repeat(True)), chunksize=curr_chunk_size))
+            p_use_num_ptls, p_curr_ptl_indices = zip(*p.starmap(initial_search, zip(p_use_halos_pos, p_use_halos_r200m, repeat(False), repeat(False), repeat(True)), chunksize=curr_chunk_size))
         p.close()
         p.join() 
 
-        p_tot_num_use_ptls = int(np.sum(p_use_num_ptls))
+        # Remove halos with 0 ptls around them
+        p_use_num_ptls = np.array(p_use_num_ptls)
+        p_curr_ptl_indices = np.array(p_curr_ptl_indices, dtype=object)
+        has_ptls = np.where(p_use_num_ptls > 0)
+        p_use_num_ptls = p_use_num_ptls[has_ptls]
+        p_curr_ptl_indices = p_curr_ptl_indices[has_ptls]
+        use_halo_idxs = use_halo_idxs[has_ptls]
+       
+        p_start_num_ptls = [np.sum(p_use_num_ptls[0:i+1]) for i in range(p_use_num_ptls.shape[0])]
+        p_start_num_ptls = np.insert(p_start_num_ptls, 0, 0)
+        p_start_num_ptls = np.delete(p_start_num_ptls, -1)
+        p_start_num_ptls += hdf5_ptl_idx # scale to where we are in the hdf5 file
         
-        # Set up arrays that can be accessed by all processes
-        global p_share_calc_rad_vel
-        global p_share_calc_tang_vel
-        global p_share_all_scal_rad
-        global p_share_all_HIPIDs
-        global p_share_all_orb_assn
-        p_share_calc_rad_vel = mp.Array(ctypes.c_float,p_tot_num_use_ptls)
-        p_share_calc_tang_vel  = mp.Array(ctypes.c_float,p_tot_num_use_ptls)
-        p_share_all_scal_rad = mp.Array(ctypes.c_float,p_tot_num_use_ptls)
-        p_share_all_HIPIDs = mp.Array(ctypes.c_uint,p_tot_num_use_ptls)
-        p_share_all_orb_assn = mp.Array(ctypes.c_float,p_tot_num_use_ptls)
+        p_tot_num_use_ptls = int(np.sum(p_use_num_ptls))
 
         # Create an array of the indices for each halo's particels
         halo_split = np.zeros((curr_num_halos,2),dtype = np.int32)
@@ -255,38 +259,29 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_snap, p_scale_factor, 
         
         # Use multiprocessing to search multiple halos at the same time and add information to shared arrays
         with mp.Pool(processes=num_processes) as p:
-            p.starmap(search_halos, zip(halo_split, repeat(False), use_halo_idxs, np.arange(curr_num_halos)), chunksize=curr_chunk_size)
+            p_all_HIPIDs, p_all_orb_assn, p_all_rad_vel, p_all_tang_vel, p_all_scal_rad = zip(*p.starmap(search_halos, zip(halo_split, repeat(False), use_halo_idxs, np.arange(curr_num_halos)), chunksize=curr_chunk_size))
         p.close()
         p.join()
-              
-        p_all_rad_vel = to_np_arr(p_share_calc_rad_vel, "float32")
-        p_all_tang_vel = to_np_arr(p_share_calc_tang_vel, "float32")
-        p_all_scal_rad = to_np_arr(p_share_all_scal_rad, "float32")
-        p_all_HIPIDs = to_np_arr(p_share_all_HIPIDs, "float32")
-        p_all_orb_assn = to_np_arr(p_share_all_orb_assn, "float32") 
+        
+        p_all_HIPIDs = np.concatenate(p_all_HIPIDs, axis = 0)
+        p_all_orb_assn = np.concatenate(p_all_orb_assn, axis = 0)
+        p_all_rad_vel = np.concatenate(p_all_rad_vel, axis = 0)
+        p_all_tang_vel = np.concatenate(p_all_tang_vel, axis = 0)
+        p_all_scal_rad = np.concatenate(p_all_scal_rad, axis = 0)
         
         # If multiple snaps also search the comparison snaps in the same manner as with the primary snap
         if prim_only == False:
-            use_halos_pos = sparta_output['halos']['position'][:,c_snap] * 10**3 * c_scale_factor
-            use_halos_r200m = sparta_output['halos']['R200m'][:,c_snap] 
+            c_use_halos_pos = sparta_output['halos']['position'][:,c_snap] * 10**3 * c_scale_factor
+            c_use_halos_r200m = sparta_output['halos']['R200m'][:,c_snap] 
             global c_curr_ptl_indices
 
             with mp.Pool(processes=num_processes) as p:
                 # halo position, halo r200m, if comparison snap, if train dataset, want mass?, want indices?
-                c_use_num_ptls, c_curr_ptl_indices = zip(*p.starmap(initial_search, zip(use_halos_pos, use_halos_r200m, repeat(True), repeat(False), repeat(True)), chunksize=curr_chunk_size))
+                c_use_num_ptls, c_curr_ptl_indices = zip(*p.starmap(initial_search, zip(c_use_halos_pos, c_use_halos_r200m, repeat(True), repeat(False), repeat(True)), chunksize=curr_chunk_size))
             p.close()
             p.join() 
 
             c_tot_num_use_ptls = int(np.sum(c_use_num_ptls))
-
-            global c_share_calc_rad_vel
-            global c_share_calc_tang_vel
-            global c_share_all_scal_rad
-            global c_share_all_HIPIDs
-            c_share_calc_rad_vel = mp.Array(ctypes.c_float,c_tot_num_use_ptls)
-            c_share_calc_tang_vel  = mp.Array(ctypes.c_float,c_tot_num_use_ptls)
-            c_share_all_scal_rad = mp.Array(ctypes.c_float,c_tot_num_use_ptls)
-            c_share_all_HIPIDs = mp.Array(ctypes.c_uint,c_tot_num_use_ptls)
             
             halo_split = np.zeros((curr_num_halos,2),dtype = np.int32)
             for j in range(curr_num_halos):
@@ -296,29 +291,33 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_snap, p_scale_factor, 
                     halo_split[j] = np.array([int(np.sum(c_use_num_ptls[:j])),int(np.sum(c_use_num_ptls[:(j+1)]))])
             
             with mp.Pool(processes=num_processes) as p:
-                p.starmap(search_halos, zip(halo_split, repeat(True), use_halo_idxs, np.arange(curr_num_halos)), chunksize=curr_chunk_size)
+                c_all_HIPIDs, c_all_rad_vel, c_all_tang_vel, c_all_scal_rad = zip(*p.starmap(search_halos, zip(halo_split, repeat(True), use_halo_idxs, np.arange(curr_num_halos)), chunksize=curr_chunk_size))
             p.close()
             p.join()
-
-            c_all_rad_vel = to_np_arr(c_share_calc_rad_vel, "float32")
-            c_all_tang_vel = to_np_arr(c_share_calc_tang_vel, "float32")
-            c_all_scal_rad = to_np_arr(c_share_all_scal_rad, "float32")
-            c_all_HIPIDs = to_np_arr(c_share_all_HIPIDs, "float32")
-                
+            
+            c_all_HIPIDs = np.concatenate(c_all_HIPIDs, axis = 0)
+            c_all_rad_vel = np.concatenate(c_all_rad_vel, axis = 0)
+            c_all_tang_vel = np.concatenate(c_all_tang_vel, axis = 0)
+            c_all_scal_rad = np.concatenate(c_all_scal_rad, axis = 0)
+            
             use_max_shape = (tot_num_ptls,2)                  
             save_scale_radii = np.zeros((p_tot_num_use_ptls,2))
             save_rad_vel = np.zeros((p_tot_num_use_ptls,2))
             save_tang_vel = np.zeros((p_tot_num_use_ptls,2))
 
             # Match the PIDs from primary snap to the secondary snap
-            # If they don't have a match just leave those as 0s
-            match_pidh_idx = np.intersect1d(p_all_HIPIDs, c_all_HIPIDs, return_indices=True)
+            # If they don't have a match set those as np.NaN for xgboost 
+            match_hipid_idx = np.intersect1d(p_all_HIPIDs, c_all_HIPIDs, return_indices=True)
             save_scale_radii[:,0] = p_all_scal_rad 
-            save_scale_radii[match_pidh_idx[1],1] = c_all_scal_rad[match_pidh_idx[2]]
+            save_scale_radii[match_hipid_idx[1],1] = c_all_scal_rad[match_hipid_idx[2]]
             save_rad_vel[:,0] = p_all_rad_vel
-            save_rad_vel[match_pidh_idx[1],1] = c_all_rad_vel[match_pidh_idx[2]]
+            save_rad_vel[match_hipid_idx[1],1] = c_all_rad_vel[match_hipid_idx[2]]
             save_tang_vel[:,0] = p_all_tang_vel
-            save_tang_vel[match_pidh_idx[1],1] = c_all_tang_vel[match_pidh_idx[2]]
+            save_tang_vel[match_hipid_idx[1],1] = c_all_tang_vel[match_hipid_idx[2]]
+            
+            save_scale_radii[save_scale_radii[:,1] == 0, 1] = np.NaN
+            save_rad_vel[save_rad_vel[:,1] == 0, 1] = np.NaN
+            save_tang_vel[save_tang_vel[:,1] == 0, 1] = np.NaN
         
         else:
             use_max_shape = (tot_num_ptls)  
@@ -329,30 +328,34 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_snap, p_scale_factor, 
             save_scale_radii = p_all_scal_rad
             save_rad_vel = p_all_rad_vel
             save_tang_vel = p_all_tang_vel
-
-        count_num_ptls = count_num_ptls + int(p_all_HIPIDs.shape[0])
         
-        # Save all data in hdf5 file depending on if training or testing halos
+        # Save all data in hdf5 file depending on if training or testing halos]
+        save_cols = ["Halo_first", "Halo_n", "HIPIDS", "Orbit_Infall", "Svaled_radii_", "Radial_vel_", "Tangential_vel_"]
         if train:
             if os.path.isfile(save_location + "train_all_particle_properties_" + curr_sparta_file + ".hdf5") and i == 0:
                 os.remove(save_location + "train_all_particle_properties_" + curr_sparta_file + ".hdf5")
             with h5py.File((save_location + "train_all_particle_properties_" + curr_sparta_file + ".hdf5"), 'a') as all_particle_properties:
                 save_location + "train_all_particle_properties_" + curr_sparta_file + ".hdf5"
-                save_to_hdf5(all_particle_properties, "HIPIDS", dataset = p_all_HIPIDs, chunk = True, max_shape = (tot_num_ptls,), curr_idx = all_start_idx, max_num_keys = num_save_ptl_params)
-                save_to_hdf5(all_particle_properties, "Orbit_Infall", dataset = p_all_orb_assn, chunk = True, max_shape = (tot_num_ptls,), curr_idx = all_start_idx, max_num_keys = num_save_ptl_params)
-                save_to_hdf5(all_particle_properties, "Scaled_radii_", dataset = save_scale_radii, chunk = True, max_shape = use_max_shape, curr_idx = all_start_idx, max_num_keys = num_save_ptl_params)
-                save_to_hdf5(all_particle_properties, "Radial_vel_", dataset = save_rad_vel, chunk = True, max_shape = use_max_shape, curr_idx = all_start_idx, max_num_keys = num_save_ptl_params)
-                save_to_hdf5(all_particle_properties, "Tangential_vel_", dataset = save_tang_vel, chunk = True, max_shape = use_max_shape, curr_idx = all_start_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(all_particle_properties, "Halo_first", dataset = p_start_num_ptls, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(all_particle_properties, "Halo_n", dataset = p_use_num_ptls, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(all_particle_properties, "HIPIDS", dataset = p_all_HIPIDs, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(all_particle_properties, "Orbit_Infall", dataset = p_all_orb_assn, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(all_particle_properties, "Scaled_radii_", dataset = save_scale_radii, chunk = True, max_shape = use_max_shape, curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(all_particle_properties, "Radial_vel_", dataset = save_rad_vel, chunk = True, max_shape = use_max_shape, curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(all_particle_properties, "Tangential_vel_", dataset = save_tang_vel, chunk = True, max_shape = use_max_shape, curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
         else:
             if os.path.isfile(save_location + "test_all_particle_properties_" + curr_sparta_file + ".hdf5") and i == 0:
                 os.remove(save_location + "test_all_particle_properties_" + curr_sparta_file + ".hdf5")
             with h5py.File((save_location + "test_all_particle_properties_" + curr_sparta_file + ".hdf5"), 'a') as all_particle_properties:
-                save_to_hdf5(all_particle_properties, "HIPIDS", dataset = p_all_HIPIDs, chunk = True, max_shape = (tot_num_ptls,), curr_idx = all_start_idx, max_num_keys = num_save_ptl_params)
-                save_to_hdf5(all_particle_properties, "Orbit_Infall", dataset = p_all_orb_assn, chunk = True, max_shape = (tot_num_ptls,), curr_idx = all_start_idx, max_num_keys = num_save_ptl_params)
-                save_to_hdf5(all_particle_properties, "Scaled_radii_", dataset = save_scale_radii, chunk = True, max_shape = use_max_shape, curr_idx = all_start_idx, max_num_keys = num_save_ptl_params)
-                save_to_hdf5(all_particle_properties, "Radial_vel_", dataset = save_rad_vel, chunk = True, max_shape = use_max_shape, curr_idx = all_start_idx, max_num_keys = num_save_ptl_params)
-                save_to_hdf5(all_particle_properties, "Tangential_vel_", dataset = save_tang_vel, chunk = True, max_shape = use_max_shape, curr_idx = all_start_idx, max_num_keys = num_save_ptl_params)
-        all_start_idx += p_tot_num_use_ptls
+                save_to_hdf5(all_particle_properties, "Halo_first", dataset = p_start_num_ptls, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(all_particle_properties, "Halo_n", dataset = p_use_num_ptls, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(all_particle_properties, "HIPIDS", dataset = p_all_HIPIDs, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(all_particle_properties, "Orbit_Infall", dataset = p_all_orb_assn, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(all_particle_properties, "Scaled_radii_", dataset = save_scale_radii, chunk = True, max_shape = use_max_shape, curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(all_particle_properties, "Radial_vel_", dataset = save_rad_vel, chunk = True, max_shape = use_max_shape, curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(all_particle_properties, "Tangential_vel_", dataset = save_tang_vel, chunk = True, max_shape = use_max_shape, curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+        hdf5_ptl_idx += p_tot_num_use_ptls
+        hdf5_halo_idx += p_start_num_ptls.shape[0]
         t4 = time.time()
         print("Bin", (i+1),"/",num_iter,"complete:",t4-t3,"sec")      
                 
@@ -423,7 +426,7 @@ if prim_only:
 else:
     match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_snap) & (c_halos_status > 0) & (c_halos_last_snap >= c_snap))[0]
     
-rng = np.random.default_rng(11)    
+rng = np.random.default_rng(rand_seed)    
 total_num_halos = match_halo_idxs.shape[0]
 rng.shuffle(match_halo_idxs)
 # split all indices into train and test groups

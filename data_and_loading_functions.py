@@ -2,6 +2,7 @@ import pickle
 import h5py 
 import os
 import numpy as np
+import multiprocessing as mp
 
 def create_directory(path):
     if os.path.exists(path) != True:
@@ -20,6 +21,7 @@ path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
 path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
 path_to_sparta = config["PATHS"]["path_to_sparta"]
+path_to_xgboost = config["PATHS"]["path_to_xgboost"]
 create_directory(path_to_MLOIS)
 create_directory(path_to_snaps)
 create_directory(path_to_SPARTA_data)
@@ -32,6 +34,10 @@ prim_only = config.getboolean("SEARCH","prim_only")
 t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
 global p_snap
 p_snap = config.getint("SEARCH","p_snap")
+global c_snap
+c_snap = config.getint("XGBOOST", 'c_snap')
+global snapshot_list
+snapshot_list = [p_snap, c_snap]
 global search_rad
 search_rad = config.getfloat("SEARCH","search_rad")
 total_num_snaps = config.getint("SEARCH","total_num_snaps")
@@ -39,6 +45,7 @@ per_n_halo_per_split = config.getfloat("SEARCH","per_n_halo_per_split")
 test_halos_ratio = config.getfloat("SEARCH","test_halos_ratio")
 global num_save_ptl_params
 num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
+num_processes = mp.cpu_count()
 ##################################################################################################################
 import sys
 sys.path.insert(0, path_to_pygadgetreader)
@@ -133,18 +140,45 @@ def load_or_pickle_SPARTA_data(sparta_name, scale_factor, snap):
         with open(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/ptl_mass.pickle", "wb") as pickle_file:
             pickle.dump(ptl_mass, pickle_file)
 
-    return halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, ptl_mass
+    return halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, ptl_mass 
 
-def standardize(values):
-    for col in range(values.shape[1]):
-        values[:,col] = (values[:,col] - values[:,col].mean())/values[:,col].std()
-    return values
+def split_dataset_by_mass(halo_first, halo_n, path_to_dataset, curr_dataset, start_nu, end_nu, curr_file):
+    num_halos = halo_first.shape[0]
+    save_path = path_to_xgboost + curr_sparta_file + "_" + str(p_snap) + "to" + str(c_snap) + "_" + str(search_rad) + "r200msearch/" + curr_dataset + "_datasets/" + "nu_" + str(start_nu) + "_" + str(end_nu) + "/"
+    create_directory(save_path)
 
-def normalize(values):
-    for col in range(values.shape[1]):
-        values[:,col] = (values[:,col] - values[:,col].min())/(values[:,col].max() - values[:,col].min())
-    return values
+    if os.path.isfile(save_path + "file_" + str(curr_file) + ".pickle") == False:
+        with h5py.File((path_to_dataset), 'r') as all_ptl_properties:
+            for i in range(num_halos):
+                curr_halo_first = halo_first[i]
+                curr_halo_n = halo_n[i]
+                first_prop = True
+                for key in all_ptl_properties.keys():
+                    # only want the data important for the training now in the training dataset
+                    # dataset now has form HIPIDS, Orbit_Infall, Scaled Radii x num snaps, Rad Vel x num snaps, Tang Vel x num snaps
+                    if key != "Halo_first" and key != "Halo_n":
+                        if all_ptl_properties[key].ndim > 1:
+                            for row in range(all_ptl_properties[key].ndim):
+                                if first_prop:
+                                    curr_dataset = np.array(all_ptl_properties[key][curr_halo_first:curr_halo_first+curr_halo_n,row])
+                                    first_prop = False
+                                else:
+                                    curr_dataset = np.column_stack((curr_dataset,all_ptl_properties[key][curr_halo_first:curr_halo_first+curr_halo_n,row])) 
+                        else:
+                            if first_prop:
+                                curr_dataset = np.array(all_ptl_properties[key][curr_halo_first:curr_halo_first+curr_halo_n])
+                                first_prop = False
+                            else:
+                                curr_dataset = np.column_stack((curr_dataset,all_ptl_properties[key][curr_halo_first:curr_halo_first+curr_halo_n]))
 
+                if i == 0:
+                    full_dataset = curr_dataset
+                else:
+                    full_dataset = np.row_stack((full_dataset, curr_dataset))
+                
+        with open(save_path + "file_" + str(curr_file) + ".pickle", 'wb') as pickle_file:
+            pickle.dump(full_dataset, pickle_file)
+                   
 def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapshot_list):
     save_path = save_path + "datasets/"
     create_directory(save_path)
@@ -160,27 +194,29 @@ def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapsh
         num_cols = 0
         with h5py.File((data_location + dataset_name + "_all_particle_properties_" + sparta_name + ".hdf5"), 'r') as all_ptl_properties: 
             for key in all_ptl_properties.keys():
-                if all_ptl_properties[key].ndim > 1:
-                    num_cols += all_ptl_properties[key].shape[1]
-                else:
-                    num_cols += 1
+                if key != "Halo_first" and key != "Halo_n":
+                    if all_ptl_properties[key].ndim > 1:
+                        num_cols += all_ptl_properties[key].shape[1]
+                    else:
+                        num_cols += 1
             num_params_per_snap = (num_cols - 2) / len(snapshot_list)    
             num_rows = all_ptl_properties[key].shape[0]
             full_dataset = np.zeros((num_rows, num_cols))
             all_keys = np.empty(num_cols,dtype=object)
             curr_col = 0
             for key in all_ptl_properties.keys():
-                if all_ptl_properties[key].ndim > 1:
-                    for row in range(all_ptl_properties[key].ndim):
-                        access_col = int((curr_col + (row * num_params_per_snap)))
-                        full_dataset[:,access_col] = all_ptl_properties[key][:,row]
-                        all_keys[access_col] = (key + str(snapshot_list[row]))
-                    curr_col += 1
-                else:
-                    full_dataset[:,curr_col] = all_ptl_properties[key]
-                    all_keys[curr_col] = (key + str(snapshot_list[0]))
-                    curr_col += 1
-    
+                if key != "Halo_first" and key != "Halo_n":
+                    if all_ptl_properties[key].ndim > 1:
+                        for row in range(all_ptl_properties[key].ndim):
+                            access_col = int((curr_col + (row * num_params_per_snap)))
+                            full_dataset[:,access_col] = all_ptl_properties[key][:,row]
+                            all_keys[access_col] = (key + str(snapshot_list[row]))
+                        curr_col += 1
+                    else:
+                        full_dataset[:,curr_col] = all_ptl_properties[key]
+                        all_keys[curr_col] = (key + str(snapshot_list[0]))
+                        curr_col += 1
+
         # once all the halos are gone through save them as pickles for later  
         with open(dataset_path, "wb") as pickle_file:
             pickle.dump(full_dataset, pickle_file)
