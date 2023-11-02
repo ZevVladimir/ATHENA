@@ -123,7 +123,7 @@ def split_by_nu(nus, peaks, curr_dataset):
                         all_keys = np.append(all_keys, (key + str(snapshot_list[row])))
                 else:
                     all_keys = np.append(all_keys, (key + str(snapshot_list[0])))
-        with open(path_to_xgboost + curr_sparta_file + "_" + str(p_snap) + "to" + str(c_snap) + "_" + str(search_rad) + "r200msearch/" + curr_dataset + "_datasets/" + curr_dataset + "_keys.pickle", 'wb') as pickle_file:
+        with open(path_to_xgboost + curr_sparta_file + "_" + str(p_snap) + "to" + str(c_snap) + "_" + str(search_rad) + "r200msearch/" + curr_dataset + "_keys.pickle", 'wb') as pickle_file:
             pickle.dump(all_keys, pickle_file)
 
     for i in range(nus.size - 1):

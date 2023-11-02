@@ -42,6 +42,10 @@ t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
 global p_snap
 p_snap = config.getint("SEARCH","p_snap")
 c_snap = config.getint("XGBOOST","c_snap")
+model_name = config["XGBOOST"]["model_name"]
+radii_splits = config.get("XGBOOST","rad_splits").split(',')
+for split in radii_splits:
+    model_name = model_name + "_" + str(split)
 snapshot_list = [p_snap, c_snap]
 global search_rad
 search_rad = config.getfloat("SEARCH","search_rad")
@@ -68,7 +72,7 @@ else:
 
 path_to_datasets = path_to_xgboost + specific_save + "datasets/"
 data_location = path_to_calc_info + specific_save
-save_location = path_to_xgboost + specific_save
+save_location = path_to_xgboost + specific_save + "models/" + model_name + "/"
 
 create_directory(save_location)
 
@@ -87,18 +91,6 @@ with open(path_to_datasets + "test_dataset_" + curr_sparta_file + "_" + str(snap
 num_params_per_snap = (len(test_all_keys) - 2) / len(snapshot_list)
 
 num_bins = 30
-
-all_file_names = []
-all_models = []
-for filename in os.listdir(save_location + "/models/"):
-    all_file_names.append(filename)
-all_file_names.sort()
-
-for filename in all_file_names:
-    with open(save_location + "/models/" + filename, "rb") as pickle_file:
-        model = pickle.load(pickle_file)
-    model.load_models()
-    all_models.append(model)
     
 # Determine where the scaled radii, rad vel, and tang vel are located within the dtaset
 for i,key in enumerate(test_all_keys[2:]):
@@ -121,87 +113,105 @@ dens_prf_1halo = sparta_output['anl_prf']['M_1halo'][new_idxs,p_snap,:]
 # test indices are the indices of the match halo idxs used (see find_particle_properties_ML.py to see how test_indices are created)
 num_test_halos = test_indices.shape[0]
 
+density_prf_all_within = np.sum(dens_prf_all, axis=0)
+density_prf_1halo_within = np.sum(dens_prf_1halo, axis=0)
+
+
+with open(save_location + model_name + "_model.pickle", 'rb') as pickle_file:
+    model = pickle.load(pickle_file) 
+    model.load_ensemble()
+
+predicts = model.ensemble_predict(dataset = test_dataset)
+
+actual_labels = test_dataset[:,1]
+
+bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
+bins = np.insert(bins, 0, 0)
+compare_density_prf(radii=test_dataset[:,2+scaled_radii_loc], actual_prf_all=density_prf_all_within, actual_prf_1halo=density_prf_1halo_within, mass=ptl_mass, orbit_assn=predicts, prf_bins=bins, title = model_name + " Predicts", show_graph = False, save_graph = True, save_location = save_location)
+plot_radius_rad_vel_tang_vel_graphs(predicts, test_dataset[:,2+scaled_radii_loc], test_dataset[:,2+rad_vel_loc], test_dataset[:,2+tang_vel_loc], actual_labels, model_name + " Predicts", num_bins, show = False, save = True, save_location=save_location)
+graph_acc_by_bin(predicts, actual_labels, test_dataset[:,2+scaled_radii_loc], num_bins, model_name + " Predicts", plot = False, save = True, save_location = save_location)
+
+
+
 # for every halo idx and pid paired in the test dataset get the halo idxs
-test_halo_idxs = np.zeros(test_dataset.shape[0])
-use_ptl_ids = np.zeros(test_dataset.shape[0])
+# test_halo_idxs = np.zeros(test_dataset.shape[0])
+# use_ptl_ids = np.zeros(test_dataset.shape[0])
 
-for i,id in enumerate(test_dataset[:,0]):
-    depaired = depair(id)
-    use_ptl_ids[i] = depaired[0]
-    test_halo_idxs[i] = depaired[1]
+# for i,id in enumerate(test_dataset[:,0]):
+#     depaired = depair(id)
+#     use_ptl_ids[i] = depaired[0]
+#     test_halo_idxs[i] = depaired[1]
+    
+# halo_masses = np.zeros(num_test_halos)
 
-halo_masses = np.zeros(num_test_halos)
+# start = 0
+# all_accuracy = []
+# # get the mases for each halo
+# for j in range(num_test_halos):
+#     curr_halo_idx = test_indices[j]
+#     curr_test_halo = test_dataset[np.where(test_halo_idxs == curr_halo_idx)]
+#     halo_masses[j] = curr_test_halo.shape[0] * ptl_mass
 
-start = 0
-all_accuracy = []
-# get the mases for each halo
-for j in range(num_test_halos):
-    curr_halo_idx = test_indices[j]
-    curr_test_halo = test_dataset[np.where(test_halo_idxs == curr_halo_idx)]
-    halo_masses[j] = curr_test_halo.shape[0] * ptl_mass
-
-p_red_shift = readheader(p_snapshot_path, 'redshift')
-peak_heights = peaks.peakHeight(halo_masses, p_red_shift)
+# p_red_shift = readheader(p_snapshot_path, 'redshift')
+# peak_heights = peaks.peakHeight(halo_masses, p_red_shift)
                 
-start_nu = np.min(peak_heights) 
-nu_step = np.max(peak_heights)
-num_iter = 1
+# start_nu = np.min(peak_heights) 
+# nu_step = np.max(peak_heights)
+# num_iter = 1
 
-for i in range(num_iter):
-    end_nu = start_nu + nu_step
+# for i in range(num_iter):
+#     end_nu = start_nu + nu_step
 
-    idx_within_nu = np.where((peak_heights >= start_nu) & (peak_heights < end_nu))[0]
-    curr_test_halo_idxs = test_indices[idx_within_nu]
-    print(start_nu, "to", end_nu, ":", idx_within_nu.shape, "halos")
+#     idx_within_nu = np.where((peak_heights >= start_nu) & (peak_heights < end_nu))[0]
+#     curr_test_halo_idxs = test_indices[idx_within_nu]
+#     print(start_nu, "to", end_nu, ":", idx_within_nu.shape, "halos")
     
-    if curr_test_halo_idxs.shape[0] != 0:
-        density_prf_all_within = np.zeros(dens_prf_all.shape[1])
-        density_prf_1halo_within = np.zeros(dens_prf_1halo.shape[1])
-        # loop through each test halo
-        for j, idx in enumerate(curr_test_halo_idxs):
-            # add that halo's corresponding mass profile together
-            density_prf_all_within = density_prf_all_within + dens_prf_all[j]
-            density_prf_1halo_within = density_prf_1halo_within + dens_prf_1halo[j]
+#     if curr_test_halo_idxs.shape[0] != 0:
+#         print(density_prf_all_within.shape)
+#         density_prf_all_within = np.sum(dens_prf_all, axis=1)
+#         density_prf_1halo_within = np.sum(density_prf_1halo_within, axis=1)
+#         # loop through each test halo
+#         # for j, idx in enumerate(curr_test_halo_idxs):
             
-            # find the ptls within this halo
-            use_ptl_idxs = np.where(test_halo_idxs == idx)
-            if j == 0:
-                test_halos_within = test_dataset[use_ptl_idxs]
-            else:
-                curr_test_halo = test_dataset[use_ptl_idxs]
-                test_halos_within = np.row_stack((test_halos_within, curr_test_halo))
+#         #     # find the ptls within this halo
+#         #     use_ptl_idxs = np.where(test_halo_idxs == idx)
+#         #     if j == 0:
+#         #         test_halos_within = test_dataset[use_ptl_idxs]
+#         #     else:
+#         #         curr_test_halo = test_dataset[use_ptl_idxs]
+#         #         test_halos_within = np.row_stack((test_halos_within, curr_test_halo))
 
-        test_predict = np.ones(test_halos_within.shape[0]) * -1
+#         test_predict = np.ones(test_halos_within.shape[0]) * -1
 
-        for i in range(len(snapshot_list)):
-            curr_dataset = test_halos_within[:,:int(2 + (num_params_per_snap * (i+1)))]
+#         for i in range(len(snapshot_list)):
+#             curr_dataset = test_halos_within[:,:int(2 + (num_params_per_snap * (i+1)))]
 
-            if i == (len(snapshot_list)-1):
-                use_ptls = np.where(test_halos_within[:,-1]!= 0)[0]
-            else:
-                use_ptls = np.where(test_halos_within[:,int(2 + (num_params_per_snap * (i+1)))] == 0)[0]
+#             if i == (len(snapshot_list)-1):
+#                 use_ptls = np.where(test_halos_within[:,-1]!= 0)[0]
+#             else:
+#                 use_ptls = np.where(test_halos_within[:,int(2 + (num_params_per_snap * (i+1)))] == 0)[0]
 
-            curr_dataset = curr_dataset[use_ptls]
-            all_models[i].predict_all_models(curr_dataset)
-            test_predict[use_ptls] = all_models[i].get_predicts()
+#             curr_dataset = curr_dataset[use_ptls]
+#             all_models[i].predict_all_models(curr_dataset)
+#             test_predict[use_ptls] = all_models[i].get_predicts()
 
-        actual_labels = test_halos_within[:,1]
+#         actual_labels = test_halos_within[:,1]
 
-        classification = classification_report(actual_labels, test_predict, output_dict=True)
+#         classification = classification_report(actual_labels, test_predict, output_dict=True)
 
-        all_accuracy.append(classification["accuracy"])
-        bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
-        bins = np.insert(bins, 0, 0)
-        compare_density_prf(radii=test_halos_within[:,2+scaled_radii_loc], actual_prf_all=density_prf_all_within, actual_prf_1halo=density_prf_1halo_within, mass=ptl_mass, orbit_assn=test_predict, prf_bins=bins, title = str(np.floor(start_nu)) + "-" + str(np.ceil(end_nu)), show_graph = False, save_graph = True, save_location = save_location)
-        plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "ML Predictions", num_bins, np.floor(start_nu), np.ceil(end_nu), show = False, save = True, save_location=save_location)
-        graph_acc_by_bin(test_predict, actual_labels, test_halos_within[:,2+scaled_radii_loc], num_bins, np.floor(start_nu), np.ceil(end_nu), plot = False, save = True, save_location = save_location)
+#         all_accuracy.append(classification["accuracy"])
+#         bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
+#         bins = np.insert(bins, 0, 0)
+#         compare_density_prf(radii=test_halos_within[:,2+scaled_radii_loc], actual_prf_all=density_prf_all_within, actual_prf_1halo=density_prf_1halo_within, mass=ptl_mass, orbit_assn=test_predict, prf_bins=bins, title = str(np.floor(start_nu)) + "-" + str(np.ceil(end_nu)), show_graph = False, save_graph = True, save_location = save_location)
+#         plot_radius_rad_vel_tang_vel_graphs(test_predict, test_halos_within[:,2+scaled_radii_loc], test_halos_within[:,2+rad_vel_loc], test_halos_within[:,2+tang_vel_loc], actual_labels, "ML Predictions", num_bins, np.floor(start_nu), np.ceil(end_nu), show = False, save = True, save_location=save_location)
+#         graph_acc_by_bin(test_predict, actual_labels, test_halos_within[:,2+scaled_radii_loc], num_bins, np.floor(start_nu), np.ceil(end_nu), plot = False, save = True, save_location = save_location)
         
-    start_nu = end_nu
+#     start_nu = end_nu
     
-print(all_accuracy)
-fig, ax = plt.subplots(1,1)
-ax.set_title("Number of halos at each accuracy level")
-ax.set_xlabel("Accuracy")
-ax.set_ylabel("Num halos")
-ax.hist(all_accuracy)
-fig.savefig(save_location + "all_test_halo_acc.png")
+# print(all_accuracy)
+# fig, ax = plt.subplots(1,1)
+# ax.set_title("Number of halos at each accuracy level")
+# ax.set_xlabel("Accuracy")
+# ax.set_ylabel("Num halos")
+# ax.hist(all_accuracy)
+# fig.savefig(save_location + "all_test_halo_acc.png")

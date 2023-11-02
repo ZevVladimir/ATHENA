@@ -240,7 +240,7 @@ def smaller(new,old):
     else:
         return old
 
-def plot_incorrectly_classified(correct_labels, ml_labels, radii, rad_vel, tang_vel, num_bins, start_nu, end_nu, save_location, act_orb_r_vr, act_orb_r_vt, act_orb_vr_vt, act_inf_r_vr, act_inf_r_vt, act_inf_vr_vt): 
+def plot_incorrectly_classified(correct_labels, ml_labels, radii, rad_vel, tang_vel, num_bins, title, save_location, act_orb_r_vr, act_orb_r_vt, act_orb_vr_vt, act_inf_r_vr, act_inf_r_vt, act_inf_vr_vt): 
     min_ptl = 30
     max_radius = np.max(radii)
     max_rad_vel = np.max(rad_vel)
@@ -331,9 +331,9 @@ def plot_incorrectly_classified(correct_labels, ml_labels, radii, rad_vel, tang_
     
     color_bar = plt.colorbar(imshow_img, cax=plt.subplot(gs[:,-1]))
     
-    miss_class_fig.savefig(save_location + "/2dhist/nu_" + str(start_nu) + "_to_" + str(end_nu) + "_miss_class.png")
+    miss_class_fig.savefig(save_location + "/2dhist/" + title + "_miss_class.png")
     
-def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf, title, num_bins, start_nu, end_nu, show, save, save_location):
+def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf, title, num_bins, show, save, save_location):
     create_directory(save_location + "/2dhist/")
     mpl.rcParams.update({'font.size': 8})
     min_ptl = 30
@@ -396,7 +396,7 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     heights = [4,4]
     
     inf_fig = plt.figure(constrained_layout=True)
-    inf_fig.suptitle("Infalling Particles nu:" + str(start_nu) + "_to_" + str(end_nu))
+    inf_fig.suptitle("Infalling Particles nu:" + title)
     gs = inf_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
     
     ml_inf_r_rv = inf_fig.add_subplot(gs[0,0])
@@ -433,10 +433,10 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     
     inf_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]))
     
-    inf_fig.savefig(save_location + "/2dhist/nu_" + str(start_nu) + "_to_" + str(end_nu) + "_ptls_inf.png")
+    inf_fig.savefig(save_location + "/2dhist/" + title + "_ptls_inf.png")
 #########################################################################################################################################################
     orb_fig = plt.figure(constrained_layout=True)
-    orb_fig.suptitle("Orbiting Particles nu:" + str(start_nu) + "_to_" + str(end_nu))
+    orb_fig.suptitle("Orbiting Particles nu:" + title)
     gs = orb_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
     
     ml_orb_r_rv = orb_fig.add_subplot(gs[0,0])
@@ -473,11 +473,11 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     
     inf_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]), pad = 0.1)
     
-    orb_fig.savefig(save_location + "/2dhist/nu_" + str(start_nu) + "_to_" + str(end_nu) + "_ptls_orb.png")    
+    orb_fig.savefig(save_location + "/2dhist/" + title + "_ptls_orb.png")    
 #########################################################################################################################################################
 
     err_fig = plt.figure(constrained_layout=True)
-    err_fig.suptitle("Orbiting Particles nu:" + str(start_nu) + "_to_" + str(end_nu))
+    err_fig.suptitle("Orbiting Particles nu:" + title)
     gs = err_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
     
     perr_inf_r_rv = err_fig.add_subplot(gs[0,0])
@@ -520,14 +520,15 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     
     perr_color_bar = plt.colorbar(perr_imshow_img, cax=plt.subplot(gs[:,-1]), pad = 0.1)
     
-    err_fig.savefig(save_location + "/2dhist/nu_" + str(start_nu) + "_to_" + str(end_nu) + "_percent_error.png") 
+    err_fig.savefig(save_location + "/2dhist/" + title + "_percent_error.png") 
     
-    plot_incorrectly_classified(correct_labels=correct_orb_inf, ml_labels=orb_inf, radii=radius, rad_vel=radial_vel, tang_vel=tang_vel, num_bins=num_bins, start_nu=start_nu, end_nu=end_nu, save_location=save_location, act_orb_r_vr=act_hist1, act_orb_r_vt=act_hist2, act_orb_vr_vt=act_hist3, act_inf_r_vr=act_hist4, act_inf_r_vt=act_hist5, act_inf_vr_vt=act_hist6)
+    plot_incorrectly_classified(correct_labels=correct_orb_inf, ml_labels=orb_inf, radii=radius, rad_vel=radial_vel, tang_vel=tang_vel, num_bins=num_bins, title=title, save_location=save_location, act_orb_r_vr=act_hist1, act_orb_r_vt=act_hist2, act_orb_vr_vt=act_hist3, act_inf_r_vr=act_hist4, act_inf_r_vt=act_hist5, act_inf_vr_vt=act_hist6)
 
 def graph_feature_importance(feature_names, feature_importance, title, plot, save, save_location):
     mpl.rcParams.update({'font.size': 8})
     fig2, (plot1) = plt.subplots(1,1)
     fig2.tight_layout()
+    
     import_idxs = np.argsort(feature_importance)
     plot1.barh(feature_names[import_idxs], feature_importance[import_idxs])
     plot1.set_xlabel("XGBoost feature importance")
@@ -557,7 +558,7 @@ def graph_correlation_matrix(data, save_location, title, show, save):
         fig.savefig(save_location + "/corr_matrix/" + title + ".png")
     plt.close()
     
-def graph_acc_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, start_nu, end_nu, plot, save, save_location):
+def graph_acc_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, title, plot, save, save_location):
     bin_width = (np.max(radius) - 0) / num_bins
     inf_radius = radius[np.where(corr_orb_inf == 0)]
     orb_radius = radius[np.where(corr_orb_inf == 1)]
@@ -613,43 +614,9 @@ def graph_acc_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, start_nu, end
         
         start_bin = finish_bin
     
-    # plot_types = ["stairs","stairs","stairs","stairs"]
-    # plot_size = (2,2)
-
-    # x_data = np.zeros((num_bins,3,4))
-    # y_data = np.zeros((num_bins,3,4))
-
-    # x_data[:,0,0] = all_accuracy
-    # x_data[:,1,0] = inf_accuracy
-    # x_data[:,2,0] = orb_accuracy
-    # x_data[:,0,1] = all_accuracy
-    # x_data[:,1,1] = all_accuracy
-    # x_data[:,2,1] = all_accuracy
-    # x_data[:,0,2] = inf_accuracy
-    # x_data[:,1,2] = inf_accuracy
-    # x_data[:,2,2] = inf_accuracy
-    # x_data[:,0,3] = orb_accuracy
-    # x_data[:,1,3] = orb_accuracy
-    # x_data[:,2,3] = orb_accuracy
-    # x_data[:,0,0] = bins
-    # x_data[:,1,0] = bins
-    # x_data[:,2,0] = bins
-    # x_data[:,:,1] = bins
-    # x_data[:,:,2] = bins
-    # x_data[:,:,3] = bins
-
-    # y_lim = [(-0.1,1.1),(-0.1,1.1),(-0.1,1.1),(-0.1,1.1)]
-    # x_label = ["radius $r/R_{200m}$","radius $r/R_{200m}$","radius $r/R_{200m}$","radius $r/R_{200m}$"]
-    # y_label = ["Accuracy","Accuracy","Accuracy","Accuracy"]
-    # save_location = save_location + "error_by_rad_graphs/error_by_rad_" + str(start_nu) + "_" + str(end_nu) + ".png"
-    # line_labels = ["All ptl", "inf ptl", "orb ptl", "All ptl","All ptl","All ptl","inf ptl","inf ptl","inf ptl","orb ptl","orb ptl","orb ptl"]
-
-    # accuracy_plotter = gp.plot_determiner(plot_types=plot_types, plot_size=plot_size, X=x_data, Y=y_data, ylim=y_lim, x_label=x_label, y_label=y_label, line_labels=line_labels, fig_title="Accuracy Per r/R200m Bin", save_location=save_location, save=True)
-    # accuracy_plotter.plot()
-    # accuracy_plotter.save()
     
     fig, ax = plt.subplots(2,2, layout="constrained")
-    fig.suptitle("Accuracy by Radius for nu: " + str(start_nu) + "_" + str(end_nu))
+    fig.suptitle("Accuracy by Radius for: " + title)
     ax[0,0].stairs(all_accuracy, bins, color = "black", alpha = 0.6, label = "all ptl")    
     ax[0,0].stairs(inf_accuracy, bins, color = "blue", alpha = 0.4, label = "inf ptl")
     ax[0,0].stairs(orb_accuracy, bins, color = "red", alpha = 0.4, label = "orb ptl")
@@ -685,7 +652,7 @@ def graph_acc_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, start_nu, end
         plt.close()
     if save:
         create_directory(save_location + "error_by_rad_graphs/")
-        fig.savefig(save_location + "error_by_rad_graphs/error_by_rad_" + str(start_nu) + "_" + str(end_nu) + ".png")
+        fig.savefig(save_location + "error_by_rad_graphs/error_by_rad_" + title + ".png")
         plt.close()
         
 def feature_dist(features, labels, save_name, plot, save, save_location):
