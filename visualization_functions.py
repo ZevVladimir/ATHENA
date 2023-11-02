@@ -71,9 +71,6 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     
     orbit_radii = radii[np.where(orbit_assn == 1)[0]]
     infall_radii = radii[np.where(orbit_assn == 0)[0]]
-    # print(radii.shape)
-    # print(orbit_radii.shape)
-    # print(infall_radii.shape)
 
     for i in range(num_prf_bins):
         start_bin = prf_bins[i]
@@ -156,7 +153,7 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
     
     if save_graph:
         fig.set_size_inches(21, 13)
-        print(save_location + "dens_prfl_ratio/" + title + ".png")
+        create_directory(save_location + "dens_prfl_ratio/")
         fig.savefig(save_location + "dens_prfl_ratio/" + title + ".png", bbox_inches='tight')
     if show_graph:
         plt.show()
@@ -331,6 +328,7 @@ def plot_incorrectly_classified(correct_labels, ml_labels, radii, rad_vel, tang_
     
     color_bar = plt.colorbar(imshow_img, cax=plt.subplot(gs[:,-1]))
     
+    create_directory(save_location + "/2dhist/")
     miss_class_fig.savefig(save_location + "/2dhist/" + title + "_miss_class.png")
     
 def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf, title, num_bins, show, save, save_location):

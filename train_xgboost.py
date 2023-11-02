@@ -84,7 +84,7 @@ t0 = time.time()
     
 model_save_location = save_location + "models/" + model_name + "/"
 create_directory(model_save_location)
- 
+print(model_save_location)
 if os.path.exists(model_save_location + model_name + "_model.pickle"):
     with open(model_save_location + model_name + "_model.pickle", 'rb') as pickle_file:
         new_model = pickle.load(pickle_file)
