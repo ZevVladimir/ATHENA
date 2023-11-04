@@ -54,6 +54,7 @@ search_rad = config.getfloat("SEARCH","search_rad")
 total_num_snaps = config.getint("SEARCH","total_num_snaps")
 per_n_halo_per_split = config.getfloat("SEARCH","per_n_halo_per_split")
 test_halos_ratio = config.getfloat("SEARCH","test_halos_ratio")
+# num_processes = int(os.environ['SLURM_CPUS_PER_TASK'])
 num_processes = mp.cpu_count()
 curr_chunk_size = config.getint("SEARCH","chunk_size")
 global num_save_ptl_params
@@ -280,6 +281,13 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_snap, p_scale_factor, 
                 c_use_num_ptls, c_curr_ptl_indices = zip(*p.starmap(initial_search, zip(c_use_halos_pos, c_use_halos_r200m, repeat(True), repeat(False), repeat(True)), chunksize=curr_chunk_size))
             p.close()
             p.join() 
+
+            c_use_num_ptls = np.array(c_use_num_ptls)
+            c_curr_ptl_indices = np.array(c_curr_ptl_indices, dtype=object)
+            has_ptls = np.where(c_use_num_ptls > 0)
+            c_use_num_ptls = c_use_num_ptls[has_ptls]
+            c_curr_ptl_indices = c_curr_ptl_indices[has_ptls]
+            use_halo_idxs = use_halo_idxs[has_ptls]
 
             c_tot_num_use_ptls = int(np.sum(c_use_num_ptls))
             

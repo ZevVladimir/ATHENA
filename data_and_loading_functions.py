@@ -3,6 +3,7 @@ import h5py
 import os
 import numpy as np
 import multiprocessing as mp
+from sklearn.model_selection import train_test_split
 
 def create_directory(path):
     if os.path.exists(path) != True:
@@ -142,12 +143,13 @@ def load_or_pickle_SPARTA_data(sparta_name, scale_factor, snap):
 
     return halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, ptl_mass 
 
-def split_dataset_by_mass(halo_first, halo_n, path_to_dataset, curr_dataset, start_nu, end_nu, curr_file):
+def split_dataset_by_mass(halo_first, halo_n, path_to_dataset, curr_dataset, start_nu, end_nu, curr_file, test):
     num_halos = halo_first.shape[0]
-    save_path = path_to_xgboost + curr_sparta_file + "_" + str(p_snap) + "to" + str(c_snap) + "_" + str(search_rad) + "r200msearch/" + curr_dataset + "_datasets/" + "nu_" + str(start_nu) + "_" + str(end_nu) + "/"
-    create_directory(save_path)
-
-    if os.path.isfile(save_path + "file_" + str(curr_file) + ".pickle") == False:
+    main_save_path = path_to_xgboost + curr_sparta_file + "_" + str(p_snap) + "to" + str(c_snap) + "_" + str(search_rad) + "r200msearch/" + curr_dataset + "_split_datasets/" + "nu_" + str(start_nu) + "_" + str(end_nu) + "/"
+    create_directory(main_save_path)
+       
+        
+    if os.path.isfile(main_save_path + "file_" + str(curr_file) + ".pickle") == False:
         with h5py.File((path_to_dataset), 'r') as all_ptl_properties:
             for i in range(num_halos):
                 curr_halo_first = halo_first[i]
@@ -175,10 +177,11 @@ def split_dataset_by_mass(halo_first, halo_n, path_to_dataset, curr_dataset, sta
                     full_dataset = curr_dataset
                 else:
                     full_dataset = np.row_stack((full_dataset, curr_dataset))
-                
-        with open(save_path + "file_" + str(curr_file) + ".pickle", 'wb') as pickle_file:
+
+        with open(main_save_path + "/file_" + str(curr_file) + "_dataset.pickle", 'wb') as pickle_file:
             pickle.dump(full_dataset, pickle_file)
-                   
+        
+                               
 def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapshot_list):
     save_path = save_path + "datasets/"
     create_directory(save_path)

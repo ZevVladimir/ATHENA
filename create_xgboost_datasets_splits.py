@@ -111,18 +111,19 @@ else:
     
 nus = np.linspace((0.001), (max_nu), num_nu_split)
 
-def split_by_nu(nus, peaks, curr_dataset):
+def split_by_nu(nus, peaks, curr_dataset, test):
     path_to_curr_dataset = path_to_calc_info  + curr_sparta_file + "_" + str(p_snap) + "to" + str(c_snap) + "_" + str(search_rad) + "r200msearch/" + curr_dataset + "_all_particle_properties_" + curr_sparta_file + ".hdf5"
 
     if os.path.exists(path_to_xgboost + curr_sparta_file + "_" + str(p_snap) + "to" + str(c_snap) + "_" + str(search_rad) + "r200msearch/" + curr_dataset + "_datasets/" + curr_dataset + "_keys.pickle") != True:
         with h5py.File((path_to_curr_dataset), 'r') as all_ptl_properties:
             all_keys = np.empty(0,dtype=object)
             for key in all_ptl_properties.keys():
-                if all_ptl_properties[key].ndim > 1:
-                    for row in range(all_ptl_properties[key].ndim):
-                        all_keys = np.append(all_keys, (key + str(snapshot_list[row])))
-                else:
-                    all_keys = np.append(all_keys, (key + str(snapshot_list[0])))
+                if key != "Halo_first" and key != "Halo_n":
+                    if all_ptl_properties[key].ndim > 1:
+                        for row in range(all_ptl_properties[key].ndim):
+                            all_keys = np.append(all_keys, (key + str(snapshot_list[row])))
+                    else:
+                        all_keys = np.append(all_keys, (key + str(snapshot_list[0])))
         with open(path_to_xgboost + curr_sparta_file + "_" + str(p_snap) + "to" + str(c_snap) + "_" + str(search_rad) + "r200msearch/" + curr_dataset + "_keys.pickle", 'wb') as pickle_file:
             pickle.dump(all_keys, pickle_file)
 
@@ -136,15 +137,15 @@ def split_by_nu(nus, peaks, curr_dataset):
 
         with mp.Pool(processes=num_processes) as p:
             p.starmap(split_dataset_by_mass, zip([halo_first[i*n_halo_per:(i+1)*n_halo_per] for i in range(num_files)], [halo_n[i*n_halo_per:(i+1)*n_halo_per] for i in range(num_files)], 
-                                                 repeat(path_to_curr_dataset), repeat(curr_dataset), repeat(np.round(nus[i],2)), repeat(np.round(nus[i+1],2)), np.arange(use_halos.shape[0])))
+                                                 repeat(path_to_curr_dataset), repeat(curr_dataset), repeat(np.round(nus[i],2)), repeat(np.round(nus[i+1],2)), np.arange(use_halos.shape[0]), repeat(test)))
         p.close()
         p.join()
 
-split_by_nu(nus, train_peaks, "train")
+split_by_nu(nus, train_peaks, "train", False)
 t2 = time.time()
 print("Time taken:", np.round((t2-t1),2),"seconds")
 
 print("Start test dataset creation")
-split_by_nu(nus, test_peaks, "test")
+split_by_nu(nus, test_peaks, "test", True)
 t3 = time.time()
 print("Time taken:", np.round((t3-t2),2),"seconds")
