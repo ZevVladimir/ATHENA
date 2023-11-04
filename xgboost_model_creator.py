@@ -21,9 +21,10 @@ config.read("config.ini")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 
 class Iterator(xgboost.DataIter):
-  def __init__(self, svm_file_paths: List[str]):
+  def __init__(self, svm_file_paths: List[str], inc_labels = True):
     self._file_paths = svm_file_paths
     self._it = 0
+    self.inc_labels = inc_labels
     # XGBoost will generate some cache files under current directory with the prefix
     # "cache"
     super().__init__(cache_prefix=os.path.join(".", "cache"))
@@ -41,7 +42,10 @@ class Iterator(xgboost.DataIter):
     # ``DMatrix``
     with open(self._file_paths[self._it], 'rb') as pickle_file:
         curr_dataset = pickle.load(pickle_file)
-    input_data(data=curr_dataset[:,2:], label=curr_dataset[:,1])
+    if self.inc_labels:
+        input_data(data=curr_dataset[:,2:], label=curr_dataset[:,1])
+    else:
+        input_data(data=curr_dataset[:,2:])
     self._it += 1
     # Return 1 to let XGBoost know we haven't seen all the files yet.
     return 1
@@ -51,11 +55,10 @@ class Iterator(xgboost.DataIter):
     self._it = 0
 
 class model_creator:
-    def __init__(self, save_location, model_name, radii_splits, dataset, radii_loc, rad_vel_loc, tang_vel_loc, keys):
+    def __init__(self, save_location, model_name, radii_splits, radii_loc, rad_vel_loc, tang_vel_loc, keys, paths_to_split_data = None, paths_to_split_val_data = None, dataset_split = False):
         self.name = model_name
         self.save_location = save_location
         self.radii_splits = radii_splits
-        self.dataset = dataset
         self.radii_loc = radii_loc
         self.rad_vel_loc = rad_vel_loc
         self.tang_vel_loc = tang_vel_loc
@@ -63,7 +66,12 @@ class model_creator:
         self.sub_model_loc = []
         self.model_location = self.save_location + "sub_models/"
         create_directory(self.model_location)
-        self.train_val_split()
+            
+        if paths_to_split_val_data != None:
+            train_it = Iterator(paths_to_split_data)
+            val_it = Iterator(paths_to_split_val_data)
+            self.train_dataset = xgboost.DMatrix(train_it)
+            self.val_dataset = xgboost.DMatrix(val_it)
 
     def train_val_split(self):
         # Split the dataset inputted into training and validation sets
@@ -151,15 +159,13 @@ class model_creator:
                     t4 = time.time()
                     print("Fitted model", t4 - t3, "seconds")
 
-                    pickle.dump(model, open(curr_model_location, "wb"), pickle.HIGHEST_PROTOCOL)
+                    model.save_model(self.model_location + "model.json")
                 
                 self.sub_model_loc.append(curr_model_location)
         else:
-            curr_model_location = self.model_location + "range_all_" + curr_sparta_file + ".pickle"
+            curr_model_location = self.model_location + "range_all_" + curr_sparta_file + ".json"
 
             if os.path.exists(curr_model_location) == False:
-                X = self.X_train
-                y = self.y_train
 
                 model = None
                 t3 = time.time()
@@ -167,33 +173,33 @@ class model_creator:
                 # Train and fit each model with gpu
                 model = XGBClassifier(tree_method='gpu_hist', eta = 0.01, n_estimators = 100)
                 
-                le = LabelEncoder()
-                y = y.astype(np.int16)
-                y = le.fit_transform(y)
+                # le = LabelEncoder()
+                # y = y.astype(np.int16)
+                # y = le.fit_transform(y)
 
-                model = model.fit(X, y)
+                model = model.fit(self.train_dataset)
 
                 t4 = time.time()
                 print("Fitted model", t4 - t3, "seconds")
 
-                pickle.dump(model, open(curr_model_location, "wb"), pickle.HIGHEST_PROTOCOL)
+                model.save_model(curr_model_location)
+                #pickle.dump(model, open(curr_model_location, "wb"), pickle.HIGHEST_PROTOCOL)
             
             self.sub_model_loc.append(curr_model_location)
 
     def ensemble_predict(self, dataset = None):
         # If there is no dataset submitted then just use the validation sets otherwise predict on the inputted one
         try:
-            use_dataset = dataset[:,2:]
-            use_labels = dataset[:,1]
+            use_dataset = dataset
         except:
             print("Using Validation Set")
-            use_dataset = self.X_val
-            use_labels = self.y_val
-
+            use_dataset = self.val_dataset
+    
         # for each submodel get the predictions
         all_predicts = np.zeros((use_dataset.shape[0],(len(self.sub_model_loc)*2)))
         for i, loc in enumerate(self.sub_model_loc):
-            model = self.load_model(loc)
+            model = xgboost.Booster()
+            model.load_model(self.sub_model_loc)
             all_predicts[:,2*i:(2*i+2)] = model.predict_proba(use_dataset)
 
         # Then determine which class each particle belongs to based of each model's prediction

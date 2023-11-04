@@ -61,13 +61,9 @@ else:
     specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(search_rad) + "r200msearch/"
 
 save_location = path_to_xgboost + specific_save
-path_to_datasets = path_to_xgboost + specific_save + "datasets/"
 
-with open(path_to_datasets + "train_dataset_all_keys.pickle", "rb") as pickle_file:
+with open(save_location + "train_keys.pickle", "rb") as pickle_file:
     train_all_keys = pickle.load(pickle_file)
-with open(path_to_datasets + "train_dataset_" + curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(snapshot_list[-1]) + ".pickle", "rb") as pickle_file:
-    train_dataset = pickle.load(pickle_file)
-
 
 create_directory(save_location)
 
@@ -81,25 +77,74 @@ for i,key in enumerate(train_all_keys[2:]):
         tang_vel_loc = i
 
 t0 = time.time()
+
+paths_to_train_data = []
+paths_to_val_data = []
+for path, subdirs, files in os.walk(path_to_xgboost + curr_sparta_file + "_" + str(p_snap) + "to" + str(c_snap) + "_" + str(search_rad) + "r200msearch/train_split_datasets/"):
+    for name in files:
+        paths_to_train_data.append(os.path.join(path, name))
+
+train_it = Iterator(paths_to_train_data)
+train_dataset = xgboost.DMatrix(train_it)
     
 model_save_location = save_location + "models/" + model_name + "/"
 create_directory(model_save_location)
-print(model_save_location)
-if os.path.exists(model_save_location + model_name + "_model.pickle"):
-    with open(model_save_location + model_name + "_model.pickle", 'rb') as pickle_file:
-        new_model = pickle.load(pickle_file)
+
+curr_model_location = model_save_location + "range_all_" + curr_sparta_file + ".json"
+
+if os.path.exists(curr_model_location) == False:
+    model = None
+    t3 = time.time()
+
+    param = {
+    'tree_method':'gpu_hist',
+    'eta': 0.01,
+    'n_estimators': 100,
+    'subsample': 0.2,
+    'sampling_method': 'gradient_based',
+    }
+    # Train and fit each model with gpu
+    model = xgboost.train(param, train_dataset)
+
+    # le = LabelEncoder()
+    # y = y.astype(np.int16)
+    # y = le.fit_transform(y)
+
+    t4 = time.time()
+    print("Fitted model", t4 - t3, "seconds")
+
+    model.save_model(curr_model_location)
+
 else:
-    new_model = model_creator(save_location=model_save_location, model_name=model_name, radii_splits=radii_splits, dataset=train_dataset, radii_loc=radii_loc, rad_vel_loc=rad_vel_loc, tang_vel_loc=tang_vel_loc, keys = train_all_keys)
-    with open(model_save_location + model_name + "_model.pickle", 'wb') as pickle_file:
-        pickle.dump(new_model, pickle_file, pickle.HIGHEST_PROTOCOL)
+    model = xgboost.Booster()
+    model.load_model(curr_model_location)
+predicts = model.predict(train_dataset)
+predicts = np.round(predicts)
 
-t3 = time.time()
-("Start training model", model_name)
-new_model.train_model()
-t4 = time.time()
-print("Finished training model",model_name,"in",np.round(((t4-t3)/60),2),"minutes")
-predicts = new_model.ensemble_predict()
-new_model.graph(corr_matrix = False, feat_imp = True)
+for i,path in enumerate(paths_to_train_data):
+    with open(path, "rb") as file:
+        curr_dataset = pickle.load(file)
+    if i == 0:
+        train_dataset = curr_dataset
+    else:
+        train_dataset = np.concatenate((train_dataset, curr_dataset), axis=0)
+print(classification_report(train_dataset[:,1], predicts))
 
-t1 = time.time()  
-print("Total time:", np.round(((t1-t0)/60),2), "minutes")
+
+
+
+# if os.path.exists(model_save_location + model_name + "_model.pickle") == False:
+#     new_model = model_creator(save_location=model_save_location, model_name=model_name, radii_splits=radii_splits, radii_loc=radii_loc, rad_vel_loc=rad_vel_loc, tang_vel_loc=tang_vel_loc, keys = train_all_keys, paths_to_split_data = paths_to_train_data, paths_to_split_val_data = paths_to_val_data)
+#     with open(model_save_location + model_name + "_model.pickle", 'wb') as pickle_file:
+#         pickle.dump(new_model, pickle_file, pickle.HIGHEST_PROTOCOL)
+
+#     t3 = time.time()
+#     ("Start training model", model_name)
+#     new_model.train_model()
+#     t4 = time.time()
+#     print("Finished training model",model_name,"in",np.round(((t4-t3)/60),2),"minutes")
+#     predicts = new_model.ensemble_predict()
+#     new_model.graph(corr_matrix = False, feat_imp = True)
+
+#     t1 = time.time()  
+#     print("Total time:", np.round(((t1-t0)/60),2), "minutes")
