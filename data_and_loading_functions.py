@@ -143,43 +143,29 @@ def load_or_pickle_SPARTA_data(sparta_name, scale_factor, snap):
 
     return halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, ptl_mass 
 
-def split_dataset_by_mass(halo_first, halo_n, path_to_dataset, curr_dataset, start_nu, end_nu, curr_file, test):
-    num_halos = halo_first.shape[0]
-    main_save_path = path_to_xgboost + curr_sparta_file + "_" + str(p_snap) + "to" + str(c_snap) + "_" + str(search_rad) + "r200msearch/" + curr_dataset + "_split_datasets/" + "nu_" + str(start_nu) + "_" + str(end_nu) + "/"
-    create_directory(main_save_path)
-       
-        
-    if os.path.isfile(main_save_path + "file_" + str(curr_file) + ".pickle") == False:
-        with h5py.File((path_to_dataset), 'r') as all_ptl_properties:
-            for i in range(num_halos):
-                curr_halo_first = halo_first[i]
-                curr_halo_n = halo_n[i]
-                first_prop = True
-                for key in all_ptl_properties.keys():
-                    # only want the data important for the training now in the training dataset
-                    # dataset now has form HIPIDS, Orbit_Infall, Scaled Radii x num snaps, Rad Vel x num snaps, Tang Vel x num snaps
-                    if key != "Halo_first" and key != "Halo_n":
-                        if all_ptl_properties[key].ndim > 1:
-                            for row in range(all_ptl_properties[key].ndim):
-                                if first_prop:
-                                    curr_dataset = np.array(all_ptl_properties[key][curr_halo_first:curr_halo_first+curr_halo_n,row])
-                                    first_prop = False
-                                else:
-                                    curr_dataset = np.column_stack((curr_dataset,all_ptl_properties[key][curr_halo_first:curr_halo_first+curr_halo_n,row])) 
+def split_dataset_by_mass(halo_first, halo_n, path_to_dataset, curr_dataset):
+    with h5py.File((path_to_dataset), 'r') as all_ptl_properties:
+        first_prop = True
+        for key in all_ptl_properties.keys():
+            # only want the data important for the training now in the training dataset
+            # dataset now has form HIPIDS, Orbit_Infall, Scaled Radii x num snaps, Rad Vel x num snaps, Tang Vel x num snaps
+            if key != "Halo_first" and key != "Halo_n":
+                if all_ptl_properties[key].ndim > 1:
+                    for row in range(all_ptl_properties[key].ndim):
+                        if first_prop:
+                            curr_dataset = np.array(all_ptl_properties[key][halo_first:halo_first+halo_n,row])
+                            first_prop = False
                         else:
-                            if first_prop:
-                                curr_dataset = np.array(all_ptl_properties[key][curr_halo_first:curr_halo_first+curr_halo_n])
-                                first_prop = False
-                            else:
-                                curr_dataset = np.column_stack((curr_dataset,all_ptl_properties[key][curr_halo_first:curr_halo_first+curr_halo_n]))
-
-                if i == 0:
-                    full_dataset = curr_dataset
+                            curr_dataset = np.column_stack((curr_dataset,all_ptl_properties[key][halo_first:halo_first+halo_n,row])) 
                 else:
-                    full_dataset = np.row_stack((full_dataset, curr_dataset))
+                    if first_prop:
+                        curr_dataset = np.array(all_ptl_properties[key][halo_first:halo_first+halo_n])
+                        first_prop = False
+                    else:
+                        curr_dataset = np.column_stack((curr_dataset,all_ptl_properties[key][halo_first:halo_first+halo_n]))
+    return curr_dataset
 
-        with open(main_save_path + "/file_" + str(curr_file) + "_dataset.pickle", 'wb') as pickle_file:
-            pickle.dump(full_dataset, pickle_file)
+    
         
                                
 def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapshot_list):
