@@ -145,9 +145,7 @@ def load_or_pickle_SPARTA_data(sparta_name, scale_factor, snap):
 
 def split_dataset_by_mass(halo_first, halo_n, path_to_dataset, curr_dataset, start_nu, end_nu, curr_file, test):
     num_halos = halo_first.shape[0]
-    main_save_path = path_to_xgboost + curr_sparta_file + "_" + str(p_snap) + "to" + str(c_snap) + "_" + str(search_rad) + "r200msearch/" + curr_dataset + "_split_datasets/" + "nu_" + str(start_nu) + "_" + str(end_nu) + "/"
-    create_directory(main_save_path)
-       
+    main_save_path = path_to_xgboost + curr_sparta_file + "_" + str(p_snap) + "to" + str(c_snap) + "_" + str(search_rad) + "r200msearch/" + curr_dataset + "_split_datasets/" + "nu_" + str(start_nu) + "_" + str(end_nu) + "/"       
         
     if os.path.isfile(main_save_path + "file_" + str(curr_file) + ".pickle") == False:
         with h5py.File((path_to_dataset), 'r') as all_ptl_properties:

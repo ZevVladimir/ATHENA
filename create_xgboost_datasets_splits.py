@@ -55,7 +55,7 @@ num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 
 num_processes = mp.cpu_count()
 global n_halo_per
-n_halo_per = 1000
+n_halo_per = config.getint("XGBOOST", "num_halo_per")
 ##################################################################################################################
 # import pygadgetreader and sparta
 import sys
@@ -135,6 +135,10 @@ def split_by_nu(nus, peaks, curr_dataset, test):
             halo_first = all_ptl_properties["Halo_first"][use_halos]
             halo_n = all_ptl_properties["Halo_n"][use_halos]
 
+        curr_save_path = path_to_xgboost + curr_sparta_file + "_" + str(p_snap) + "to" + str(c_snap) + "_" + str(search_rad) + "r200msearch/" + curr_dataset + "_split_datasets/" + "nu_" + str(np.round(nus[i],2)) + "_" + str(np.round(nus[i+1],2)) + "/"
+        create_directory(curr_save_path)
+       
+       #TODO change so multiprocessing is done for the halo loading and the file splitting is just done in a for loop
         with mp.Pool(processes=num_processes) as p:
             p.starmap(split_dataset_by_mass, zip([halo_first[i*n_halo_per:(i+1)*n_halo_per] for i in range(num_files)], [halo_n[i*n_halo_per:(i+1)*n_halo_per] for i in range(num_files)], 
                                                  repeat(path_to_curr_dataset), repeat(curr_dataset), repeat(np.round(nus[i],2)), repeat(np.round(nus[i+1],2)), np.arange(use_halos.shape[0]), repeat(test)))
