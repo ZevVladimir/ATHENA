@@ -333,6 +333,7 @@ def plot_incorrectly_classified(correct_labels, ml_labels, radii, rad_vel, tang_
     
 def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf, title, num_bins, show, save, save_location):
     create_directory(save_location + "/2dhist/")
+    print(save_location + "/2dhist/")
     mpl.rcParams.update({'font.size': 8})
     min_ptl = 30
 
@@ -472,6 +473,40 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     inf_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]), pad = 0.1)
     
     orb_fig.savefig(save_location + "/2dhist/" + title + "_ptls_orb.png")    
+    
+    
+    only_r_rv_widths = [4,4,.5]
+    only_r_rv_heights = [4,4]
+    only_r_rv_fig = plt.figure(constrained_layout = True)
+    only_r_rv_fig.suptitle("Radial Velocity Versus Radius:" + title)
+    gs = only_r_rv_fig.add_gridspec(2,3,width_ratios = only_r_rv_widths, height_ratios = only_r_rv_heights)
+    ml_orb_r_rv = only_r_rv_fig.add_subplot(gs[0,0])
+    ml_orb_r_rv.hist2d(ml_orb_radius, ml_orb_rad_vel, num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    ml_orb_r_rv.set_xlabel("$r/R_{200m}$")
+    ml_orb_r_rv.set_ylabel("$v_r/v_{200m}$")
+    ml_orb_r_rv.set_title("ML Predicted Orbiting Particles")
+    
+    ml_inf_r_rv = only_r_rv_fig.add_subplot(gs[0,1])
+    ml_inf_r_rv.hist2d(ml_inf_radius, ml_inf_rad_vel, num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    ml_inf_r_rv.set_xlabel("$r/R_{200m}$")
+    ml_inf_r_rv.set_ylabel("$v_r/v_{200m}$")
+    ml_inf_r_rv.set_title("ML Predicted Infalling Particles")
+    
+    act_orb_r_rv = only_r_rv_fig.add_subplot(gs[1,0])
+    act_orb_r_rv.hist2d(act_orb_radius, act_orb_rad_vel, num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    act_orb_r_rv.set_xlabel("$r/R_{200m}$")
+    act_orb_r_rv.set_ylabel("$v_r/v_{200m}$")
+    act_orb_r_rv.set_title("Actual Orbiting Particles")
+    
+    act_inf_r_rv = only_r_rv_fig.add_subplot(gs[1,1])
+    act_inf_r_rv.hist2d(act_inf_radius, act_inf_rad_vel, num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    act_inf_r_rv.set_xlabel("$r/R_{200m}$")
+    act_inf_r_rv.set_ylabel("$v_r/v_{200m}$")
+    act_inf_r_rv.set_title("Actual Infalling Particles")
+    
+    inf_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]))
+    only_r_rv_fig.savefig(save_location + "/2dhist/" + title + "_only_r_rv.png")
+    
 #########################################################################################################################################################
 
     err_fig = plt.figure(constrained_layout=True)

@@ -164,18 +164,11 @@ def split_dataset_by_mass(halo_first, halo_n, path_to_dataset, curr_dataset):
                     else:
                         curr_dataset = np.column_stack((curr_dataset,all_ptl_properties[key][halo_first:halo_first+halo_n]))
     return curr_dataset
-
-    
-        
                                
 def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapshot_list):
     save_path = save_path + "datasets/"
     create_directory(save_path)
-    dataset_path = save_path + dataset_name + "_dataset_" + sparta_name 
-    
-    for snap in snapshot_list:
-        dataset_path = dataset_path + "_" + str(snap)
-    dataset_path = dataset_path + ".pickle"
+    dataset_path = save_path + dataset_name + "_dataset" + ".pickle"
     # if the directory for this hdf5 file exists if not make it
     if os.path.exists(save_path) != True:
         os.makedirs(save_path)
@@ -209,6 +202,7 @@ def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapsh
         # once all the halos are gone through save them as pickles for later  
         with open(dataset_path, "wb") as pickle_file:
             pickle.dump(full_dataset, pickle_file)
+        #np.save(dataset_path, full_dataset)
         with open(save_path + dataset_name + "_dataset_all_keys.pickle", "wb") as pickle_file:
             pickle.dump(all_keys, pickle_file)
     # if there are already pickle files just open them

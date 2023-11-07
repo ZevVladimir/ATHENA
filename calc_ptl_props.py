@@ -302,7 +302,7 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_snap, p_scale_factor, 
                 c_all_HIPIDs, c_all_rad_vel, c_all_tang_vel, c_all_scal_rad = zip(*p.starmap(search_halos, zip(halo_split, repeat(True), use_halo_idxs, np.arange(curr_num_halos)), chunksize=curr_chunk_size))
             p.close()
             p.join()
-            
+
             c_all_HIPIDs = np.concatenate(c_all_HIPIDs, axis = 0)
             c_all_rad_vel = np.concatenate(c_all_rad_vel, axis = 0)
             c_all_tang_vel = np.concatenate(c_all_tang_vel, axis = 0)

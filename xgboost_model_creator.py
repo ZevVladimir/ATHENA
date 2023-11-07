@@ -21,8 +21,8 @@ config.read("config.ini")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 
 class Iterator(xgboost.DataIter):
-  def __init__(self, svm_file_paths: List[str], inc_labels = True):
-    self._file_paths = svm_file_paths
+  def __init__(self, file_paths: List[str], inc_labels = True):
+    self._file_paths = file_paths
     self._it = 0
     self.inc_labels = inc_labels
     # XGBoost will generate some cache files under current directory with the prefix
@@ -44,8 +44,10 @@ class Iterator(xgboost.DataIter):
         curr_dataset = pickle.load(pickle_file)
     if self.inc_labels:
         input_data(data=curr_dataset[:,2:], label=curr_dataset[:,1])
+        print(np.where(curr_dataset[:,1]==1)[0].shape)
     else:
         input_data(data=curr_dataset[:,2:])
+    
     self._it += 1
     # Return 1 to let XGBoost know we haven't seen all the files yet.
     return 1
