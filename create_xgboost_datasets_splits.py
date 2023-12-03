@@ -127,29 +127,32 @@ def split_by_nu(nus, peaks, curr_dataset, test):
         with open(path_to_xgboost + curr_sparta_file + "_" + str(p_snap) + "to" + str(c_snap) + "_" + str(search_rad) + "r200msearch/" + curr_dataset + "_keys.pickle", 'wb') as pickle_file:
             pickle.dump(all_keys, pickle_file)
 
-    for i in range(nus.size - 1):
-        t3 = time.time()
-        use_halos = np.where((peaks > nus[i]) & (peaks < nus[i+1]))[0]
-        num_files = int(np.ceil(use_halos.shape[0] / n_halo_per))
-        
-        with h5py.File((path_to_curr_dataset), 'r') as all_ptl_properties: 
-            halo_first = all_ptl_properties["Halo_first"][use_halos]
-            halo_n = all_ptl_properties["Halo_n"][use_halos]
+        for i in range(nus.size - 1):
+            t3 = time.time()
+            use_halos = np.where((peaks > nus[i]) & (peaks <= nus[i+1]))[0]
+            num_files = int(np.ceil(use_halos.shape[0] / n_halo_per))
 
-        curr_save_path = path_to_xgboost + curr_sparta_file + "_" + str(p_snap) + "to" + str(c_snap) + "_" + str(search_rad) + "r200msearch/" + curr_dataset + "_split_datasets/" + "nu_" + str(np.round(nus[i],2)) + "_" + str(np.round(nus[i+1],2)) + "/"
-        create_directory(curr_save_path)
-       
-        for j in range(num_files):
-            if os.path.isfile(curr_save_path + "file_" + str(j) + ".pickle") == False:
-                with mp.Pool(processes=num_processes) as p:
-                    full_dataset = zip(*p.starmap(split_dataset_by_mass, zip(halo_first[j*n_halo_per:(j+1)*n_halo_per], halo_n[j*n_halo_per:(j+1)*n_halo_per], 
-                                                        repeat(path_to_curr_dataset), repeat(curr_dataset))))
-                p.close()
-                p.join()
+            with h5py.File((path_to_curr_dataset), 'r') as all_ptl_properties: 
+                halo_first = all_ptl_properties["Halo_first"][use_halos]
+                halo_n = all_ptl_properties["Halo_n"][use_halos]
 
-                with open(curr_save_path + "/file_" + str(j) + "_dataset.pickle", 'wb') as pickle_file:
-                    pickle.dump(full_dataset, pickle_file)
-        
+            curr_save_path = path_to_xgboost + curr_sparta_file + "_" + str(p_snap) + "to" + str(c_snap) + "_" + str(search_rad) + "r200msearch/" + curr_dataset + "_split_datasets/" + "nu_" + str(np.round(nus[i],2)) + "_" + str(np.round(nus[i+1],2)) + "/"
+            create_directory(curr_save_path)
+            
+            print(num_files, "files for", str(np.round(nus[i],2)) + " to " + str(np.round(nus[i+1],2)))
+            for j in range(num_files):
+                if os.path.isfile(curr_save_path + "file_" + str(j) + ".pickle") == False:
+                    with mp.Pool(processes=num_processes) as p:
+                        full_dataset = p.starmap(split_dataset_by_mass, zip(halo_first[j*n_halo_per:(j+1)*n_halo_per], halo_n[j*n_halo_per:(j+1)*n_halo_per],
+                                                                            repeat(path_to_curr_dataset), repeat(curr_dataset)))
+                    p.close()
+                    p.join()
+                    
+                    full_dataset = np.concatenate(full_dataset, axis = 0)
+                    
+                    with open(curr_save_path + "/file_" + str(j) + "_dataset.pickle", 'wb') as pickle_file:
+                        pickle.dump(full_dataset, pickle_file)
+
         t4 = time.time()
         print("Finished nu:" + str(np.round(nus[i],2)) + " to " + str(np.round(nus[i+1],2)), "in", np.round((t4-t3),2), "seconds", np.round(((t4-t3)/60),2), "minutes")
 

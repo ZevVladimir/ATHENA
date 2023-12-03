@@ -270,6 +270,12 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_snap, p_scale_factor, 
         p_all_tang_vel = np.concatenate(p_all_tang_vel, axis = 0)
         p_all_scal_rad = np.concatenate(p_all_scal_rad, axis = 0)
         
+        p_all_HIPIDs = p_all_HIPIDs.astype(np.float64)
+        p_all_orb_assn = p_all_orb_assn.astype(np.int8)
+        p_all_rad_vel = p_all_rad_vel.astype(np.float32)
+        p_all_tang_vel = p_all_tang_vel.astype(np.float32)
+        p_all_scal_rad = p_all_scal_rad.astype(np.float32)
+        
         # If multiple snaps also search the comparison snaps in the same manner as with the primary snap
         if prim_only == False:
             c_use_halos_pos = sparta_output['halos']['position'][:,c_snap] * 10**3 * c_scale_factor
@@ -302,21 +308,26 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_snap, p_scale_factor, 
                 c_all_HIPIDs, c_all_rad_vel, c_all_tang_vel, c_all_scal_rad = zip(*p.starmap(search_halos, zip(halo_split, repeat(True), use_halo_idxs, np.arange(curr_num_halos)), chunksize=curr_chunk_size))
             p.close()
             p.join()
-            
+
             c_all_HIPIDs = np.concatenate(c_all_HIPIDs, axis = 0)
             c_all_rad_vel = np.concatenate(c_all_rad_vel, axis = 0)
             c_all_tang_vel = np.concatenate(c_all_tang_vel, axis = 0)
             c_all_scal_rad = np.concatenate(c_all_scal_rad, axis = 0)
             
+            c_all_HIPIDs = c_all_HIPIDs.astype(np.float64)
+            c_all_rad_vel = c_all_rad_vel.astype(np.float32)
+            c_all_tang_vel = c_all_tang_vel.astype(np.float32)
+            c_all_scal_rad = c_all_scal_rad.astype(np.float32)
+            
             use_max_shape = (tot_num_ptls,2)                  
-            save_scale_radii = np.zeros((p_tot_num_use_ptls,2))
-            save_rad_vel = np.zeros((p_tot_num_use_ptls,2))
-            save_tang_vel = np.zeros((p_tot_num_use_ptls,2))
+            save_scale_radii = np.zeros((p_tot_num_use_ptls,2), dtype = np.float32)
+            save_rad_vel = np.zeros((p_tot_num_use_ptls,2), dtype = np.float32)
+            save_tang_vel = np.zeros((p_tot_num_use_ptls,2), dtype = np.float32)
 
             # Match the PIDs from primary snap to the secondary snap
             # If they don't have a match set those as np.NaN for xgboost 
             match_hipid_idx = np.intersect1d(p_all_HIPIDs, c_all_HIPIDs, return_indices=True)
-            save_scale_radii[:,0] = p_all_scal_rad 
+            save_scale_radii[:,0] = p_all_scal_rad
             save_scale_radii[match_hipid_idx[1],1] = c_all_scal_rad[match_hipid_idx[2]]
             save_rad_vel[:,0] = p_all_rad_vel
             save_rad_vel[match_hipid_idx[1],1] = c_all_rad_vel[match_hipid_idx[2]]

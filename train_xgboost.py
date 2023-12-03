@@ -7,6 +7,8 @@ import time
 import pickle
 import os
 from imblearn import under_sampling, over_sampling
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import StratifiedKFold
 from data_and_loading_functions import build_ml_dataset, check_pickle_exist_gadget, choose_halo_split, create_directory
 from visualization_functions import *
 from xgboost_model_creator import model_creator, Iterator
@@ -78,30 +80,38 @@ for i,key in enumerate(train_all_keys[2:]):
 
 t0 = time.time()
 
-paths_to_train_data = []
-paths_to_val_data = []
-for path, subdirs, files in os.walk(path_to_xgboost + curr_sparta_file + "_" + str(p_snap) + "to" + str(c_snap) + "_" + str(search_rad) + "r200msearch/train_split_datasets/"):
-    for name in files:
-        paths_to_train_data.append(os.path.join(path, name))
+# paths_to_train_data = []
+# paths_to_val_data = []
+# for path, subdirs, files in os.walk(path_to_xgboost + curr_sparta_file + "_" + str(p_snap) + "to" + str(c_snap) + "_" + str(search_rad) + "r200msearch/train_split_datasets/"):
+#     for name in files:
+#         paths_to_train_data.append(os.path.join(path, name))
 
-train_it = Iterator(paths_to_train_data)
-train_dataset = xgboost.DMatrix(train_it)
-    
+# train_it = Iterator(paths_to_train_data)
+# train_dataset = xgboost.DMatrix(train_it)
+
+train_dataset = pickle.load(open("/home/zvladimi/MLOIS/xgboost_datasets_plots/sparta_cbol_l0063_n0256_190to178_6.0r200msearch/datasets/train_dataset.pickle", "rb"))
+scale_pos_weight = np.where(train_dataset[:,1] == 0)[0].size / np.where(train_dataset[:,1] == 1)[0].size
+print(scale_pos_weight)
+train_dataset = xgboost.DMatrix(train_dataset[:,2:], label = train_dataset[:,1])
+
 model_save_location = save_location + "models/" + model_name + "/"
 create_directory(model_save_location)
 
 curr_model_location = model_save_location + "range_all_" + curr_sparta_file + ".json"
+
 
 if os.path.exists(curr_model_location) == False:
     model = None
     t3 = time.time()
 
     param = {
-    'tree_method':'gpu_hist',
+    'tree_method':'hist',
+    'decice':'cuda',
     'eta': 0.01,
     'n_estimators': 100,
-    'subsample': 0.2,
-    'sampling_method': 'gradient_based',
+    'subsample': 0.1,
+    'scale_pos_weight': scale_pos_weight,
+    'seed': 11
     }
     # Train and fit each model with gpu
     model = xgboost.train(param, train_dataset)
@@ -121,30 +131,12 @@ else:
 predicts = model.predict(train_dataset)
 predicts = np.round(predicts)
 
-for i,path in enumerate(paths_to_train_data):
-    with open(path, "rb") as file:
-        curr_dataset = pickle.load(file)
-    if i == 0:
-        train_dataset = curr_dataset
-    else:
-        train_dataset = np.concatenate((train_dataset, curr_dataset), axis=0)
+# for i,path in enumerate(paths_to_train_data):
+#     with open(path, "rb") as file:
+#         curr_dataset = pickle.load(file)
+#     if i == 0:
+#         train_dataset = curr_dataset
+#     else:
+#         train_dataset = np.concatenate((train_dataset, curr_dataset), axis=0)
+train_dataset = pickle.load(open("/home/zvladimi/MLOIS/xgboost_datasets_plots/sparta_cbol_l0063_n0256_190to178_6.0r200msearch/datasets/train_dataset.pickle", "rb"))
 print(classification_report(train_dataset[:,1], predicts))
-
-
-
-
-# if os.path.exists(model_save_location + model_name + "_model.pickle") == False:
-#     new_model = model_creator(save_location=model_save_location, model_name=model_name, radii_splits=radii_splits, radii_loc=radii_loc, rad_vel_loc=rad_vel_loc, tang_vel_loc=tang_vel_loc, keys = train_all_keys, paths_to_split_data = paths_to_train_data, paths_to_split_val_data = paths_to_val_data)
-#     with open(model_save_location + model_name + "_model.pickle", 'wb') as pickle_file:
-#         pickle.dump(new_model, pickle_file, pickle.HIGHEST_PROTOCOL)
-
-#     t3 = time.time()
-#     ("Start training model", model_name)
-#     new_model.train_model()
-#     t4 = time.time()
-#     print("Finished training model",model_name,"in",np.round(((t4-t3)/60),2),"minutes")
-#     predicts = new_model.ensemble_predict()
-#     new_model.graph(corr_matrix = False, feat_imp = True)
-
-#     t1 = time.time()  
-#     print("Total time:", np.round(((t1-t0)/60),2), "minutes")

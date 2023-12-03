@@ -4,7 +4,7 @@ import matplotlib as mpl
 mpl.use('agg')
 import matplotlib.gridspec as gridspec
 from calculation_functions import calculate_distance
-import seaborn as sns
+#import seaborn as sns
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from sklearn.metrics import classification_report
 from colossus.halo import mass_so
@@ -333,6 +333,7 @@ def plot_incorrectly_classified(correct_labels, ml_labels, radii, rad_vel, tang_
     
 def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, correct_orb_inf, title, num_bins, show, save, save_location):
     create_directory(save_location + "/2dhist/")
+    print(save_location + "/2dhist/")
     mpl.rcParams.update({'font.size': 8})
     min_ptl = 30
 
@@ -472,6 +473,40 @@ def plot_radius_rad_vel_tang_vel_graphs(orb_inf, radius, radial_vel, tang_vel, c
     inf_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]), pad = 0.1)
     
     orb_fig.savefig(save_location + "/2dhist/" + title + "_ptls_orb.png")    
+    
+    
+    only_r_rv_widths = [4,4,.5]
+    only_r_rv_heights = [4,4]
+    only_r_rv_fig = plt.figure(constrained_layout = True)
+    only_r_rv_fig.suptitle("Radial Velocity Versus Radius:" + title)
+    gs = only_r_rv_fig.add_gridspec(2,3,width_ratios = only_r_rv_widths, height_ratios = only_r_rv_heights)
+    ml_orb_r_rv = only_r_rv_fig.add_subplot(gs[0,0])
+    ml_orb_r_rv.hist2d(ml_orb_radius, ml_orb_rad_vel, num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    ml_orb_r_rv.set_xlabel("$r/R_{200m}$")
+    ml_orb_r_rv.set_ylabel("$v_r/v_{200m}$")
+    ml_orb_r_rv.set_title("ML Predicted Orbiting Particles")
+    
+    ml_inf_r_rv = only_r_rv_fig.add_subplot(gs[0,1])
+    ml_inf_r_rv.hist2d(ml_inf_radius, ml_inf_rad_vel, num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    ml_inf_r_rv.set_xlabel("$r/R_{200m}$")
+    ml_inf_r_rv.set_ylabel("$v_r/v_{200m}$")
+    ml_inf_r_rv.set_title("ML Predicted Infalling Particles")
+    
+    act_orb_r_rv = only_r_rv_fig.add_subplot(gs[1,0])
+    act_orb_r_rv.hist2d(act_orb_radius, act_orb_rad_vel, num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    act_orb_r_rv.set_xlabel("$r/R_{200m}$")
+    act_orb_r_rv.set_ylabel("$v_r/v_{200m}$")
+    act_orb_r_rv.set_title("Actual Orbiting Particles")
+    
+    act_inf_r_rv = only_r_rv_fig.add_subplot(gs[1,1])
+    act_inf_r_rv.hist2d(act_inf_radius, act_inf_rad_vel, num_bins, [[0,max_radius],[min_rad_vel,max_rad_vel]], False, None, min_ptl, cmap = cmap, norm = "log", vmin = min_ptl, vmax = max_ptl)
+    act_inf_r_rv.set_xlabel("$r/R_{200m}$")
+    act_inf_r_rv.set_ylabel("$v_r/v_{200m}$")
+    act_inf_r_rv.set_title("Actual Infalling Particles")
+    
+    inf_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]))
+    only_r_rv_fig.savefig(save_location + "/2dhist/" + title + "_only_r_rv.png")
+    
 #########################################################################################################################################################
 
     err_fig = plt.figure(constrained_layout=True)
@@ -541,20 +576,21 @@ def graph_feature_importance(feature_names, feature_importance, title, plot, sav
     plt.close()
 
 def graph_correlation_matrix(data, save_location, title, show, save):
-    create_directory(save_location + "/corr_matrix/")
-    mpl.rcParams.update({'font.size': 12})
+    return
+    # create_directory(save_location + "/corr_matrix/")
+    # mpl.rcParams.update({'font.size': 12})
 
-    heatmap = sns.heatmap(data.corr(), annot = True, cbar = True)
-    heatmap.set_title("Feature Correlation Heatmap")
-    heatmap.set_xticklabels(heatmap.get_xticklabels(),rotation=45)
+    # heatmap = sns.heatmap(data.corr(), annot = True, cbar = True)
+    # heatmap.set_title("Feature Correlation Heatmap")
+    # heatmap.set_xticklabels(heatmap.get_xticklabels(),rotation=45)
 
-    if show:
-        plt.show()
-    if save:
-        fig = heatmap.get_figure()
-        fig.set_size_inches(21, 13)
-        fig.savefig(save_location + "/corr_matrix/" + title + ".png")
-    plt.close()
+    # if show:
+    #     plt.show()
+    # if save:
+    #     fig = heatmap.get_figure()
+    #     fig.set_size_inches(21, 13)
+    #     fig.savefig(save_location + "/corr_matrix/" + title + ".png")
+    # plt.close()
     
 def graph_acc_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, title, plot, save, save_location):
     bin_width = (np.max(radius) - 0) / num_bins
@@ -679,4 +715,35 @@ def feature_dist(features, labels, save_name, plot, save, save_location):
         fig.savefig(save_location + "feature_dist_hists/feature_dist_" + save_name + ".png")
     plt.close()
         
-        
+def plot_halo_ptls(pos, act_labels, save_path, pred_labels = None):
+    act_inf_ptls = pos[np.where(act_labels == 0)]
+    act_orb_ptls = pos[np.where(act_labels == 1)]
+    pred_inf_ptls = pos[np.where(pred_labels == 0)]
+    pred_orb_ptls = pos[np.where(pred_labels == 1)]
+    inc_class = pos[np.where(act_labels != pred_labels)]
+    corr_class = pos[np.where(act_labels == pred_labels)]
+    plt.rcParams['figure.constrained_layout.use'] = True
+    fig, ax = plt.subplots(2)
+    ax[0].scatter(act_inf_ptls[:,0], act_inf_ptls[:,1], c='g', label = "Infalling Particles")
+    ax[0].scatter(act_orb_ptls[:,0], act_orb_ptls[:,1], c='b', label = "Orbiting Particles")
+    ax[0].set_title("Actual Distribution of Orbiting/Infalling Particles")
+    ax[0].set_xlabel("X position (kpc)")
+    ax[0].set_ylabel("Y position (kpc)")
+    ax[0].legend()
+    
+    ax[1].scatter(pred_inf_ptls[:,0], pred_inf_ptls[:,1], c='g', label = "Infalling Particles")
+    ax[1].scatter(pred_orb_ptls[:,0], pred_orb_ptls[:,1], c='b', label = "Orbiting Particles")
+    ax[1].set_title("Predicted Distribution of Orbiting/Infalling Particles")
+    ax[1].set_xlabel("X position (kpc)")
+    ax[1].set_ylabel("Y position (kpc)")
+    ax[1].legend()
+    fig.savefig(save_path + "plot_of_halo_both_dist.png")
+
+    fig, ax = plt.subplots(1)
+    ax.scatter(corr_class[:,0], corr_class[:,1], c='g', label = "Correctly Labeled")
+    ax.scatter(inc_class[:,0], inc_class[:,1], c='r', label = "Incorrectly Labeled")
+    ax.set_title("Predicted Distribution of Orbiting/Infalling Particles")
+    ax.set_xlabel("X position (kpc)")
+    ax.set_ylabel("Y position (kpc)")
+    ax.legend()
+    fig.savefig(save_path + "plot_of_halo_label_dist.png")
