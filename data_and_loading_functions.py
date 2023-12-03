@@ -215,7 +215,7 @@ def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapsh
 
 def save_to_hdf5(hdf5_file, data_name, dataset, chunk, max_shape, curr_idx, max_num_keys):
     if len(list(hdf5_file.keys())) < (max_num_keys):
-        hdf5_file.create_dataset(data_name, data = dataset, chunks = chunk, maxshape = max_shape)
+        hdf5_file.create_dataset(data_name, data = dataset, chunks = chunk, maxshape = max_shape, dtype=dataset.dtype)
     # with a new file adding on additional data to the datasets
     elif len(list(hdf5_file.keys())) == (max_num_keys):
         hdf5_file[data_name].resize((hdf5_file[data_name].shape[0] + dataset.shape[0]), axis = 0)
