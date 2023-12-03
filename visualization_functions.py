@@ -4,7 +4,7 @@ import matplotlib as mpl
 mpl.use('agg')
 import matplotlib.gridspec as gridspec
 from calculation_functions import calculate_distance
-import seaborn as sns
+#import seaborn as sns
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from sklearn.metrics import classification_report
 from colossus.halo import mass_so
@@ -576,20 +576,21 @@ def graph_feature_importance(feature_names, feature_importance, title, plot, sav
     plt.close()
 
 def graph_correlation_matrix(data, save_location, title, show, save):
-    create_directory(save_location + "/corr_matrix/")
-    mpl.rcParams.update({'font.size': 12})
+    return
+    # create_directory(save_location + "/corr_matrix/")
+    # mpl.rcParams.update({'font.size': 12})
 
-    heatmap = sns.heatmap(data.corr(), annot = True, cbar = True)
-    heatmap.set_title("Feature Correlation Heatmap")
-    heatmap.set_xticklabels(heatmap.get_xticklabels(),rotation=45)
+    # heatmap = sns.heatmap(data.corr(), annot = True, cbar = True)
+    # heatmap.set_title("Feature Correlation Heatmap")
+    # heatmap.set_xticklabels(heatmap.get_xticklabels(),rotation=45)
 
-    if show:
-        plt.show()
-    if save:
-        fig = heatmap.get_figure()
-        fig.set_size_inches(21, 13)
-        fig.savefig(save_location + "/corr_matrix/" + title + ".png")
-    plt.close()
+    # if show:
+    #     plt.show()
+    # if save:
+    #     fig = heatmap.get_figure()
+    #     fig.set_size_inches(21, 13)
+    #     fig.savefig(save_location + "/corr_matrix/" + title + ".png")
+    # plt.close()
     
 def graph_acc_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, title, plot, save, save_location):
     bin_width = (np.max(radius) - 0) / num_bins
@@ -714,4 +715,35 @@ def feature_dist(features, labels, save_name, plot, save, save_location):
         fig.savefig(save_location + "feature_dist_hists/feature_dist_" + save_name + ".png")
     plt.close()
         
-        
+def plot_halo_ptls(pos, act_labels, save_path, pred_labels = None):
+    act_inf_ptls = pos[np.where(act_labels == 0)]
+    act_orb_ptls = pos[np.where(act_labels == 1)]
+    pred_inf_ptls = pos[np.where(pred_labels == 0)]
+    pred_orb_ptls = pos[np.where(pred_labels == 1)]
+    inc_class = pos[np.where(act_labels != pred_labels)]
+    corr_class = pos[np.where(act_labels == pred_labels)]
+    plt.rcParams['figure.constrained_layout.use'] = True
+    fig, ax = plt.subplots(2)
+    ax[0].scatter(act_inf_ptls[:,0], act_inf_ptls[:,1], c='g', label = "Infalling Particles")
+    ax[0].scatter(act_orb_ptls[:,0], act_orb_ptls[:,1], c='b', label = "Orbiting Particles")
+    ax[0].set_title("Actual Distribution of Orbiting/Infalling Particles")
+    ax[0].set_xlabel("X position (kpc)")
+    ax[0].set_ylabel("Y position (kpc)")
+    ax[0].legend()
+    
+    ax[1].scatter(pred_inf_ptls[:,0], pred_inf_ptls[:,1], c='g', label = "Infalling Particles")
+    ax[1].scatter(pred_orb_ptls[:,0], pred_orb_ptls[:,1], c='b', label = "Orbiting Particles")
+    ax[1].set_title("Predicted Distribution of Orbiting/Infalling Particles")
+    ax[1].set_xlabel("X position (kpc)")
+    ax[1].set_ylabel("Y position (kpc)")
+    ax[1].legend()
+    fig.savefig(save_path + "plot_of_halo_both_dist.png")
+
+    fig, ax = plt.subplots(1)
+    ax.scatter(corr_class[:,0], corr_class[:,1], c='g', label = "Correctly Labeled")
+    ax.scatter(inc_class[:,0], inc_class[:,1], c='r', label = "Incorrectly Labeled")
+    ax.set_title("Predicted Distribution of Orbiting/Infalling Particles")
+    ax.set_xlabel("X position (kpc)")
+    ax.set_ylabel("Y position (kpc)")
+    ax.legend()
+    fig.savefig(save_path + "plot_of_halo_label_dist.png")
