@@ -62,7 +62,6 @@ test_halos_ratio = config.getfloat("SEARCH","test_halos_ratio")
 curr_chunk_size = config.getint("SEARCH","chunk_size")
 global num_save_ptl_params
 num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
-frac_train_ptls = 1
 
 # size float32 is 4 bytes
 chunk_size = int(np.floor(1e9 / (num_save_ptl_params * 4)))
@@ -87,6 +86,37 @@ def get_cluster():
 
     return client
 
+def create_training_matrix(X_loc, y_loc, frac_use_data = 1, calc_scale_pos_weight = False):
+    with open(X_loc, "rb") as file:
+        X = pickle.load(file) 
+    with open(y_loc, "rb") as file:
+        y = pickle.load(file)
+    
+    scale_pos_weight = np.where(y == 0)[0].size / np.where(y == 1)[0].size
+    
+    num_features = X.shape[1]
+    
+    num_use_data = int(np.floor(X.shape[0] * frac_use_data))
+    print("Tot num of train particles:", X.shape[0])
+    print("Num use train particles:", num_use_data)
+
+    print(X[:,0].dtype)
+    print(X[:,1].dtype)
+    print(X[:,2].dtype)
+    X = da.from_array(X,chunks=(chunk_size,num_features))
+    y = da.from_array(y,chunks=(chunk_size))
+    print("converted to array")
+        
+    print("X Number of total bytes:", X.nbytes, "X Number of Gigabytes:", (X.nbytes)/(10**9))
+    print("y Number of total bytes:", y.nbytes, "y Number of Gigabytes:", (y.nbytes)/(10**9))
+    
+    dqmatrix = xgb.dask.DaskQuantileDMatrix(client, X, y)
+    print("converted to DaskQuantileDMatrix")
+    
+    if calc_scale_pos_weight:
+        return dqmatrix, scale_pos_weight
+    return dqmatrix
+
 
 if __name__ == "__main__":
     client = get_cluster()
@@ -100,60 +130,13 @@ if __name__ == "__main__":
     model_save_location = save_location + "models/" + model_name + "/"
 
     train_dataset_loc = save_location + "datasets/" + "train_dataset.pickle"
+    train_labels_loc = save_location + "datasets/" + "train_labels.pickle"
     test_dataset_loc = save_location + "datasets/" + "test_dataset.pickle"
-            
+    test_labels_loc = save_location + "datasets/" + "test_labels.pickle"
         
-    with open(train_dataset_loc, "rb") as file:
-        train_dataset = pickle.load(file) 
-            
-    num_features = train_dataset[:,2:].shape[1]
-        
-    num_use_data = int(np.floor(train_dataset.shape[0] * frac_train_ptls))
-    print("Tot num of train particles:",train_dataset.shape[0])
-    print("Num use train particles:", num_use_data)
-
-    scale_pos_weight = np.where(train_dataset[:num_use_data,1] == 0)[0].size / np.where(train_dataset[:num_use_data,1] == 1)[0].size
-    X = da.from_array(train_dataset[:num_use_data,2:],chunks=(chunk_size,num_features))
-    y = da.from_array(train_dataset[:num_use_data,1],chunks=(chunk_size))
-    print("converted to array")
-        
-    print("X Number of total bytes:",X.nbytes, "X Number of Gigabytes:", (X.nbytes)/(10**9))
-    print("y Number of total bytes:",y.nbytes, "y Number of Gigabytes:", (y.nbytes)/(10**9))
-    del train_dataset
-    #h = hpy()
-    #print(h.heap())
-    dtrain = xgb.dask.DaskQuantileDMatrix(client, X, y)
-
-    print("converted to DaskQuantileDMatrix")
-    #for name, size in sorted(((name, sys.getsizeof(value)) for name, value in list(
-    #        locals().items())), key= lambda x: -x[1])[:25]:
-    #    print("{:>30}: {:>8}".format(name, sizeof_fmt(size)))
-    del X
-    del y
-
-    with open(test_dataset_loc, "rb") as file:
-        test_dataset = pickle.load(file)
-
-    num_features = test_dataset[:,2:].shape[1]
-
-    print("Tot num of test particles:",test_dataset.shape[0])
-    
-    X = da.from_array(test_dataset[:,2:],chunks=(chunk_size,num_features))
-    y = da.from_array(test_dataset[:,1],chunks=(chunk_size))
-    print("converted to array")
-
-    print("X Number of total bytes:",X.nbytes, "X Number of Gigabytes:", (X.nbytes)/(10**9))
-    print("y Number of total bytes:",y.nbytes, "y Number of Gigabytes:", (y.nbytes)/(10**9))
-    del test_dataset
-    #h = hpy()
-    #print(h.heap())
-    dtest = xgb.dask.DaskQuantileDMatrix(client, X, y)
-    print("converted to DaskQuantileDMatrix")
-    #for name, size in sorted(((name, sys.getsizeof(value)) for name, value in list(
-    #        locals().items())), key= lambda x: -x[1])[:25]:
-    #    print("{:>30}: {:>8}".format(name, sizeof_fmt(size)))
-    del X
-    del y
+    dtrain,scale_pos_weight = create_training_matrix(train_dataset_loc, train_labels_loc, frac_use_data=1, calc_scale_pos_weight=True)
+    dtest = create_training_matrix(test_dataset_loc, test_labels_loc, frac_use_data=1, calc_scale_pos_weight=False)
+    print("scale_pos_weight:", scale_pos_weight)
         
     if os.path.isfile("/home/zvladimi/MLOIS/xgboost_datasets_plots/sparta_cbol_l0063_n0256_190to178_6.0r200msearch/models/big_model.json"):
         bst = xgb.Booster()
@@ -178,6 +161,7 @@ if __name__ == "__main__":
             )
         bst = output["booster"]
         history = output["history"]
+        create_directory(save_location + "models/")
         bst.save_model(save_location + "models/big_model.json")
         #print("Evaluation history:", history)
         plt.figure(figsize=(10,7))
@@ -195,29 +179,33 @@ if __name__ == "__main__":
     # you can pass output directly into `predict` too.
     
     del dtrain
+    del dtest
 
     with open(train_dataset_loc, "rb") as file:
-        train_dataset = pickle.load(file)
-    X = da.from_array(train_dataset[:,2:],chunks=(chunk_size,num_features))
+        X = pickle.load(file)
+    with open(train_labels_loc, "rb") as file:
+        y = pickle.load(file)
+    X = da.from_array(X,chunks=(chunk_size,X.shape[1]))
     
-
     train_prediction = dxgb.inplace_predict(client, bst, X)
     train_prediction = np.round(train_prediction)
 
     print("Train Report")
-    print(classification_report(train_dataset[:num_use_data,1], train_prediction))
+    print(classification_report(y, train_prediction))
 
-    del train_dataset
+    del X
+    del y
 
     with open(test_dataset_loc, "rb") as file:
-        test_dataset = pickle.load(file)
-    X = da.from_array(test_dataset[:,2:],chunks=(chunk_size,num_features))
+        X = pickle.load(file)
+    with open(test_labels_loc, "rb") as file:
+        y = pickle.load(file)
+    X = da.from_array(X,chunks=(chunk_size,X.shape[1]))
     
     test_prediction = dxgb.inplace_predict(client, bst, X)
     test_prediction = np.round(test_prediction)
-
-    del dtest
     
     print("Test Report")
-    print(classification_report(test_dataset[:num_use_data,1], test_prediction))
+    print(classification_report(y, test_prediction))
+
         

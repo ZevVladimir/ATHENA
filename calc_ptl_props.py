@@ -67,9 +67,6 @@ from pygadgetreader import readsnap, readheader
 from sparta import sparta
 ##################################################################################################################
 
-def to_np_arr(mp_arr, dtype):
-    return np.frombuffer(mp_arr.get_obj(), dtype = dtype)
-
 def initial_search(halo_positions, halo_r200m, comp_snap, find_mass = False, find_ptl_indices = False):
     global search_rad
     if comp_snap:
