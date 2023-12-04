@@ -176,18 +176,24 @@ def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapsh
         num_cols = 0
         with h5py.File((data_location + dataset_name + "_all_particle_properties_" + sparta_name + ".hdf5"), 'r') as all_ptl_properties: 
             for key in all_ptl_properties.keys():
-                if key != "Halo_first" and key != "Halo_n":
+                if key != "Halo_first" and key != "Halo_n" and key != "HIPIDS" and key != "Orbit_Infall":
                     if all_ptl_properties[key].ndim > 1:
                         num_cols += all_ptl_properties[key].shape[1]
                     else:
                         num_cols += 1
             num_params_per_snap = (num_cols - 2) / len(snapshot_list)    
             num_rows = all_ptl_properties[key].shape[0]
-            full_dataset = np.zeros((num_rows, num_cols))
+            full_dataset = np.zeros((num_rows, num_cols),dtype=np.float32)
+            hipids = np.zeros(num_rows, dtype=np.float64)
+            labels = np.zeros(num_rows, dtype=np.int8)
             all_keys = np.empty(num_cols,dtype=object)
             curr_col = 0
             for key in all_ptl_properties.keys():
-                if key != "Halo_first" and key != "Halo_n":
+                if key == "HIPIDS":
+                    hipids = all_ptl_properties[key][:]
+                elif key == "Orbit_Infall":
+                    labels = all_ptl_properties[key][:]
+                elif key != "Halo_first" and key != "Halo_n" and key != "HIPIDS" and key != "Orbit_Infall":
                     if all_ptl_properties[key].ndim > 1:
                         for row in range(all_ptl_properties[key].ndim):
                             access_col = int((curr_col + (row * num_params_per_snap)))
@@ -202,9 +208,16 @@ def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapsh
         # once all the halos are gone through save them as pickles for later  
         with open(dataset_path, "wb") as pickle_file:
             pickle.dump(full_dataset, pickle_file)
-        #np.save(dataset_path, full_dataset)
+
         with open(save_path + dataset_name + "_dataset_all_keys.pickle", "wb") as pickle_file:
             pickle.dump(all_keys, pickle_file)
+            
+        with open(save_path + dataset_name + "_labels.pickle", "wb") as pickle_file:
+            pickle.dump(labels, pickle_file)
+        
+        with open(save_path + dataset_name + "_hipids.pickle", "wb") as pickle_file:
+            pickle.dump(hipids, pickle_file)
+            
     # if there are already pickle files just open them
     else:
         with open(dataset_path, "rb") as pickle_file:
