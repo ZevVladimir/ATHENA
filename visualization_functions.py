@@ -120,7 +120,7 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
             diff_n_tot_ptls[i] = np.floor((actual_prf_all[i])/mass)
     middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
 
-    fig, ax = plt.subplots(1,2, layout = "tight")
+    fig, ax = plt.subplots(1,2)
 
     with np.errstate(divide='ignore', invalid='ignore'):
         all_ratio = np.divide(calculated_prf_all,actual_prf_all)
@@ -187,36 +187,56 @@ def rv_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = None):
     
     return ax.plot(hubble_vel[:,0], hubble_vel[:,1], color = "purple", alpha = 0.5, linestyle = "dashed", label = r"Hubble Flow")
 
+def histogram(x,y,bins,range,min_ptl):
+    hist = np.histogram2d(x, y, bins=bins, range=range)
+    hist[0][hist[0] < min_ptl] = min_ptl
+    return hist
+  
+def split_orb_inf(data, labels):
+    infall = data[np.where(labels == 0)]
+    orbit = data[np.where(labels == 1)]
+    return infall, orbit
+ 
+def phase_plot(ax, x, y, min_ptl, max_ptl, range, x_label, y_label, num_bins, cmap, title=""):
+    ax.hist2d(x, y, bins=num_bins, range=range, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm="log", vmin=min_ptl, vmax=max_ptl)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    if title != "":
+        ax.set_title(title)
+        
+def imshow_plot(ax, img, vmin, vmax, extent, origin, aspect, x_label, y_label, cmap, title="", return_img=False):
+    img=ax.imshow(img, cmap = cmap, vmin = vmin, vmax = vmax, origin = origin, aspect = aspect, extent = extent)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    if title != "":
+        ax.set_title(title)
+    if return_img:
+        return img
+ 
 def create_hist_max_ptl(min_ptl, inf_r, orb_r, inf_rv, orb_rv, inf_tv, orb_tv, num_bins, max_r, max_rv, min_rv, max_tv, min_tv, bin_r_vr = None, bin_r_vt = None, bin_vr_vt = None):
     if bin_r_vr == None:
-        orb_r_rv = np.histogram2d(orb_r, orb_rv, bins=num_bins, range=[[0,max_r],[min_rv,max_rv]])
-        orb_r_tv = np.histogram2d(orb_r, orb_tv, bins=num_bins, range=[[0,max_r],[min_tv,max_tv]])
-        orb_rv_tv = np.histogram2d(orb_rv, orb_tv, bins=num_bins, range=[[min_rv,max_rv],[min_tv,max_tv]])
-        inf_r_rv = np.histogram2d(inf_r, inf_rv, bins=[orb_r_rv[1],orb_r_rv[2]], range=[[0,max_r],[min_rv,max_rv]])
-        inf_r_tv = np.histogram2d(inf_r, inf_tv, bins=[orb_r_tv[1],orb_r_tv[2]], range=[[0,max_r],[min_tv,max_tv]])
-        inf_rv_tv = np.histogram2d(inf_rv, inf_tv, bins=[orb_rv_tv[1],orb_rv_tv[2]], range=[[min_rv,max_rv],[min_tv,max_tv]])
+        bins = num_bins
+        orb_r_rv = histogram(orb_r, orb_rv, bins=bins, range=[[0,max_r],[min_rv,max_rv]],min_ptl=min_ptl)
+        orb_r_tv = histogram(orb_r, orb_tv, bins=bins, range=[[0,max_r],[min_tv,max_tv]],min_ptl=min_ptl)
+        orb_rv_tv = histogram(orb_rv, orb_tv, bins=bins, range=[[min_rv,max_rv],[min_tv,max_tv]],min_ptl=min_ptl)
+        inf_r_rv = histogram(inf_r, inf_rv, bins=bins, range=[[0,max_r],[min_rv,max_rv]],min_ptl=min_ptl)
+        inf_r_tv = histogram(inf_r, inf_tv, bins=bins, range=[[0,max_r],[min_tv,max_tv]],min_ptl=min_ptl)
+        inf_rv_tv = histogram(inf_rv, inf_tv, bins=bins, range=[[min_rv,max_rv],[min_tv,max_tv]],min_ptl=min_ptl)
     else:
-        orb_r_rv = np.histogram2d(orb_r, orb_rv, bins=bin_r_vr, range=[[0,max_r],[min_rv,max_rv]])
-        orb_r_tv = np.histogram2d(orb_r, orb_tv, bins=bin_r_vt, range=[[0,max_r],[min_tv,max_tv]])
-        orb_rv_tv = np.histogram2d(orb_rv, orb_tv, bins=bin_vr_vt, range=[[min_rv,max_rv],[min_tv,max_tv]])
-        inf_r_rv = np.histogram2d(inf_r, inf_rv, bins=bin_r_vr, range=[[0,max_r],[min_rv,max_rv]])
-        inf_r_tv = np.histogram2d(inf_r, inf_tv, bins=bin_r_vt, range=[[0,max_r],[min_tv,max_tv]])
-        inf_rv_tv = np.histogram2d(inf_rv, inf_tv, bins=bin_vr_vt, range=[[min_rv,max_rv],[min_tv,max_tv]])
-        
-    orb_r_rv[0][orb_r_rv[0] < min_ptl] = min_ptl
-    orb_r_tv[0][orb_r_tv[0] < min_ptl] = min_ptl
-    orb_rv_tv[0][orb_rv_tv[0] < min_ptl] = min_ptl
-    inf_r_rv[0][inf_r_rv[0] < min_ptl] = min_ptl
-    inf_r_tv[0][inf_r_tv[0] < min_ptl] = min_ptl
-    inf_rv_tv[0][inf_rv_tv[0] < min_ptl] = min_ptl
+        orb_r_rv = histogram(orb_r, orb_rv, bins=bin_r_vr, range=[[0,max_r],[min_rv,max_rv]],min_ptl=min_ptl)
+        orb_r_tv = histogram(orb_r, orb_tv, bins=bin_r_vt, range=[[0,max_r],[min_tv,max_tv]],min_ptl=min_ptl)
+        orb_rv_tv = histogram(orb_rv, orb_tv, bins=bin_vr_vt, range=[[min_rv,max_rv],[min_tv,max_tv]],min_ptl=min_ptl)
+        inf_r_rv = histogram(inf_r, inf_rv, bins=bin_r_vr, range=[[0,max_r],[min_rv,max_rv]],min_ptl=min_ptl)
+        inf_r_tv = histogram(inf_r, inf_tv, bins=bin_r_vt, range=[[0,max_r],[min_tv,max_tv]],min_ptl=min_ptl)
+        inf_rv_tv = histogram(inf_rv, inf_tv, bins=bin_vr_vt, range=[[min_rv,max_rv],[min_tv,max_tv]],min_ptl=min_ptl)
 
     max_ptl = np.max(np.array([np.max(orb_r_rv[0]),np.max(orb_r_tv[0]),np.max(orb_rv_tv[0]),np.max(inf_r_rv[0]),np.max(inf_r_tv[0]),np.max(inf_rv_tv[0]),]))
-    max_ptl = np.max(orb_r_rv[0])
     
     return max_ptl, orb_r_rv, orb_r_tv, orb_rv_tv, inf_r_rv, inf_r_tv, inf_rv_tv
 
 def percent_error(pred, act):
     return (((pred - act))/act) * 100
+
 def plot_incorrectly_classified(correct_labels, ml_labels, r, rv, tv, num_bins, title, save_location, act_orb_r_vr, act_orb_r_vt, act_orb_vr_vt, act_inf_r_vr, act_inf_r_vt, act_inf_vr_vt): 
     min_ptl = 30
     max_r = np.max(r)
@@ -226,9 +246,11 @@ def plot_incorrectly_classified(correct_labels, ml_labels, r, rv, tv, num_bins, 
     min_tv = np.min(tv)
        
     inc_orbit = np.where((ml_labels == 1) & (correct_labels == 0))[0]
-    print("num incorrect orb", inc_orbit.shape)
+    num_orbit = np.where(correct_labels == 1)[0].shape[0]
+    print("num incorrect orb", inc_orbit.shape, ",", np.round(((inc_orbit.shape[0]/num_orbit)*100),2), "% of orbiting ptls")
     inc_infall = np.where((ml_labels == 0) & (correct_labels == 1))[0]
-    print("num incorrect inf", inc_infall.shape)
+    num_inf = np.where(correct_labels == 0)[0].shape[0]
+    print("num incorrect inf", inc_infall.shape, ",", np.round(((inc_infall.shape[0]/num_inf) * 100),2), "% of infalling ptls")
     
     inc_orb_r = r[inc_orbit]
     inc_inf_r = r[inc_infall]
@@ -237,14 +259,14 @@ def plot_incorrectly_classified(correct_labels, ml_labels, r, rv, tv, num_bins, 
     inc_orb_tv = tv[inc_orbit]
     inc_inf_tv = tv[inc_infall]
     
-    max_ptl, np_hist1, np_hist2, np_hist3, np_hist4, np_hist5, np_hist6 = create_hist_max_ptl(min_ptl, inc_inf_r, inc_orb_r, inc_inf_rv, inc_orb_rv, inc_inf_tv, inc_orb_tv, num_bins, max_r, max_rv, min_rv, max_tv, min_tv, bin_r_vr=act_orb_r_vr[1:], bin_r_vt=act_orb_r_vt[1:],bin_vr_vt=act_orb_vr_vt[1:])
+    max_ptl, inc_orb_r_rv, inc_orb_r_tv, inc_orb_rv_tv, inc_inf_r_rv, inc_inf_r_tv, inc_inf_rv_tv = create_hist_max_ptl(min_ptl, inc_inf_r, inc_orb_r, inc_inf_rv, inc_orb_rv, inc_inf_tv, inc_orb_tv, num_bins, max_r, max_rv, min_rv, max_tv, min_tv, bin_r_vr=act_orb_r_vr[1:], bin_r_vt=act_orb_r_vt[1:],bin_vr_vt=act_orb_vr_vt[1:])
     
-    scaled_orb_r_vr = np_hist1[0]/act_orb_r_vr[0]
-    scaled_orb_r_vt = np_hist2[0]/act_orb_r_vt[0]
-    scaled_orb_vr_vt = np_hist3[0]/act_orb_vr_vt[0]
-    scaled_inf_r_vr = np_hist4[0]/act_inf_r_vr[0]
-    scaled_inf_r_vt = np_hist5[0]/act_inf_r_vt[0]
-    scaled_inf_vr_vt = np_hist6[0]/act_inf_vr_vt[0]
+    scaled_orb_r_vr = (inc_orb_r_rv[0]/act_orb_r_vr[0]).T
+    scaled_orb_r_vt = (inc_orb_r_tv[0]/act_orb_r_vt[0])
+    scaled_orb_vr_vt = (inc_orb_rv_tv[0]/act_orb_vr_vt[0]).T
+    scaled_inf_r_vr = (inc_inf_r_rv[0]/act_inf_r_vr[0]).T
+    scaled_inf_r_vt = (inc_inf_r_tv[0]/act_inf_r_vt[0]).T
+    scaled_inf_vr_vt = (inc_inf_rv_tv[0]/act_inf_vr_vt[0]).T
 
     max_diff = np.max(np.array([np.max(scaled_orb_r_vr),np.max(scaled_orb_r_vt),np.max(scaled_orb_vr_vt),np.max(scaled_inf_r_vr),np.max(scaled_inf_r_vt),np.max(scaled_inf_vr_vt)]))
 
@@ -253,47 +275,17 @@ def plot_incorrectly_classified(correct_labels, ml_labels, r, rv, tv, num_bins, 
     widths = [4,4,4,.5]
     heights = [4,4]
     
-    scal_miss_class_fig = plt.figure(constrained_layout=True)
+    scal_miss_class_fig = plt.figure()
     scal_miss_class_fig.suptitle("Misclassified Particles/Num Targets")
     gs = scal_miss_class_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
     
-    r_rv = scal_miss_class_fig.add_subplot(gs[0,0])
-    scaled_inf_r_vr = scaled_inf_r_vr.T
-    r_rv.imshow(scaled_inf_r_vr, cmap = cmap, vmin = 0, vmax = max_diff, origin = 'lower', aspect = 'auto', extent = [0,max_r,min_rv,max_rv])
-    r_rv.set_xlabel("$r/R_{200m}$")
-    r_rv.set_ylabel("$v_r/v_{200m}$")
-    
-    r_tv = scal_miss_class_fig.add_subplot(gs[0,1])
-    scaled_inf_r_vt = scaled_inf_r_vt.T
-    r_tv.imshow(scaled_inf_r_vt, cmap = cmap, vmin = 0, vmax = max_diff, origin = 'lower', aspect = 'auto', extent = [0,max_r,min_tv,max_tv])
-    r_tv.set_xlabel("$r/R_{200m}$")
-    r_tv.set_ylabel("$v_t/v_{200m}$")
-    r_tv.set_title("Label: Infall Real: Orbit")
-    
-    rv_tv = scal_miss_class_fig.add_subplot(gs[0,2])
-    scaled_inf_vr_vt = scaled_inf_vr_vt.T
-    rv_tv.imshow(scaled_inf_vr_vt, cmap = cmap, vmin = 0, vmax = max_diff, origin = 'lower', aspect = 'auto', extent = [min_rv,max_rv,min_tv,max_tv])
-    rv_tv.set_xlabel("$v_r/v_{200m}$")
-    rv_tv.set_ylabel("$v_t/v_{200m}$")
-    
-    r_rv = scal_miss_class_fig.add_subplot(gs[1,0])
-    scaled_orb_r_vr = scaled_orb_r_vr.T
-    r_rv.imshow(scaled_orb_r_vr, cmap = cmap, vmin = 0, vmax = max_diff, origin = 'lower', aspect = 'auto', extent = [0,max_r,min_rv,max_rv])
-    r_rv.set_xlabel("$r/R_{200m}$")
-    r_rv.set_ylabel("$v_r/v_{200m}$")
-    
-    r_tv = scal_miss_class_fig.add_subplot(gs[1,1])
-    scaled_orb_r_vt = scaled_orb_r_vt.T
-    r_tv.imshow(scaled_orb_r_vt, cmap = cmap, vmin = 0, vmax = max_diff, origin = 'lower', aspect = 'auto', extent = [0,max_r,min_tv,max_tv])
-    r_tv.set_xlabel("$r/R_{200m}$")
-    r_tv.set_ylabel("$v_t/v_{200m}$")
-    r_tv.set_title("Label: Orbit Real: Infall")
-    
-    rv_tv = scal_miss_class_fig.add_subplot(gs[1,2])
-    scaled_orb_vr_vt = scaled_orb_vr_vt.T
-    imshow_img = rv_tv.imshow(scaled_orb_vr_vt, cmap = cmap, vmin = 0, vmax = max_diff, origin = 'lower', aspect = 'auto', extent = [min_rv,max_rv,min_tv,max_tv])
-    rv_tv.set_xlabel("$v_r/v_{200m}$")
-    rv_tv.set_ylabel("$v_t/v_{200m}$")
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[0,0]), scaled_inf_r_vr, vmin=0,vmax=max_diff,extent=[0,max_r,min_rv,max_rv], origin="lower",aspect="auto",x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",cmap=cmap)
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[0,1]), scaled_inf_r_vt, vmin=0,vmax=max_diff,extent=[0,max_r,min_tv,max_tv], origin="lower",aspect="auto",x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",cmap=cmap,title="Label: Infall Real: Orbit")
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[0,2]), scaled_inf_r_vr, vmin=0,vmax=max_diff,extent=[min_rv,max_rv,min_tv,max_tv], origin="lower",aspect="auto",x_label="$v_r/v_{200m}$",y_label="$v_t/v_{200m}$",cmap=cmap)
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[1,0]), scaled_inf_r_vr, vmin=0,vmax=max_diff,extent=[0,max_r,min_rv,max_rv], origin="lower",aspect="auto",x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",cmap=cmap)
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[1,1]), scaled_inf_r_vr, vmin=0,vmax=max_diff,extent=[0,max_r,min_tv,max_tv], origin="lower",aspect="auto",x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",cmap=cmap,title="Label: Orbit Real: Infall")
+    imshow_img=imshow_plot(scal_miss_class_fig.add_subplot(gs[1,2]), scaled_inf_r_vr, vmin=0,vmax=max_diff,extent=[min_rv,max_rv,min_tv,max_tv], origin="lower",aspect="auto",x_label="$v_r/v_{200m}$",y_label="$v_t/v_{200m}$",cmap=cmap,return_img=True)
+
     
     color_bar = plt.colorbar(imshow_img, cax=plt.subplot(gs[:,-1]))
     
@@ -302,7 +294,7 @@ def plot_incorrectly_classified(correct_labels, ml_labels, r, rv, tv, num_bins, 
     
 #########################################################################################################################################################
 
-    miss_class_fig = plt.figure(constrained_layout=True)
+    miss_class_fig = plt.figure()
     miss_class_fig.suptitle("Misclassified Particles")
     gs = miss_class_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
     
@@ -316,25 +308,13 @@ def plot_incorrectly_classified(correct_labels, ml_labels, r, rv, tv, num_bins, 
     color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:,-1]))
     
     miss_class_fig.savefig(save_location + "/2dhist/" + title + "_miss_class.png")
-    
-
-
-def phase_plot(ax, x, y, min_ptl, max_ptl, range, x_label, y_label, num_bins, cmap, title=""):
-    ax.hist2d(x, y, bins=num_bins, range=range, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm="log", vmin=min_ptl, vmax=max_ptl)
-    ax.set_xlabel(x_label)
-    ax.set_ylabel(y_label)
-    if title != "":
-        ax.set_title(title)
-
-def split_orb_inf(data, labels):
-    infall = data[np.where(labels == 0)]
-    orbit = data[np.where(labels == 1)]
-    return infall, orbit
 
 def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, show, save, save_location):
     create_directory(save_location + "2dhist/")
     print(save_location + "2dhist/")
     mpl.rcParams.update({'font.size': 8})
+    plt.rcParams['figure.constrained_layout.use'] = True
+
     min_ptl = 30
 
     max_r = np.max(r)
@@ -355,12 +335,12 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sho
     act_max_ptl, act_orb_r_rv, act_orb_r_tv, act_orb_rv_tv, act_inf_r_rv, act_inf_r_tv, act_inf_rv_tv = create_hist_max_ptl(min_ptl, act_inf_r, act_orb_r, act_inf_rv, act_orb_rv, act_inf_tv, act_orb_tv, num_bins, max_r, max_rv, min_rv, max_tv, min_tv, bin_r_vr=ml_orb_r_rv[1:], bin_r_vt=ml_orb_r_tv[1:],bin_vr_vt=ml_orb_rv_tv[1:])    
     
     floor = 200
-    per_err_1 = percent_error(ml_orb_r_rv[0], act_orb_r_rv[0])
-    per_err_2 = percent_error(ml_orb_r_tv[0], act_orb_r_tv[0])
-    per_err_3 = percent_error(ml_orb_rv_tv[0], act_orb_rv_tv[0])
-    per_err_4 = percent_error(ml_inf_r_rv[0], act_inf_r_rv[0])
-    per_err_5 = percent_error(ml_inf_r_tv[0], act_inf_r_tv[0])
-    per_err_6 = percent_error(ml_inf_rv_tv[0], act_inf_rv_tv[0])
+    per_err_1 = percent_error(ml_orb_r_rv[0], act_orb_r_rv[0]).T
+    per_err_2 = percent_error(ml_orb_r_tv[0], act_orb_r_tv[0]).T
+    per_err_3 = percent_error(ml_orb_rv_tv[0], act_orb_rv_tv[0]).T
+    per_err_4 = percent_error(ml_inf_r_rv[0], act_inf_r_rv[0]).T
+    per_err_5 = percent_error(ml_inf_r_tv[0], act_inf_r_tv[0]).T
+    per_err_6 = percent_error(ml_inf_rv_tv[0], act_inf_rv_tv[0]).T
 
     max_err = np.max(np.array([np.max(per_err_1),np.max(per_err_2),np.max(per_err_3),np.max(per_err_4),np.max(per_err_5),np.max(per_err_6)]))
     min_err = np.min(np.array([np.min(per_err_1),np.min(per_err_2),np.min(per_err_3),np.min(per_err_4),np.min(per_err_5),np.min(per_err_6)]))
@@ -376,7 +356,7 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sho
     widths = [4,4,4,.5]
     heights = [4,4]
     
-    inf_fig = plt.figure(constrained_layout=True)
+    inf_fig = plt.figure()
     inf_fig.suptitle("Infalling Particles nu:" + title)
     gs = inf_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
     
@@ -393,7 +373,7 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sho
     
 #########################################################################################################################################################
     
-    orb_fig = plt.figure(constrained_layout=True)
+    orb_fig = plt.figure()
     orb_fig.suptitle("Orbiting Particles nu:" + title)
     gs = orb_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
     
@@ -412,7 +392,7 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sho
     
     only_r_rv_widths = [4,4,.5]
     only_r_rv_heights = [4,4]
-    only_r_rv_fig = plt.figure(constrained_layout = True)
+    only_r_rv_fig = plt.figure()
     only_r_rv_fig.suptitle("Radial Velocity Versus r:" + title)
     gs = only_r_rv_fig.add_gridspec(2,3,width_ratios = only_r_rv_widths, height_ratios = only_r_rv_heights)
     
@@ -427,47 +407,16 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sho
     
 #########################################################################################################################################################
 
-    err_fig = plt.figure(constrained_layout=True)
+    err_fig = plt.figure()
     err_fig.suptitle("Orbiting Particles nu:" + title)
     gs = err_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
     
-    perr_inf_r_rv = err_fig.add_subplot(gs[0,0])
-    per_err_1 = per_err_1.T
-    perr_inf_r_rv.imshow(per_err_1, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [0,max_r,min_rv,max_rv])
-    perr_inf_r_rv.set_xlabel("$r/R_{200m}$")
-    perr_inf_r_rv.set_ylabel("$v_r/v_{200m}$")
-    
-    perr_inf_r_tv = err_fig.add_subplot(gs[0,1])
-    per_err_2 = per_err_2.T
-    perr_inf_r_tv.imshow(per_err_2, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [0,max_r,min_tv,max_tv])
-    perr_inf_r_tv.set_xlabel("$r/R_{200m}$")
-    perr_inf_r_tv.set_ylabel("$v_t/v_{200m}$")
-    perr_inf_r_tv.set_title("Percent Error Orbiting Ptls")
-    
-    perr_inf_rv_tv = err_fig.add_subplot(gs[0,2])
-    per_err_3 = per_err_3.T
-    perr_inf_rv_tv.imshow(per_err_3, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [min_rv,max_rv,min_tv,max_tv])
-    perr_inf_rv_tv.set_xlabel("$v_r/v_{200m}$")
-    perr_inf_rv_tv.set_ylabel("$v_t/v_{200m}$")
-    
-    perr_orb_r_rv = err_fig.add_subplot(gs[1,0])
-    per_err_4 = per_err_4.T
-    perr_imshow_img = perr_orb_r_rv.imshow(per_err_4, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [0,max_r,min_rv,max_rv])
-    perr_orb_r_rv.set_xlabel("$r/R_{200m}$")
-    perr_orb_r_rv.set_ylabel("$v_r/v_{200m}$")
-    
-    perr_orb_r_tv = err_fig.add_subplot(gs[1,1])
-    per_err_5 = per_err_5.T
-    perr_orb_r_tv.imshow(per_err_5, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [0,max_r,min_tv,max_tv])
-    perr_orb_r_tv.set_xlabel("$r/R_{200m}$")
-    perr_orb_r_tv.set_ylabel("$v_t/v_{200m}$")
-    perr_orb_r_tv.set_title("Percent Error Infalling Ptls")
-
-    perr_orb_rv_tv = err_fig.add_subplot(gs[1,2])
-    per_err_6 = per_err_6.T
-    perr_orb_rv_tv.imshow(per_err_6, cmap = per_err_cmap, vmin = min_err, vmax = max_err, origin = 'lower', aspect = 'auto', extent = [min_rv,max_rv,min_tv,max_tv])
-    perr_orb_rv_tv.set_xlabel("$v_r/v_{200m}$")
-    perr_orb_rv_tv.set_ylabel("$v_t/v_{200m}$")
+    imshow_plot(err_fig.add_subplot(gs[0,0]), per_err_1, vmin=min_err, vmax=max_err, extent=[0,max_r,min_rv,max_rv], origin="lower", aspect="auto", x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", cmap=cmap, title="", return_img=False)
+    imshow_plot(err_fig.add_subplot(gs[0,1]), per_err_2, vmin=min_err, vmax=max_err, extent=[0,max_r,min_tv,max_tv], origin="lower", aspect="auto", x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", cmap=cmap, title="", return_img=False)
+    imshow_plot(err_fig.add_subplot(gs[0,2]), per_err_3, vmin=min_err, vmax=max_err, extent=[min_rv,max_rv,min_tv,max_tv], origin="lower", aspect="auto", x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$", cmap=cmap, title="Percent Error Orbiting Ptls", return_img=False)
+    imshow_plot(err_fig.add_subplot(gs[1,0]), per_err_4, vmin=min_err, vmax=max_err, extent=[0,max_r,min_rv,max_rv], origin="lower", aspect="auto", x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", cmap=cmap, title="", return_img=False)
+    imshow_plot(err_fig.add_subplot(gs[1,1]), per_err_5, vmin=min_err, vmax=max_err, extent=[0,max_r,min_tv,max_tv], origin="lower", aspect="auto", x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", cmap=cmap, title="", return_img=False)
+    perr_imshow_img=imshow_plot(err_fig.add_subplot(gs[1,2]), per_err_6, vmin=min_err, vmax=max_err, extent=[min_rv,max_rv,min_tv,max_tv], origin="lower", aspect="auto", x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$", cmap=cmap, title="Percent Error Infalling Ptls", return_img=True)
     
     perr_color_bar = plt.colorbar(perr_imshow_img, cax=plt.subplot(gs[:,-1]), pad = 0.1)
     
@@ -618,7 +567,7 @@ def feature_dist(features, labels, save_name, plot, save, save_location):
     position = np.arange(1, tot_plts + 1)
     
     fig = plt.figure(1)
-    fig = plt.figure(tight_layout=True)
+    fig = plt.figure()
     
     for i in range(tot_plts):
         ax = fig.add_subplot(num_rows, num_col, position[i])
