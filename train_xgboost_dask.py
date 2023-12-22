@@ -14,9 +14,13 @@ import time
 import os
 import sys
 import numpy as np
-from data_and_loading_functions import create_directory
-
 import matplotlib.pyplot as plt
+
+from pairing import depair
+from colossus.cosmology import cosmology
+
+from data_and_loading_functions import create_directory, load_or_pickle_SPARTA_data, conv_halo_id_spid
+from visualization_functions import *
 
 from guppy import hpy
 ##################################################################################################################
@@ -66,6 +70,10 @@ num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 # size float32 is 4 bytes
 chunk_size = int(np.floor(1e9 / (num_save_ptl_params * 4)))
 ###############################################################################################################
+sys.path.insert(0, path_to_pygadgetreader)
+sys.path.insert(0, path_to_sparta)
+from pygadgetreader import readsnap, readheader
+from sparta import sparta
 
 def sizeof_fmt(num, suffix='B'):
     ''' by Fred Cirera,  https://stackoverflow.com/a/1094933/1870254, modified'''
@@ -100,9 +108,6 @@ def create_training_matrix(X_loc, y_loc, frac_use_data = 1, calc_scale_pos_weigh
     print("Tot num of train particles:", X.shape[0])
     print("Num use train particles:", num_use_data)
 
-    print(X[:,0].dtype)
-    print(X[:,1].dtype)
-    print(X[:,2].dtype)
     X = da.from_array(X,chunks=(chunk_size,num_features))
     y = da.from_array(y,chunks=(chunk_size))
     print("converted to array")
@@ -127,8 +132,7 @@ if __name__ == "__main__":
 
     save_location = path_to_xgboost + specific_save
 
-    model_save_location = save_location + "models/" + model_name + "/"
-
+    model_save_location = save_location + "models/"  
     train_dataset_loc = save_location + "datasets/" + "train_dataset.pickle"
     train_labels_loc = save_location + "datasets/" + "train_labels.pickle"
     test_dataset_loc = save_location + "datasets/" + "test_dataset.pickle"
@@ -138,9 +142,9 @@ if __name__ == "__main__":
     dtest = create_training_matrix(test_dataset_loc, test_labels_loc, frac_use_data=1, calc_scale_pos_weight=False)
     print("scale_pos_weight:", scale_pos_weight)
         
-    if os.path.isfile("/home/zvladimi/MLOIS/xgboost_datasets_plots/sparta_cbol_l0063_n0256_190to178_6.0r200msearch/models/big_model.json"):
+    if os.path.isfile(model_save_location + model_name + ".json"):
         bst = xgb.Booster()
-        bst.load_model("/home/zvladimi/MLOIS/xgboost_datasets_plots/sparta_cbol_l0063_n0256_190to178_6.0r200msearch/models/big_model.json")
+        bst.load_model(model_save_location + model_name + ".json")
         print("Loaded Booster")
     else:
         print("Start train")
@@ -162,7 +166,8 @@ if __name__ == "__main__":
         bst = output["booster"]
         history = output["history"]
         create_directory(save_location + "models/")
-        bst.save_model(save_location + "models/big_model.json")
+        print(model_save_location + model_name + ".json")
+        bst.save_model(model_save_location + model_name + ".json")
         #print("Evaluation history:", history)
         plt.figure(figsize=(10,7))
         plt.plot(history["train"]["rmse"], label="Training loss")
@@ -171,7 +176,7 @@ if __name__ == "__main__":
         plt.xlabel("Number of trees")
         plt.ylabel("Loss")
         plt.legend()
-        plt.savefig("/home/zvladimi/MLOIS/Random_figures/training_loss_graph.png")
+        plt.savefig(model_save_location + "training_loss_graph.png")
     #for name, size in sorted(((name, sys.getsizeof(value)) for name, value in list(
      #               locals().items())), key= lambda x: -x[1])[:25]:
       #  print("{:>30}: {:>8}".format(name, sizeof_fmt(size)))      
@@ -190,22 +195,62 @@ if __name__ == "__main__":
     train_prediction = dxgb.inplace_predict(client, bst, X)
     train_prediction = np.round(train_prediction)
 
-    print("Train Report")
-    print(classification_report(y, train_prediction))
+    # print("Train Report")
+    #print(classification_report(y, train_prediction))
 
     del X
     del y
 
     with open(test_dataset_loc, "rb") as file:
-        X = pickle.load(file)
+        X_np = pickle.load(file)
     with open(test_labels_loc, "rb") as file:
-        y = pickle.load(file)
-    X = da.from_array(X,chunks=(chunk_size,X.shape[1]))
+        y_np = pickle.load(file)
+    X = da.from_array(X_np,chunks=(chunk_size,X_np.shape[1]))
     
     test_prediction = dxgb.inplace_predict(client, bst, X)
     test_prediction = np.round(test_prediction)
     
-    print("Test Report")
-    print(classification_report(y, test_prediction))
+    # print("Test Report")
+    # print(classification_report(y_np, test_prediction))
 
-        
+
+    with open(save_location + "datasets/" + "test_dataset_all_keys.pickle", "rb") as file:
+        test_all_keys = pickle.load(file)
+
+    for i,key in enumerate(test_all_keys):
+        if key == "Scaled_radii_" + str(p_snap):
+            scaled_radii_loc = i
+        elif key == "Radial_vel_" + str(p_snap):
+            rad_vel_loc = i
+        elif key == "Tangential_vel_" + str(p_snap):
+            tang_vel_loc = i
+
+    with open(path_to_calc_info + specific_save + "test_indices.pickle", "rb") as pickle_file:
+        test_indices = pickle.load(pickle_file)
+
+    
+    p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
+
+    p_red_shift = readheader(p_snapshot_path, 'redshift')
+    p_scale_factor = 1/(1+p_red_shift)
+    halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, ptl_mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap)
+    cosmol = cosmology.setCosmology("bolshoi")
+    use_halo_ids = halos_id[test_indices]
+    sparta_output = sparta.load(filename=path_to_hdf5_file, halo_ids=use_halo_ids, log_level=0)
+    new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_snap) # If the order changed by sparta resort the indices
+    dens_prf_all = sparta_output['anl_prf']['M_all'][new_idxs,p_snap,:]
+    dens_prf_1halo = sparta_output['anl_prf']['M_1halo'][new_idxs,p_snap,:]
+
+    # test indices are the indices of the match halo idxs used (see find_particle_properties_ML.py to see how test_indices are created)
+    num_test_halos = test_indices.shape[0]
+
+    density_prf_all_within = np.sum(dens_prf_all, axis=0)
+    density_prf_1halo_within = np.sum(dens_prf_1halo, axis=0)
+
+    num_bins = 30
+    bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
+    bins = np.insert(bins, 0, 0)
+    compare_density_prf(radii=X_np[:,scaled_radii_loc], actual_prf_all=density_prf_all_within, actual_prf_1halo=density_prf_1halo_within, mass=ptl_mass, orbit_assn=test_prediction, prf_bins=bins, title = model_name + " Predicts", show_graph = False, save_graph = True, save_location = save_location)
+    plot_r_rv_tv_graph(test_prediction, X_np[:,scaled_radii_loc], X_np[:,rad_vel_loc], X_np[:,tang_vel_loc], y_np, model_name + " Predicts", num_bins, show = False, save = True, save_location=save_location)
+    #ssgraph_acc_by_bin(test_prediction, y_np, X_np[:,scaled_radii_loc], num_bins, model_name + " Predicts", plot = False, save = True, save_location = save_location)
+ 
