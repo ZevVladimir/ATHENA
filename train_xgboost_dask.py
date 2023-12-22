@@ -186,30 +186,32 @@ if __name__ == "__main__":
     del dtrain
     del dtest
 
-    with open(train_dataset_loc, "rb") as file:
-        X = pickle.load(file)
-    with open(train_labels_loc, "rb") as file:
-        y = pickle.load(file)
-    X = da.from_array(X,chunks=(chunk_size,X.shape[1]))
+    # with open(train_dataset_loc, "rb") as file:
+    #     X = pickle.load(file)
+    # with open(train_labels_loc, "rb") as file:
+    #     y = pickle.load(file)
+    # X = da.from_array(X,chunks=(chunk_size,X.shape[1]))
     
-    train_prediction = dxgb.inplace_predict(client, bst, X)
-    train_prediction = np.round(train_prediction)
+    # train_prediction = dxgb.inplace_predict(client, bst, X).compute()
+    # train_prediction = np.round(train_prediction)
 
     # print("Train Report")
     #print(classification_report(y, train_prediction))
 
-    del X
-    del y
+    # del X
+    # del y
 
+    t1 = time.time()
     with open(test_dataset_loc, "rb") as file:
         X_np = pickle.load(file)
     with open(test_labels_loc, "rb") as file:
         y_np = pickle.load(file)
     X = da.from_array(X_np,chunks=(chunk_size,X_np.shape[1]))
     
-    test_prediction = dxgb.inplace_predict(client, bst, X)
+    test_prediction = dxgb.inplace_predict(client, bst, X).compute()
     test_prediction = np.round(test_prediction)
-    
+    t2 = time.time()
+    print("Predictions finished:", np.round((t2-t1),2),"sec", np.round(((t2-t1)/60),2), "min")
     # print("Test Report")
     # print(classification_report(y_np, test_prediction))
 

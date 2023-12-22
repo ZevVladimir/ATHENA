@@ -191,17 +191,17 @@ def create_hist_max_ptl(min_ptl, inf_radius, orb_radius, inf_rad_vel, orb_rad_ve
     if bin_r_vr == None:
         orb_r_rv = np.histogram2d(orb_radius, orb_rad_vel, bins=num_bins, range=[[0,max_radius],[min_rad_vel,max_rad_vel]])
         orb_r_tv = np.histogram2d(orb_radius, orb_tang_vel, bins=num_bins, range=[[0,max_radius],[min_tang_vel,max_tang_vel]])
-        orb_rv_tv = np.histogram2d(orb_tang_vel, orb_rad_vel, bins=num_bins, range=[[min_tang_vel,max_tang_vel],[min_rad_vel,max_rad_vel]])
+        orb_rv_tv = np.histogram2d(orb_rad_vel, orb_tang_vel, bins=num_bins, range=[[min_rad_vel,max_rad_vel],[min_tang_vel,max_tang_vel]])
         inf_r_rv = np.histogram2d(inf_radius, inf_rad_vel, bins=[orb_r_rv[1],orb_r_rv[2]], range=[[0,max_radius],[min_rad_vel,max_rad_vel]])
         inf_r_tv = np.histogram2d(inf_radius, inf_tang_vel, bins=[orb_r_tv[1],orb_r_tv[2]], range=[[0,max_radius],[min_tang_vel,max_tang_vel]])
-        inf_rv_tv = np.histogram2d(inf_rad_vel, inf_tang_vel, bins=[orb_rv_tv[1],orb_rv_tv[2]], range=[[min_tang_vel,max_tang_vel],[min_rad_vel,max_rad_vel]])
+        inf_rv_tv = np.histogram2d(inf_rad_vel, inf_tang_vel, bins=[orb_rv_tv[1],orb_rv_tv[2]], range=[[min_rad_vel,max_rad_vel],[min_tang_vel,max_tang_vel]])
     else:
         orb_r_rv = np.histogram2d(orb_radius, orb_rad_vel, bins=bin_r_vr, range=[[0,max_radius],[min_rad_vel,max_rad_vel]])
         orb_r_tv = np.histogram2d(orb_radius, orb_tang_vel, bins=bin_r_vt, range=[[0,max_radius],[min_tang_vel,max_tang_vel]])
-        orb_rv_tv = np.histogram2d(orb_tang_vel, orb_rad_vel, bins=bin_vr_vt, range=[[min_tang_vel,max_tang_vel],[min_rad_vel,max_rad_vel]])
+        orb_rv_tv = np.histogram2d(orb_rad_vel, orb_tang_vel, bins=bin_vr_vt, range=[[min_rad_vel,max_rad_vel],[min_tang_vel,max_tang_vel]])
         inf_r_rv = np.histogram2d(inf_radius, inf_rad_vel, bins=bin_r_vr, range=[[0,max_radius],[min_rad_vel,max_rad_vel]])
         inf_r_tv = np.histogram2d(inf_radius, inf_tang_vel, bins=bin_r_vt, range=[[0,max_radius],[min_tang_vel,max_tang_vel]])
-        inf_rv_tv = np.histogram2d(inf_rad_vel, inf_tang_vel, bins=bin_vr_vt, range=[[min_tang_vel,max_tang_vel],[min_rad_vel,max_rad_vel]])
+        inf_rv_tv = np.histogram2d(inf_rad_vel, inf_tang_vel, bins=bin_vr_vt, range=[[min_rad_vel,max_rad_vel],[min_tang_vel,max_tang_vel]])
         
     orb_r_rv[0][orb_r_rv[0] < min_ptl] = min_ptl
     orb_r_tv[0][orb_r_tv[0] < min_ptl] = min_ptl
@@ -226,9 +226,6 @@ def plot_incorrectly_classified(correct_labels, ml_labels, radii, rad_vel, tang_
     min_tang_vel = np.min(tang_vel)
        
     incorrect_orbit = np.where((ml_labels == 1) & (correct_labels == 0))[0]
-    print(incorrect_orbit)
-    print(ml_labels[:10])
-    print(correct_labels[:10])
     print("num incorrect orb", incorrect_orbit.shape)
     incorrect_infall = np.where((ml_labels == 0) & (correct_labels == 1))[0]
     print("num incorrect inf", incorrect_infall.shape)
