@@ -19,7 +19,10 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 
-from data_and_loading_functions import create_directory
+from colossus.cosmology import cosmology
+
+from data_and_loading_functions import create_directory, load_or_pickle_SPARTA_data, conv_halo_id_spid
+from visualization_functions import *
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
@@ -51,8 +54,6 @@ p_snap = config.getint("SEARCH","p_snap")
 c_snap = config.getint("XGBOOST","c_snap")
 model_name = config["XGBOOST"]["model_name"]
 radii_splits = config.get("XGBOOST","rad_splits").split(',')
-for split in radii_splits:
-    model_name = model_name + "_" + str(split)
 
 snapshot_list = [p_snap, c_snap]
 global search_rad
@@ -64,11 +65,16 @@ curr_chunk_size = config.getint("SEARCH","chunk_size")
 global num_save_ptl_params
 num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 
-frac_training_data = 1
+frac_training_data = 0.25
 
 # size float32 is 4 bytes
 #chunk_size = int(np.floor(1e9 / (num_save_ptl_params * 4))/4)
 chunk_size = 100000
+
+sys.path.insert(0, path_to_pygadgetreader)
+sys.path.insert(0, path_to_sparta)
+from pygadgetreader import readsnap, readheader
+from sparta import sparta
 
 import subprocess
 
@@ -161,16 +167,14 @@ if __name__ == "__main__":
     else:
         specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(search_rad) + "r200msearch/"
 
-    save_location = path_to_xgboost + specific_save
-
-    model_save_location = save_location + "models/" + model_name + "/"
+    save_location = path_to_xgboost + specific_save    
     model_location = save_location + "models/"
-    if gpu_use:
-        model_name = str(frac_training_data) + "gpu_model"
-    else:
-        model_name = str(frac_training_data) + "cpu_model"
     dataset_location = save_location + "datasets/"
 
+    if gpu_use:
+        model_name = str(frac_training_data) + "_gpu_model"
+    else:
+        model_name = str(frac_training_data) + "_cpu_model"
 
     train_dataset_loc = dataset_location + "train_dataset.pickle"
     train_labels_loc = dataset_location + "train_labels.pickle"
@@ -180,9 +184,13 @@ if __name__ == "__main__":
     t2 = time.time()
     print("Dask Client setup:", np.round(((t2-t1)/60),2), "min")
 
-    if os.path.isfile(model_location + model_name + ".json"):
+    #if os.path.isfile(model_location + model_name + ".json"):
+    #    bst = xgb.Booster()
+    #    bst.load_model(model_location + model_name + ".json")
+    #    print("Loaded Booster")
+    if os.path.isfile("/home/zvladimi/scratch/MLOIS/model_frac_1_gpu_model.json"):
         bst = xgb.Booster()
-        bst.load_model(model_location + model_name + ".json")
+        bst.load_model("/home/zvladimi/scratch/MLOIS/model_frac_1_gpu_model.json")
         print("Loaded Booster")
     else:
         t3 = time.time()
@@ -191,8 +199,6 @@ if __name__ == "__main__":
         with open(train_labels_loc, "rb") as file:
             y = pickle.load(file)
         print("Tot num of train particles:", X.shape[0])
-
-        scale_pos_weight = np.where(y == 0)[0].size / np.where(y == 1)[0].size
     
         num_features = X.shape[1]
     
@@ -204,6 +210,7 @@ if __name__ == "__main__":
         #print(use_idxs)
         X = X[:num_use_data]
         y = y[:num_use_data]
+        scale_pos_weight = np.where(y == 0)[0].size / np.where(y == 1)[0].size
         print("Num use train particles:", num_use_data)
 
         X = da.from_array(X,chunks=(chunk_size, num_features))
@@ -265,7 +272,7 @@ if __name__ == "__main__":
         bst = output["booster"]
         history = output["history"]
         create_directory(save_location + "models/")
-        bst.save_model(model_location + str(frac_training_data) + "_model.json")
+        bst.save_model(model_location + model_name + ".json")
         t5 = time.time()
         print("Training time:", np.round(((t5-t4)/60),2), "min")
         #print("Evaluation history:", history)
@@ -289,40 +296,79 @@ if __name__ == "__main__":
     bst = client.scatter(bst)
     
     t6 = time.time()
-    with open(train_dataset_loc, "rb") as file:
-        X = pickle.load(file)
-    with open(train_labels_loc, "rb") as file:
-        y = pickle.load(file)
-    X = da.from_array(X,chunks=(chunk_size,X.shape[1]))
+    #with open(train_dataset_loc, "rb") as file:
+    #    X = pickle.load(file)
+    #with open(train_labels_loc, "rb") as file:
+    #    y = pickle.load(file)
+    #X = da.from_array(X,chunks=(chunk_size,X.shape[1]))
     
-    train_prediction = dxgb.inplace_predict(client, bst, X)
-    train_prediction = train_prediction.compute()
-    train_prediction = np.round(train_prediction)
+    #train_prediction = dxgb.inplace_predict(client, bst, X)
+    #train_prediction = train_prediction.compute()
+    #train_prediction = np.round(train_prediction)
 
-    print("Train Report")
-    print(classification_report(y, train_prediction))
+    #print("Train Report")
+    #print(classification_report(y, train_prediction))
     
     t7 = time.time()
-    print("Training predictions:", np.round(((t7-t6)/60),2), "min")
+    #print("Training predictions:", np.round(((t7-t6)/60),2), "min")
 
-    del X
-    del y
+    #del X
+    #del y
 
     with open(test_dataset_loc, "rb") as file:
-        X = pickle.load(file)
+        X_np = pickle.load(file)
     with open(test_labels_loc, "rb") as file:
-        y = pickle.load(file)
-    X = da.from_array(X,chunks=(chunk_size,X.shape[1]))
+        y_np = pickle.load(file)
+    X = da.from_array(X_np,chunks=(chunk_size,X_np.shape[1]))
     
     test_prediction = dxgb.inplace_predict(client, bst, X)
     test_prediction = test_prediction.compute()
     test_prediction = np.round(test_prediction)
     
-    print("Test Report")
-    print(classification_report(y, test_prediction))
+    #print("Test Report")
+    #print(classification_report(y_np, test_prediction))
     
     t8 = time.time()
     print("Testing predictions:", np.round(((t8-t7)/60),2), "min")
 
+    with open(save_location + "datasets/" + "test_dataset_all_keys.pickle", "rb") as file:
+        test_all_keys = pickle.load(file)
+
+    for i,key in enumerate(test_all_keys):
+        if key == "Scaled_radii_" + str(p_snap):
+            scaled_radii_loc = i
+        elif key == "Radial_vel_" + str(p_snap):
+            rad_vel_loc = i
+        elif key == "Tangential_vel_" + str(p_snap):
+            tang_vel_loc = i
+
+    with open(path_to_calc_info + specific_save + "test_indices.pickle", "rb") as pickle_file:
+        test_indices = pickle.load(pickle_file)
+
+    
+    p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
+
+    p_red_shift = readheader(p_snapshot_path, 'redshift')
+    p_scale_factor = 1/(1+p_red_shift)
+    halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, ptl_mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap)
+    cosmol = cosmology.setCosmology("bolshoi")
+    use_halo_ids = halos_id[test_indices]
+    sparta_output = sparta.load(filename=path_to_hdf5_file, halo_ids=use_halo_ids, log_level=0)
+    new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_snap) # If the order changed by sparta resort the indices
+    dens_prf_all = sparta_output['anl_prf']['M_all'][new_idxs,p_snap,:]
+    dens_prf_1halo = sparta_output['anl_prf']['M_1halo'][new_idxs,p_snap,:]
+
+    # test indices are the indices of the match halo idxs used (see find_particle_properties_ML.py to see how test_indices are created)
+    num_test_halos = test_indices.shape[0]
+
+    density_prf_all_within = np.sum(dens_prf_all, axis=0)
+    density_prf_1halo_within = np.sum(dens_prf_1halo, axis=0)
+
+    num_bins = 30
+    bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
+    bins = np.insert(bins, 0, 0)
+    compare_density_prf(radii=X_np[:,scaled_radii_loc], actual_prf_all=density_prf_all_within, actual_prf_1halo=density_prf_1halo_within, mass=ptl_mass, orbit_assn=test_prediction, prf_bins=bins, title = model_name + " Predicts", show_graph = False, save_graph = True, save_location = save_location)
+    plot_r_rv_tv_graph(test_prediction, X_np[:,scaled_radii_loc], X_np[:,rad_vel_loc], X_np[:,tang_vel_loc], y_np, model_name + " Predicts", num_bins, show = False, save = True, save_location=save_location)
+    #ssgraph_acc_by_bin(test_prediction, y_np, X_np[:,scaled_radii_loc], num_bins, model_name + " Predicts", plot = False, save = True, save_location = save_location)
     client.shutdown()
         
