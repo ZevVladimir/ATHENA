@@ -234,8 +234,12 @@ if __name__ == "__main__":
             
             file = open(model_save_location + "model_info.txt", 'w')
             file.write("SPARTA File: " +curr_sparta_file+ "\n")
+            snap_str = "Snapshots used: "
+            for snapshot in snapshot_list:
+                snap_str += (str(snapshot) + "_")
+            file.write(snap_str)
+            file.write("Search Radius: " + str(search_rad))
             file.write("Fraction of training data used: "+str(frac_training_data)+"\n")
-            file.write("Optimal Number of Trees: " + str(res.best_iteration)+"\n")
             for item in results.best_params_.items():
                 file.write(str(item[0]) + ": " + str(item[1]) + "\n")
             file.close()
@@ -276,12 +280,6 @@ if __name__ == "__main__":
             )
         bst = output["booster"]
         history = output["history"]
-        print(output)
-        print(bst)
-        print(history)
-        print(output.keys())
-        print(bst.keys())
-        print(history.keys())
         bst.save_model(model_save_location + model_name + ".json")
         #print("Evaluation history:", history)
         plt.figure(figsize=(10,7))

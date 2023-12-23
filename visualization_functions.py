@@ -411,12 +411,12 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sho
     err_fig.suptitle("Orbiting Particles nu:" + title)
     gs = err_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
     
-    imshow_plot(err_fig.add_subplot(gs[0,0]), per_err_1, vmin=min_err, vmax=max_err, extent=[0,max_r,min_rv,max_rv], origin="lower", aspect="auto", x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", cmap=cmap, title="", return_img=False)
-    imshow_plot(err_fig.add_subplot(gs[0,1]), per_err_2, vmin=min_err, vmax=max_err, extent=[0,max_r,min_tv,max_tv], origin="lower", aspect="auto", x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", cmap=cmap, title="", return_img=False)
-    imshow_plot(err_fig.add_subplot(gs[0,2]), per_err_3, vmin=min_err, vmax=max_err, extent=[min_rv,max_rv,min_tv,max_tv], origin="lower", aspect="auto", x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$", cmap=cmap, title="Percent Error Orbiting Ptls", return_img=False)
-    imshow_plot(err_fig.add_subplot(gs[1,0]), per_err_4, vmin=min_err, vmax=max_err, extent=[0,max_r,min_rv,max_rv], origin="lower", aspect="auto", x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", cmap=cmap, title="", return_img=False)
-    imshow_plot(err_fig.add_subplot(gs[1,1]), per_err_5, vmin=min_err, vmax=max_err, extent=[0,max_r,min_tv,max_tv], origin="lower", aspect="auto", x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", cmap=cmap, title="", return_img=False)
-    perr_imshow_img=imshow_plot(err_fig.add_subplot(gs[1,2]), per_err_6, vmin=min_err, vmax=max_err, extent=[min_rv,max_rv,min_tv,max_tv], origin="lower", aspect="auto", x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$", cmap=cmap, title="Percent Error Infalling Ptls", return_img=True)
+    imshow_plot(err_fig.add_subplot(gs[0,0]), per_err_1, vmin=min_err, vmax=max_err, extent=[0,max_r,min_rv,max_rv], origin="lower", aspect="auto", x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", cmap=cmap)
+    imshow_plot(err_fig.add_subplot(gs[0,1]), per_err_2, vmin=min_err, vmax=max_err, extent=[0,max_r,min_tv,max_tv], origin="lower", aspect="auto", x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", cmap=cmap, title="Percent Error Orbiting Ptls")
+    imshow_plot(err_fig.add_subplot(gs[0,2]), per_err_3, vmin=min_err, vmax=max_err, extent=[min_rv,max_rv,min_tv,max_tv], origin="lower", aspect="auto", x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$", cmap=cmap)
+    imshow_plot(err_fig.add_subplot(gs[1,0]), per_err_4, vmin=min_err, vmax=max_err, extent=[0,max_r,min_rv,max_rv], origin="lower", aspect="auto", x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", cmap=cmap)
+    imshow_plot(err_fig.add_subplot(gs[1,1]), per_err_5, vmin=min_err, vmax=max_err, extent=[0,max_r,min_tv,max_tv], origin="lower", aspect="auto", x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", cmap=cmap, title="Percent Error Infalling Ptls")
+    perr_imshow_img=imshow_plot(err_fig.add_subplot(gs[1,2]), per_err_6, vmin=min_err, vmax=max_err, extent=[min_rv,max_rv,min_tv,max_tv], origin="lower", aspect="auto", x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$", cmap=cmap, return_img=True)
     
     perr_color_bar = plt.colorbar(perr_imshow_img, cax=plt.subplot(gs[:,-1]), pad = 0.1)
     
