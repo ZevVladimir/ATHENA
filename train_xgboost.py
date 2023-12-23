@@ -1,17 +1,30 @@
+from dask import array as da
+from dask import dataframe as dd
+from dask.distributed import Client
+from dask_cuda import LocalCUDACluster
+
+import cudf
+import cuml
+
+import sklearn.model_selection as sk
+import dask_ml.model_selection as dcv
+
+from sklearn.metrics import make_scorer
+from sklearn.metrics import accuracy_score as sk_acc
+
+from cuml.metrics.accuracy import accuracy_score
+
 import numpy as np
 import pandas as pd
-import xgboost
+import xgboost as xgb
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report  
 import time 
 import pickle
 import os
 from imblearn import under_sampling, over_sampling
-from sklearn.model_selection import GridSearchCV
-from sklearn.model_selection import StratifiedKFold
 from data_and_loading_functions import build_ml_dataset, check_pickle_exist_gadget, choose_halo_split, create_directory
 from visualization_functions import *
-from xgboost_model_creator import model_creator, Iterator
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
@@ -55,88 +68,45 @@ test_halos_ratio = config.getfloat("SEARCH","test_halos_ratio")
 curr_chunk_size = config.getint("SEARCH","chunk_size")
 global num_save_ptl_params
 num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
+
+frac_use_data = 1
 ##################################################################################################################
-# set what the paths should be for saving and getting the data
-if len(snapshot_list) > 1:
-    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "_" + str(search_rad) + "r200msearch/"
-else:
-    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(search_rad) + "r200msearch/"
+def get_cluster():
+    cluster = LocalCUDACluster(
+                               device_memory_limit='10GB',
+                               jit_unspill=True)
+    client = Client(cluster)
+    return client
 
-save_location = path_to_xgboost + specific_save
+if __name__ == "__main__":
+    client = get_cluster()
+    if len(snapshot_list) > 1:
+        specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "_" + str(search_rad) + "r200msearch/"
+    else:
+        specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(search_rad) + "r200msearch/"
 
-with open(save_location + "train_keys.pickle", "rb") as pickle_file:
-    train_all_keys = pickle.load(pickle_file)
-
-create_directory(save_location)
-
-# Determine where the scaled radii, rad vel, and tang vel are located within the dtaset
-for i,key in enumerate(train_all_keys[2:]):
-    if key == "Scaled_radii_" + str(p_snap):
-        radii_loc = i
-    elif key == "Radial_vel_" + str(p_snap):
-        rad_vel_loc = i 
-    elif key == "Tangential_vel_" + str(p_snap):
-        tang_vel_loc = i
-
-t0 = time.time()
-
-# paths_to_train_data = []
-# paths_to_val_data = []
-# for path, subdirs, files in os.walk(path_to_xgboost + curr_sparta_file + "_" + str(p_snap) + "to" + str(c_snap) + "_" + str(search_rad) + "r200msearch/train_split_datasets/"):
-#     for name in files:
-#         paths_to_train_data.append(os.path.join(path, name))
-
-# train_it = Iterator(paths_to_train_data)
-# train_dataset = xgboost.DMatrix(train_it)
-
-train_dataset = pickle.load(open("/home/zvladimi/MLOIS/xgboost_datasets_plots/sparta_cbol_l0063_n0256_190to178_6.0r200msearch/datasets/train_dataset.pickle", "rb"))
-scale_pos_weight = np.where(train_dataset[:,1] == 0)[0].size / np.where(train_dataset[:,1] == 1)[0].size
-print(scale_pos_weight)
-train_dataset = xgboost.DMatrix(train_dataset[:,2:], label = train_dataset[:,1])
-
-model_save_location = save_location + "models/" + model_name + "/"
-create_directory(model_save_location)
-
-curr_model_location = model_save_location + "range_all_" + curr_sparta_file + ".json"
-
-
-if os.path.exists(curr_model_location) == False:
-    model = None
-    t3 = time.time()
-
-    param = {
-    'tree_method':'hist',
-    'decice':'cuda',
-    'eta': 0.01,
-    'n_estimators': 100,
-    'subsample': 0.1,
-    'scale_pos_weight': scale_pos_weight,
-    'seed': 11
-    }
-    # Train and fit each model with gpu
-    model = xgboost.train(param, train_dataset)
-
-    # le = LabelEncoder()
-    # y = y.astype(np.int16)
-    # y = le.fit_transform(y)
-
-    t4 = time.time()
-    print("Fitted model", t4 - t3, "seconds")
-
-    model.save_model(curr_model_location)
-
-else:
-    model = xgboost.Booster()
-    model.load_model(curr_model_location)
-predicts = model.predict(train_dataset)
-predicts = np.round(predicts)
-
-# for i,path in enumerate(paths_to_train_data):
-#     with open(path, "rb") as file:
-#         curr_dataset = pickle.load(file)
-#     if i == 0:
-#         train_dataset = curr_dataset
-#     else:
-#         train_dataset = np.concatenate((train_dataset, curr_dataset), axis=0)
-train_dataset = pickle.load(open("/home/zvladimi/MLOIS/xgboost_datasets_plots/sparta_cbol_l0063_n0256_190to178_6.0r200msearch/datasets/train_dataset.pickle", "rb"))
-print(classification_report(train_dataset[:,1], predicts))
+    save_location = path_to_xgboost + specific_save
+    model_save_location = save_location + model_name + "/"  
+    plot_save_location = save_location + "plots/"
+    create_directory(model_save_location)
+    create_directory(plot_save_location)
+    train_dataset_loc = save_location + "datasets/" + "train_dataset.pickle"
+    train_labels_loc = save_location + "datasets/" + "train_labels.pickle"
+    test_dataset_loc = save_location + "datasets/" + "test_dataset.pickle"
+    test_labels_loc = save_location + "datasets/" + "test_labels.pickle"
+    
+    with open(train_dataset_loc, "rb") as file:
+        X = pickle.load(file) 
+    with open(train_labels_loc, "rb") as file:
+        y = pickle.load(file)
+    
+    scale_pos_weight = np.where(y == 0)[0].size / np.where(y == 1)[0].size
+    
+    num_features = X.shape[1]
+    
+    num_use_data = int(np.floor(X.shape[0] * frac_use_data))
+    print("Tot num of train particles:", X.shape[0])
+    print("Num use train particles:", num_use_data)
+    X = da.from_array(X,chunks=(chunk_size,num_features))
+    y = da.from_array(y,chunks=(chunk_size))
+    print("converted to array")
