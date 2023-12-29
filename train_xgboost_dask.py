@@ -182,6 +182,16 @@ if __name__ == "__main__":
     dtrain,X_train,y_train,scale_pos_weight = create_training_matrix(train_dataset_loc, train_labels_loc, frac_use_data=1, calc_scale_pos_weight=True)
     dtest,X_test,y_test = create_training_matrix(test_dataset_loc, test_labels_loc, frac_use_data=1, calc_scale_pos_weight=False)
     print("scale_pos_weight:", scale_pos_weight)
+    
+    file = open(model_save_location + "model_info.txt", 'w')
+    file.write("SPARTA File: " +curr_sparta_file+ "\n")
+    snap_str = "Snapshots used: "
+    for snapshot in snapshot_list:
+        snap_str += (str(snapshot) + "_")
+    file.write(snap_str)
+    file.write("Search Radius: " + str(search_rad) + "\n")
+    file.write("Fraction of training data used: "+str(frac_training_data)+"\n")
+    file.close()
 
     if do_hpo == True and os.path.isfile(model_save_location + "best_params.pickle") == False:  
         params = {
@@ -189,7 +199,7 @@ if __name__ == "__main__":
         'max_depth':np.arange(2,6,1),
         # 'min_child_weight': 1,
         'learning_rate':np.arange(0.01,1.01,.1),
-        'scale_pos_weight':np.arange(1,10,.1)
+        'scale_pos_weight':np.arange(1,8,.1)
         # 'subsample': 1,
         # 'colsample_bytree': 1,
         }
@@ -197,7 +207,7 @@ if __name__ == "__main__":
         N_FOLDS = 5
         N_ITER = 25
         
-        model = xgb.XGBClassifier(tree_method='gpu_hist', n_estimators=750, use_label_encoder=False)
+        model = dxgb.XGBClassifier(tree_method='gpu_hist', n_estimators=750, use_label_encoder=False)
         accuracy_wrapper_scorer = make_scorer(accuracy_score_wrapper)
         cuml_accuracy_scorer = make_scorer(accuracy_score, convert_dtype=True)
         print_acc(model, X_train, y_train, X_test, y_test)
@@ -232,14 +242,7 @@ if __name__ == "__main__":
             with open(model_save_location + "best_params.pickle", "wb") as pickle_file:
                 pickle.dump(results.best_params_, pickle_file)
             
-            file = open(model_save_location + "model_info.txt", 'w')
-            file.write("SPARTA File: " +curr_sparta_file+ "\n")
-            snap_str = "Snapshots used: "
-            for snapshot in snapshot_list:
-                snap_str += (str(snapshot) + "_")
-            file.write(snap_str)
-            file.write("Search Radius: " + str(search_rad))
-            file.write("Fraction of training data used: "+str(frac_training_data)+"\n")
+            file = open(model_save_location + "model_info.txt", 'a')
             for item in results.best_params_.items():
                 file.write(str(item[0]) + ": " + str(item[1]) + "\n")
             file.close()
@@ -262,7 +265,13 @@ if __name__ == "__main__":
             "device": "cuda",
             'scale_pos_weight': scale_pos_weight,
         }
-        
+    
+    file = open(model_save_location + "model_info.txt", 'a')
+    file.write("Params:\n")
+    for item in params.items():
+        file.write(str(item[0]) + ": " + str(item[1]) + "\n")
+    file.close()
+    
     if os.path.isfile(model_save_location + model_name + ".json"):
         bst = xgb.Booster()
         # bst.load_model("/home/zvladimi/MLOIS/0.25_cpu_model.json")
@@ -306,10 +315,16 @@ if __name__ == "__main__":
     
     train_prediction = dxgb.inplace_predict(client, bst, X).compute()
     train_prediction = np.round(train_prediction)
-    print("Train Report")
-    print(classification_report(y, train_prediction))
-    # del X
-    # del y
+    # print("Train Report")    
+    # train_report = classification_report(y, train_prediction)
+    # print(train_report)
+    # file = open(model_save_location + "model_info.txt", 'a')
+    # file.write("Train Report\n")
+    # file.write(train_report)
+    # file.close()
+    del X
+    del y
+    
     t1 = time.time()
     with open(test_dataset_loc, "rb") as file:
         X_np = pickle.load(file)
@@ -321,8 +336,14 @@ if __name__ == "__main__":
     test_prediction = np.round(test_prediction)
     t2 = time.time()
     print("Predictions finished:", np.round((t2-t1),2),"sec", np.round(((t2-t1)/60),2), "min")
-    print("Test Report")
-    print(classification_report(y_np, test_prediction))
+    # print("Test Report")    
+    # test_report = classification_report(y_np, test_prediction)
+    # print(test_report)
+    # file = open(model_save_location + "model_info.txt", 'a')
+    # file.write("Test Report\n")
+    # file.write(test_report)
+    # file.close()
+    
     with open(save_location + "datasets/" + "test_dataset_all_keys.pickle", "rb") as file:
         test_all_keys = pickle.load(file)
     for i,key in enumerate(test_all_keys):
@@ -352,6 +373,6 @@ if __name__ == "__main__":
     num_bins = 30
     bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
     bins = np.insert(bins, 0, 0)
-    #compare_density_prf(radii=X_np[:,scaled_radii_loc], actual_prf_all=density_prf_all_within, actual_prf_1halo=density_prf_1halo_within, mass=ptl_mass, orbit_assn=test_prediction, prf_bins=bins, title = model_name + " Predicts", show_graph = False, save_graph = True, save_location = plot_save_location)
-    plot_r_rv_tv_graph(test_prediction, X_np[:,scaled_radii_loc], X_np[:,rad_vel_loc], X_np[:,tang_vel_loc], y_np, model_name + " Predicts", num_bins, show = False, save = True, save_location=plot_save_location)
+    compare_density_prf(radii=X_np[:,scaled_radii_loc], actual_prf_all=density_prf_all_within, actual_prf_1halo=density_prf_1halo_within, mass=ptl_mass, orbit_assn=test_prediction, prf_bins=bins, title = model_name, show_graph = False, save_graph = True, save_location = plot_save_location)
+    plot_r_rv_tv_graph(test_prediction, X_np[:,scaled_radii_loc], X_np[:,rad_vel_loc], X_np[:,tang_vel_loc], y_np, model_name, num_bins, show = False, save = True, save_location=plot_save_location)
     #ssgraph_acc_by_bin(test_prediction, y_np, X_np[:,scaled_radii_loc], num_bins, model_name + " Predicts", plot = False, save = True, save_location = plot_save_location)
