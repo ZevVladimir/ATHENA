@@ -95,11 +95,13 @@ def get_cluster():
     client = Client(cluster)
     return client
 
-def create_training_matrix(X_loc, y_loc, frac_use_data = 1, calc_scale_pos_weight = False):
+def create_training_matrix(X_loc, y_loc, key_loc, frac_use_data = 1, calc_scale_pos_weight = False):
     with open(X_loc, "rb") as file:
         X_cpu = pickle.load(file) 
     with open(y_loc, "rb") as file:
         y_cpu = pickle.load(file)
+    with open(key_loc, "rb") as file:
+        features = pickle.load(file)
     
     scale_pos_weight = np.where(y_cpu == 0)[0].size / np.where(y_cpu == 1)[0].size
     
@@ -115,7 +117,7 @@ def create_training_matrix(X_loc, y_loc, frac_use_data = 1, calc_scale_pos_weigh
     print("X Number of total bytes:", X.nbytes, "X Number of Gigabytes:", (X.nbytes)/(10**9))
     print("y Number of total bytes:", y.nbytes, "y Number of Gigabytes:", (y.nbytes)/(10**9))
     
-    dqmatrix = xgb.dask.DaskDMatrix(client, X, y)
+    dqmatrix = xgb.dask.DaskDMatrix(client, X, y, feature_names=features)
     print("converted to DaskDMatrix")
     
     if calc_scale_pos_weight:
@@ -157,6 +159,27 @@ def print_acc(model, X_train, y_train, X_test, y_test, mode_str="Default"):
     score = accuracy_score(y_pred, y_test.astype('float32'), convert_dtype=True)
     print("{} model accuracy: {}".format(mode_str, score))
 
+def make_preds(client, bst, dataset_loc, labels_loc, report_name="Classification Report", print_report=False):
+    with open(dataset_loc, "rb") as file:
+        X_np = pickle.load(file)
+    with open(labels_loc, "rb") as file:
+        y_np = pickle.load(file)
+    X = da.from_array(X_np,chunks=(chunk_size,X_np.shape[1]))
+    
+    preds = dxgb.inplace_predict(client, bst, X).compute()
+    preds = np.round(preds)
+    
+    if print_report:
+        print(report_name)    
+        report = classification_report(y_np, preds)
+        print(report)
+        file = open(model_save_location + "model_info.txt", 'a')
+        file.write(report_name+"\n")
+        file.write(report)
+        file.close()
+    
+    return preds
+
 if __name__ == "__main__":
     client = get_cluster()
     if len(snapshot_list) > 1:
@@ -178,9 +201,11 @@ if __name__ == "__main__":
     train_labels_loc = save_location + "datasets/" + "train_labels.pickle"
     test_dataset_loc = save_location + "datasets/" + "test_dataset.pickle"
     test_labels_loc = save_location + "datasets/" + "test_labels.pickle"
+    train_keys_loc = save_location + "datasets/" + "train_dataset_all_keys.pickle"
+    test_keys_loc = save_location + "datasets/" + "test_dataset_all_keys.pickle"
     
-    dtrain,X_train,y_train,scale_pos_weight = create_training_matrix(train_dataset_loc, train_labels_loc, frac_use_data=1, calc_scale_pos_weight=True)
-    dtest,X_test,y_test = create_training_matrix(test_dataset_loc, test_labels_loc, frac_use_data=1, calc_scale_pos_weight=False)
+    dtrain,X_train,y_train,scale_pos_weight = create_training_matrix(train_dataset_loc, train_labels_loc, train_keys_loc, frac_use_data=1, calc_scale_pos_weight=True)
+    dtest,X_test,y_test = create_training_matrix(test_dataset_loc, test_labels_loc, test_keys_loc, frac_use_data=1, calc_scale_pos_weight=False)
     print("scale_pos_weight:", scale_pos_weight)
     
     file = open(model_save_location + "model_info.txt", 'w')
@@ -189,7 +214,7 @@ if __name__ == "__main__":
     for snapshot in snapshot_list:
         snap_str += (str(snapshot) + "_")
     file.write(snap_str)
-    file.write("Search Radius: " + str(search_rad) + "\n")
+    file.write("\nSearch Radius: " + str(search_rad) + "\n")
     file.write("Fraction of training data used: "+str(frac_training_data)+"\n")
     file.close()
 
@@ -199,7 +224,9 @@ if __name__ == "__main__":
         'max_depth':np.arange(2,6,1),
         # 'min_child_weight': 1,
         'learning_rate':np.arange(0.01,1.01,.1),
-        'scale_pos_weight':np.arange(1,8,.1)
+        'scale_pos_weight':np.arange(1,8,.1),
+        'lambda':np.arange(0,3,.5),
+        'alpha':np.arange(0,3,.5),
         # 'subsample': 1,
         # 'colsample_bytree': 1,
         }
@@ -243,9 +270,6 @@ if __name__ == "__main__":
                 pickle.dump(results.best_params_, pickle_file)
             
             file = open(model_save_location + "model_info.txt", 'a')
-            for item in results.best_params_.items():
-                file.write(str(item[0]) + ": " + str(item[1]) + "\n")
-            file.close()
             
             print(results)
             # df_gridsearch = pd.DataFrame(results.cv_results_)
@@ -307,42 +331,16 @@ if __name__ == "__main__":
     
     del dtrain
     del dtest
-    with open(train_dataset_loc, "rb") as file:
-        X = pickle.load(file)
-    with open(train_labels_loc, "rb") as file:
-        y = pickle.load(file)
-    X = da.from_array(X,chunks=(chunk_size,X.shape[1]))
     
-    train_prediction = dxgb.inplace_predict(client, bst, X).compute()
-    train_prediction = np.round(train_prediction)
-    # print("Train Report")    
-    # train_report = classification_report(y, train_prediction)
-    # print(train_report)
-    # file = open(model_save_location + "model_info.txt", 'a')
-    # file.write("Train Report\n")
-    # file.write(train_report)
-    # file.close()
-    del X
-    del y
+    train_preds = make_preds(client, bst, train_dataset_loc, train_labels_loc, report_name="Train Report", print_report=True)
+    test_preds = make_preds(client, bst, test_dataset_loc, test_labels_loc, report_name="Test Report", print_report=True)
+    bst.save_model(model_save_location + model_name + ".json")
     
     t1 = time.time()
     with open(test_dataset_loc, "rb") as file:
         X_np = pickle.load(file)
     with open(test_labels_loc, "rb") as file:
         y_np = pickle.load(file)
-    X = da.from_array(X_np,chunks=(chunk_size,X_np.shape[1]))
-    
-    test_prediction = dxgb.inplace_predict(client, bst, X).compute()
-    test_prediction = np.round(test_prediction)
-    t2 = time.time()
-    print("Predictions finished:", np.round((t2-t1),2),"sec", np.round(((t2-t1)/60),2), "min")
-    # print("Test Report")    
-    # test_report = classification_report(y_np, test_prediction)
-    # print(test_report)
-    # file = open(model_save_location + "model_info.txt", 'a')
-    # file.write("Test Report\n")
-    # file.write(test_report)
-    # file.close()
     
     with open(save_location + "datasets/" + "test_dataset_all_keys.pickle", "rb") as file:
         test_all_keys = pickle.load(file)
@@ -373,6 +371,6 @@ if __name__ == "__main__":
     num_bins = 30
     bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
     bins = np.insert(bins, 0, 0)
-    compare_density_prf(radii=X_np[:,scaled_radii_loc], actual_prf_all=density_prf_all_within, actual_prf_1halo=density_prf_1halo_within, mass=ptl_mass, orbit_assn=test_prediction, prf_bins=bins, title = model_name, show_graph = False, save_graph = True, save_location = plot_save_location)
-    plot_r_rv_tv_graph(test_prediction, X_np[:,scaled_radii_loc], X_np[:,rad_vel_loc], X_np[:,tang_vel_loc], y_np, model_name, num_bins, show = False, save = True, save_location=plot_save_location)
+    compare_density_prf(radii=X_np[:,scaled_radii_loc], actual_prf_all=density_prf_all_within, actual_prf_1halo=density_prf_1halo_within, mass=ptl_mass, orbit_assn=test_preds, prf_bins=bins, title = model_name, show_graph = False, save_graph = True, save_location = plot_save_location)
+    plot_r_rv_tv_graph(test_preds, X_np[:,scaled_radii_loc], X_np[:,rad_vel_loc], X_np[:,tang_vel_loc], y_np, model_name, num_bins, show = False, save = True, save_location=plot_save_location)
     #ssgraph_acc_by_bin(test_prediction, y_np, X_np[:,scaled_radii_loc], num_bins, model_name + " Predicts", plot = False, save = True, save_location = plot_save_location)

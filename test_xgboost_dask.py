@@ -2,11 +2,7 @@ from dask import array as da
 from dask.distributed import Client
 from dask_cuda import LocalCUDACluster
 
-from cuml.metrics.accuracy import accuracy_score
-from sklearn.metrics import make_scorer
-import dask_ml.model_selection as dcv
 from contextlib import contextmanager
-from cuml.experimental.hyperopt_utils import plotting_utils
 
 import xgboost as xgb
 from xgboost import dask as dxgb
@@ -147,15 +143,26 @@ if __name__ == "__main__":
     file.write("Search Radius: " + str(search_rad) + "\n")
     file.write("Fraction of training data used: "+str(frac_training_data)+"\n")
     file.close()
+    
+    with open(save_location + "datasets/" + "test_dataset_all_keys.pickle", "rb") as file:
+        test_all_keys = pickle.load(file)
 
     if os.path.isfile(model_save_location + model_name + ".json"):
         bst = xgb.Booster()
         bst.load_model(model_save_location + model_name + ".json")
+    
+        print(bst.get_score())
+        fig, ax = plt.subplots(figsize=(400, 10))
+        xgb.plot_tree(bst, num_trees=4, ax=ax)
+        plt.savefig("/home/zvladimi/MLOIS/Random_figures/temp.png")
+
+
+
         print("Loaded Booster")
     else:
         print("Couldn't load Booster Located at: " + model_save_location + model_name + ".json")
         
-    #train_preds = make_preds(client, bst, train_dataset_loc, train_labels_loc, report_name="Train Report", print_report=False)
+    train_preds = make_preds(client, bst, train_dataset_loc, train_labels_loc, report_name="Train Report", print_report=False)
     test_preds = make_preds(client, bst, test_dataset_loc, test_labels_loc, report_name="Test Report", print_report=False)
     
     with open(test_dataset_loc, "rb") as file:
@@ -163,8 +170,6 @@ if __name__ == "__main__":
     with open(test_labels_loc, "rb") as file:
         y_np = pickle.load(file)
     
-    with open(save_location + "datasets/" + "test_dataset_all_keys.pickle", "rb") as file:
-        test_all_keys = pickle.load(file)
     for i,key in enumerate(test_all_keys):
         if key == "Scaled_radii_" + str(p_snap):
             scaled_radii_loc = i
