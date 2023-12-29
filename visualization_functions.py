@@ -13,6 +13,7 @@ from calculation_functions import calc_v200m
 # import general_plotting as gp
 from textwrap import wrap
 from scipy.ndimage import rotate
+import matplotlib.colors as colors
 
 def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r200_per_part, red_shift, hubble_constant, little_h):
     start_bin_val = 0.001
@@ -204,8 +205,8 @@ def phase_plot(ax, x, y, min_ptl, max_ptl, range, x_label, y_label, num_bins, cm
     if title != "":
         ax.set_title(title)
         
-def imshow_plot(ax, img, vmin, vmax, extent, origin, aspect, x_label, y_label, cmap, title="", return_img=False):
-    img=ax.imshow(img, cmap = cmap, vmin = vmin, vmax = vmax, origin = origin, aspect = aspect, extent = extent)
+def imshow_plot(ax, img, extent, x_label, y_label, title="", return_img=False, kwargs={}):
+    img=ax.imshow(img, extent = extent, **kwargs)
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
     if title != "":
@@ -262,7 +263,7 @@ def plot_incorrectly_classified(correct_labels, ml_labels, r, rv, tv, num_bins, 
     max_ptl, inc_orb_r_rv, inc_orb_r_tv, inc_orb_rv_tv, inc_inf_r_rv, inc_inf_r_tv, inc_inf_rv_tv = create_hist_max_ptl(min_ptl, inc_inf_r, inc_orb_r, inc_inf_rv, inc_orb_rv, inc_inf_tv, inc_orb_tv, num_bins, max_r, max_rv, min_rv, max_tv, min_tv, bin_r_vr=act_orb_r_vr[1:], bin_r_vt=act_orb_r_vt[1:],bin_vr_vt=act_orb_vr_vt[1:])
     
     scaled_orb_r_vr = (inc_orb_r_rv[0]/act_orb_r_vr[0]).T
-    scaled_orb_r_vt = (inc_orb_r_tv[0]/act_orb_r_vt[0])
+    scaled_orb_r_vt = (inc_orb_r_tv[0]/act_orb_r_vt[0]).T
     scaled_orb_vr_vt = (inc_orb_rv_tv[0]/act_orb_vr_vt[0]).T
     scaled_inf_r_vr = (inc_inf_r_rv[0]/act_inf_r_vr[0]).T
     scaled_inf_r_vt = (inc_inf_r_tv[0]/act_inf_r_vt[0]).T
@@ -270,21 +271,30 @@ def plot_incorrectly_classified(correct_labels, ml_labels, r, rv, tv, num_bins, 
 
     max_diff = np.max(np.array([np.max(scaled_orb_r_vr),np.max(scaled_orb_r_vt),np.max(scaled_orb_vr_vt),np.max(scaled_inf_r_vr),np.max(scaled_inf_r_vt),np.max(scaled_inf_vr_vt)]))
 
+    scaled_cmap = plt.get_cmap("coolwarm")
     cmap = plt.get_cmap("inferno")
 
     widths = [4,4,4,.5]
     heights = [4,4]
     
     scal_miss_class_fig = plt.figure()
-    scal_miss_class_fig.suptitle("Misclassified Particles/Num Targets")
+    scal_miss_class_fig.suptitle("Misclassified Particles/Num Targets " + title)
     gs = scal_miss_class_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
     
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[0,0]), scaled_inf_r_vr, vmin=0,vmax=max_diff,extent=[0,max_r,min_rv,max_rv], origin="lower",aspect="auto",x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",cmap=cmap)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[0,1]), scaled_inf_r_vt, vmin=0,vmax=max_diff,extent=[0,max_r,min_tv,max_tv], origin="lower",aspect="auto",x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",cmap=cmap,title="Label: Infall Real: Orbit")
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[0,2]), scaled_inf_r_vr, vmin=0,vmax=max_diff,extent=[min_rv,max_rv,min_tv,max_tv], origin="lower",aspect="auto",x_label="$v_r/v_{200m}$",y_label="$v_t/v_{200m}$",cmap=cmap)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[1,0]), scaled_inf_r_vr, vmin=0,vmax=max_diff,extent=[0,max_r,min_rv,max_rv], origin="lower",aspect="auto",x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",cmap=cmap)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[1,1]), scaled_inf_r_vr, vmin=0,vmax=max_diff,extent=[0,max_r,min_tv,max_tv], origin="lower",aspect="auto",x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",cmap=cmap,title="Label: Orbit Real: Infall")
-    imshow_img=imshow_plot(scal_miss_class_fig.add_subplot(gs[1,2]), scaled_inf_r_vr, vmin=0,vmax=max_diff,extent=[min_rv,max_rv,min_tv,max_tv], origin="lower",aspect="auto",x_label="$v_r/v_{200m}$",y_label="$v_t/v_{200m}$",cmap=cmap,return_img=True)
+    miss_class_args = {
+        "vmin":0,
+        "vmax":max_diff,
+        "origin":"lower",
+        "aspect":"auto",
+        "cmap":scaled_cmap,
+    }
+    
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[0,0]), scaled_inf_r_vr, extent=[0,max_r,min_rv,max_rv], x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",kwargs=miss_class_args)
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[0,1]), scaled_inf_r_vt, extent=[0,max_r,min_tv,max_tv], x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",title="Label: Infall Real: Orbit",kwargs=miss_class_args)
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[0,2]), scaled_inf_vr_vt, extent=[min_rv,max_rv,min_tv,max_tv], x_label="$v_r/v_{200m}$",y_label="$v_t/v_{200m}$",kwargs=miss_class_args)
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[1,0]), scaled_orb_r_vr, extent=[0,max_r,min_rv,max_rv], x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",kwargs=miss_class_args)
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[1,1]), scaled_orb_r_vt, extent=[0,max_r,min_tv,max_tv], x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",title="Label: Orbit Real: Infall",kwargs=miss_class_args)
+    imshow_img=imshow_plot(scal_miss_class_fig.add_subplot(gs[1,2]), scaled_orb_vr_vt, extent=[min_rv,max_rv,min_tv,max_tv], x_label="$v_r/v_{200m}$",y_label="$v_t/v_{200m}$",return_img=True,kwargs=miss_class_args)
 
     
     color_bar = plt.colorbar(imshow_img, cax=plt.subplot(gs[:,-1]))
@@ -293,9 +303,8 @@ def plot_incorrectly_classified(correct_labels, ml_labels, r, rv, tv, num_bins, 
     scal_miss_class_fig.savefig(save_location + "/2dhist/" + title + "_scaled_miss_class.png")
     
 #########################################################################################################################################################
-
     miss_class_fig = plt.figure()
-    miss_class_fig.suptitle("Misclassified Particles")
+    miss_class_fig.suptitle("Misclassified Particles " + title)
     gs = miss_class_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
     
     phase_plot(miss_class_fig.add_subplot(gs[0,0]), inc_inf_r, inc_inf_rv, min_ptl, max_ptl, range=[[0,max_r],[min_rv,max_rv]], x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", num_bins=num_bins, cmap=cmap)
@@ -351,20 +360,20 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sho
         max_ptl = act_max_ptl
   
     cmap = plt.get_cmap("inferno")
-    per_err_cmap = plt.get_cmap("inferno")
+    per_err_cmap = plt.get_cmap("coolwarm")
 
     widths = [4,4,4,.5]
     heights = [4,4]
     
     inf_fig = plt.figure()
-    inf_fig.suptitle("Infalling Particles nu:" + title)
+    inf_fig.suptitle("Infalling Particles: " + title)
     gs = inf_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
     
     phase_plot(inf_fig.add_subplot(gs[0,0]), ml_inf_r, ml_inf_rv, min_ptl, max_ptl, range=[[0,max_r],[min_rv,max_rv]], x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", num_bins=num_bins, cmap=cmap)
     phase_plot(inf_fig.add_subplot(gs[0,1]), ml_inf_r, ml_inf_tv, min_ptl, max_ptl, range=[[0,max_r],[min_tv,max_tv]], x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", num_bins=num_bins, cmap=cmap, title="ML Predictions")
     phase_plot(inf_fig.add_subplot(gs[0,2]), ml_inf_rv, ml_inf_tv, min_ptl, max_ptl, range=[[min_rv,max_rv],[min_tv,max_tv]], x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$", num_bins=num_bins, cmap=cmap)
     phase_plot(inf_fig.add_subplot(gs[1,0]), act_inf_r, act_inf_rv, min_ptl, max_ptl, range=[[0,max_r],[min_rv,max_rv]], x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", num_bins=num_bins, cmap=cmap)
-    phase_plot(inf_fig.add_subplot(gs[1,1]), act_inf_r, act_inf_tv, min_ptl, max_ptl, range=[[0,max_r],[min_tv,max_tv]], x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", num_bins=num_bins, cmap=cmap, title="Act Predictions")
+    phase_plot(inf_fig.add_subplot(gs[1,1]), act_inf_r, act_inf_tv, min_ptl, max_ptl, range=[[0,max_r],[min_tv,max_tv]], x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", num_bins=num_bins, cmap=cmap, title="Actual Distribution")
     phase_plot(inf_fig.add_subplot(gs[1,2]), act_inf_rv, act_inf_tv, min_ptl, max_ptl, range=[[min_rv,max_rv],[min_tv,max_tv]], x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$", num_bins=num_bins, cmap=cmap)
     
     inf_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]))
@@ -374,14 +383,14 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sho
 #########################################################################################################################################################
     
     orb_fig = plt.figure()
-    orb_fig.suptitle("Orbiting Particles nu:" + title)
+    orb_fig.suptitle("Orbiting Particles: " + title)
     gs = orb_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
     
     phase_plot(orb_fig.add_subplot(gs[0,0]), ml_orb_r, ml_orb_rv, min_ptl, max_ptl, range=[[0,max_r],[min_rv,max_rv]], x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", num_bins=num_bins, cmap=cmap)
     phase_plot(orb_fig.add_subplot(gs[0,1]), ml_orb_r, ml_orb_tv, min_ptl, max_ptl, range=[[0,max_r],[min_tv,max_tv]], x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", num_bins=num_bins, cmap=cmap, title="ML Predictions")
     phase_plot(orb_fig.add_subplot(gs[0,2]), ml_orb_rv, ml_orb_tv, min_ptl, max_ptl, range=[[min_rv,max_rv],[min_tv,max_tv]], x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$", num_bins=num_bins, cmap=cmap)
     phase_plot(orb_fig.add_subplot(gs[1,0]), act_orb_r, act_orb_rv, min_ptl, max_ptl, range=[[0,max_r],[min_rv,max_rv]], x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", num_bins=num_bins, cmap=cmap)
-    phase_plot(orb_fig.add_subplot(gs[1,1]), act_orb_r, act_orb_tv, min_ptl, max_ptl, range=[[0,max_r],[min_tv,max_tv]], x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", num_bins=num_bins, cmap=cmap, title="Act Predictions")
+    phase_plot(orb_fig.add_subplot(gs[1,1]), act_orb_r, act_orb_tv, min_ptl, max_ptl, range=[[0,max_r],[min_tv,max_tv]], x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", num_bins=num_bins, cmap=cmap, title="Actual Distribution")
     phase_plot(orb_fig.add_subplot(gs[1,2]), act_orb_rv, act_orb_tv, min_ptl, max_ptl, range=[[min_rv,max_rv],[min_tv,max_tv]], x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$", num_bins=num_bins, cmap=cmap)
     
     orb_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]), pad = 0.1)
@@ -393,7 +402,7 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sho
     only_r_rv_widths = [4,4,.5]
     only_r_rv_heights = [4,4]
     only_r_rv_fig = plt.figure()
-    only_r_rv_fig.suptitle("Radial Velocity Versus r:" + title)
+    only_r_rv_fig.suptitle("Radial Velocity Versus Radius: " + title)
     gs = only_r_rv_fig.add_gridspec(2,3,width_ratios = only_r_rv_widths, height_ratios = only_r_rv_heights)
     
     phase_plot(only_r_rv_fig.add_subplot(gs[0,0]), ml_orb_r, ml_orb_rv, min_ptl, max_ptl, range=[[0,max_r],[min_rv,max_rv]], x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", num_bins=num_bins, cmap=cmap, title="ML Predicted Orbiting Particles")
@@ -408,15 +417,22 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sho
 #########################################################################################################################################################
 
     err_fig = plt.figure()
-    err_fig.suptitle("Orbiting Particles nu:" + title)
+    err_fig.suptitle("Percent Error " + title)
     gs = err_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
     
-    imshow_plot(err_fig.add_subplot(gs[0,0]), per_err_1, vmin=min_err, vmax=max_err, extent=[0,max_r,min_rv,max_rv], origin="lower", aspect="auto", x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", cmap=cmap)
-    imshow_plot(err_fig.add_subplot(gs[0,1]), per_err_2, vmin=min_err, vmax=max_err, extent=[0,max_r,min_tv,max_tv], origin="lower", aspect="auto", x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", cmap=cmap, title="Percent Error Orbiting Ptls")
-    imshow_plot(err_fig.add_subplot(gs[0,2]), per_err_3, vmin=min_err, vmax=max_err, extent=[min_rv,max_rv,min_tv,max_tv], origin="lower", aspect="auto", x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$", cmap=cmap)
-    imshow_plot(err_fig.add_subplot(gs[1,0]), per_err_4, vmin=min_err, vmax=max_err, extent=[0,max_r,min_rv,max_rv], origin="lower", aspect="auto", x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", cmap=cmap)
-    imshow_plot(err_fig.add_subplot(gs[1,1]), per_err_5, vmin=min_err, vmax=max_err, extent=[0,max_r,min_tv,max_tv], origin="lower", aspect="auto", x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", cmap=cmap, title="Percent Error Infalling Ptls")
-    perr_imshow_img=imshow_plot(err_fig.add_subplot(gs[1,2]), per_err_6, vmin=min_err, vmax=max_err, extent=[min_rv,max_rv,min_tv,max_tv], origin="lower", aspect="auto", x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$", cmap=cmap, return_img=True)
+    err_fig_kwargs = {
+        "norm":colors.CenteredNorm(),
+        "origin":"lower",
+        "aspect":"auto",
+        "cmap":per_err_cmap,
+    }
+    
+    imshow_plot(err_fig.add_subplot(gs[0,0]), per_err_1, extent=[0,max_r,min_rv,max_rv], x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$",kwargs=err_fig_kwargs)
+    imshow_plot(err_fig.add_subplot(gs[0,1]), per_err_2, extent=[0,max_r,min_tv,max_tv], x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="Orbiting Ptls",kwargs=err_fig_kwargs)
+    imshow_plot(err_fig.add_subplot(gs[0,2]), per_err_3, extent=[min_rv,max_rv,min_tv,max_tv], x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$",kwargs=err_fig_kwargs)
+    imshow_plot(err_fig.add_subplot(gs[1,0]), per_err_4, extent=[0,max_r,min_rv,max_rv], x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$",kwargs=err_fig_kwargs)
+    imshow_plot(err_fig.add_subplot(gs[1,1]), per_err_5, extent=[0,max_r,min_tv,max_tv], x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="Infalling Ptls",kwargs=err_fig_kwargs)
+    perr_imshow_img=imshow_plot(err_fig.add_subplot(gs[1,2]), per_err_6, extent=[min_rv,max_rv,min_tv,max_tv], x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$", return_img=True,kwargs=err_fig_kwargs)
     
     perr_color_bar = plt.colorbar(perr_imshow_img, cax=plt.subplot(gs[:,-1]), pad = 0.1)
     
