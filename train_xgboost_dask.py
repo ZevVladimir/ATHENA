@@ -1,6 +1,5 @@
 from dask import array as da
 from dask.distributed import Client
-from dask_cuda import LocalCUDACluster
 
 from cuml.metrics.accuracy import accuracy_score
 from sklearn.metrics import make_scorer
@@ -10,18 +9,16 @@ from cuml.experimental.hyperopt_utils import plotting_utils
 
 import xgboost as xgb
 from xgboost import dask as dxgb
-from xgboost.dask import DaskDMatrix
+
+from colossus.cosmology import cosmology    
 from sklearn.metrics import classification_report
 import pickle
 import time
 import os
 import sys
 import numpy as np
-import pandas as pd
-import seaborn as sns
 import matplotlib.pyplot as plt
-from pairing import depair
-from colossus.cosmology import cosmology
+
 from data_and_loading_functions import create_directory, load_or_pickle_SPARTA_data, conv_halo_id_spid
 from visualization_functions import *
 ##################################################################################################################
@@ -29,6 +26,7 @@ from visualization_functions import *
 import configparser
 config = configparser.ConfigParser()
 config.read("config.ini")
+on_zaratan = config.getboolean("MISC","on_zaratan")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
@@ -65,9 +63,9 @@ curr_chunk_size = config.getint("SEARCH","chunk_size")
 global num_save_ptl_params
 num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 do_hpo = config.getboolean("XGBOOST","hpo")
+frac_training_data = config.getint("XGBOOST","frac_training_data")
 # size float32 is 4 bytes
 chunk_size = int(np.floor(1e9 / (num_save_ptl_params * 4)))
-frac_training_data = 1
 
 import subprocess
 
@@ -76,6 +74,15 @@ try:
     gpu_use = True
 except Exception: # this command not being found can raise quite a few different errors depending on the configuration
     gpu_use = False
+    
+if on_zaratan:
+    from dask_mpi import initialize
+    from mpi4py import MPI
+    from distributed.scheduler import logger
+    import socket
+    #from dask_jobqueue import SLURMCluster
+else:
+    from dask_cuda import LocalCUDACluster
 ###############################################################################################################
 sys.path.insert(0, path_to_pygadgetreader)
 sys.path.insert(0, path_to_sparta)
@@ -88,14 +95,14 @@ def timed(txt):
     t1 = time.time()
     print("%32s time:  %8.5f" % (txt, t1 - t0))
 
-def get_cluster():
+def get_CUDA_cluster():
     cluster = LocalCUDACluster(
                                device_memory_limit='10GB',
                                jit_unspill=True)
     client = Client(cluster)
     return client
 
-def create_training_matrix(X_loc, y_loc, key_loc, frac_use_data = 1, calc_scale_pos_weight = False):
+def create_matrix(client, X_loc, y_loc, key_loc, frac_use_data = 1, calc_scale_pos_weight = False):
     with open(X_loc, "rb") as file:
         X_cpu = pickle.load(file) 
     with open(y_loc, "rb") as file:
@@ -181,7 +188,25 @@ def make_preds(client, bst, dataset_loc, labels_loc, report_name="Classification
     return preds
 
 if __name__ == "__main__":
-    client = get_cluster()
+    if on_zaratan:
+        if 'SLURM_CPUS_PER_TASK' in os.environ:
+            cpus_per_task = int(os.environ['SLURM_CPUS_PER_TASK'])
+        else:
+            print("SLURM_CPUS_PER_TASK is not defined.")
+        if gpu_use:
+            initialize(local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
+        else:
+            initialize(nthreads = cpus_per_task, local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
+        print("Initialized")
+        client = Client()
+        host = client.run_on_scheduler(socket.gethostname)
+        port = client.scheduler_info()['services']['dashboard']
+        login_node_address = "zvladimi@login.zaratan.umd.edu" # Change this to the address/domain of your login node
+
+        logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}")
+    else:
+        client = get_CUDA_cluster()
+        
     if len(snapshot_list) > 1:
         specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "_" + str(search_rad) + "r200msearch/"
     else:
@@ -193,20 +218,18 @@ if __name__ == "__main__":
         model_name = model_name + "_frac_" + str(frac_training_data) + "_cpu_model"
 
     save_location = path_to_xgboost + specific_save
+    dataset_location = save_location + "datasets/"
     model_save_location = save_location + model_name + "/"  
     plot_save_location = model_save_location + "plots/"
     create_directory(model_save_location)
     create_directory(plot_save_location)
-    train_dataset_loc = save_location + "datasets/" + "train_dataset.pickle"
-    train_labels_loc = save_location + "datasets/" + "train_labels.pickle"
-    test_dataset_loc = save_location + "datasets/" + "test_dataset.pickle"
-    test_labels_loc = save_location + "datasets/" + "test_labels.pickle"
-    train_keys_loc = save_location + "datasets/" + "train_dataset_all_keys.pickle"
-    test_keys_loc = save_location + "datasets/" + "test_dataset_all_keys.pickle"
     
-    dtrain,X_train,y_train,scale_pos_weight = create_training_matrix(train_dataset_loc, train_labels_loc, train_keys_loc, frac_use_data=1, calc_scale_pos_weight=True)
-    dtest,X_test,y_test = create_training_matrix(test_dataset_loc, test_labels_loc, test_keys_loc, frac_use_data=1, calc_scale_pos_weight=False)
-    print("scale_pos_weight:", scale_pos_weight)
+    train_dataset_loc = dataset_location + "train_dataset.pickle"
+    train_labels_loc = dataset_location + "train_labels.pickle"
+    test_dataset_loc = dataset_location + "test_dataset.pickle"
+    test_labels_loc = dataset_location + "test_labels.pickle"
+    train_keys_loc = dataset_location + "train_dataset_all_keys.pickle"
+    test_keys_loc = dataset_location + "test_dataset_all_keys.pickle"
     
     file = open(model_save_location + "model_info.txt", 'w')
     file.write("SPARTA File: " +curr_sparta_file+ "\n")
@@ -217,91 +240,88 @@ if __name__ == "__main__":
     file.write("\nSearch Radius: " + str(search_rad) + "\n")
     file.write("Fraction of training data used: "+str(frac_training_data)+"\n")
     file.close()
-
-    if do_hpo == True and os.path.isfile(model_save_location + "best_params.pickle") == False:  
-        params = {
-        # Parameters that we are going to tune.
-        'max_depth':np.arange(2,6,1),
-        # 'min_child_weight': 1,
-        'learning_rate':np.arange(0.01,1.01,.1),
-        'scale_pos_weight':np.arange(1,8,.1),
-        'lambda':np.arange(0,3,.5),
-        'alpha':np.arange(0,3,.5),
-        # 'subsample': 1,
-        # 'colsample_bytree': 1,
-        }
-    
-        N_FOLDS = 5
-        N_ITER = 25
-        
-        model = dxgb.XGBClassifier(tree_method='gpu_hist', n_estimators=750, use_label_encoder=False)
-        accuracy_wrapper_scorer = make_scorer(accuracy_score_wrapper)
-        cuml_accuracy_scorer = make_scorer(accuracy_score, convert_dtype=True)
-        print_acc(model, X_train, y_train, X_test, y_test)
-        
-        mode = "gpu-random"
-
-        if os.path.isfile(model_save_location + "hyper_param_res.pickle") and os.path.isfile(model_save_location + "hyper_param_results.pickle"):
-            with open(model_save_location + "hyper_param_res.pickle", "rb") as pickle_file:
-                res = pickle.load(pickle_file)
-            with open(model_save_location + "hyper_param_results.pickle", "rb") as pickle_file:
-                results = pickle.load(pickle_file)
-        else:
-            with timed("XGB-"+mode):
-                res, results = do_HPO(model,
-                                        params,
-                                        cuml_accuracy_scorer,
-                                        X_train,
-                                        y_train,
-                                        mode=mode,
-                                        n_iter=N_ITER)
-            with open(model_save_location + "hyper_param_res.pickle", "wb") as pickle_file:
-                pickle.dump(res, pickle_file)
-            with open(model_save_location + "hyper_param_results.pickle", "wb") as pickle_file:
-                pickle.dump(results, pickle_file)
-                
-            print("Searched over {} parameters".format(len(results.cv_results_['mean_test_score'])))
-            print_acc(res, X_train, y_train, X_test, y_test, mode_str=mode)
-            print("Best params", results.best_params_)
-            
-            params = results.best_params_
-            
-            with open(model_save_location + "best_params.pickle", "wb") as pickle_file:
-                pickle.dump(results.best_params_, pickle_file)
-            
-            file = open(model_save_location + "model_info.txt", 'a')
-            
-            print(results)
-            # df_gridsearch = pd.DataFrame(results.cv_results_)
-            # print(df_gridsearch)
-            # heatmap = sns.heatmap(df_gridsearch, annot=True)
-            # fig = heatmap.get_figure()
-            # fig.savefig(plot_save_location + "param_heatmap.png")
-
-    elif os.path.isfile(model_save_location + "best_params.pickle"):
-        with open(model_save_location + "best_params.pickle", "rb") as pickle_file:
-            params = pickle.load(pickle_file)
-    else:
-        params = {
-            "verbosity": 1,
-            "tree_method": "hist",
-            # Golden line for GPU training
-            "device": "cuda",
-            'scale_pos_weight': scale_pos_weight,
-        }
-    
-    file = open(model_save_location + "model_info.txt", 'a')
-    file.write("Params:\n")
-    for item in params.items():
-        file.write(str(item[0]) + ": " + str(item[1]) + "\n")
-    file.close()
     
     if os.path.isfile(model_save_location + model_name + ".json"):
         bst = xgb.Booster()
-        # bst.load_model("/home/zvladimi/MLOIS/0.25_cpu_model.json")
         bst.load_model(model_save_location + model_name + ".json")
         print("Loaded Booster")
     else:
+        dtrain,X_train,y_train,scale_pos_weight = create_matrix(client, train_dataset_loc, train_labels_loc, train_keys_loc, frac_use_data=frac_training_data, calc_scale_pos_weight=True)
+        dtest,X_test,y_test = create_matrix(client, test_dataset_loc, test_labels_loc, test_keys_loc, frac_use_data=1, calc_scale_pos_weight=False)
+        print("scale_pos_weight:", scale_pos_weight)
+        
+        if do_hpo == True and os.path.isfile(model_save_location + "best_params.pickle") == False:  
+            params = {
+            # Parameters that we are going to tune.
+            'max_depth':np.arange(2,6,1),
+            # 'min_child_weight': 1,
+            'learning_rate':np.arange(0.01,1.01,.1),
+            'scale_pos_weight':np.arange(1,8,.1),
+            'lambda':np.arange(0,3,.5),
+            'alpha':np.arange(0,3,.5),
+            # 'subsample': 1,
+            # 'colsample_bytree': 1,
+            }
+        
+            N_FOLDS = 5
+            N_ITER = 25
+            
+            model = dxgb.XGBClassifier(tree_method='gpu_hist', n_estimators=750, use_label_encoder=False)
+            accuracy_wrapper_scorer = make_scorer(accuracy_score_wrapper)
+            cuml_accuracy_scorer = make_scorer(accuracy_score, convert_dtype=True)
+            print_acc(model, X_train, y_train, X_test, y_test)
+            
+            mode = "gpu-random"
+
+            if os.path.isfile(model_save_location + "hyper_param_res.pickle") and os.path.isfile(model_save_location + "hyper_param_results.pickle"):
+                with open(model_save_location + "hyper_param_res.pickle", "rb") as pickle_file:
+                    res = pickle.load(pickle_file)
+                with open(model_save_location + "hyper_param_results.pickle", "rb") as pickle_file:
+                    results = pickle.load(pickle_file)
+            else:
+                with timed("XGB-"+mode):
+                    res, results = do_HPO(model,
+                                            params,
+                                            cuml_accuracy_scorer,
+                                            X_train,
+                                            y_train,
+                                            mode=mode,
+                                            n_iter=N_ITER)
+                with open(model_save_location + "hyper_param_res.pickle", "wb") as pickle_file:
+                    pickle.dump(res, pickle_file)
+                with open(model_save_location + "hyper_param_results.pickle", "wb") as pickle_file:
+                    pickle.dump(results, pickle_file)
+                    
+                print("Searched over {} parameters".format(len(results.cv_results_['mean_test_score'])))
+                print_acc(res, X_train, y_train, X_test, y_test, mode_str=mode)
+                print("Best params", results.best_params_)
+                
+                params = results.best_params_
+                
+                with open(model_save_location + "best_params.pickle", "wb") as pickle_file:
+                    pickle.dump(results.best_params_, pickle_file)
+                
+                file = open(model_save_location + "model_info.txt", 'a')
+                
+                print(results)
+        elif os.path.isfile(model_save_location + "best_params.pickle"):
+            with open(model_save_location + "best_params.pickle", "rb") as pickle_file:
+                params = pickle.load(pickle_file)
+        else:
+            params = {
+                "verbosity": 1,
+                "tree_method": "hist",
+                # Golden line for GPU training
+                "device": "cuda",
+                'scale_pos_weight': scale_pos_weight,
+            }
+            
+        file = open(model_save_location + "model_info.txt", 'a')
+        file.write("Params:\n")
+        for item in params.items():
+            file.write(str(item[0]) + ": " + str(item[1]) + "\n")
+        file.close()
+        
         print("Starting train using params:", params)
         output = dxgb.train(
             client,
@@ -323,14 +343,11 @@ if __name__ == "__main__":
         plt.ylabel("Loss")
         plt.legend()
         plt.savefig(plot_save_location + "training_loss_graph.png")
-    #for name, size in sorted(((name, sys.getsizeof(value)) for name, value in list(
-     #               locals().items())), key= lambda x: -x[1])[:25]:
-      #  print("{:>30}: {:>8}".format(name, sizeof_fmt(size)))      
+ 
+        
     
-    # you can pass output directly into `predict` too.
-    
-    del dtrain
-    del dtest
+        del dtrain
+        del dtest
     
     train_preds = make_preds(client, bst, train_dataset_loc, train_labels_loc, report_name="Train Report", print_report=True)
     test_preds = make_preds(client, bst, test_dataset_loc, test_labels_loc, report_name="Test Report", print_report=True)

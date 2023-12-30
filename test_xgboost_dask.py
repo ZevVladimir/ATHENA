@@ -155,9 +155,6 @@ if __name__ == "__main__":
         fig, ax = plt.subplots(figsize=(400, 10))
         xgb.plot_tree(bst, num_trees=4, ax=ax)
         plt.savefig("/home/zvladimi/MLOIS/Random_figures/temp.png")
-
-
-
         print("Loaded Booster")
     else:
         print("Couldn't load Booster Located at: " + model_save_location + model_name + ".json")
