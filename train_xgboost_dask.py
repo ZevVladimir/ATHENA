@@ -1,11 +1,7 @@
 from dask import array as da
 from dask.distributed import Client
 
-from cuml.metrics.accuracy import accuracy_score
-from sklearn.metrics import make_scorer
-import dask_ml.model_selection as dcv
 from contextlib import contextmanager
-from cuml.experimental.hyperopt_utils import plotting_utils
 
 import xgboost as xgb
 from xgboost import dask as dxgb
@@ -83,6 +79,9 @@ if on_zaratan:
     #from dask_jobqueue import SLURMCluster
 else:
     from dask_cuda import LocalCUDACluster
+    from cuml.metrics.accuracy import accuracy_score
+    from sklearn.metrics import make_scorer
+    import dask_ml.model_selection as dcv
 ###############################################################################################################
 sys.path.insert(0, path_to_pygadgetreader)
 sys.path.insert(0, path_to_sparta)
@@ -250,7 +249,7 @@ if __name__ == "__main__":
         dtest,X_test,y_test = create_matrix(client, test_dataset_loc, test_labels_loc, test_keys_loc, frac_use_data=1, calc_scale_pos_weight=False)
         print("scale_pos_weight:", scale_pos_weight)
         
-        if do_hpo == True and os.path.isfile(model_save_location + "best_params.pickle") == False:  
+        if on_zaratan == False and do_hpo == True and os.path.isfile(model_save_location + "best_params.pickle") == False:  
             params = {
             # Parameters that we are going to tune.
             'max_depth':np.arange(2,6,1),
@@ -391,3 +390,4 @@ if __name__ == "__main__":
     compare_density_prf(radii=X_np[:,scaled_radii_loc], actual_prf_all=density_prf_all_within, actual_prf_1halo=density_prf_1halo_within, mass=ptl_mass, orbit_assn=test_preds, prf_bins=bins, title = model_name, show_graph = False, save_graph = True, save_location = plot_save_location)
     plot_r_rv_tv_graph(test_preds, X_np[:,scaled_radii_loc], X_np[:,rad_vel_loc], X_np[:,tang_vel_loc], y_np, model_name, num_bins, show = False, save = True, save_location=plot_save_location)
     #ssgraph_acc_by_bin(test_prediction, y_np, X_np[:,scaled_radii_loc], num_bins, model_name + " Predicts", plot = False, save = True, save_location = plot_save_location)
+    client.close()
