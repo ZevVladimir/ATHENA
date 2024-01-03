@@ -59,7 +59,7 @@ curr_chunk_size = config.getint("SEARCH","chunk_size")
 global num_save_ptl_params
 num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 do_hpo = config.getboolean("XGBOOST","hpo")
-frac_training_data = config.getint("XGBOOST","frac_training_data")
+frac_training_data = config.getfloat("XGBOOST","frac_train_data")
 # size float32 is 4 bytes
 chunk_size = int(np.floor(1e9 / (num_save_ptl_params * 4)))
 
@@ -348,8 +348,10 @@ if __name__ == "__main__":
         del dtrain
         del dtest
     
-    train_preds = make_preds(client, bst, train_dataset_loc, train_labels_loc, report_name="Train Report", print_report=True)
-    test_preds = make_preds(client, bst, test_dataset_loc, test_labels_loc, report_name="Test Report", print_report=True)
+    with timed("Train Predictions"):
+        train_preds = make_preds(client, bst, train_dataset_loc, train_labels_loc, report_name="Train Report", print_report=False)
+    with timed("Test Predictions"):
+        test_preds = make_preds(client, bst, test_dataset_loc, test_labels_loc, report_name="Test Report", print_report=False)
     bst.save_model(model_save_location + model_name + ".json")
     
     t1 = time.time()
