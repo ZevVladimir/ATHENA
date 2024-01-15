@@ -5,20 +5,15 @@ from colossus.cosmology import cosmology
 from colossus.halo import mass_so
 from colossus.lss import peaks
 import matplotlib.pyplot as plt
-from matplotlib.pyplot import cm
 import matplotlib as mpl
 mpl.rcParams.update(mpl.rcParamsDefault)
+from contextlib import contextmanager
 import time
 import h5py
 import pickle
 import os
-from multiprocessing import shared_memory
 import multiprocessing as mp
-import logging
-import ctypes
 from itertools import repeat
-from contextlib import closing
-import pandas as pd
 from data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5, conv_halo_id_spid, get_comp_snap, create_directory
 from visualization_functions import compare_density_prf
 from calculation_functions import *
@@ -26,7 +21,7 @@ from calculation_functions import *
 # LOAD CONFIG PARAMETERS
 import configparser
 config = configparser.ConfigParser()
-config.read("config.ini")
+config.read("/home/zvladimi/MLOIS/config.ini")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 rand_seed = config.getint("MISC","random_seed")
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
@@ -66,7 +61,13 @@ sys.path.insert(0, path_to_sparta)
 from pygadgetreader import readsnap, readheader
 from sparta import sparta
 ##################################################################################################################
-
+@contextmanager
+def timed(txt):
+    t0 = time.time()
+    yield
+    t1 = time.time()
+    print("%32s time:  %8.5f" % (txt, t1 - t0))
+    
 def initial_search(halo_positions, halo_r200m, comp_snap, find_mass = False, find_ptl_indices = False):
     global search_rad
     if comp_snap:
@@ -107,6 +108,8 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     hubble_const = snap_dict["hubble_const"]
     box_size = snap_dict["box_size"]    
     
+    halo_pos = halo_pos * 10**3 * scale_factor
+    
     num_new_ptls = curr_ptl_pids.shape[0]
 
     curr_ptl_pids = curr_ptl_pids.astype(np.int64) # otherwise ne.evaluate doesn't work
@@ -141,17 +144,17 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     scaled_radii = (ptl_rad / halo_r200m)
     
     if create_dens_prf:
-        bins = np.insert(bins, 0, 0)
         if curr_sparta_idx < 5:
+            bins = np.insert(bins, 0, 0)
             print("num sparta n peri:",np.where(sparta_n_pericenter !=0)[0].size)
             print("num n peri adj:", np.where(adj_sparta_n_pericenter != 0)[0].size)
             print("num orbiting after:",np.where(curr_orb_assn != 0)[0].size)
-            print("curr_ptl_pids", curr_ptl_pids[:10])
-            print("sparta_tracer_ids",sparta_tracer_ids[:10])
+            print("curr_ptl_pids", curr_ptl_pids[:10], "num pids", curr_ptl_pids.shape)
+            print("sparta_tracer_ids",sparta_tracer_ids[:10], "num sparta ids", sparta_tracer_ids.shape)
             print("num matches:",matched_ids[0].size)
             print(curr_orb_assn[:25])
-            compare_density_prf((ptl_rad/halo_r200m),dens_prf_all, dens_prf_1halo, mass, curr_orb_assn, bins, str(curr_halo_idx), "/home/zvladimi/scratch/MLOIS/Random_figures/",save_graph=True)
-
+            print(scaled_radii)
+            compare_density_prf(scaled_radii, dens_prf_all, dens_prf_1halo, mass, curr_orb_assn, bins, str(curr_halo_idx), "/home/zvladimi/MLOIS/Random_figures/",save_graph=True)
 
     if comp_snap == False:
         return fnd_HIPIDs, curr_orb_assn, scaled_rad_vel, scaled_tang_vel, scaled_radii
@@ -198,7 +201,7 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_pt
         has_ptls = np.where(p_use_num_ptls > 0)
         p_use_num_ptls = p_use_num_ptls[has_ptls]
         p_curr_ptl_indices = p_curr_ptl_indices[has_ptls]
-        use_halo_idxs = use_halo_idxs[has_ptls]
+        p_use_halo_idxs = use_halo_idxs[has_ptls]
        
         p_start_num_ptls = [np.sum(p_use_num_ptls[0:i+1]) for i in range(p_use_num_ptls.shape[0])]
         p_start_num_ptls = np.insert(p_start_num_ptls, 0, 0)
@@ -221,7 +224,7 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_pt
         # Use multiprocessing to search multiple halos at the same time and add information to shared arrays
         with mp.Pool(processes=num_processes) as p:
             p_all_HIPIDs, p_all_orb_assn, p_all_rad_vel, p_all_tang_vel, p_all_scal_rad = zip(*p.starmap(search_halos, 
-                                        zip(repeat(False), repeat(p_dict), use_halo_idxs, np.arange(curr_num_halos),
+                                        zip(repeat(False), repeat(p_dict), p_use_halo_idxs, np.arange(curr_num_halos),
                                         (p_ptls_pid[p_curr_ptl_indices[i]] for i in range(curr_num_halos)), 
                                         (p_ptls_pos[p_curr_ptl_indices[j]] for j in range(curr_num_halos)),
                                         (p_ptls_vel[p_curr_ptl_indices[k]] for k in range(curr_num_halos)),
@@ -235,7 +238,7 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_pt
                                         (sparta_output['anl_prf']['M_all'][l,p_snap,:] for l in range(curr_num_halos)),
                                         (sparta_output['anl_prf']['M_1halo'][l,p_snap,:] for l in range(curr_num_halos)),
                                         # Uncomment below to create dens profiles
-                                        #repeat(sparta_output["config"]['anl_prf']["r_bins_lin"]),repeat(True) 
+                                        repeat(sparta_output["config"]['anl_prf']["r_bins_lin"]),repeat(True) 
                                         ),chunksize=curr_chunk_size))
         p.close()
         p.join()
@@ -268,7 +271,7 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_pt
             has_ptls = np.where(c_use_num_ptls > 0)
             c_use_num_ptls = c_use_num_ptls[has_ptls]
             c_curr_ptl_indices = c_curr_ptl_indices[has_ptls]
-            use_halo_idxs = use_halo_idxs[has_ptls]
+            c_use_halo_idxs = use_halo_idxs[has_ptls]
 
             c_tot_num_use_ptls = int(np.sum(c_use_num_ptls))
             
@@ -281,7 +284,7 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_pt
             
             with mp.Pool(processes=num_processes) as p:
                 c_all_HIPIDs, c_all_rad_vel, c_all_tang_vel, c_all_scal_rad = zip(*p.starmap(search_halos, 
-                                            zip(repeat(True), repeat(c_dict),use_halo_idxs, np.arange(curr_num_halos),
+                                            zip(repeat(True), repeat(c_dict),c_use_halo_idxs, np.arange(curr_num_halos),
                                                 (c_ptls_pid[c_curr_ptl_indices[i]] for i in range(curr_num_halos)), 
                                                 (c_ptls_pos[c_curr_ptl_indices[j]] for j in range(curr_num_halos)),
                                                 (c_ptls_vel[c_curr_ptl_indices[k]] for k in range(curr_num_halos)),
