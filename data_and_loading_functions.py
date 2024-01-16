@@ -33,12 +33,6 @@ snap_format = config["MISC"]["snap_format"]
 global prim_only
 prim_only = config.getboolean("SEARCH","prim_only")
 t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
-global p_snap
-p_snap = config.getint("SEARCH","p_snap")
-global c_snap
-c_snap = config.getint("XGBOOST", 'c_snap')
-global snapshot_list
-snapshot_list = [p_snap, c_snap]
 global search_rad
 search_rad = config.getfloat("SEARCH","search_rad")
 total_num_snaps = config.getint("SEARCH","total_num_snaps")
@@ -251,17 +245,23 @@ def choose_halo_split(indices, snap, halo_props, particle_props, num_features):
 
     return dataset
 
-def find_closest_snap(cosmology, time_find, num_snaps, path_to_snap, snap_format):
-    closest_time = 0
-    closest_snap = 0
-    for i in range(num_snaps):
-        red_shift = readheader(path_to_snap + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift')
-        comp_time = cosmology.age(red_shift)
-        
-        if np.abs(time_find - comp_time) < np.abs(time_find - closest_time):
-            closest_time = comp_time
-            closest_snap = i
-    return closest_snap
+def find_closest_z(value):
+    all_red_shift = np.zeros(total_num_snaps)
+    for i in range(total_num_snaps):
+        all_red_shift[i] = readheader(path_to_snaps + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift')
+
+    idx = (np.abs(all_red_shift - value)).argmin()
+
+    return idx, all_red_shift[idx]
+
+
+def find_closest_snap(value, cosmology):
+    all_times = np.zeros(total_num_snaps)
+    for i in range(total_num_snaps):
+        all_times[i] = cosmology.age(readheader(path_to_snaps + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift'))
+
+    idx = (np.abs(all_times - value)).argmin()
+    return idx
 
 def conv_halo_id_spid(my_halo_ids, sdata, snapshot):
     sparta_idx = np.zeros(my_halo_ids.shape[0], dtype = np.int32)
@@ -273,7 +273,7 @@ def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, total_n
     # calculate one dynamical time ago and set that as the comparison snap
     curr_time = cosmol.age(p_red_shift)
     past_time = curr_time - (t_dyn_step * t_dyn)
-    c_snap = find_closest_snap(cosmol, past_time, num_snaps = total_num_snaps, path_to_snap=path_to_snaps, snap_format = snap_format)
+    c_snap = find_closest_snap(past_time, cosmol)
     snapshot_list.append(c_snap)
 
     # switch to comparison snap
@@ -286,6 +286,7 @@ def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, total_n
     c_hubble_constant = cosmol.Hz(c_red_shift) * 0.001 # convert to units km/s/kpc
     c_box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
     c_box_size = c_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
+    c_box_size = c_box_size + 0.001 # NEED TO MAKE WORK FOR PARTICLES ON THE VERY EDGE
     
     # load particle data and SPARTA data for the comparison snap
     c_particles_pid, c_particles_vel, c_particles_pos = load_or_pickle_ptl_data(curr_sparta_file, str(c_snap), snapshot_path, c_scale_factor)
