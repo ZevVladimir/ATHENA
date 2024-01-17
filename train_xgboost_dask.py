@@ -15,7 +15,7 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
-from data_and_loading_functions import create_directory, load_or_pickle_SPARTA_data, conv_halo_id_spid
+from data_and_loading_functions import create_directory, load_or_pickle_SPARTA_data, conv_halo_id_spid, find_closest_z
 from visualization_functions import *
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -44,8 +44,9 @@ snap_format = config["MISC"]["snap_format"]
 global prim_only
 prim_only = config.getboolean("SEARCH","prim_only")
 t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
+p_red_shift = config.getfloat("SEARCH","p_red_shift")
 global p_snap
-p_snap = config.getint("SEARCH","p_snap")
+p_snap = config.getint("XGBOOST","p_snap")
 c_snap = config.getint("XGBOOST","c_snap")
 model_name = config["XGBOOST"]["model_name"]
 radii_splits = config.get("XGBOOST","rad_splits").split(',')
@@ -372,10 +373,18 @@ if __name__ == "__main__":
     with open(path_to_calc_info + specific_save + "test_indices.pickle", "rb") as pickle_file:
         test_indices = pickle.load(pickle_file)
     
+    p_snap, p_red_shift = find_closest_z(p_red_shift)
+    sparta_output = sparta.load(filename=path_to_hdf5_file, log_level= 0)
+    all_red_shifts = sparta_output["simulation"]["snap_z"][:]
+    p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
+    print("corresponding SPARTA snap num:", p_sparta_snap)
+    print("check sparta redshift:",sparta_output["simulation"]["snap_z"][p_sparta_snap])
+
+
     p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
     p_red_shift = readheader(p_snapshot_path, 'redshift')
     p_scale_factor = 1/(1+p_red_shift)
-    halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, ptl_mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap)
+    halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, ptl_mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
     cosmol = cosmology.setCosmology("bolshoi")
     use_halo_ids = halos_id[test_indices]
     sparta_output = sparta.load(filename=path_to_hdf5_file, halo_ids=use_halo_ids, log_level=0)
@@ -390,6 +399,6 @@ if __name__ == "__main__":
     bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
     bins = np.insert(bins, 0, 0)
     compare_density_prf(radii=X_np[:,scaled_radii_loc], actual_prf_all=density_prf_all_within, actual_prf_1halo=density_prf_1halo_within, mass=ptl_mass, orbit_assn=test_preds, prf_bins=bins, title = model_name, show_graph = False, save_graph = True, save_location = plot_save_location)
-    plot_r_rv_tv_graph(test_preds, X_np[:,scaled_radii_loc], X_np[:,rad_vel_loc], X_np[:,tang_vel_loc], y_np, model_name, num_bins, show = False, save = True, save_location=plot_save_location)
+    plot_r_rv_tv_graph(test_preds, X_np[:,scaled_radii_loc], X_np[:,rad_vel_loc], X_np[:,tang_vel_loc], y_np, model_name, num_bins, show = False, save = True, save_location=plot_save_location, model_save_location=model_save_location)
     #ssgraph_acc_by_bin(test_prediction, y_np, X_np[:,scaled_radii_loc], num_bins, model_name + " Predicts", plot = False, save = True, save_location = plot_save_location)
     client.close()
