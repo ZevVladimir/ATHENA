@@ -21,7 +21,7 @@ from calculation_functions import *
 # LOAD CONFIG PARAMETERS
 import configparser
 config = configparser.ConfigParser()
-config.read("/home/zvladimi/MLOIS/config.ini")
+config.read("/home/zvladimi/scratch/MLOIS/config.ini")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 rand_seed = config.getint("MISC","random_seed")
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
@@ -87,7 +87,9 @@ def initial_search(halo_positions, halo_r200m, comp_snap, find_mass = False, fin
         if find_ptl_indices:
             all_ptl_indices = indices
     else:
+        print(halo_r200m)
         num_new_particles = 0
+        all_ptl_indices = np.empty(1)
     
     if find_mass == False and find_ptl_indices == False:
         return num_new_particles
@@ -192,19 +194,16 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_pt
 
         # Load the halo information for the ids within this range
         sparta_output = sparta.load(filename = path_to_hdf5_file, halo_ids=use_halo_ids, log_level=0)
-        global sparta_p_snap
-        sparta_p_snap = np.abs(sparta_output["simulation"]["snap_z"][:] - p_red_shift).argmin()
-        print(sparta_output["simulation"]["snap_z"][sparta_p_snap])
 
-        global sparta_c_snap
-        sparta_c_snap = np.abs(sparta_output["simulation"]["snap_z"][:] - c_red_shift).argmin()
+        global c_sparta_snap
+        c_sparta_snap = np.abs(sparta_output["simulation"]["snap_z"][:] - c_red_shift).argmin()
         
-        new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, sparta_p_snap) # If the order changed by sparta resort the indices
+        new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta resort the indices
         use_halo_idxs = use_indices[new_idxs]
 
         # Search around these halos and get the number of particles and the corresponding ptl indices for them
-        p_use_halos_pos = sparta_output['halos']['position'][:,sparta_p_snap] * 10**3 * p_scale_factor 
-        p_use_halos_r200m = sparta_output['halos']['R200m'][:,sparta_p_snap]
+        p_use_halos_pos = sparta_output['halos']['position'][:,p_sparta_snap] * 10**3 * p_scale_factor 
+        p_use_halos_r200m = sparta_output['halos']['R200m'][:,p_sparta_snap]
 
         with mp.Pool(processes=num_processes) as p:
             # halo position, halo r200m, if comparison snap, want mass?, want indices?
@@ -237,17 +236,17 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_pt
                                         (p_ptls_pid[p_curr_ptl_indices[i]] for i in range(curr_num_halos)), 
                                         (p_ptls_pos[p_curr_ptl_indices[j]] for j in range(curr_num_halos)),
                                         (p_ptls_vel[p_curr_ptl_indices[k]] for k in range(curr_num_halos)),
-                                        (sparta_output['halos']['position'][l,sparta_p_snap,:] for l in range(curr_num_halos)),
-                                        (sparta_output['halos']['velocity'][l,sparta_p_snap,:] for l in range(curr_num_halos)),
-                                        (sparta_output['halos']['R200m'][l,sparta_p_snap] for l in range(curr_num_halos)),
+                                        (sparta_output['halos']['position'][l,p_sparta_snap,:] for l in range(curr_num_halos)),
+                                        (sparta_output['halos']['velocity'][l,p_sparta_snap,:] for l in range(curr_num_halos)),
+                                        (sparta_output['halos']['R200m'][l,p_sparta_snap] for l in range(curr_num_halos)),
                                         (sparta_output['tcr_ptl']['res_oct']['last_pericenter_snap'][halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
                                         (sparta_output['tcr_ptl']['res_oct']['n_pericenter'][halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
                                         (sparta_output['tcr_ptl']['res_oct']['tracer_id'][halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
                                         (sparta_output['tcr_ptl']['res_oct']['n_is_lower_limit'][halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
-                                        (sparta_output['anl_prf']['M_all'][l,sparta_p_snap,:] for l in range(curr_num_halos)),
-                                        (sparta_output['anl_prf']['M_1halo'][l,sparta_p_snap,:] for l in range(curr_num_halos)),
+                                        (sparta_output['anl_prf']['M_all'][l,p_sparta_snap,:] for l in range(curr_num_halos)),
+                                        (sparta_output['anl_prf']['M_1halo'][l,p_sparta_snap,:] for l in range(curr_num_halos)),
                                         # Uncomment below to create dens profiles
-                                        #repeat(sparta_output["config"]['anl_prf']["r_bins_lin"]),repeat(True) 
+                                        repeat(sparta_output["config"]['anl_prf']["r_bins_lin"]),repeat(True) 
                                         ),chunksize=curr_chunk_size))
         p.close()
         p.join()
@@ -266,8 +265,8 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_pt
         
         # If multiple snaps also search the comparison snaps in the same manner as with the primary snap
         if prim_only == False:
-            c_use_halos_pos = sparta_output['halos']['position'][:,sparta_c_snap] * 10**3 * c_scale_factor
-            c_use_halos_r200m = sparta_output['halos']['R200m'][:,sparta_c_snap] 
+            c_use_halos_pos = sparta_output['halos']['position'][:,c_sparta_snap] * 10**3 * c_scale_factor
+            c_use_halos_r200m = sparta_output['halos']['R200m'][:,c_sparta_snap] 
 
             with mp.Pool(processes=num_processes) as p:
                 # halo position, halo r200m, if comparison snap, if train dataset, want mass?, want indices?
@@ -291,9 +290,9 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_pt
                                                 (c_ptls_pid[c_curr_ptl_indices[i]] for i in range(curr_num_halos)), 
                                                 (c_ptls_pos[c_curr_ptl_indices[j]] for j in range(curr_num_halos)),
                                                 (c_ptls_vel[c_curr_ptl_indices[k]] for k in range(curr_num_halos)),
-                                                (sparta_output['halos']['position'][l,sparta_c_snap,:] for l in range(curr_num_halos)),
-                                                (sparta_output['halos']['velocity'][l,sparta_c_snap,:] for l in range(curr_num_halos)),
-                                                (sparta_output['halos']['R200m'][l,sparta_c_snap] for l in range(curr_num_halos)),
+                                                (sparta_output['halos']['position'][l,c_sparta_snap,:] for l in range(curr_num_halos)),
+                                                (sparta_output['halos']['velocity'][l,c_sparta_snap,:] for l in range(curr_num_halos)),
+                                                (sparta_output['halos']['R200m'][l,c_sparta_snap] for l in range(curr_num_halos)),
                                                 ),chunksize=curr_chunk_size))
             p.close()
             p.join()
@@ -371,12 +370,14 @@ t1 = time.time()
 
 cosmol = cosmology.setCosmology("bolshoi") 
 
-print(p_red_shift)
 p_snap, p_red_shift = find_closest_z(p_red_shift)
-print(p_snap, p_red_shift)
-
-global sparta_p_snap
-sparta_p_snap = p_snap
+print("Snapshot number found:", p_snap, "Closest redshift found:", p_red_shift)
+sparta_output = sparta.load(filename=path_to_hdf5_file, log_level= 0)
+all_red_shifts = sparta_output["simulation"]["snap_z"][:]
+p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
+print("corresponding SPARTA snap num:", p_sparta_snap)
+print("check sparta redshift:",sparta_output["simulation"]["snap_z"][p_sparta_snap])
+del sparta_output
 
 # Set constants
 p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
@@ -399,12 +400,11 @@ p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/sn
 # load all information needed for the primary snap
 p_ptls_pid, p_ptls_vel, p_ptls_pos = load_or_pickle_ptl_data(curr_sparta_file, str(p_snap), p_snapshot_path, p_scale_factor)
 
-p_halos_pos, p_halos_r200m, p_halos_id, p_halos_status, p_halos_last_snap, mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap)
+p_halos_pos, p_halos_r200m, p_halos_id, p_halos_status, p_halos_last_snap, mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_red_shift)
 
 t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], p_red_shift)
 
-c_snap, c_box_size, c_rho_m, c_red_shift, c_hubble_constant, c_ptls_pid, c_ptls_vel, c_ptls_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, total_num_snaps=total_num_snaps, snap_format=snap_format)
-c_scale_factor = 1/(1+c_red_shift)
+c_snap, c_sparta_snap, c_box_size, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_ptls_pid, c_ptls_vel, c_ptls_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts, snap_format=snap_format)
 c_snap_dict = {
     "snap":c_snap,
     "red_shift":c_red_shift,
@@ -412,9 +412,6 @@ c_snap_dict = {
     "hubble_const": c_hubble_constant,
     "box_size": c_box_size
 }
-
-global sparta_c_snap
-sparta_c_snap = c_snap
 
 snapshot_list = [p_snap, c_snap]
 
@@ -444,9 +441,9 @@ else:
 
 # only take halos that are hosts in primary snap and exist past the p_snap and exist in some form at the comparison snap
 if prim_only:
-    match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_snap))[0]
+    match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap))[0]
 else:
-    match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_snap) & (c_halos_status > 0) & (c_halos_last_snap >= c_snap))[0]
+    match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap) & (c_halos_status > 0) & (c_halos_last_snap >= c_sparta_snap))[0]
     
 rng = np.random.default_rng(rand_seed)    
 total_num_halos = match_halo_idxs.shape[0]
