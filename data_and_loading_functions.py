@@ -12,7 +12,7 @@ def create_directory(path):
 # LOAD CONFIG PARAMETERS
 import configparser
 config = configparser.ConfigParser()
-config.read("/home/zvladimi/MLOIS/config.ini")
+config.read("/home/zvladimi/scratch/MLOIS/config.ini")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
@@ -74,7 +74,7 @@ def load_or_pickle_ptl_data(sparta_name, snapshot, snapshot_path, scale_factor):
 
     return ptl_pid, ptl_vel, ptl_pos
 
-def load_or_pickle_SPARTA_data(sparta_name, scale_factor, snap):
+def load_or_pickle_SPARTA_data(sparta_name, scale_factor, snap, sparta_snap):
     create_directory(path_to_pickle + str(snap) +  "_" + str(sparta_name) + "/")
     reload_sparta = False
 
@@ -116,19 +116,19 @@ def load_or_pickle_SPARTA_data(sparta_name, scale_factor, snap):
     
     if reload_sparta:
         sparta_output = sparta.load(filename=path_to_hdf5_file, log_level= 0)
-        halos_pos = sparta_output['halos']['position'][:,snap,:] * 10**3 * scale_factor # convert to kpc/h and physical
+        halos_pos = sparta_output['halos']['position'][:,sparta_snap,:] * 10**3 * scale_factor # convert to kpc/h and physical
         with open(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/halos_pos.pickle", "wb") as pickle_file:
             pickle.dump(halos_pos, pickle_file)
         halos_last_snap = sparta_output['halos']['last_snap'][:]
         with open(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/halos_last_snap.pickle", "wb") as pickle_file:
             pickle.dump(halos_last_snap, pickle_file)
-        halos_r200m = sparta_output['halos']['R200m'][:,snap]
+        halos_r200m = sparta_output['halos']['R200m'][:,sparta_snap]
         with open(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/halos_r200m.pickle", "wb") as pickle_file:
             pickle.dump(halos_r200m, pickle_file) 
-        halos_id = sparta_output['halos']['id'][:,snap]
+        halos_id = sparta_output['halos']['id'][:,sparta_snap]
         with open(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/halos_id.pickle", "wb") as pickle_file:
             pickle.dump(halos_id, pickle_file)
-        halos_status = sparta_output['halos']['status'][:,snap]
+        halos_status = sparta_output['halos']['status'][:,sparta_snap]
         with open(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/halos_status.pickle", "wb") as pickle_file:
             pickle.dump(halos_status, pickle_file)
         ptl_mass = sparta_output["simulation"]["particle_mass"]
@@ -269,7 +269,7 @@ def conv_halo_id_spid(my_halo_ids, sdata, snapshot):
         sparta_idx[i] = int(np.where(my_id == sdata['halos']['id'][:,snapshot])[0])
     return sparta_idx
 
-def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, total_num_snaps, snap_format):
+def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red_shifts, snap_format):
     # calculate one dynamical time ago and set that as the comparison snap
     curr_time = cosmol.age(p_red_shift)
     past_time = curr_time - (t_dyn_step * t_dyn)
@@ -281,6 +281,10 @@ def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, total_n
         
     # get constants from pygadgetreader
     c_red_shift = readheader(snapshot_path, 'redshift')
+    c_sparta_snap = np.abs(all_red_shifts - c_red_shift).argmin()
+    print("Complementary snapshot:", c_snap, "Complementary redshift:", c_red_shift)
+    print("Corresponding SPARTA loc:", c_sparta_snap, "SPARTA redshift:",all_red_shifts[c_sparta_snap])
+
     c_scale_factor = 1/(1+c_red_shift)
     c_rho_m = cosmol.rho_m(c_red_shift)
     c_hubble_constant = cosmol.Hz(c_red_shift) * 0.001 # convert to units km/s/kpc
@@ -290,6 +294,6 @@ def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, total_n
     
     # load particle data and SPARTA data for the comparison snap
     c_particles_pid, c_particles_vel, c_particles_pos = load_or_pickle_ptl_data(curr_sparta_file, str(c_snap), snapshot_path, c_scale_factor)
-    c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap, mass = load_or_pickle_SPARTA_data(curr_sparta_file, c_scale_factor, c_snap)
+    c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap, mass = load_or_pickle_SPARTA_data(curr_sparta_file, c_scale_factor, c_snap, c_sparta_snap)
 
-    return c_snap, c_box_size, c_rho_m, c_red_shift, c_hubble_constant, c_particles_pid, c_particles_vel, c_particles_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap
+    return c_snap, c_sparta_snap, c_box_size, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_particles_pid, c_particles_vel, c_particles_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap
