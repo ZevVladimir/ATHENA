@@ -21,7 +21,7 @@ from calculation_functions import *
 # LOAD CONFIG PARAMETERS
 import configparser
 config = configparser.ConfigParser()
-config.read("/home/zvladimi/scratch/MLOIS/config.ini")
+config.read("/home/zvladimi/MLOIS/config.ini")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 rand_seed = config.getint("MISC","random_seed")
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
@@ -120,7 +120,7 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     #calculate the radii of each particle based on the distance formula
     ptl_rad, coord_dist = calculate_distance(halo_pos[0], halo_pos[1], halo_pos[2], curr_ptl_pos[:,0], curr_ptl_pos[:,1], curr_ptl_pos[:,2], num_new_ptls, box_size)         
     
-    if comp_snap == False:        
+    if comp_snap == False:         
         compare_sparta_assn = np.zeros((sparta_tracer_ids.shape[0]))
         curr_orb_assn = np.zeros((num_new_ptls))
          # Anywhere sparta_last_pericenter is greater than the current snap then that is in the future so set to 0
@@ -130,7 +130,10 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
         adj_sparta_n_is_lower_limit = sparta_n_is_lower_limit
         adj_sparta_n_is_lower_limit[future_peri] = 0
         # If a particle has a pericenter of the lower limit is 1 then it is orbiting
-        compare_sparta_assn[np.where((adj_sparta_n_pericenter >= 1) | (adj_sparta_n_is_lower_limit == 1))[0]] = 1
+        if (total_num_snaps - snap) <= 3:
+            compare_sparta_assn[np.where((adj_sparta_n_pericenter >= 1) | (adj_sparta_n_is_lower_limit == 1))[0]] = 1
+        else:
+            compare_sparta_assn[np.where(adj_sparta_n_pericenter >= 1)] = 1
         # Compare the ids between SPARTA and the found prtl ids and match the SPARTA results
         matched_ids = np.intersect1d(curr_ptl_pids, sparta_tracer_ids, return_indices = True)
         curr_orb_assn[matched_ids[1]] = compare_sparta_assn[matched_ids[2]]
@@ -145,30 +148,39 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     scaled_tang_vel = fnd_tang_vel
     scaled_radii = (ptl_rad / halo_r200m)
     
-    if create_dens_prf:
-        if curr_sparta_idx < 3:
-            bins = np.insert(bins, 0, 0)
-            print("num sparta n peri:",np.where(sparta_n_pericenter !=0)[0].size)
-            print("num n peri adj:", np.where(adj_sparta_n_pericenter != 0)[0].size)
-            print("num orbiting after:",np.where(curr_orb_assn != 0)[0].size)
-            print("curr_ptl_pids", curr_ptl_pids[:10], "num pids", curr_ptl_pids.shape)
-            print("sparta_tracer_ids",sparta_tracer_ids[:10], "num sparta ids", sparta_tracer_ids.shape)
-            print("num matches:",matched_ids[0].size)
-            print(curr_orb_assn[:25])
-            print(scaled_radii)
-            compare_density_prf(scaled_radii, dens_prf_all, dens_prf_1halo, mass, curr_orb_assn, bins, str(curr_halo_idx), path_to_MLOIS +  "Random_figures/",save_graph=True)
+    # if create_dens_prf:
+    #     if (curr_sparta_idx < 15) and (curr_sparta_idx > 5):
+    #     #if curr_halo_idx == 9504:
+    #         bins = np.insert(bins, 0, 0)
+    #         # print("num sparta n peri:",np.where(sparta_n_pericenter !=0)[0].size)
+    #         # print("num n peri adj:", np.where(adj_sparta_n_pericenter != 0)[0].size)
+    #         # print("num n_is_lower_limit:", np.where(sparta_n_is_lower_limit ==1)[0].size)
+    #         # print("num n_is_lower_limit adj:", np.where(adj_sparta_n_is_lower_limit==1)[0].size)
+    #         # print("no peri yes lower lim", np.where((adj_sparta_n_pericenter < 1)&(adj_sparta_n_is_lower_limit==1))[0].size)
+    #         # print("yes peri no lower lim", np.where((adj_sparta_n_pericenter >= 1)&(adj_sparta_n_is_lower_limit==0))[0].size)
+    #         # print("yes peri yes lower lim", np.where((adj_sparta_n_pericenter >= 1)&(adj_sparta_n_is_lower_limit==1))[0].size)
+    #         # print("no peri no lower lim", np.where((adj_sparta_n_pericenter < 1)&(adj_sparta_n_is_lower_limit==0))[0].size)
+    #         # print("curr_ptl_pids", curr_ptl_pids[:10], "num pids", curr_ptl_pids.shape)
+    #         # print("num sparta ids", sparta_tracer_ids.shape)
+    #         # print(*sparta_tracer_ids[np.where((adj_sparta_n_pericenter < 1)&(adj_sparta_n_is_lower_limit==0))[0]], sep=",")
+    #         # print("num matches:",matched_ids[0].size)
+    #         # print("total orbiting mass and num orbiting SPARTA:", dens_prf_1halo[-1], dens_prf_1halo[-1]/mass)
+    #         # print("total orbiting mass and num orbiting me:", np.where(curr_orb_assn != 0)[0].size, np.where(curr_orb_assn != 0)[0].size * mass)
+    #         #print("total num ptls at 3R200m:", dens_prf_all[-1]/mass)
+    #         # print(sparta_last_pericenter_snap[np.where(sparta_tracer_ids==161066)[0]])
+    #         compare_density_prf(scaled_radii, dens_prf_all, dens_prf_1halo, mass, curr_orb_assn, bins, str(curr_halo_idx), path_to_MLOIS +  "Random_figures/",save_graph=True)
             
-            #plot_pos_loc = np.where((curr_ptl_pos[:,2] > np.average(curr_ptl_pos[:,2] - np.std(curr_ptl_pos[:,2]))) & (curr_ptl_pos[:,2] < np.average(curr_ptl_pos[:,2] + np.std(curr_ptl_pos[:,2]))))[0]
+    #         #plot_pos_loc = np.where((curr_ptl_pos[:,2] > np.average(curr_ptl_pos[:,2] - np.std(curr_ptl_pos[:,2]))) & (curr_ptl_pos[:,2] < np.average(curr_ptl_pos[:,2] + np.std(curr_ptl_pos[:,2]))))[0]
             
-            sparta_matches = np.intersect1d(p_ptls_pid, sparta_tracer_ids, return_indices=True)
-            sparta_pos = p_ptls_pos[sparta_matches[1]]
-            #sparta_pos_loc = np.where((sparta_pos[:,2] > np.average(curr_ptl_pos[:,2] - np.std(curr_ptl_pos[:,2]))) & (sparta_pos[:,2] < np.average(curr_ptl_pos[:,2] + np.std(curr_ptl_pos[:,2]))))[0]
+    #         sparta_matches = np.intersect1d(p_ptls_pid, sparta_tracer_ids, return_indices=True)
+    #         sparta_pos = p_ptls_pos[sparta_matches[1]]
+    #         #sparta_pos_loc = np.where((sparta_pos[:,2] > np.average(curr_ptl_pos[:,2] - np.std(curr_ptl_pos[:,2]))) & (sparta_pos[:,2] < np.average(curr_ptl_pos[:,2] + np.std(curr_ptl_pos[:,2]))))[0]
 
-            fig, ax = plt.subplots(1, layout="constrained")
-            ax.scatter(curr_ptl_pos[:,0], curr_ptl_pos[:,1], c="b", alpha=.5, label="my tree")
-            ax.scatter(sparta_pos[:,0], sparta_pos[:,1], c="r", alpha=.5, label="sparta")
-            ax.legend()
-            fig.savefig(path_to_MLOIS + "Random_figures/halo_" + str(curr_halo_idx) + "my_vs_spta_plt.png")
+    #         fig, ax = plt.subplots(1, layout="constrained")
+    #         ax.scatter(curr_ptl_pos[:,0], curr_ptl_pos[:,1], c="b", alpha=.5, label="my tree")
+    #         ax.scatter(sparta_pos[:,0], sparta_pos[:,1], c="r", alpha=.5, label="sparta")
+    #         ax.legend()
+    #         fig.savefig(path_to_MLOIS + "Random_figures/halo_" + str(curr_halo_idx) + "my_vs_spta_plt.png")
     if comp_snap == False:
         return fnd_HIPIDs, curr_orb_assn, scaled_rad_vel, scaled_tang_vel, scaled_radii
     else:
@@ -198,7 +210,7 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_pt
         global c_sparta_snap
         c_sparta_snap = np.abs(sparta_output["simulation"]["snap_z"][:] - c_red_shift).argmin()
         
-        new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta resort the indices
+        new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta re-sort the indices
         use_halo_idxs = use_indices[new_idxs]
 
         # Search around these halos and get the number of particles and the corresponding ptl indices for them
@@ -400,7 +412,7 @@ p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/sn
 # load all information needed for the primary snap
 p_ptls_pid, p_ptls_vel, p_ptls_pos = load_or_pickle_ptl_data(curr_sparta_file, str(p_snap), p_snapshot_path, p_scale_factor)
 
-p_halos_pos, p_halos_r200m, p_halos_id, p_halos_status, p_halos_last_snap, mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_red_shift)
+p_halos_pos, p_halos_r200m, p_halos_id, p_halos_status, p_halos_last_snap, mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
 
 t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], p_red_shift)
 
