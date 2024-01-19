@@ -256,7 +256,7 @@ if __name__ == "__main__":
             'max_depth':np.arange(2,6,1),
             # 'min_child_weight': 1,
             'learning_rate':np.arange(0.01,1.01,.1),
-            'scale_pos_weight':np.arange(1,8,.1),
+            #'scale_pos_weight':np.arange(1,8,.1),
             'lambda':np.arange(0,3,.5),
             'alpha':np.arange(0,3,.5),
             # 'subsample': 1,
@@ -266,7 +266,7 @@ if __name__ == "__main__":
             N_FOLDS = 5
             N_ITER = 25
             
-            model = dxgb.XGBClassifier(tree_method='gpu_hist', n_estimators=750, use_label_encoder=False)
+            model = dxgb.XGBClassifier(tree_method='gpu_hist', n_estimators=100, use_label_encoder=False, scale_pos_weight=scale_pos_weight)
             accuracy_wrapper_scorer = make_scorer(accuracy_score_wrapper)
             cuml_accuracy_scorer = make_scorer(accuracy_score, convert_dtype=True)
             print_acc(model, X_train, y_train, X_test, y_test)
@@ -312,9 +312,9 @@ if __name__ == "__main__":
                 "verbosity": 1,
                 "tree_method": "hist",
                 # Golden line for GPU training
+                "scale_pos_weight":scale_pos_weight,
                 "device": "cuda",
-                'scale_pos_weight': scale_pos_weight,
-            }
+                }
             
         file = open(model_save_location + "model_info.txt", 'a')
         file.write("Params:\n")
@@ -340,17 +340,16 @@ if __name__ == "__main__":
         plt.plot(history["test"]["rmse"], label="Validation loss")
         plt.axvline(21, color="gray", label="Optimal tree number")
         plt.xlabel("Number of trees")
+        test_preds = make_preds(client, bst, test_dataset_loc, test_labels_loc, report_name="Test Report", print_report=False)
         plt.ylabel("Loss")
         plt.legend()
         plt.savefig(plot_save_location + "training_loss_graph.png")
- 
-        
     
         del dtrain
         del dtest
     
-    with timed("Train Predictions"):
-        train_preds = make_preds(client, bst, train_dataset_loc, train_labels_loc, report_name="Train Report", print_report=False)
+    # with timed("Train Predictions"):
+    #     train_preds = make_preds(client, bst, train_dataset_loc, train_labels_loc, report_name="Train Report", print_report=False)
     with timed("Test Predictions"):
         test_preds = make_preds(client, bst, test_dataset_loc, test_labels_loc, report_name="Test Report", print_report=False)
     bst.save_model(model_save_location + model_name + ".json")
