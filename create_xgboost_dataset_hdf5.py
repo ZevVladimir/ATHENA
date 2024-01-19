@@ -31,7 +31,7 @@ global prim_only
 prim_only = config.getboolean("SEARCH","prim_only")
 t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
 global p_snap
-p_snap = config.getint("SEARCH","p_snap")
+p_snap = config.getint("XGBOOST","p_snap")
 c_snap = config.getint("XGBOOST","c_snap")
 snapshot_list = [p_snap, c_snap]
 global search_rad
