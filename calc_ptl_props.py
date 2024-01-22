@@ -87,7 +87,6 @@ def initial_search(halo_positions, halo_r200m, comp_snap, find_mass = False, fin
         if find_ptl_indices:
             all_ptl_indices = indices
     else:
-        print(halo_r200m)
         num_new_particles = 0
         all_ptl_indices = np.empty(1)
     

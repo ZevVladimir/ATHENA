@@ -252,12 +252,16 @@ def plot_incorrectly_classified(correct_labels, ml_labels, r, rv, tv, num_bins, 
     num_orb = np.where(correct_labels == 1)[0].shape[0]
     inc_orb = np.where((ml_labels == 0) & (correct_labels == 1))[0]
     num_inf = np.where(correct_labels == 0)[0].shape[0]
+    tot_num_inc = inc_orb.shape[0] + inc_inf.shape[0]
+    tot_num_ptl = num_orb + num_inf
     print("num incorrect inf", inc_inf.shape, ",", np.round(((inc_inf.shape[0]/num_inf)*100),2), "% of infalling ptls")
     print("num incorrect orb", inc_orb.shape, ",", np.round(((inc_orb.shape[0]/num_orb) * 100),2), "% of orbiting ptls")
+    print("num incorrect tot", tot_num_ptl, ",", np.round(((tot_num_inc/tot_num_ptl) * 100),2), "% of all ptls")
 
     file = open(model_save_location + "model_info.txt", 'a')
-    file.write("Percent of Orbiting Particles Mislabeled:" + str(np.round(((inc_orb.shape[0]/num_orb)*100),2)) + "\n")
-    file.write("Percent of Infalling Particles Mislabeled:" + str(np.round(((inc_inf.shape[0]/num_inf)*100),2)) + "\n")
+    file.write("Percent of Orbiting Particles Mislabeled: " + str(np.round(((inc_orb.shape[0]/num_orb)*100),2)) + "%\n")
+    file.write("Percent of Infalling Particles Mislabeled: " + str(np.round(((inc_inf.shape[0]/num_inf)*100),2)) + "%\n")
+    file.write("Percent of Total Particles Misclassified: " + str(np.round(((tot_num_inc/tot_num_ptl)*100),2)) + "%\n")
     file.close()
     
     inc_orb_r = r[inc_orb]
