@@ -13,6 +13,7 @@ import time
 import os
 import sys
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 
 from data_and_loading_functions import create_directory, load_or_pickle_SPARTA_data, conv_halo_id_spid, find_closest_z
@@ -231,32 +232,25 @@ if __name__ == "__main__":
     train_keys_loc = dataset_location + "train_dataset_all_keys.pickle"
     test_keys_loc = dataset_location + "test_dataset_all_keys.pickle"
     
-    file = open(model_save_location + "model_info.txt", 'w')
-    file.write("SPARTA File: " +curr_sparta_file+ "\n")
-    snap_str = "Snapshots used: "
-    for snapshot in snapshot_list:
-        snap_str += (str(snapshot) + "_")
-    file.write(snap_str)
-    file.write("\nSearch Radius: " + str(search_rad) + "\n")
-    file.write("Fraction of training data used: "+str(frac_training_data)+"\n")
-    file.close()
     
     if os.path.isfile(model_save_location + model_name + ".json"):
         bst = xgb.Booster()
         bst.load_model(model_save_location + model_name + ".json")
+        with open(model_save_location + "used_params.pickle", "rb") as pickle_file:
+            params = pickle.load(pickle_file)
         print("Loaded Booster")
     else:
         dtrain,X_train,y_train,scale_pos_weight = create_matrix(client, train_dataset_loc, train_labels_loc, train_keys_loc, frac_use_data=frac_training_data, calc_scale_pos_weight=True)
         dtest,X_test,y_test = create_matrix(client, test_dataset_loc, test_labels_loc, test_keys_loc, frac_use_data=1, calc_scale_pos_weight=False)
         print("scale_pos_weight:", scale_pos_weight)
         
-        if on_zaratan == False and do_hpo == True and os.path.isfile(model_save_location + "best_params.pickle") == False:  
+        if on_zaratan == False and do_hpo == True and os.path.isfile(model_save_location + "used_params.pickle") == False:  
             params = {
             # Parameters that we are going to tune.
-            'max_depth':np.arange(2,6,1),
+            'max_depth':np.arange(2,4,1),
             # 'min_child_weight': 1,
             'learning_rate':np.arange(0.01,1.01,.1),
-            #'scale_pos_weight':np.arange(1,8,.1),
+            'scale_pos_weight':np.arange(scale_pos_weight,scale_pos_weight+10,1),
             'lambda':np.arange(0,3,.5),
             'alpha':np.arange(0,3,.5),
             # 'subsample': 1,
@@ -298,14 +292,12 @@ if __name__ == "__main__":
                 
                 params = results.best_params_
                 
-                with open(model_save_location + "best_params.pickle", "wb") as pickle_file:
+                with open(model_save_location + "used_params.pickle", "wb") as pickle_file:
                     pickle.dump(results.best_params_, pickle_file)
                 
-                file = open(model_save_location + "model_info.txt", 'a')
-                
                 print(results)
-        elif os.path.isfile(model_save_location + "best_params.pickle"):
-            with open(model_save_location + "best_params.pickle", "rb") as pickle_file:
+        elif os.path.isfile(model_save_location + "used_params.pickle"):
+            with open(model_save_location + "used_params.pickle", "rb") as pickle_file:
                 params = pickle.load(pickle_file)
         else:
             params = {
@@ -315,13 +307,9 @@ if __name__ == "__main__":
                 "scale_pos_weight":scale_pos_weight,
                 "device": "cuda",
                 }
+            with open(model_save_location + "used_params.pickle", "wb") as pickle_file:
+                pickle.dump(params, pickle_file)
             
-        file = open(model_save_location + "model_info.txt", 'a')
-        file.write("Params:\n")
-        for item in params.items():
-            file.write(str(item[0]) + ": " + str(item[1]) + "\n")
-        file.close()
-        
         print("Starting train using params:", params)
         output = dxgb.train(
             client,
@@ -348,12 +336,47 @@ if __name__ == "__main__":
         del dtrain
         del dtest
     
+
+    file = open(model_save_location + "model_info.txt", 'w')
+    file.write("SPARTA File: " +curr_sparta_file+ "\n")
+    snap_str = "Snapshots used: "
+    for snapshot in snapshot_list:
+        snap_str += (str(snapshot) + " ")
+    file.write(snap_str)
+    file.write("\nSearch Radius: " + str(search_rad) + "\n")
+    file.write("Fraction of training data used: "+str(frac_training_data)+"\n")
+    file = open(model_save_location + "model_info.txt", 'a')
+    file.write("Params:\n")
+    for item in params.items():
+        file.write(str(item[0]) + ": " + str(item[1]) + "\n")
+    file.close()
+
+
     # with timed("Train Predictions"):
     #     train_preds = make_preds(client, bst, train_dataset_loc, train_labels_loc, report_name="Train Report", print_report=False)
     with timed("Test Predictions"):
         test_preds = make_preds(client, bst, test_dataset_loc, test_labels_loc, report_name="Test Report", print_report=False)
     bst.save_model(model_save_location + model_name + ".json")
-    
+    print(bst.get_score(importance_type='gain'))
+    print(bst.get_score(importance_type='weight'))
+
+    feature_important = bst.get_score(importance_type='weight')
+    keys = list(feature_important.keys())
+    values = list(feature_important.values())
+    pos = np.arange(len(keys))
+
+    fig, ax = plt.subplots(1)
+    ax.barh(pos,values)
+    ax.set_yticks(pos, keys)
+    print(plot_save_location + "feature_importance.png")
+    fig.savefig(plot_save_location + "feature_importance.png")
+
+
+    # tree_num = 2
+    # xgb.plot_tree(bst, num_trees=tree_num)
+    # fig = plt.gcf()
+    # fig.set_size_inches(110, 25)
+    # fig.savefig('/home/zvladimi/MLOIS/Random_figures/' + model_name + 'tree' + str(tree_num) + '.png')
     t1 = time.time()
     with open(test_dataset_loc, "rb") as file:
         X_np = pickle.load(file)
@@ -387,9 +410,9 @@ if __name__ == "__main__":
     cosmol = cosmology.setCosmology("bolshoi")
     use_halo_ids = halos_id[test_indices]
     sparta_output = sparta.load(filename=path_to_hdf5_file, halo_ids=use_halo_ids, log_level=0)
-    new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_snap) # If the order changed by sparta resort the indices
-    dens_prf_all = sparta_output['anl_prf']['M_all'][new_idxs,p_snap,:]
-    dens_prf_1halo = sparta_output['anl_prf']['M_1halo'][new_idxs,p_snap,:]
+    new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta resort the indices
+    dens_prf_all = sparta_output['anl_prf']['M_all'][new_idxs,p_sparta_snap,:]
+    dens_prf_1halo = sparta_output['anl_prf']['M_1halo'][new_idxs,p_sparta_snap,:]
     # test indices are the indices of the match halo idxs used (see find_particle_properties_ML.py to see how test_indices are created)
     num_test_halos = test_indices.shape[0]
     density_prf_all_within = np.sum(dens_prf_all, axis=0)
