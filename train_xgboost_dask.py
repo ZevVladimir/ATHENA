@@ -225,8 +225,8 @@ if __name__ == "__main__":
     create_directory(model_save_location)
     create_directory(plot_save_location)
     
-    train_dataset_loc = dataset_location + "train_dataset.pickle"
-    train_labels_loc = dataset_location + "train_labels.pickle"
+    train_dataset_loc = dataset_location + "train_within_rad_dataset.pickle"
+    train_labels_loc = dataset_location + "train_within_rad_labels.pickle"
     test_dataset_loc = dataset_location + "test_dataset.pickle"
     test_labels_loc = dataset_location + "test_labels.pickle"
     train_keys_loc = dataset_location + "train_dataset_all_keys.pickle"
@@ -385,6 +385,11 @@ if __name__ == "__main__":
     
     with open(save_location + "datasets/" + "test_dataset_all_keys.pickle", "rb") as file:
         test_all_keys = pickle.load(file)
+    with open(save_location + "datasets/" + "test_all_rad_halo_first.pickle", "rb") as file:
+        test_halo_first = pickle.load(file) 
+    with open(save_location + "datasets/" + "test_all_rad_halo_n.pickle", "rb") as file:
+        test_halo_n = pickle.load(file)    
+        
     for i,key in enumerate(test_all_keys):
         if key == "Scaled_radii_" + str(p_snap):
             scaled_radii_loc = i
@@ -413,6 +418,8 @@ if __name__ == "__main__":
     new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta resort the indices
     dens_prf_all = sparta_output['anl_prf']['M_all'][new_idxs,p_sparta_snap,:]
     dens_prf_1halo = sparta_output['anl_prf']['M_1halo'][new_idxs,p_sparta_snap,:]
+    
+    
     # test indices are the indices of the match halo idxs used (see find_particle_properties_ML.py to see how test_indices are created)
     num_test_halos = test_indices.shape[0]
     density_prf_all_within = np.sum(dens_prf_all, axis=0)
@@ -420,7 +427,8 @@ if __name__ == "__main__":
     num_bins = 30
     bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
     bins = np.insert(bins, 0, 0)
-    compare_density_prf(radii=X_np[:,scaled_radii_loc], actual_prf_all=density_prf_all_within, actual_prf_1halo=density_prf_1halo_within, mass=ptl_mass, orbit_assn=test_preds, prf_bins=bins, title = model_name, show_graph = False, save_graph = True, save_location = plot_save_location)
+    compare_density_prf(radii=X_np[:,scaled_radii_loc], halo_first=test_halo_first[0:2], halo_n=test_halo_n[0:2], actual_prf_all=dens_prf_all[0:2], actual_prf_1halo=dens_prf_1halo[0:2], mass=ptl_mass, orbit_assn=test_preds, prf_bins=bins, title = model_name, show_graph = False, save_graph = True, save_location = plot_save_location)
     plot_r_rv_tv_graph(test_preds, X_np[:,scaled_radii_loc], X_np[:,rad_vel_loc], X_np[:,tang_vel_loc], y_np, model_name, num_bins, show = False, save = True, save_location=plot_save_location, model_save_location=model_save_location)
-    #ssgraph_acc_by_bin(test_prediction, y_np, X_np[:,scaled_radii_loc], num_bins, model_name + " Predicts", plot = False, save = True, save_location = plot_save_location)
+    plot_incorrectly_classified(correct_labels=y_np, ml_labels=test_preds, r=X_np[:,scaled_radii_loc], rv=X_np[:,rad_vel_loc], tv=X_np[:,tang_vel_loc], num_bins=num_bins, title=model_name, save_location=plot_save_location, model_save_location=model_save_location)
+    #graph_acc_by_bin(test_prediction, y_np, X_np[:,scaled_radii_loc], num_bins, model_name + " Predicts", plot = False, save = True, save_location = plot_save_location)
     client.close()
