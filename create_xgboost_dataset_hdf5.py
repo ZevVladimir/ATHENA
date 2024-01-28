@@ -39,6 +39,7 @@ search_rad = config.getfloat("SEARCH","search_rad")
 total_num_snaps = config.getint("SEARCH","total_num_snaps")
 per_n_halo_per_split = config.getfloat("SEARCH","per_n_halo_per_split")
 test_halos_ratio = config.getfloat("SEARCH","test_halos_ratio")
+training_rad = config.getfloat("XGBOOST","training_rad")
 curr_chunk_size = 500
 global num_save_ptl_params
 num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
@@ -73,11 +74,11 @@ np.random.seed(11)
 t1 = time.time()
 print("Start train dataset creation")
 # Create the separate datasets for training and testing
-train_dataset, train_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "train", snapshot_list = snapshot_list)
+train_dataset, train_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "train", snapshot_list = snapshot_list, p_snap=p_snap, max_rad=training_rad)
 t2 = time.time()
 print("Time taken:", np.round((t2-t1),2),"seconds")
 
 print("Start test dataset creation")
-test_dataset, test_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "test", snapshot_list = snapshot_list)
+test_dataset, test_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "test", snapshot_list = snapshot_list, p_snap=p_snap, max_rad=search_rad)
 t3 = time.time()
 print("Time taken:", np.round((t3-t1),2),"seconds")
