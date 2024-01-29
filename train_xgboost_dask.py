@@ -427,7 +427,7 @@ if __name__ == "__main__":
     num_bins = 30
     bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
     bins = np.insert(bins, 0, 0)
-    compare_density_prf(radii=X_np[:,scaled_radii_loc], halo_first=test_halo_first[0:2], halo_n=test_halo_n[0:2], actual_prf_all=dens_prf_all[0:2], actual_prf_1halo=dens_prf_1halo[0:2], mass=ptl_mass, orbit_assn=test_preds, prf_bins=bins, title = model_name, show_graph = False, save_graph = True, save_location = plot_save_location)
+    compare_density_prf(radii=X_np[:,scaled_radii_loc], halo_first=test_halo_first, halo_n=test_halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_1halo=dens_prf_1halo, mass=ptl_mass, orbit_assn=test_preds, prf_bins=bins, title = model_name, show_graph = False, save_graph = True, save_location = plot_save_location)
     plot_r_rv_tv_graph(test_preds, X_np[:,scaled_radii_loc], X_np[:,rad_vel_loc], X_np[:,tang_vel_loc], y_np, model_name, num_bins, show = False, save = True, save_location=plot_save_location, model_save_location=model_save_location)
     plot_incorrectly_classified(correct_labels=y_np, ml_labels=test_preds, r=X_np[:,scaled_radii_loc], rv=X_np[:,rad_vel_loc], tv=X_np[:,tang_vel_loc], num_bins=num_bins, title=model_name, save_location=plot_save_location, model_save_location=model_save_location)
     #graph_acc_by_bin(test_prediction, y_np, X_np[:,scaled_radii_loc], num_bins, model_name + " Predicts", plot = False, save = True, save_location = plot_save_location)

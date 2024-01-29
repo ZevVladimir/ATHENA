@@ -9,7 +9,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from sklearn.metrics import classification_report
 from colossus.halo import mass_so
 from data_and_loading_functions import check_pickle_exist_gadget, create_directory
-from calculation_functions import calc_v200m
+from calculation_functions import calc_v200m, calculate_density
 # import general_plotting as gp
 from textwrap import wrap
 from scipy.ndimage import rotate
@@ -78,14 +78,14 @@ def update_density_prf(calc_prf, diff_n_ptl, radii, idx, start_bin, end_bin, mas
     
     return calc_prf, diff_n_ptl
 
-def create_dens_prf(radii, orbit_assn, act_prf_all, act_prf_1halo, prf_bins, mass):
-    act_prf_inf = act_prf_all - act_prf_1halo
+def create_dens_prf(radii, orbit_assn, act_mass_prf_all, act_mass_prf_1halo, prf_bins, mass):
+    act_mass_prf_inf = act_mass_prf_all - act_mass_prf_1halo
     # Create bins for the density profile calculation
-    num_prf_bins = act_prf_all.shape[0]
+    num_prf_bins = act_mass_prf_all.shape[0]
 
-    calc_prf_orb = np.zeros(num_prf_bins)
-    calc_prf_inf = np.zeros(num_prf_bins)
-    calc_prf_all = np.zeros(num_prf_bins)
+    calc_mass_prf_orb = np.zeros(num_prf_bins)
+    calc_mass_prf_inf = np.zeros(num_prf_bins)
+    calc_mass_prf_all = np.zeros(num_prf_bins)
     diff_n_inf_ptls = np.zeros(num_prf_bins)
     diff_n_orb_ptls = np.zeros(num_prf_bins)
     diff_n_all_ptls = np.zeros(num_prf_bins)
@@ -97,111 +97,155 @@ def create_dens_prf(radii, orbit_assn, act_prf_all, act_prf_1halo, prf_bins, mas
         start_bin = prf_bins[i]
         end_bin = prf_bins[i+1]  
         
-        calc_prf_orb, diff_n_orb_ptls = update_density_prf(calc_prf_orb, diff_n_orb_ptls, orbit_radii, i, start_bin, end_bin, mass, act_prf_1halo)      
-        calc_prf_inf, diff_n_inf_ptls = update_density_prf(calc_prf_inf, diff_n_inf_ptls, infall_radii, i, start_bin, end_bin, mass, act_prf_inf)      
-        calc_prf_all, diff_n_all_ptls  = update_density_prf(calc_prf_all, diff_n_all_ptls, radii, i, start_bin, end_bin, mass, act_prf_all)    
+        calc_mass_prf_orb, diff_n_orb_ptls = update_density_prf(calc_mass_prf_orb, diff_n_orb_ptls, orbit_radii, i, start_bin, end_bin, mass, act_mass_prf_1halo)      
+        calc_mass_prf_inf, diff_n_inf_ptls = update_density_prf(calc_mass_prf_inf, diff_n_inf_ptls, infall_radii, i, start_bin, end_bin, mass, act_mass_prf_inf)      
+        calc_mass_prf_all, diff_n_all_ptls  = update_density_prf(calc_mass_prf_all, diff_n_all_ptls, radii, i, start_bin, end_bin, mass, act_mass_prf_all)    
     
-    return calc_prf_orb, calc_prf_inf, calc_prf_all, diff_n_orb_ptls, diff_n_inf_ptls, diff_n_all_ptls 
+    calc_dens_prf_orb = calculate_density(calc_mass_prf_orb, prf_bins[1:])
+    calc_dens_prf_inf = calculate_density(calc_mass_prf_inf, prf_bins[1:])
+    calc_dens_prf_all = calculate_density(calc_mass_prf_all, prf_bins[1:])
+    
+    return calc_mass_prf_orb, calc_mass_prf_inf, calc_mass_prf_all, calc_dens_prf_orb, calc_dens_prf_inf, calc_dens_prf_all, diff_n_orb_ptls, diff_n_inf_ptls, diff_n_all_ptls 
 
-def compare_density_prf(radii, halo_first, halo_n, actual_prf_all, actual_prf_1halo, mass, orbit_assn, prf_bins, title, save_location, show_graph = False, save_graph = False):
+def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_prf_1halo, mass, orbit_assn, prf_bins, title, save_location, show_graph = False, save_graph = False):
+    act_mass_prf_inf = act_mass_prf_all - act_mass_prf_1halo
     create_directory(save_location + "dens_prfl_ratio/")
     curr_num_halos = halo_first.shape[0]
     
     num_processes = mp.cpu_count()
     with mp.Pool(processes=num_processes) as p:
-        calc_prf_orb, calc_prf_inf, calc_prf_all, diff_n_orb_ptls, diff_n_inf_ptls, diff_n_all_ptls = zip(*p.starmap(create_dens_prf, 
+        calc_mass_prf_orb, calc_mass_prf_inf, calc_mass_prf_all, calc_dens_prf_orb, calc_dens_prf_inf, calc_dens_prf_all, diff_n_orb_ptls, diff_n_inf_ptls, diff_n_all_ptls = zip(*p.starmap(create_dens_prf, 
                                     zip((radii[halo_first[i]:halo_first[i]+halo_n[i]] for i in range(curr_num_halos)),
                                         (orbit_assn[halo_first[i]:halo_first[i]+halo_n[i]] for i in range(curr_num_halos)),
-                                        (actual_prf_all[j] for j in range(curr_num_halos)),
-                                        (actual_prf_1halo[j] for j in range(curr_num_halos)),
+                                        (act_mass_prf_all[j] for j in range(curr_num_halos)),
+                                        (act_mass_prf_1halo[j] for j in range(curr_num_halos)),
                                         repeat(prf_bins),repeat(mass)),
                                     chunksize=100))
     p.close()
     p.join() 
     
     # print(calc_prf_all)
-    calc_prf_orb = np.stack(calc_prf_orb, axis=0)
-    calc_prf_inf = np.stack(calc_prf_inf, axis=0)
-    calc_prf_all = np.stack(calc_prf_all, axis=0)
+    calc_mass_prf_orb = np.stack(calc_mass_prf_orb, axis=0)
+    calc_mass_prf_inf = np.stack(calc_mass_prf_inf, axis=0)
+    calc_mass_prf_all = np.stack(calc_mass_prf_all, axis=0)
+    calc_dens_prf_orb = np.stack(calc_dens_prf_orb, axis=0)
+    calc_dens_prf_inf = np.stack(calc_dens_prf_inf, axis=0)
+    calc_dens_prf_all = np.stack(calc_dens_prf_all, axis=0)
     diff_n_orb_ptls = np.stack(diff_n_orb_ptls, axis=0)
     diff_n_inf_ptls = np.stack(diff_n_inf_ptls, axis=0)
     diff_n_all_ptls = np.stack(diff_n_all_ptls, axis=0)
 
-    calc_prf_orb = calc_prf_orb.astype(np.float32)
-    calc_prf_inf = calc_prf_inf.astype(np.float32)
-    calc_prf_all = calc_prf_all.astype(np.float32)
+    calc_mass_prf_orb = calc_mass_prf_orb.astype(np.float32)
+    calc_mass_prf_inf = calc_mass_prf_inf.astype(np.float32)
+    calc_mass_prf_all = calc_mass_prf_all.astype(np.float32)
     diff_n_orb_ptls = diff_n_orb_ptls.astype(np.int32)
     diff_n_inf_ptls = diff_n_inf_ptls.astype(np.int32)
     diff_n_all_ptls = diff_n_all_ptls.astype(np.int32)
     
-    avg_calc_prf_orb = np.mean(calc_prf_orb,axis=0)
-    avg_calc_prf_inf = np.mean(calc_prf_inf,axis=0)
-    avg_calc_prf_all = np.mean(calc_prf_all,axis=0)
+    avg_calc_mass_prf_orb = np.mean(calc_mass_prf_orb,axis=0)
+    avg_calc_mass_prf_inf = np.mean(calc_mass_prf_inf,axis=0)
+    avg_calc_mass_prf_all = np.mean(calc_mass_prf_all,axis=0)
+    avg_calc_dens_prf_orb = np.mean(calc_dens_prf_orb,axis=0)
+    avg_calc_dens_prf_inf = np.mean(calc_dens_prf_inf,axis=0)
+    avg_calc_dens_prf_all = np.mean(calc_dens_prf_all,axis=0)
+    
+    upper_calc_mass_prf_orb = np.percentile(calc_mass_prf_orb, q=84.1, axis=0)
+    lower_calc_mass_prf_orb = np.percentile(calc_mass_prf_orb, q=15.9, axis=0)
+    upper_calc_mass_prf_inf = np.percentile(calc_mass_prf_inf, q=84.1, axis=0)
+    lower_calc_mass_prf_inf = np.percentile(calc_mass_prf_inf, q=15.9, axis=0)
+    upper_calc_mass_prf_all = np.percentile(calc_mass_prf_all, q=84.1, axis=0)
+    lower_calc_mass_prf_all = np.percentile(calc_mass_prf_all, q=15.9, axis=0)
+    upper_calc_dens_prf_orb = np.percentile(calc_dens_prf_orb, q=84.1, axis=0)
+    lower_calc_dens_prf_orb = np.percentile(calc_dens_prf_orb, q=15.9, axis=0)
+    upper_calc_dens_prf_inf = np.percentile(calc_dens_prf_inf, q=84.1, axis=0)
+    lower_calc_dens_prf_inf = np.percentile(calc_dens_prf_inf, q=15.9, axis=0)
+    upper_calc_dens_prf_all = np.percentile(calc_dens_prf_all, q=84.1, axis=0)
+    lower_calc_dens_prf_all = np.percentile(calc_dens_prf_all, q=15.9, axis=0)
+    
+    act_dens_prf_all = calculate_density(act_mass_prf_all, prf_bins[1:])
+    act_dens_prf_1halo = calculate_density(act_mass_prf_1halo, prf_bins[1:])
+    act_dens_prf_inf = calculate_density(act_mass_prf_inf, prf_bins[1:])
+    
+    avg_act_dens_prf_all = np.mean(act_dens_prf_all, axis=0)
+    avg_act_dens_prf_1halo = np.mean(act_dens_prf_1halo, axis=0)
+    avg_act_dens_prf_inf = np.mean(act_dens_prf_inf, axis=0)
     
 
-    upper_calc_prf_orb = np.percentile(calc_prf_orb, q=84.1, axis=0)
-    lower_calc_prf_orb = np.percentile(calc_prf_orb, q=15.9, axis=0)
-    upper_calc_prf_inf = np.percentile(calc_prf_inf, q=84.1, axis=0)
-    lower_calc_prf_inf = np.percentile(calc_prf_inf, q=15.9, axis=0)
-    upper_calc_prf_all = np.percentile(calc_prf_all, q=84.1, axis=0)
-    lower_calc_prf_all = np.percentile(calc_prf_all, q=15.9, axis=0)
-    
     middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
 
-    tot_act_prf_all = np.mean(actual_prf_all, axis=0)
-    tot_act_prf_1halo = np.mean(actual_prf_1halo, axis=0)
+    avg_act_mass_prf_all = np.mean(act_mass_prf_all, axis=0)
+    avg_act_mass_prf_1halo = np.mean(act_mass_prf_1halo, axis=0)
+    avg_act_mass_prf_inf = np.mean(act_mass_prf_inf, axis=0)
     
     with np.errstate(divide='ignore', invalid='ignore'):
-        all_ratio = np.divide(calc_prf_all,tot_act_prf_all)
-        inf_ratio = np.divide(calc_prf_inf,(tot_act_prf_all - tot_act_prf_1halo))
-        orb_ratio = np.divide(calc_prf_orb,tot_act_prf_1halo)
+        all_dens_ratio = np.divide(calc_dens_prf_all,avg_act_dens_prf_all)
+        inf_dens_ratio = np.divide(calc_dens_prf_inf,avg_act_dens_prf_inf)
+        orb_dens_ratio = np.divide(calc_dens_prf_orb,avg_act_dens_prf_1halo)
         
-    upper_orb_ratio = np.percentile(orb_ratio, q=84.1, axis=0)
-    lower_orb_ratio = np.percentile(orb_ratio, q=15.9, axis=0)
-    upper_inf_ratio = np.percentile(inf_ratio, q=84.1, axis=0)
-    lower_inf_ratio = np.percentile(inf_ratio, q=15.9, axis=0)
-    upper_all_ratio = np.percentile(all_ratio, q=84.1, axis=0)
-    lower_all_ratio = np.percentile(all_ratio, q=15.9, axis=0)
+    upper_orb_dens_ratio = np.percentile(orb_dens_ratio, q=84.1, axis=0)
+    lower_orb_dens_ratio = np.percentile(orb_dens_ratio, q=15.9, axis=0)
+    upper_inf_dens_ratio = np.percentile(inf_dens_ratio, q=84.1, axis=0)
+    lower_inf_dens_ratio = np.percentile(inf_dens_ratio, q=15.9, axis=0)
+    upper_all_dens_ratio = np.percentile(all_dens_ratio, q=84.1, axis=0)
+    lower_all_dens_ratio = np.percentile(all_dens_ratio, q=15.9, axis=0)
     
-    avg_all_ratio = np.mean(all_ratio, axis=0)
-    avg_inf_ratio = np.mean(inf_ratio, axis=0)
-    avg_orb_ratio = np.mean(orb_ratio, axis=0)
+    avg_all_ratio = np.mean(all_dens_ratio, axis=0)
+    avg_inf_ratio = np.mean(inf_dens_ratio, axis=0)
+    avg_orb_ratio = np.mean(orb_dens_ratio, axis=0)
 
-    fig, ax = plt.subplots(1,2)
+    fig, ax = plt.subplots(1,3)
     fill_alpha = 0.2
     
-    ax[0].plot(middle_bins, avg_all_ratio, 'r', label = "My prf / SPARTA prf all")
-    ax[0].plot(middle_bins, avg_orb_ratio, 'b', label = "My prf / SPARTA profile orb")
-    ax[0].plot(middle_bins, avg_inf_ratio, 'g', label = "My prf / SPARTA profile inf")
+    ax[0].plot(middle_bins, avg_calc_mass_prf_all, 'r-', label = "ML mass profile all ptls")
+    ax[0].plot(middle_bins, avg_calc_mass_prf_orb, 'b-', label = "ML mass profile orb ptls")
+    ax[0].plot(middle_bins, avg_calc_mass_prf_inf, 'g-', label = "ML mass profile inf ptls")
+    ax[0].plot(middle_bins, avg_act_mass_prf_all, 'r--', label = "SPARTA mass profile all ptls")
+    ax[0].plot(middle_bins, avg_act_mass_prf_1halo, 'b--', label = "SPARTA mass profile orb ptls")
+    ax[0].plot(middle_bins, avg_act_mass_prf_inf, 'g--', label = "SPARTA mass profile inf ptls")
     
-    ax[0].fill_between(middle_bins, lower_all_ratio, upper_all_ratio, color='r', alpha=fill_alpha)
-    ax[0].fill_between(middle_bins, lower_inf_ratio, upper_inf_ratio, color='g', alpha=fill_alpha)
-    ax[0].fill_between(middle_bins, lower_orb_ratio, upper_orb_ratio, color='b', alpha=fill_alpha)    
+    ax[0].fill_between(middle_bins, lower_calc_mass_prf_all, upper_calc_mass_prf_all, color='r', alpha=fill_alpha)
+    ax[0].fill_between(middle_bins, lower_calc_mass_prf_inf, upper_calc_mass_prf_inf, color='g', alpha=fill_alpha)
+    ax[0].fill_between(middle_bins, lower_calc_mass_prf_orb, upper_calc_mass_prf_orb, color='b', alpha=fill_alpha)
     
-    ax[0].set_title(wrap("My Predicted  / Actual Density Profile for halo idx: " + title))
-    ax[0].set_xlabel("radius $r/R_{200m}$")
-    ax[0].set_ylabel("My Dens Prf / Act Dens Prf")
+    ax[0].set_title("ML Predicted vs Actual Mass Profile")
+    ax[0].set_xlabel("Radius $r/R_{200m}$")
+    ax[0].set_ylabel("Mass $M_\odot$")
     ax[0].set_xscale("log")
     ax[0].set_yscale("log")
     ax[0].legend()
-
-    ax[1].plot(middle_bins, avg_calc_prf_all, 'r-', label = "My prf all")
-    ax[1].plot(middle_bins, avg_calc_prf_orb, 'b-', label = "My prf orb")
-    ax[1].plot(middle_bins, avg_calc_prf_inf, 'g-', label = "My prf inf")
-    ax[1].plot(middle_bins, tot_act_prf_all, 'r--', label = "SPARTA prf all")
-    ax[1].plot(middle_bins, tot_act_prf_1halo, 'b--', label = "SPARTA prf orb")
-    ax[1].plot(middle_bins, (tot_act_prf_all - tot_act_prf_1halo), 'g--', label = "SPARTA prf inf")
     
-    ax[1].fill_between(middle_bins, lower_calc_prf_all, upper_calc_prf_all, color='r', alpha=fill_alpha)
-    ax[1].fill_between(middle_bins, lower_calc_prf_inf, upper_calc_prf_inf, color='g', alpha=fill_alpha)
-    ax[1].fill_between(middle_bins, lower_calc_prf_orb, upper_calc_prf_orb, color='b', alpha=fill_alpha)
+    ax[1].plot(middle_bins, avg_calc_dens_prf_all, 'r-', label = "ML density profile all ptls")
+    ax[1].plot(middle_bins, avg_calc_dens_prf_orb, 'b-', label = "ML density profile orb ptls")
+    ax[1].plot(middle_bins, avg_calc_dens_prf_inf, 'g-', label = "ML density profile inf ptls")
+    ax[1].plot(middle_bins, avg_act_dens_prf_all, 'r--', label = "SPARTA density profile all ptls")
+    ax[1].plot(middle_bins, avg_act_dens_prf_1halo, 'b--', label = "SPARTA mass profile orb ptls")
+    ax[1].plot(middle_bins, avg_act_dens_prf_inf, 'g--', label = "SPARTA mass profile inf ptls")
     
-    ax[1].set_title(wrap("ML Predicted vs Actual Density Profile for halo idx: " + title))
-    ax[1].set_xlabel("radius $r/R_{200m}$")
-    ax[1].set_ylabel("Mass $M_/odot$")
+    ax[1].fill_between(middle_bins, lower_calc_dens_prf_all, upper_calc_dens_prf_all, color='r', alpha=fill_alpha)
+    ax[1].fill_between(middle_bins, lower_calc_dens_prf_inf, upper_calc_dens_prf_inf, color='g', alpha=fill_alpha)
+    ax[1].fill_between(middle_bins, lower_calc_dens_prf_orb, upper_calc_dens_prf_orb, color='b', alpha=fill_alpha)
+    
+    ax[1].set_title("ML Predicted vs Actual Density Profile")
+    ax[1].set_xlabel("Radius $r/R_{200m}$")
+    ax[1].set_ylabel("Density $M_\odot/kpc^3$")
     ax[1].set_xscale("log")
     ax[1].set_yscale("log")
     ax[1].legend()
+    
+    ax[2].plot(middle_bins, avg_all_ratio, 'r', label = "ML density profile / SPARTA density profile all")
+    ax[2].plot(middle_bins, avg_orb_ratio, 'b', label = "ML density profile / SPARTA density profile orb")
+    ax[2].plot(middle_bins, avg_inf_ratio, 'g', label = "ML density profile / SPARTA density profile inf")
+    
+    ax[2].fill_between(middle_bins, lower_all_dens_ratio, upper_all_dens_ratio, color='r', alpha=fill_alpha)
+    ax[2].fill_between(middle_bins, lower_inf_dens_ratio, upper_inf_dens_ratio, color='g', alpha=fill_alpha)
+    ax[2].fill_between(middle_bins, lower_orb_dens_ratio, upper_orb_dens_ratio, color='b', alpha=fill_alpha)    
+    
+    ax[2].set_title(wrap("ML Predicted / Actual Density Profile"))
+    ax[2].set_xlabel("Radius $r/R_{200m}$")
+    ax[2].set_ylabel("ML Dens Prf / Act Dens Prf")
+    ax[2].set_xscale("log")
+    ax[2].set_yscale("log")
+    ax[2].legend()    
     
     if save_graph:
         fig.set_size_inches(21, 13)
@@ -474,7 +518,6 @@ def plot_incorrectly_classified(correct_labels, ml_labels, r, rv, tv, num_bins, 
 
 def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, show, save, save_location, model_save_location):
     create_directory(save_location + "2dhist/")
-    print(save_location + "2dhist/")
     mpl.rcParams.update({'font.size': 8})
     plt.rcParams['figure.constrained_layout.use'] = True
 
