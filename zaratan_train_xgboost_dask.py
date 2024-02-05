@@ -529,7 +529,7 @@ if __name__ == "__main__":
     num_bins = 30
     bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
     bins = np.insert(bins, 0, 0)
-    compare_density_prf(radii=X_np[:,scaled_radii_loc], act_mass_prf_all=density_prf_all_within, act_mass_prf_1halo=density_prf_1halo_within, mass=ptl_mass, orbit_assn=test_prediction, prf_bins=bins, title = model_name + " Predicts", show_graph = False, save_graph = True, save_location = plot_save_location)
+    compare_density_prf(radii=X_np[:,scaled_radii_loc], act_mass_prf_all=density_prf_all_within, act_mass_prf_orb=density_prf_1halo_within, mass=ptl_mass, orbit_assn=test_prediction, prf_bins=bins, title = model_name + " Predicts", show_graph = False, save_graph = True, save_location = plot_save_location)
     plot_r_rv_tv_graph(test_prediction, X_np[:,scaled_radii_loc], X_np[:,rad_vel_loc], X_np[:,tang_vel_loc], y_np, model_name + " Predicts", num_bins, show = False, save = True, save_location=plot_save_location)
     #ssgraph_acc_by_bin(test_prediction, y_np, X_np[:,scaled_radii_loc], num_bins, model_name + " Predicts", plot = False, save = True, save_location = plot_save_location)
 

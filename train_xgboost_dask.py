@@ -116,17 +116,14 @@ def create_matrix(client, X_loc, y_loc, key_loc, frac_use_data = 1, calc_scale_p
     num_features = X_cpu.shape[1]
     
     num_use_data = int(np.floor(X_cpu.shape[0] * frac_use_data))
-    print("Tot num of train particles:", X_cpu.shape[0])
-    print("Num use train particles:", num_use_data)
+    print("Tot num of train particles:", X_cpu.shape[0], "Num use train particles:", num_use_data)
     X = da.from_array(X_cpu,chunks=(chunk_size,num_features))
     y = da.from_array(y_cpu,chunks=(chunk_size))
-    print("converted to array")
         
     print("X Number of total bytes:", X.nbytes, "X Number of Gigabytes:", (X.nbytes)/(10**9))
     print("y Number of total bytes:", y.nbytes, "y Number of Gigabytes:", (y.nbytes)/(10**9))
     
     dqmatrix = xgb.dask.DaskDMatrix(client, X, y, feature_names=features)
-    print("converted to DaskDMatrix")
     
     if calc_scale_pos_weight:
         return dqmatrix, X, y_cpu, scale_pos_weight 
@@ -138,13 +135,11 @@ def accuracy_score_wrapper(y, y_hat):
 
 def do_HPO(model, gridsearch_params, scorer, X, y, mode='gpu-Grid', n_iter=10):
     if mode == 'gpu-grid':
-        print("gpu-grid selected")
         clf = dcv.GridSearchCV(model,
                                gridsearch_params,
                                cv=N_FOLDS,
                                scoring=scorer)
     elif mode == 'gpu-random':
-        print("gpu-random selected")
         clf = dcv.RandomizedSearchCV(model,
                                gridsearch_params,
                                cv=N_FOLDS,
@@ -177,10 +172,9 @@ def make_preds(client, bst, dataset_loc, labels_loc, report_name="Classification
     preds = dxgb.inplace_predict(client, bst, X).compute()
     preds = np.round(preds)
     
-    if print_report:
-        print(report_name)    
+    if print_report:   
         report = classification_report(y_np, preds)
-        print(report)
+        print(report_name, "\n", report)
         file = open(model_save_location + "model_info.txt", 'a')
         file.write(report_name+"\n")
         file.write(report)
@@ -295,7 +289,6 @@ if __name__ == "__main__":
                 with open(model_save_location + "used_params.pickle", "wb") as pickle_file:
                     pickle.dump(results.best_params_, pickle_file)
                 
-                print(results)
         elif os.path.isfile(model_save_location + "used_params.pickle"):
             with open(model_save_location + "used_params.pickle", "rb") as pickle_file:
                 params = pickle.load(pickle_file)
@@ -322,7 +315,7 @@ if __name__ == "__main__":
         bst = output["booster"]
         history = output["history"]
         bst.save_model(model_save_location + model_name + ".json")
-        #print("Evaluation history:", history)
+
         plt.figure(figsize=(10,7))
         plt.plot(history["train"]["rmse"], label="Training loss")
         plt.plot(history["test"]["rmse"], label="Validation loss")
@@ -357,18 +350,16 @@ if __name__ == "__main__":
     with timed("Test Predictions"):
         test_preds = make_preds(client, bst, test_dataset_loc, test_labels_loc, report_name="Test Report", print_report=False)
     bst.save_model(model_save_location + model_name + ".json")
-    print(bst.get_score(importance_type='gain'))
-    print(bst.get_score(importance_type='weight'))
+
 
     feature_important = bst.get_score(importance_type='weight')
     keys = list(feature_important.keys())
     values = list(feature_important.values())
     pos = np.arange(len(keys))
 
-    fig, ax = plt.subplots(1)
+    fig, ax = plt.subplots(1, figsize=(15,10))
     ax.barh(pos,values)
     ax.set_yticks(pos, keys)
-    print(plot_save_location + "feature_importance.png")
     fig.savefig(plot_save_location + "feature_importance.png")
 
 
@@ -390,13 +381,14 @@ if __name__ == "__main__":
     with open(save_location + "datasets/" + "test_all_rad_halo_n.pickle", "rb") as file:
         test_halo_n = pickle.load(file)    
         
-    for i,key in enumerate(test_all_keys):
-        if key == "Scaled_radii_" + str(p_snap):
-            scaled_radii_loc = i
-        elif key == "Radial_vel_" + str(p_snap):
-            rad_vel_loc = i
-        elif key == "Tangential_vel_" + str(p_snap):
-            tang_vel_loc = i
+
+    p_scal_rad_loc = np.where(test_all_keys == "Scaled_radii_" + str(p_snap))[0][0]
+    c_scal_rad_loc = np.where(test_all_keys == "Scaled_radii_" + str(c_snap))[0][0]
+    p_rad_vel_loc = np.where(test_all_keys == "Radial_vel_" + str(p_snap))[0][0]
+    c_rad_vel_loc = np.where(test_all_keys == "Radial_vel_" + str(c_snap))[0][0]
+    p_tan_vel_loc = np.where(test_all_keys == "Tangential_vel_" + str(p_snap))[0][0]
+    c_tan_vel_loc = np.where(test_all_keys == "Tangential_vel_" + str(c_snap))[0][0]
+
     with open(path_to_calc_info + specific_save + "test_indices.pickle", "rb") as pickle_file:
         test_indices = pickle.load(pickle_file)
     
@@ -404,9 +396,6 @@ if __name__ == "__main__":
     sparta_output = sparta.load(filename=path_to_hdf5_file, log_level= 0)
     all_red_shifts = sparta_output["simulation"]["snap_z"][:]
     p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
-    print("corresponding SPARTA snap num:", p_sparta_snap)
-    print("check sparta redshift:",sparta_output["simulation"]["snap_z"][p_sparta_snap])
-
 
     p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
     p_red_shift = readheader(p_snapshot_path, 'redshift')
@@ -427,8 +416,8 @@ if __name__ == "__main__":
     num_bins = 30
     bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
     bins = np.insert(bins, 0, 0)
-    compare_density_prf(radii=X_np[:,scaled_radii_loc], halo_first=test_halo_first, halo_n=test_halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_1halo=dens_prf_1halo, mass=ptl_mass, orbit_assn=test_preds, prf_bins=bins, title = model_name, show_graph = False, save_graph = True, save_location = plot_save_location)
-    plot_r_rv_tv_graph(test_preds, X_np[:,scaled_radii_loc], X_np[:,rad_vel_loc], X_np[:,tang_vel_loc], y_np, model_name, num_bins, show = False, save = True, save_location=plot_save_location, model_save_location=model_save_location)
-    plot_incorrectly_classified(correct_labels=y_np, ml_labels=test_preds, r=X_np[:,scaled_radii_loc], rv=X_np[:,rad_vel_loc], tv=X_np[:,tang_vel_loc], num_bins=num_bins, title=model_name, save_location=plot_save_location, model_save_location=model_save_location)
+    compare_density_prf(radii=X_np[:,p_scal_rad_loc], halo_first=test_halo_first, halo_n=test_halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=ptl_mass, orbit_assn=test_preds, prf_bins=bins, title = model_name, show_graph = False, save_graph = True, save_location = plot_save_location)
+    plot_r_rv_tv_graph(test_preds, X_np[:,p_scal_rad_loc], X_np[:,p_rad_vel_loc], X_np[:,p_tan_vel_loc], y_np, title=model_name, num_bins=num_bins, show = False, save = True, save_location=plot_save_location, model_save_location=model_save_location)
+    plot_misclassified(p_corr_labels=y_np, p_ml_labels=test_preds, p_r=X_np[:,p_scal_rad_loc], p_rv=X_np[:,p_rad_vel_loc], p_tv=X_np[:,p_tan_vel_loc], c_r=X_np[:,c_scal_rad_loc], c_rv=X_np[:,c_rad_vel_loc], c_tv=X_np[:,c_tan_vel_loc], title=model_name, num_bins=num_bins, save_location=plot_save_location, model_save_location=model_save_location)
     #graph_acc_by_bin(test_prediction, y_np, X_np[:,scaled_radii_loc], num_bins, model_name + " Predicts", plot = False, save = True, save_location = plot_save_location)
     client.close()
