@@ -9,11 +9,13 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from sklearn.metrics import classification_report
 from colossus.halo import mass_so
 from data_and_loading_functions import check_pickle_exist_gadget, create_directory
-from calculation_functions import calc_v200m
+from calculation_functions import calc_v200m, calculate_density
 # import general_plotting as gp
 from textwrap import wrap
 from scipy.ndimage import rotate
 import matplotlib.colors as colors
+import multiprocessing as mp
+from itertools import repeat
 
 def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r200_per_part, red_shift, hubble_constant, little_h):
     start_bin_val = 0.001
@@ -60,6 +62,7 @@ def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r20
 
 def update_density_prf(calc_prf, diff_n_ptl, radii, idx, start_bin, end_bin, mass, act_prf):
     radii_within_range = np.where((radii >= start_bin) & (radii < end_bin))[0]
+        
     if radii_within_range.size != 0 and idx != 0:
         calc_prf[idx] = calc_prf[idx - 1] + radii_within_range.size * mass
         diff_n_ptl[idx] = ((act_prf[idx] - act_prf[idx-1])/mass) - radii_within_range.size
@@ -75,16 +78,14 @@ def update_density_prf(calc_prf, diff_n_ptl, radii, idx, start_bin, end_bin, mas
     
     return calc_prf, diff_n_ptl
 
-def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_assn, prf_bins, title, save_location, show_graph = False, save_graph = False):
-    create_directory(save_location + "dens_prfl_ratio/")
-    
-    actual_prf_inf = actual_prf_all - actual_prf_1halo
+def create_dens_prf(radii, orbit_assn, act_mass_prf_all, act_mass_prf_1halo, prf_bins, mass):
+    act_mass_prf_inf = act_mass_prf_all - act_mass_prf_1halo
     # Create bins for the density profile calculation
-    num_prf_bins = actual_prf_all.shape[0]
+    num_prf_bins = act_mass_prf_all.shape[0]
 
-    calc_prf_orb = np.zeros(num_prf_bins)
-    calc_prf_inf = np.zeros(num_prf_bins)
-    calc_prf_all = np.zeros(num_prf_bins)
+    calc_mass_prf_orb = np.zeros(num_prf_bins)
+    calc_mass_prf_inf = np.zeros(num_prf_bins)
+    calc_mass_prf_all = np.zeros(num_prf_bins)
     diff_n_inf_ptls = np.zeros(num_prf_bins)
     diff_n_orb_ptls = np.zeros(num_prf_bins)
     diff_n_all_ptls = np.zeros(num_prf_bins)
@@ -96,45 +97,196 @@ def compare_density_prf(radii, actual_prf_all, actual_prf_1halo, mass, orbit_ass
         start_bin = prf_bins[i]
         end_bin = prf_bins[i+1]  
         
-        calc_prf_orb, diff_n_orb_ptls = update_density_prf(calc_prf_orb, diff_n_orb_ptls, orbit_radii, i, start_bin, end_bin, mass, actual_prf_1halo)      
-        calc_prf_inf, diff_n_inf_ptls = update_density_prf(calc_prf_inf, diff_n_inf_ptls, infall_radii, i, start_bin, end_bin, mass, actual_prf_inf)      
-        calc_prf_all, diff_n_all_ptls = update_density_prf(calc_prf_all, diff_n_all_ptls, radii, i, start_bin, end_bin, mass, actual_prf_all)      
-       
+        calc_mass_prf_orb, diff_n_orb_ptls = update_density_prf(calc_mass_prf_orb, diff_n_orb_ptls, orbit_radii, i, start_bin, end_bin, mass, act_mass_prf_1halo)      
+        calc_mass_prf_inf, diff_n_inf_ptls = update_density_prf(calc_mass_prf_inf, diff_n_inf_ptls, infall_radii, i, start_bin, end_bin, mass, act_mass_prf_inf)      
+        calc_mass_prf_all, diff_n_all_ptls  = update_density_prf(calc_mass_prf_all, diff_n_all_ptls, radii, i, start_bin, end_bin, mass, act_mass_prf_all)    
+    
+    calc_dens_prf_orb = calculate_density(calc_mass_prf_orb, prf_bins[1:])
+    calc_dens_prf_inf = calculate_density(calc_mass_prf_inf, prf_bins[1:])
+    calc_dens_prf_all = calculate_density(calc_mass_prf_all, prf_bins[1:])
+    
+    return calc_mass_prf_orb, calc_mass_prf_inf, calc_mass_prf_all, calc_dens_prf_orb, calc_dens_prf_inf, calc_dens_prf_all, diff_n_orb_ptls, diff_n_inf_ptls, diff_n_all_ptls 
+
+def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_prf_orb, mass, orbit_assn, prf_bins, title, save_location, show_graph = False, save_graph = False):
+    act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
+    create_directory(save_location + "dens_prfl_ratio/")
+    curr_num_halos = halo_first.shape[0]
+    min_disp_halos = int(np.ceil(0.5 * curr_num_halos))
+    
+    num_processes = mp.cpu_count()
+    with mp.Pool(processes=num_processes) as p:
+        calc_mass_prf_orb, calc_mass_prf_inf, calc_mass_prf_all, calc_dens_prf_orb, calc_dens_prf_inf, calc_dens_prf_all, diff_n_orb_ptls, diff_n_inf_ptls, diff_n_all_ptls = zip(*p.starmap(create_dens_prf, 
+                                    zip((radii[halo_first[i]:halo_first[i]+halo_n[i]] for i in range(curr_num_halos)),
+                                        (orbit_assn[halo_first[i]:halo_first[i]+halo_n[i]] for i in range(curr_num_halos)),
+                                        (act_mass_prf_all[j] for j in range(curr_num_halos)),
+                                        (act_mass_prf_orb[j] for j in range(curr_num_halos)),
+                                        repeat(prf_bins),repeat(mass)),
+                                    chunksize=100))
+    p.close()
+    p.join()        
+
+    calc_mass_prf_orb = np.stack(calc_mass_prf_orb, axis=0)
+    calc_mass_prf_inf = np.stack(calc_mass_prf_inf, axis=0)
+    calc_mass_prf_all = np.stack(calc_mass_prf_all, axis=0)
+    calc_dens_prf_orb = np.stack(calc_dens_prf_orb, axis=0)
+    calc_dens_prf_inf = np.stack(calc_dens_prf_inf, axis=0)
+    calc_dens_prf_all = np.stack(calc_dens_prf_all, axis=0)
+    diff_n_orb_ptls = np.stack(diff_n_orb_ptls, axis=0)
+    diff_n_inf_ptls = np.stack(diff_n_inf_ptls, axis=0)
+    diff_n_all_ptls = np.stack(diff_n_all_ptls, axis=0)
+
+    calc_mass_prf_orb = calc_mass_prf_orb.astype(np.float32)
+    calc_mass_prf_inf = calc_mass_prf_inf.astype(np.float32)
+    calc_mass_prf_all = calc_mass_prf_all.astype(np.float32)
+    diff_n_orb_ptls = diff_n_orb_ptls.astype(np.int32)
+    diff_n_inf_ptls = diff_n_inf_ptls.astype(np.int32)
+    diff_n_all_ptls = diff_n_all_ptls.astype(np.int32)
+    
+    mid_calc_mass_prf_orb = np.median(calc_mass_prf_orb,axis=0)
+    mid_calc_mass_prf_inf = np.median(calc_mass_prf_inf,axis=0)
+    mid_calc_mass_prf_all = np.median(calc_mass_prf_all,axis=0)
+    mid_calc_dens_prf_orb = np.median(calc_dens_prf_orb,axis=0)
+    mid_calc_dens_prf_inf = np.median(calc_dens_prf_inf,axis=0)
+    mid_calc_dens_prf_all = np.median(calc_dens_prf_all,axis=0)
+    
+    act_dens_prf_all = calculate_density(act_mass_prf_all, prf_bins[1:])
+    act_dens_prf_orb = calculate_density(act_mass_prf_orb, prf_bins[1:])
+    act_dens_prf_inf = calculate_density(act_mass_prf_inf, prf_bins[1:])
+    
+    mid_act_dens_prf_all = np.median(act_dens_prf_all, axis=0)
+    mid_act_dens_prf_orb = np.median(act_dens_prf_orb, axis=0)
+    mid_act_dens_prf_inf = np.median(act_dens_prf_inf, axis=0)
+    
+    # for each bin checking how many halos have particles there
+    # if there are less than 10 halos then just treat that bin as having 0
+    for i in range(calc_mass_prf_orb.shape[1]):
+        if np.where(calc_mass_prf_orb[:,i] > 0)[0].shape[0] < min_disp_halos:
+            calc_mass_prf_orb[:,i] = np.NaN
+            act_mass_prf_orb[:,i] = np.NaN
+        if np.where(calc_mass_prf_inf[:,i] > 0)[0].shape[0] < min_disp_halos:
+            calc_mass_prf_inf[:,i] = np.NaN
+            act_mass_prf_inf[:,i] = np.NaN
+        if np.where(calc_mass_prf_all[:,i] > 0)[0].shape[0] < min_disp_halos:
+            calc_mass_prf_all[:,i] = np.NaN
+            act_mass_prf_all[:,i] = np.NaN
+        if np.where(calc_dens_prf_orb[:,i] > 0)[0].shape[0] < min_disp_halos:
+            calc_dens_prf_orb[:,i] = np.NaN
+            act_dens_prf_orb[:,i] = np.NaN
+        if np.where(calc_dens_prf_inf[:,i] > 0)[0].shape[0] < min_disp_halos:
+            calc_dens_prf_inf[:,i] = np.NaN
+            act_dens_prf_inf[:,i] = np.NaN
+        if np.where(calc_dens_prf_all[:,i] > 0)[0].shape[0] < min_disp_halos:
+            calc_dens_prf_all[:,i] = np.NaN
+            act_dens_prf_all[:,i] = np.NaN
+    
+    mid_act_mass_prf_all = np.median(act_mass_prf_all, axis=0)
+    mid_act_mass_prf_orb = np.median(act_mass_prf_orb, axis=0)
+    mid_act_mass_prf_inf = np.median(act_mass_prf_inf, axis=0)
+    
+    with np.errstate(divide='ignore', invalid='ignore'):
+        all_dens_ratio = np.divide(calc_dens_prf_all,mid_act_dens_prf_all)
+        inf_dens_ratio = np.divide(calc_dens_prf_inf,mid_act_dens_prf_inf)
+        orb_dens_ratio = np.divide(calc_dens_prf_orb,mid_act_dens_prf_orb)
+    
+    upper_calc_mass_prf_orb = np.percentile(calc_mass_prf_orb, q=84.1, axis=0)
+    lower_calc_mass_prf_orb = np.percentile(calc_mass_prf_orb, q=15.9, axis=0)
+    upper_calc_mass_prf_inf = np.percentile(calc_mass_prf_inf, q=84.1, axis=0)
+    lower_calc_mass_prf_inf = np.percentile(calc_mass_prf_inf, q=15.9, axis=0)
+    upper_calc_mass_prf_all = np.percentile(calc_mass_prf_all, q=84.1, axis=0)
+    lower_calc_mass_prf_all = np.percentile(calc_mass_prf_all, q=15.9, axis=0)
+    upper_calc_dens_prf_orb = np.percentile(calc_dens_prf_orb, q=84.1, axis=0)
+    lower_calc_dens_prf_orb = np.percentile(calc_dens_prf_orb, q=15.9, axis=0)
+    upper_calc_dens_prf_inf = np.percentile(calc_dens_prf_inf, q=84.1, axis=0)
+    lower_calc_dens_prf_inf = np.percentile(calc_dens_prf_inf, q=15.9, axis=0)
+    upper_calc_dens_prf_all = np.percentile(calc_dens_prf_all, q=84.1, axis=0)
+    lower_calc_dens_prf_all = np.percentile(calc_dens_prf_all, q=15.9, axis=0)
+        
+    upper_orb_dens_ratio = np.percentile(orb_dens_ratio, q=84.1, axis=0)
+    lower_orb_dens_ratio = np.percentile(orb_dens_ratio, q=15.9, axis=0)
+    upper_inf_dens_ratio = np.percentile(inf_dens_ratio, q=84.1, axis=0)
+    lower_inf_dens_ratio = np.percentile(inf_dens_ratio, q=15.9, axis=0)
+    upper_all_dens_ratio = np.percentile(all_dens_ratio, q=84.1, axis=0)
+    lower_all_dens_ratio = np.percentile(all_dens_ratio, q=15.9, axis=0)
+    
+    mid_all_ratio = np.median(all_dens_ratio, axis=0)
+    mid_inf_ratio = np.median(inf_dens_ratio, axis=0)
+    mid_orb_ratio = np.median(orb_dens_ratio, axis=0)
+    
     middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
 
-    fig, ax = plt.subplots(1,2)
-
-    with np.errstate(divide='ignore', invalid='ignore'):
-        all_ratio = np.divide(calc_prf_all,actual_prf_all)
-        inf_ratio = np.divide(calc_prf_inf,(actual_prf_all - actual_prf_1halo))
-        orb_ratio = np.divide(calc_prf_orb,actual_prf_1halo)
-
-    ax[0].plot(middle_bins, all_ratio, 'r', label = "My prf / SPARTA prf all")
-    ax[0].plot(middle_bins, orb_ratio, 'b', label = "My prf / SPARTA profile orb")
-    ax[0].plot(middle_bins, inf_ratio, 'g', label = "My prf / SPARTA profile inf")
+    fig, ax = plt.subplots(1,3)
+    plt.rcParams.update({'font.size': 16})
+    fill_alpha = 0.2
     
-    ax[0].set_title(wrap("My Predicted  / Actual Density Profile for halo idx: " + title))
-    ax[0].set_xlabel("radius $r/R_{200m}$")
-    ax[0].set_ylabel("My Dens Prf / Act Dens Prf")
+    mid_calc_mass_prf_all[mid_calc_mass_prf_all == 0] = np.NaN
+    mid_calc_mass_prf_orb[mid_calc_mass_prf_orb == 0] = np.NaN
+    mid_calc_mass_prf_inf[mid_calc_mass_prf_inf == 0] = np.NaN
+    mid_calc_dens_prf_all[mid_calc_dens_prf_all == 0] = np.NaN
+    mid_calc_dens_prf_orb[mid_calc_dens_prf_orb == 0] = np.NaN
+    mid_calc_dens_prf_inf[mid_calc_dens_prf_inf == 0] = np.NaN
+    mid_act_mass_prf_all[mid_act_mass_prf_all == 0] = np.NaN
+    mid_act_mass_prf_orb[mid_act_mass_prf_orb == 0] = np.NaN
+    mid_act_mass_prf_inf[mid_act_mass_prf_inf == 0] = np.NaN
+    mid_act_dens_prf_all[mid_act_dens_prf_all == 0] = np.NaN
+    mid_act_dens_prf_orb[mid_act_dens_prf_orb == 0] = np.NaN
+    mid_act_dens_prf_inf[mid_act_dens_prf_inf == 0] = np.NaN
+    
+    ax[0].plot(middle_bins, mid_calc_mass_prf_all, 'r-', label = "ML mass profile all ptls")
+    ax[0].plot(middle_bins, mid_calc_mass_prf_orb, 'b-', label = "ML mass profile orb ptls")
+    ax[0].plot(middle_bins, mid_calc_mass_prf_inf, 'g-', label = "ML mass profile inf ptls")
+    ax[0].plot(middle_bins, mid_act_mass_prf_all, 'r--', label = "SPARTA mass profile all ptls")
+    ax[0].plot(middle_bins, mid_act_mass_prf_orb, 'b--', label = "SPARTA mass profile orb ptls")
+    ax[0].plot(middle_bins, mid_act_mass_prf_inf, 'g--', label = "SPARTA mass profile inf ptls")
+    
+    ax[0].fill_between(middle_bins, lower_calc_mass_prf_all, upper_calc_mass_prf_all, color='r', alpha=fill_alpha)
+    ax[0].fill_between(middle_bins, lower_calc_mass_prf_inf, upper_calc_mass_prf_inf, color='g', alpha=fill_alpha)
+    ax[0].fill_between(middle_bins, lower_calc_mass_prf_orb, upper_calc_mass_prf_orb, color='b', alpha=fill_alpha)
+    
+    ax[0].set_title("ML Predicted vs Actual Mass Profile")
+    ax[0].set_xlabel("Radius $r/R_{200m}$")
+    ax[0].set_ylabel("Mass $M_\odot$")
     ax[0].set_xscale("log")
     ax[0].set_yscale("log")
+    ax[0].set_box_aspect(1)
     ax[0].legend()
-
-    ax[1].plot(middle_bins, calc_prf_all, 'r-', label = "My prf all")
-    ax[1].plot(middle_bins, calc_prf_orb, 'b-', label = "My prf orb")
-    ax[1].plot(middle_bins, calc_prf_inf, 'g-', label = "My prf inf")
-    ax[1].plot(middle_bins, actual_prf_all, 'r--', label = "SPARTA prf all")
-    ax[1].plot(middle_bins, actual_prf_1halo, 'b--', label = "SPARTA prf orb")
-    ax[1].plot(middle_bins, (actual_prf_all - actual_prf_1halo), 'g--', label = "SPARTA prf inf")
-    ax[1].set_title(wrap("ML Predicted vs Actual Density Profile for halo idx: " + title))
-    ax[1].set_xlabel("radius $r/R_{200m}$")
-    ax[1].set_ylabel("Mass $M_/odot$")
+    
+    ax[1].plot(middle_bins, mid_calc_dens_prf_all, 'r-', label = "ML density profile all ptls")
+    ax[1].plot(middle_bins, mid_calc_dens_prf_orb, 'b-', label = "ML density profile orb ptls")
+    ax[1].plot(middle_bins, mid_calc_dens_prf_inf, 'g-', label = "ML density profile inf ptls")
+    ax[1].plot(middle_bins, mid_act_dens_prf_all, 'r--', label = "SPARTA density profile all ptls")
+    ax[1].plot(middle_bins, mid_act_dens_prf_orb, 'b--', label = "SPARTA mass profile orb ptls")
+    ax[1].plot(middle_bins, mid_act_dens_prf_inf, 'g--', label = "SPARTA mass profile inf ptls")
+    
+    ax[1].fill_between(middle_bins, lower_calc_dens_prf_all, upper_calc_dens_prf_all, color='r', alpha=fill_alpha)
+    ax[1].fill_between(middle_bins, lower_calc_dens_prf_inf, upper_calc_dens_prf_inf, color='g', alpha=fill_alpha)
+    ax[1].fill_between(middle_bins, lower_calc_dens_prf_orb, upper_calc_dens_prf_orb, color='b', alpha=fill_alpha)
+    
+    ax[1].set_title("ML Predicted vs Actual Density Profile")
+    ax[1].set_xlabel("Radius $r/R_{200m}$")
+    ax[1].set_ylabel("Density $M_\odot/kpc^3$")
     ax[1].set_xscale("log")
     ax[1].set_yscale("log")
+    ax[1].set_box_aspect(1)
     ax[1].legend()
     
+    ax[2].plot(middle_bins, mid_all_ratio, 'r', label = "ML density profile / SPARTA density profile all")
+    ax[2].plot(middle_bins, mid_orb_ratio, 'b', label = "ML density profile / SPARTA density profile orb")
+    ax[2].plot(middle_bins, mid_inf_ratio, 'g', label = "ML density profile / SPARTA density profile inf")
+    
+    ax[2].fill_between(middle_bins, lower_all_dens_ratio, upper_all_dens_ratio, color='r', alpha=fill_alpha)
+    ax[2].fill_between(middle_bins, lower_inf_dens_ratio, upper_inf_dens_ratio, color='g', alpha=fill_alpha)
+    ax[2].fill_between(middle_bins, lower_orb_dens_ratio, upper_orb_dens_ratio, color='b', alpha=fill_alpha)    
+    
+    ax[2].set_title("ML Predicted / Actual Density Profile")
+    ax[2].set_xlabel("Radius $r/R_{200m}$")
+    ax[2].set_ylabel("ML Dens Prf / Act Dens Prf")
+    ax[2].set_ylim(0.1,6)
+    ax[2].set_yscale("log")
+    ax[2].set_box_aspect(1)
+    ax[2].legend(loc="lower right")    
+    
     if save_graph:
-        fig.set_size_inches(21, 13)
+        fig.set_size_inches(50, 25)
         create_directory(save_location + "dens_prfl_ratio/")
         fig.savefig(save_location + "dens_prfl_ratio/" + title + ".png", bbox_inches='tight')
     if show_graph:
@@ -179,10 +331,12 @@ def split_orb_inf(data, labels):
     orbit = data[np.where(labels == 1)]
     return infall, orbit
  
-def phase_plot(ax, x, y, min_ptl, max_ptl, range, num_bins, cmap, x_label="", y_label="", hide_xticks=False, hide_yticks=False, title=""):
+def phase_plot(ax, x, y, min_ptl, max_ptl, range, num_bins, cmap, x_label="", y_label="", hide_xticks=False, hide_yticks=False,text="", title=""):
     ax.hist2d(x, y, bins=num_bins, range=range, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm="log", vmin=min_ptl, vmax=max_ptl)
+    if text != "":
+        ax.text(.01,.03, text, ha="left", va="bottom", transform=ax.transAxes, fontsize="large", bbox={"facecolor":'white',"alpha":.9,})
     if title != "":
-        ax.text(.01,.03,title, ha="left", va="bottom", transform=ax.transAxes, fontsize="large")
+        ax.set_title(title)
     if x_label != "":
         ax.set_xlabel(x_label)
     if y_label != "":
@@ -192,10 +346,12 @@ def phase_plot(ax, x, y, min_ptl, max_ptl, range, num_bins, cmap, x_label="", y_
     if hide_yticks:
         ax.tick_params(axis='y', which='both',left=False,labelleft=False) 
         
-def imshow_plot(ax, img, extent, x_label="", y_label="", title="", return_img=False, hide_xticks=False, hide_yticks=False, kwargs={}):
+def imshow_plot(ax, img, extent, x_label="", y_label="", text="", title="", return_img=False, hide_xticks=False, hide_yticks=False, kwargs={}):
     img=ax.imshow(img, interpolation="none", extent = extent, **kwargs)
+    if text != "":
+        ax.text(.01,.03, text, ha="left", va="bottom", transform=ax.transAxes, fontsize="large", bbox={"facecolor":'white',"alpha":0.9,})
     if title != "":
-        ax.text(.01,.03,title, ha="left", va="bottom", transform=ax.transAxes, fontsize="large")
+        ax.set_title(title)
     if x_label != "":
         ax.set_xlabel(x_label)
     if y_label != "":
@@ -214,23 +370,22 @@ def update_miss_class(img, miss_class, act, miss_class_min, act_min):
     img = np.where((miss_class >= 1) & (img < miss_class_min) & (act >= act_min), miss_class_min, img)
     return img.T
 
-
-def create_hist_max_ptl(min_ptl, set_ptl, inf_r, orb_r, inf_rv, orb_rv, inf_tv, orb_tv, num_bins, max_r, max_rv, min_rv, max_tv, min_tv, bin_r_rv = None, bin_r_tv = None, bin_rv_tv = None):
+def create_hist_max_ptl(min_ptl, set_ptl, inf_r, orb_r, inf_rv, orb_rv, inf_tv, orb_tv, num_bins, r_range, rv_range, tv_range, bin_r_rv = None, bin_r_tv = None, bin_rv_tv = None):
     if bin_r_rv == None:
         bins = num_bins
-        orb_r_rv = histogram(orb_r, orb_rv, bins=bins, range=[[0,max_r],[min_rv,max_rv]],min_ptl=min_ptl,set_ptl=set_ptl)
-        orb_r_tv = histogram(orb_r, orb_tv, bins=bins, range=[[0,max_r],[min_tv,max_tv]],min_ptl=min_ptl,set_ptl=set_ptl)
-        orb_rv_tv = histogram(orb_rv, orb_tv, bins=bins, range=[[min_rv,max_rv],[min_tv,max_tv]],min_ptl=min_ptl,set_ptl=set_ptl)
-        inf_r_rv = histogram(inf_r, inf_rv, bins=bins, range=[[0,max_r],[min_rv,max_rv]],min_ptl=min_ptl,set_ptl=set_ptl)
-        inf_r_tv = histogram(inf_r, inf_tv, bins=bins, range=[[0,max_r],[min_tv,max_tv]],min_ptl=min_ptl,set_ptl=set_ptl)
-        inf_rv_tv = histogram(inf_rv, inf_tv, bins=bins, range=[[min_rv,max_rv],[min_tv,max_tv]],min_ptl=min_ptl,set_ptl=set_ptl)
+        orb_r_rv = histogram(orb_r, orb_rv, bins=bins, range=[r_range,rv_range],min_ptl=min_ptl,set_ptl=set_ptl)
+        orb_r_tv = histogram(orb_r, orb_tv, bins=bins, range=[r_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl)
+        orb_rv_tv = histogram(orb_rv, orb_tv, bins=bins, range=[rv_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl)
+        inf_r_rv = histogram(inf_r, inf_rv, bins=bins, range=[r_range,rv_range],min_ptl=min_ptl,set_ptl=set_ptl)
+        inf_r_tv = histogram(inf_r, inf_tv, bins=bins, range=[r_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl)
+        inf_rv_tv = histogram(inf_rv, inf_tv, bins=bins, range=[rv_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl)
     else:
-        orb_r_rv = histogram(orb_r, orb_rv, bins=bin_r_rv, range=[[0,max_r],[min_rv,max_rv]],min_ptl=min_ptl,set_ptl=set_ptl)
-        orb_r_tv = histogram(orb_r, orb_tv, bins=bin_r_tv, range=[[0,max_r],[min_tv,max_tv]],min_ptl=min_ptl,set_ptl=set_ptl)
-        orb_rv_tv = histogram(orb_rv, orb_tv, bins=bin_rv_tv, range=[[min_rv,max_rv],[min_tv,max_tv]],min_ptl=min_ptl,set_ptl=set_ptl)
-        inf_r_rv = histogram(inf_r, inf_rv, bins=bin_r_rv, range=[[0,max_r],[min_rv,max_rv]],min_ptl=min_ptl,set_ptl=set_ptl)
-        inf_r_tv = histogram(inf_r, inf_tv, bins=bin_r_tv, range=[[0,max_r],[min_tv,max_tv]],min_ptl=min_ptl,set_ptl=set_ptl)
-        inf_rv_tv = histogram(inf_rv, inf_tv, bins=bin_rv_tv, range=[[min_rv,max_rv],[min_tv,max_tv]],min_ptl=min_ptl,set_ptl=set_ptl)
+        orb_r_rv = histogram(orb_r, orb_rv, bins=bin_r_rv, range=[r_range,rv_range],min_ptl=min_ptl,set_ptl=set_ptl)
+        orb_r_tv = histogram(orb_r, orb_tv, bins=bin_r_tv, range=[r_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl)
+        orb_rv_tv = histogram(orb_rv, orb_tv, bins=bin_rv_tv, range=[rv_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl)
+        inf_r_rv = histogram(inf_r, inf_rv, bins=bin_r_rv, range=[r_range,rv_range],min_ptl=min_ptl,set_ptl=set_ptl)
+        inf_r_tv = histogram(inf_r, inf_tv, bins=bin_r_tv, range=[r_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl)
+        inf_rv_tv = histogram(inf_rv, inf_tv, bins=bin_rv_tv, range=[rv_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl)
 
     max_ptl = np.max(np.array([np.max(orb_r_rv[0]),np.max(orb_r_tv[0]),np.max(orb_rv_tv[0]),np.max(inf_r_rv[0]),np.max(inf_r_tv[0]),np.max(inf_rv_tv[0]),]))
     
@@ -239,14 +394,9 @@ def create_hist_max_ptl(min_ptl, set_ptl, inf_r, orb_r, inf_rv, orb_rv, inf_tv, 
 def percent_error(pred, act):
     return (((pred - act))/act) * 100
 
-def plot_incorrectly_classified(correct_labels, ml_labels, r, rv, tv, num_bins, title, save_location, model_save_location, act_orb_r_rv, act_orb_r_tv, act_orb_rv_tv, act_inf_r_rv, act_inf_r_tv, act_inf_rv_tv): 
+def calc_misclassified(correct_labels, ml_labels, r, rv, tv, r_range, rv_range, tv_range, num_bins, model_save_location): 
     min_ptl = 1e-4
     act_min_ptl = 1
-    max_r = np.max(r)
-    max_rv = np.max(rv)
-    min_rv = np.min(rv)
-    max_tv = np.max(tv)
-    min_tv = np.min(tv)
        
     inc_inf = np.where((ml_labels == 1) & (correct_labels == 0))[0]
     num_orb = np.where(correct_labels == 1)[0].shape[0]
@@ -254,9 +404,11 @@ def plot_incorrectly_classified(correct_labels, ml_labels, r, rv, tv, num_bins, 
     num_inf = np.where(correct_labels == 0)[0].shape[0]
     tot_num_inc = inc_orb.shape[0] + inc_inf.shape[0]
     tot_num_ptl = num_orb + num_inf
-    print("num incorrect inf", inc_inf.shape, ",", np.round(((inc_inf.shape[0]/num_inf)*100),2), "% of infalling ptls")
-    print("num incorrect orb", inc_orb.shape, ",", np.round(((inc_orb.shape[0]/num_orb) * 100),2), "% of orbiting ptls")
-    print("num incorrect tot", tot_num_ptl, ",", np.round(((tot_num_inc/tot_num_ptl) * 100),2), "% of all ptls")
+    print(np.where(correct_labels==-99)[0].shape)
+    print("tot num ptl:",tot_num_ptl)
+    print("num incorrect inf", inc_inf.shape[0], ",", np.round(((inc_inf.shape[0]/num_inf)*100),2), "% of infalling ptls")
+    print("num incorrect orb", inc_orb.shape[0], ",", np.round(((inc_orb.shape[0]/num_orb) * 100),2), "% of orbiting ptls")
+    print("num incorrect tot", tot_num_inc, ",", np.round(((tot_num_inc/tot_num_ptl) * 100),2), "% of all ptls")
 
     file = open(model_save_location + "model_info.txt", 'a')
     file.write("Percent of Orbiting Particles Mislabeled: " + str(np.round(((inc_orb.shape[0]/num_orb)*100),2)) + "%\n")
@@ -275,9 +427,9 @@ def plot_incorrectly_classified(correct_labels, ml_labels, r, rv, tv, num_bins, 
     act_inf_rv, act_orb_rv = split_orb_inf(rv, correct_labels)
     act_inf_tv, act_orb_tv = split_orb_inf(tv, correct_labels)
 
-    max_all_ptl, act_orb_r_rv, act_orb_r_tv, act_orb_rv_tv, act_inf_r_rv, act_inf_r_tv, act_inf_rv_tv = create_hist_max_ptl(act_min_ptl, 0, act_inf_r, act_orb_r, act_inf_rv, act_orb_rv, act_inf_tv, act_orb_tv, num_bins, max_r, max_rv, min_rv, max_tv, min_tv)    
-    max_ptl, inc_orb_r_rv, inc_orb_r_tv, inc_orb_rv_tv, inc_inf_r_rv, inc_inf_r_tv, inc_inf_rv_tv = create_hist_max_ptl(min_ptl, min_ptl, inc_inf_r, inc_orb_r, inc_inf_rv, inc_orb_rv, inc_inf_tv, inc_orb_tv, num_bins, max_r, max_rv, min_rv, max_tv, min_tv, bin_r_rv=act_orb_r_rv[1:], bin_r_tv=act_orb_r_tv[1:],bin_rv_tv=act_orb_rv_tv[1:])
-    
+    max_all_ptl, act_orb_r_rv, act_orb_r_tv, act_orb_rv_tv, act_inf_r_rv, act_inf_r_tv, act_inf_rv_tv = create_hist_max_ptl(act_min_ptl, 0, act_inf_r, act_orb_r, act_inf_rv, act_orb_rv, act_inf_tv, act_orb_tv, num_bins, r_range, rv_range, tv_range)    
+    max_ptl, inc_orb_r_rv, inc_orb_r_tv, inc_orb_rv_tv, inc_inf_r_rv, inc_inf_r_tv, inc_inf_rv_tv = create_hist_max_ptl(min_ptl, min_ptl, inc_inf_r, inc_orb_r, inc_inf_rv, inc_orb_rv, inc_inf_tv, inc_orb_tv, num_bins, r_range, rv_range, tv_range, bin_r_rv=act_orb_r_rv[1:], bin_r_tv=act_orb_r_tv[1:],bin_rv_tv=act_orb_rv_tv[1:])
+
     all_inc_r_rv = (inc_orb_r_rv[0] + inc_inf_r_rv[0])
     all_inc_r_tv = (inc_orb_r_tv[0] + inc_inf_r_tv[0])
     all_inc_rv_tv = (inc_orb_rv_tv[0] + inc_inf_rv_tv[0])
@@ -305,15 +457,42 @@ def plot_incorrectly_classified(correct_labels, ml_labels, r, rv, tv, num_bins, 
     scaled_all_r_rv = update_miss_class(scaled_all_r_rv.T, all_inc_r_rv, all_act_r_rv, miss_class_min=min_ptl, act_min=act_min_ptl)
     scaled_all_r_tv = update_miss_class(scaled_all_r_tv.T, all_inc_r_tv, all_act_r_tv, miss_class_min=min_ptl, act_min=act_min_ptl)
     scaled_all_rv_tv = update_miss_class(scaled_all_rv_tv.T, all_inc_rv_tv, all_act_rv_tv, miss_class_min=min_ptl, act_min=act_min_ptl)
-
-    # all_r_rv_hist = histogram(x=r,y=rv,bins=num_bins,range=[[0,max_r],[min_rv,max_rv]],min_ptl=0)
-    # all_r_tv_hist = histogram(x=r,y=tv,bins=num_bins,range=[[0,max_r],[min_tv,max_tv]],min_ptl=0)
-    # all_rv_tv_hist = histogram(x=rv,y=tv,bins=num_bins,range=[[min_rv,max_rv],[min_tv,max_tv]],min_ptl=0)
     
-
     max_diff = np.max(np.array([np.max(scaled_orb_r_rv),np.max(scaled_orb_r_tv),np.max(scaled_orb_rv_tv),
                                 np.max(scaled_inf_r_rv),np.max(scaled_inf_r_tv),np.max(scaled_inf_rv_tv),
                                 np.max(scaled_all_r_rv),np.max(scaled_all_r_tv),np.max(scaled_all_rv_tv)]))
+    
+    return min_ptl, max_diff, max_all_ptl, all_inc_r_rv, all_inc_r_tv, all_inc_rv_tv, scaled_inf_r_rv, scaled_inf_r_tv, scaled_inf_rv_tv, scaled_orb_r_rv, scaled_orb_r_tv, scaled_orb_rv_tv, scaled_all_r_rv, scaled_all_r_tv, scaled_all_rv_tv
+    
+def plot_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, c_tv, title, num_bins, save_location, model_save_location):
+    max_r = np.max(p_r)
+    max_rv = np.max(p_rv)
+    min_rv = np.min(p_rv)
+    max_tv = np.max(p_tv)
+    min_tv = np.min(p_tv)
+    
+    c_max_r = np.nanmax(c_r)
+    c_max_rv = np.nanmax(c_rv)
+    c_min_rv = np.nanmin(c_rv)
+    c_max_tv = np.nanmax(c_tv)
+    c_min_tv = np.nanmin(c_tv)
+    
+    r_range = [0, max_r]
+    rv_range = [min_rv, max_rv]
+    tv_range = [min_tv, max_tv]
+    
+    print(r_range, [0,c_max_r])
+    print(rv_range, [c_min_rv,c_max_rv])
+    print(tv_range, [c_min_tv,c_max_tv])
+    
+    c_corr_labels = np.copy(p_corr_labels)
+    c_ml_labels = np.copy(p_ml_labels)
+
+    c_corr_labels[np.argwhere(np.isnan(c_r)).flatten()] = -99
+    c_ml_labels[np.argwhere(np.isnan(c_r)).flatten()] = -99
+    
+    p_min_ptl, p_max_diff, p_max_all_ptl, p_all_inc_r_rv, p_all_inc_r_tv, p_all_inc_rv_tv, p_scaled_inf_r_rv, p_scaled_inf_r_tv, p_scaled_inf_rv_tv, p_scaled_orb_r_rv, p_scaled_orb_r_tv, p_scaled_orb_rv_tv, p_scaled_all_r_rv, p_scaled_all_r_tv, p_scaled_all_rv_tv = calc_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, r_range, rv_range, tv_range, num_bins=num_bins, model_save_location=model_save_location)
+    c_min_ptl, c_max_diff, c_max_all_ptl, c_all_inc_r_rv, c_all_inc_r_tv, c_all_inc_rv_tv, c_scaled_inf_r_rv, c_scaled_inf_r_tv, c_scaled_inf_rv_tv, c_scaled_orb_r_rv, c_scaled_orb_r_tv, c_scaled_orb_rv_tv, c_scaled_all_r_rv, c_scaled_all_r_tv, c_scaled_all_rv_tv = calc_misclassified(c_corr_labels, c_ml_labels, c_r, c_rv, c_tv, r_range, rv_range, tv_range, num_bins=num_bins, model_save_location=model_save_location)
     
     cividis_cmap = plt.get_cmap("cividis_r")
     cividis_cmap.set_under(color='white')   
@@ -323,8 +502,8 @@ def plot_incorrectly_classified(correct_labels, ml_labels, r, rv, tv, num_bins, 
     test_cmap = plt.get_cmap("viridis")
     
     scale_miss_class_args = {
-        "vmin":min_ptl,
-        "vmax":max_diff,
+        "vmin":p_min_ptl,
+        "vmax":p_max_diff,
         "norm":"log",
         "origin":"lower",
         "aspect":"auto",
@@ -333,78 +512,55 @@ def plot_incorrectly_classified(correct_labels, ml_labels, r, rv, tv, num_bins, 
 
     all_miss_class_args = {
         "vmin":1,
-        "vmax":max_all_ptl,
+        "vmax":p_max_all_ptl,
         "norm":"log",
         "origin":"lower",
         "aspect":"auto",
         "cmap":cividis_cmap,
     }
-    
-    # print(act_inf_r_rv[0].T[13,:15])
-    # print(inc_inf_r_rv[0].T[13,:15])
-    # print(scaled_inf_r_rv[13,:15])
 
-    # fig, ax = plt.subplots(3)
-    # ax[0].imshow(act_inf_r_rv[0].T, interpolation="none", extent =[0,max_r,min_rv,max_rv], **all_miss_class_args)
-    # ax[1].imshow(inc_inf_r_rv[0].T, interpolation="none", extent =[0,max_r,min_rv,max_rv], **all_miss_class_args)
-    # ax[2].imshow(scaled_inf_r_rv, interpolation="none", extent =[0,max_r,min_rv,max_rv], **scale_miss_class_args)
-    # fig.savefig(save_location+"/2dhist/"+title+"test.png")
-
-    widths = [4,4,4,.5]
+    widths = [4,4,4,4,.5]
     heights = [4,4,4,4,4]
     
-    scal_miss_class_fig = plt.figure(constrained_layout=True, figsize=(10,15))
-    scal_miss_class_fig.suptitle("Misclassified Particles/Num Targets " + title)
-    gs = scal_miss_class_fig.add_gridspec(5,4,width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
+    scal_miss_class_fig = plt.figure(constrained_layout=True, figsize=(15,15))
+    #scal_miss_class_fig.suptitle("Misclassified Particles/Num Targets " + title)
+    gs = scal_miss_class_fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
     
     plt.rcParams.update({'font.size': 12})
-
-    phase_plot(scal_miss_class_fig.add_subplot(gs[0,0]), r, rv, min_ptl=1, max_ptl=max_all_ptl, range=[[0,max_r],[min_rv,max_rv]],num_bins=num_bins,cmap=cividis_cmap,y_label="$v_r/v_{200m}$", hide_xticks=True, title="Actual\nDistribution")
-    phase_plot(scal_miss_class_fig.add_subplot(gs[0,1]), r, tv, min_ptl=1, max_ptl=max_all_ptl, range=[[0,max_r],[min_tv,max_tv]],num_bins=num_bins,cmap=cividis_cmap,y_label="$v_t/v_{200m}$",hide_xticks=True)
-    phase_plot(scal_miss_class_fig.add_subplot(gs[0,2]), rv, tv, min_ptl=1, max_ptl=max_all_ptl, range=[[min_rv,max_rv],[min_tv,max_tv]],num_bins=num_bins,cmap=cividis_cmap, hide_xticks=True, hide_yticks=True)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[1,0]), all_inc_r_rv.T, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",hide_xticks=True,title="All Misclassified",kwargs=all_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[1,1]), all_inc_r_tv.T, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=all_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[1,2]), all_inc_rv_tv.T, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=all_miss_class_args)
-    phase_plt_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=1, vmax=max_all_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[0:2,-1]))
-
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[2,0]), scaled_inf_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",title="Label: Orbit\nReal: Infall",hide_xticks=True,kwargs=scale_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[2,1]), scaled_inf_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=scale_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[2,2]), scaled_inf_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[3,0]), scaled_orb_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",title="Label: Infall\nReal: Orbit",hide_xticks=True,kwargs=scale_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[3,1]), scaled_orb_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=scale_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[3,2]), scaled_orb_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[4,0]), scaled_all_r_rv, extent=[0,max_r,min_rv,max_rv],x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",title="All Misclassified Scaled",kwargs=scale_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[4,1]), scaled_all_r_tv, extent=[0,max_r,min_tv,max_tv],x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",kwargs=scale_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[4,2]), scaled_all_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],x_label="$v_r/v_{200m}$",hide_yticks=True,kwargs=scale_miss_class_args)
     
-    scal_misclas_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_diff),cmap=magma_cmap), cax=plt.subplot(gs[2:,-1]))
+    phase_plot(scal_miss_class_fig.add_subplot(gs[0,0]), c_r, c_rv, min_ptl=1, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,y_label="$v_r/v_{200m}$", hide_xticks=True, text="Actual\nDistribution", title="Secondary Snap")
+    phase_plot(scal_miss_class_fig.add_subplot(gs[0,1]), p_r, p_rv, min_ptl=1, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap, hide_xticks=True, hide_yticks=True, title="Primary Snap")
+    phase_plot(scal_miss_class_fig.add_subplot(gs[0,2]), p_r, p_tv, min_ptl=1, max_ptl=p_max_all_ptl, range=[r_range,tv_range],num_bins=num_bins,cmap=cividis_cmap,y_label="$v_t/v_{200m}$",hide_xticks=True)
+    phase_plot(scal_miss_class_fig.add_subplot(gs[0,3]), p_rv, p_tv, min_ptl=1, max_ptl=p_max_all_ptl, range=[rv_range,tv_range],num_bins=num_bins,cmap=cividis_cmap, hide_xticks=True, hide_yticks=True)
+    
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[1,0]), c_all_inc_r_rv.T, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified",kwargs=all_miss_class_args)
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[1,1]), p_all_inc_r_rv.T, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=True,kwargs=all_miss_class_args)
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[1,2]), p_all_inc_r_tv.T, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=all_miss_class_args)
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[1,3]), p_all_inc_rv_tv.T, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=all_miss_class_args)
+    phase_plt_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=1, vmax=p_max_all_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[0:2,-1]))
+
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[2,0]), c_scaled_inf_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",hide_xticks=True,kwargs=scale_miss_class_args)
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[2,1]), p_scaled_inf_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[2,2]), p_scaled_inf_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=scale_miss_class_args)
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[2,3]), p_scaled_inf_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
+    
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[3,0]), c_scaled_orb_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",hide_xticks=True,kwargs=scale_miss_class_args)
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[3,1]), p_scaled_orb_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[3,2]), p_scaled_orb_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=scale_miss_class_args)
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[3,3]), p_scaled_orb_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
+    
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[4,0]), c_scaled_all_r_rv, extent=[0,max_r,min_rv,max_rv],x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="All Misclassified\nScaled",kwargs=scale_miss_class_args)
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[4,1]), p_scaled_all_r_rv, extent=[0,max_r,min_rv,max_rv],x_label="$r/R_{200m}$",hide_yticks=True,kwargs=scale_miss_class_args)
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[4,2]), p_scaled_all_r_tv, extent=[0,max_r,min_tv,max_tv],x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",kwargs=scale_miss_class_args)
+    imshow_plot(scal_miss_class_fig.add_subplot(gs[4,3]), p_scaled_all_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],x_label="$v_r/v_{200m}$",hide_yticks=True,kwargs=scale_miss_class_args)
+    
+    scal_misclas_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=p_min_ptl, vmax=p_max_diff),cmap=magma_cmap), cax=plt.subplot(gs[2:,-1]))
     
     create_directory(save_location + "/2dhist/")
     scal_miss_class_fig.savefig(save_location + "/2dhist/" + title + "_scaled_miss_class.png")
-    
-#########################################################################################################################################################
-    widths = [4,4,4,.5]
-    heights = [4,4]
-    miss_class_fig = plt.figure()
-    miss_class_fig.suptitle("Misclassified Particles " + title)
-    gs = miss_class_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
-
-    min_ptl = 30
-    
-    phase_plot(miss_class_fig.add_subplot(gs[0,0]), inc_inf_r, inc_inf_rv, min_ptl, max_ptl, range=[[0,max_r],[min_rv,max_rv]], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$")
-    phase_plot(miss_class_fig.add_subplot(gs[0,1]), inc_inf_r, inc_inf_tv, min_ptl, max_ptl, range=[[0,max_r],[min_tv,max_tv]], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", title="Label: Infall Real: Orbit")
-    phase_plot(miss_class_fig.add_subplot(gs[0,2]), inc_inf_rv, inc_inf_tv, min_ptl, max_ptl, range=[[min_rv,max_rv],[min_tv,max_tv]], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$")
-    phase_plot(miss_class_fig.add_subplot(gs[1,0]), inc_orb_r, inc_orb_rv, min_ptl, max_ptl, range=[[0,max_r],[min_rv,max_rv]], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$")
-    phase_plot(miss_class_fig.add_subplot(gs[1,1]), inc_orb_r, inc_orb_tv, min_ptl, max_ptl, range=[[0,max_r],[min_tv,max_tv]], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", title="Label: Orbit Real: Infall")
-    phase_plot(miss_class_fig.add_subplot(gs[1,2]), inc_orb_rv, inc_orb_tv, min_ptl, max_ptl, range=[[min_rv,max_rv],[min_tv,max_tv]], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$")
-    
-    color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:,-1]))
-    
-    miss_class_fig.savefig(save_location + "/2dhist/" + title + "_miss_class.png")
 
 def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, show, save, save_location, model_save_location):
     create_directory(save_location + "2dhist/")
-    print(save_location + "2dhist/")
     mpl.rcParams.update({'font.size': 8})
     plt.rcParams['figure.constrained_layout.use'] = True
 
@@ -416,6 +572,10 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sho
     max_tv = np.max(tv)
     min_tv = np.min(tv)
     
+    r_range = [0, max_r]
+    rv_range = [min_rv, max_rv]
+    tv_range = [min_tv, max_tv]
+    
     ml_inf_r, ml_orb_r = split_orb_inf(r, orb_inf)
     ml_inf_rv, ml_orb_rv = split_orb_inf(rv, orb_inf)
     ml_inf_tv, ml_orb_tv = split_orb_inf(tv, orb_inf)
@@ -424,8 +584,8 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sho
     act_inf_rv, act_orb_rv = split_orb_inf(rv, correct_orb_inf)
     act_inf_tv, act_orb_tv = split_orb_inf(tv, correct_orb_inf)
 
-    ml_max_ptl, ml_orb_r_rv, ml_orb_r_tv, ml_orb_rv_tv, ml_inf_r_rv, ml_inf_r_tv, ml_inf_rv_tv = create_hist_max_ptl(min_ptl,min_ptl, ml_inf_r, ml_orb_r, ml_inf_rv, ml_orb_rv, ml_inf_tv, ml_orb_tv, num_bins, max_r, max_rv, min_rv, max_tv, min_tv)
-    act_max_ptl, act_orb_r_rv, act_orb_r_tv, act_orb_rv_tv, act_inf_r_rv, act_inf_r_tv, act_inf_rv_tv = create_hist_max_ptl(min_ptl,min_ptl, act_inf_r, act_orb_r, act_inf_rv, act_orb_rv, act_inf_tv, act_orb_tv, num_bins, max_r, max_rv, min_rv, max_tv, min_tv, bin_r_rv=ml_orb_r_rv[1:], bin_r_tv=ml_orb_r_tv[1:],bin_rv_tv=ml_orb_rv_tv[1:])    
+    ml_max_ptl, ml_orb_r_rv, ml_orb_r_tv, ml_orb_rv_tv, ml_inf_r_rv, ml_inf_r_tv, ml_inf_rv_tv = create_hist_max_ptl(min_ptl,min_ptl, ml_inf_r, ml_orb_r, ml_inf_rv, ml_orb_rv, ml_inf_tv, ml_orb_tv, num_bins, r_range, rv_range, tv_range)
+    act_max_ptl, act_orb_r_rv, act_orb_r_tv, act_orb_rv_tv, act_inf_r_rv, act_inf_r_tv, act_inf_rv_tv = create_hist_max_ptl(min_ptl,min_ptl, act_inf_r, act_orb_r, act_inf_rv, act_orb_rv, act_inf_tv, act_orb_tv, num_bins, r_range, rv_range, tv_range, bin_r_rv=ml_orb_r_rv[1:], bin_r_tv=ml_orb_r_tv[1:],bin_rv_tv=ml_orb_rv_tv[1:])    
     
     floor = 200
     per_err_1 = percent_error(ml_orb_r_rv[0], act_orb_r_rv[0]).T
@@ -453,12 +613,12 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sho
     inf_fig.suptitle("Infalling Particles: " + title)
     gs = inf_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
     
-    phase_plot(inf_fig.add_subplot(gs[0,0]), ml_inf_r, ml_inf_rv, min_ptl, max_ptl, range=[[0,max_r],[min_rv,max_rv]], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$")
-    phase_plot(inf_fig.add_subplot(gs[0,1]), ml_inf_r, ml_inf_tv, min_ptl, max_ptl, range=[[0,max_r],[min_tv,max_tv]], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="ML Predictions")
-    phase_plot(inf_fig.add_subplot(gs[0,2]), ml_inf_rv, ml_inf_tv, min_ptl, max_ptl, range=[[min_rv,max_rv],[min_tv,max_tv]], num_bins=num_bins, cmap=cmap, x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$")
-    phase_plot(inf_fig.add_subplot(gs[1,0]), act_inf_r, act_inf_rv, min_ptl, max_ptl, range=[[0,max_r],[min_rv,max_rv]], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$")
-    phase_plot(inf_fig.add_subplot(gs[1,1]), act_inf_r, act_inf_tv, min_ptl, max_ptl, range=[[0,max_r],[min_tv,max_tv]], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="Actual Distribution")
-    phase_plot(inf_fig.add_subplot(gs[1,2]), act_inf_rv, act_inf_tv, min_ptl, max_ptl, range=[[min_rv,max_rv],[min_tv,max_tv]], num_bins=num_bins, cmap=cmap, x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$")
+    phase_plot(inf_fig.add_subplot(gs[0,0]), ml_inf_r, ml_inf_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$")
+    phase_plot(inf_fig.add_subplot(gs[0,1]), ml_inf_r, ml_inf_tv, min_ptl, max_ptl, range=[r_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="ML Predictions")
+    phase_plot(inf_fig.add_subplot(gs[0,2]), ml_inf_rv, ml_inf_tv, min_ptl, max_ptl, range=[rv_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$")
+    phase_plot(inf_fig.add_subplot(gs[1,0]), act_inf_r, act_inf_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$")
+    phase_plot(inf_fig.add_subplot(gs[1,1]), act_inf_r, act_inf_tv, min_ptl, max_ptl, range=[r_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="Actual Distribution")
+    phase_plot(inf_fig.add_subplot(gs[1,2]), act_inf_rv, act_inf_tv, min_ptl, max_ptl, range=[rv_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$")
     
     inf_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]))
     
@@ -470,12 +630,12 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sho
     orb_fig.suptitle("Orbiting Particles: " + title)
     gs = orb_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
     
-    phase_plot(orb_fig.add_subplot(gs[0,0]), ml_orb_r, ml_orb_rv, min_ptl, max_ptl, range=[[0,max_r],[min_rv,max_rv]], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$")
-    phase_plot(orb_fig.add_subplot(gs[0,1]), ml_orb_r, ml_orb_tv, min_ptl, max_ptl, range=[[0,max_r],[min_tv,max_tv]], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="ML Predictions")
-    phase_plot(orb_fig.add_subplot(gs[0,2]), ml_orb_rv, ml_orb_tv, min_ptl, max_ptl, range=[[min_rv,max_rv],[min_tv,max_tv]], num_bins=num_bins, cmap=cmap, x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$")
-    phase_plot(orb_fig.add_subplot(gs[1,0]), act_orb_r, act_orb_rv, min_ptl, max_ptl, range=[[0,max_r],[min_rv,max_rv]], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$")
-    phase_plot(orb_fig.add_subplot(gs[1,1]), act_orb_r, act_orb_tv, min_ptl, max_ptl, range=[[0,max_r],[min_tv,max_tv]], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="Actual Distribution")
-    phase_plot(orb_fig.add_subplot(gs[1,2]), act_orb_rv, act_orb_tv, min_ptl, max_ptl, range=[[min_rv,max_rv],[min_tv,max_tv]], num_bins=num_bins, cmap=cmap, x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$")
+    phase_plot(orb_fig.add_subplot(gs[0,0]), ml_orb_r, ml_orb_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$")
+    phase_plot(orb_fig.add_subplot(gs[0,1]), ml_orb_r, ml_orb_tv, min_ptl, max_ptl, range=[r_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="ML Predictions")
+    phase_plot(orb_fig.add_subplot(gs[0,2]), ml_orb_rv, ml_orb_tv, min_ptl, max_ptl, range=[rv_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$")
+    phase_plot(orb_fig.add_subplot(gs[1,0]), act_orb_r, act_orb_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$")
+    phase_plot(orb_fig.add_subplot(gs[1,1]), act_orb_r, act_orb_tv, min_ptl, max_ptl, range=[r_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="Actual Distribution")
+    phase_plot(orb_fig.add_subplot(gs[1,2]), act_orb_rv, act_orb_tv, min_ptl, max_ptl, range=[rv_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$")
     
     orb_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]), pad = 0.1)
     
@@ -489,10 +649,10 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sho
     only_r_rv_fig.suptitle("Radial Velocity Versus Radius: " + title)
     gs = only_r_rv_fig.add_gridspec(2,3,width_ratios = only_r_rv_widths, height_ratios = only_r_rv_heights)
     
-    phase_plot(only_r_rv_fig.add_subplot(gs[0,0]), ml_orb_r, ml_orb_rv, min_ptl, max_ptl, range=[[0,max_r],[min_rv,max_rv]], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", title="ML Predicted Orbiting Particles")
-    phase_plot(only_r_rv_fig.add_subplot(gs[0,1]), ml_inf_r, ml_inf_rv, min_ptl, max_ptl, range=[[0,max_r],[min_rv,max_rv]], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", title="ML Predicted Infalling Particles")
-    phase_plot(only_r_rv_fig.add_subplot(gs[1,0]), act_orb_r, act_orb_rv, min_ptl, max_ptl, range=[[0,max_r],[min_rv,max_rv]], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", title="Actual Orbiting Particles")
-    phase_plot(only_r_rv_fig.add_subplot(gs[1,1]), act_inf_r, act_inf_rv, min_ptl, max_ptl, range=[[0,max_r],[min_rv,max_rv]], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", title="Actual Infalling Particles")
+    phase_plot(only_r_rv_fig.add_subplot(gs[0,0]), ml_orb_r, ml_orb_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", title="ML Predicted Orbiting Particles")
+    phase_plot(only_r_rv_fig.add_subplot(gs[0,1]), ml_inf_r, ml_inf_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", title="ML Predicted Infalling Particles")
+    phase_plot(only_r_rv_fig.add_subplot(gs[1,0]), act_orb_r, act_orb_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", title="Actual Orbiting Particles")
+    phase_plot(only_r_rv_fig.add_subplot(gs[1,1]), act_inf_r, act_inf_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", title="Actual Infalling Particles")
 
     
     only_r_rv_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]))
@@ -522,8 +682,6 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sho
     
     err_fig.savefig(save_location + "/2dhist/" + title + "_percent_error.png") 
     
-    plot_incorrectly_classified(correct_labels=correct_orb_inf, ml_labels=orb_inf, r=r, rv=rv, tv=tv, num_bins=num_bins, title=title, save_location=save_location, model_save_location=model_save_location, act_orb_r_rv=act_orb_r_rv, act_orb_r_tv=act_orb_r_tv, act_orb_rv_tv=act_orb_rv_tv, act_inf_r_rv=act_inf_r_rv, act_inf_r_tv=act_inf_r_tv, act_inf_rv_tv=act_inf_rv_tv)
-
 def graph_feature_importance(feature_names, feature_importance, title, plot, save, save_location):
     mpl.rcParams.update({'font.size': 8})
     fig2, (plot1) = plt.subplots(1,1)
@@ -598,6 +756,7 @@ def graph_acc_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, title, plot, 
         classification = classification_report(bin_corr, bin_preds, output_dict=True, zero_division=0)
         inf_accuracy.append(classification["accuracy"])
         
+
         start_bin = finish_bin
 
     start_bin = 0

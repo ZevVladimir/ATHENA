@@ -4,6 +4,7 @@ import os
 import numpy as np
 import multiprocessing as mp
 from sklearn.model_selection import train_test_split
+from itertools import repeat
 
 def create_directory(path):
     if os.path.exists(path) != True:
@@ -158,69 +159,6 @@ def split_dataset_by_mass(halo_first, halo_n, path_to_dataset, curr_dataset):
                     else:
                         curr_dataset = np.column_stack((curr_dataset,all_ptl_properties[key][halo_first:halo_first+halo_n]))
     return curr_dataset
-                               
-def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapshot_list):
-    save_path = save_path + "datasets/"
-    create_directory(save_path)
-    dataset_path = save_path + dataset_name + "_dataset" + ".pickle"
-    # if the directory for this hdf5 file exists if not make it
-    if os.path.exists(save_path) != True:
-        os.makedirs(save_path)
-    if os.path.exists(dataset_path) != True:
-        num_cols = 0
-        with h5py.File((data_location + dataset_name + "_all_particle_properties_" + sparta_name + ".hdf5"), 'r') as all_ptl_properties: 
-            for key in all_ptl_properties.keys():
-                if key != "Halo_first" and key != "Halo_n" and key != "HIPIDS" and key != "Orbit_Infall":
-                    if all_ptl_properties[key].ndim > 1:
-                        num_cols += all_ptl_properties[key].shape[1]
-                    else:
-                        num_cols += 1
-            num_params_per_snap = num_cols / len(snapshot_list)    
-
-            num_rows = all_ptl_properties[key].shape[0]
-            full_dataset = np.zeros((num_rows, num_cols),dtype=np.float32)
-            hipids = np.zeros(num_rows, dtype=np.float64)
-            labels = np.zeros(num_rows, dtype=np.int8)
-            all_keys = np.empty(num_cols,dtype=object)
-            curr_col = 0
-            for key in all_ptl_properties.keys():
-                if key == "HIPIDS":
-                    hipids = all_ptl_properties[key][:]
-                elif key == "Orbit_Infall":
-                    labels = all_ptl_properties[key][:]
-                elif key != "Halo_first" and key != "Halo_n" and key != "HIPIDS" and key != "Orbit_Infall":
-                    if all_ptl_properties[key].ndim > 1:
-                        for row in range(all_ptl_properties[key].ndim):
-                            access_col = int((curr_col + (row * num_params_per_snap)))
-                            full_dataset[:,access_col] = all_ptl_properties[key][:,row]
-                            all_keys[access_col] = (key + str(snapshot_list[row]))
-                        curr_col += 1
-                    else:
-                        full_dataset[:,curr_col] = all_ptl_properties[key]
-                        all_keys[curr_col] = (key + str(snapshot_list[0]))
-                        curr_col += 1
-
-                
-        # once all the halos are gone through save them as pickles for later  
-        with open(dataset_path, "wb") as pickle_file:
-            pickle.dump(full_dataset, pickle_file)
-            
-        with open(save_path + dataset_name + "_dataset_all_keys.pickle", "wb") as pickle_file:
-            pickle.dump(all_keys, pickle_file)
-            
-        with open(save_path + dataset_name + "_labels.pickle", "wb") as pickle_file:
-            pickle.dump(labels, pickle_file)
-        
-        with open(save_path + dataset_name + "_hipids.pickle", "wb") as pickle_file:
-            pickle.dump(hipids, pickle_file)
-            
-    # if there are already pickle files just open them
-    else:
-        with open(dataset_path, "rb") as pickle_file:
-            full_dataset = pickle.load(pickle_file)
-        with open(save_path + dataset_name + "_dataset_all_keys.pickle", "rb") as pickle_file:
-            all_keys = pickle.load(pickle_file)
-    return full_dataset, all_keys
 
 def save_to_hdf5(hdf5_file, data_name, dataset, chunk, max_shape, curr_idx, max_num_keys):
     if len(list(hdf5_file.keys())) < (max_num_keys):

@@ -131,7 +131,7 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
         # If a particle has a pericenter of the lower limit is 1 then it is orbiting
         if (total_num_snaps - snap) <= 3:
             compare_sparta_assn[np.where((adj_sparta_n_pericenter >= 1) | (adj_sparta_n_is_lower_limit == 1))[0]] = 1
-        else:
+        else: 
             compare_sparta_assn[np.where(adj_sparta_n_pericenter >= 1)] = 1
         # Compare the ids between SPARTA and the found prtl ids and match the SPARTA results
         matched_ids = np.intersect1d(curr_ptl_pids, sparta_tracer_ids, return_indices = True)
@@ -146,6 +146,13 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     scaled_rad_vel = fnd_rad_vel / curr_v200m
     scaled_tang_vel = fnd_tang_vel
     scaled_radii = (ptl_rad / halo_r200m)
+
+    scaled_radii_inds = scaled_radii.argsort()
+    scaled_radii = scaled_radii[scaled_radii_inds[::1]]
+    fnd_HIPIDs = fnd_HIPIDs[scaled_radii_inds[::1]]
+    scaled_rad_vel = scaled_rad_vel[scaled_radii_inds[::1]]
+    scaled_tang_vel = scaled_tang_vel[scaled_radii_inds[::1]]
+
     
     # if create_dens_prf:
     #     if (curr_sparta_idx < 15) and (curr_sparta_idx > 5):
@@ -181,6 +188,7 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     #         ax.legend()
     #         fig.savefig(path_to_MLOIS + "Random_figures/halo_" + str(curr_halo_idx) + "my_vs_spta_plt.png")
     if comp_snap == False:
+        curr_orb_assn = curr_orb_assn[scaled_radii_inds[::1]]
         return fnd_HIPIDs, curr_orb_assn, scaled_rad_vel, scaled_tang_vel, scaled_radii
     else:
         return fnd_HIPIDs, scaled_rad_vel, scaled_tang_vel, scaled_radii
