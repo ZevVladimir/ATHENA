@@ -184,9 +184,9 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
     mid_act_mass_prf_inf = np.median(act_mass_prf_inf, axis=0)
     
     with np.errstate(divide='ignore', invalid='ignore'):
-        all_dens_ratio = np.divide(calc_dens_prf_all,mid_act_dens_prf_all)
-        inf_dens_ratio = np.divide(calc_dens_prf_inf,mid_act_dens_prf_inf)
-        orb_dens_ratio = np.divide(calc_dens_prf_orb,mid_act_dens_prf_orb)
+        all_dens_ratio = np.divide(calc_dens_prf_all,mid_act_dens_prf_all) - 1
+        inf_dens_ratio = np.divide(calc_dens_prf_inf,mid_act_dens_prf_inf) - 1
+        orb_dens_ratio = np.divide(calc_dens_prf_orb,mid_act_dens_prf_orb) - 1
     
     upper_calc_mass_prf_orb = np.percentile(calc_mass_prf_orb, q=84.1, axis=0)
     lower_calc_mass_prf_orb = np.percentile(calc_mass_prf_orb, q=15.9, axis=0)
@@ -215,7 +215,7 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
     middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
 
     fig, ax = plt.subplots(1,3)
-    plt.rcParams.update({'font.size': 16})
+    plt.rcParams.update({'font.size': 20})
     fill_alpha = 0.2
     
     mid_calc_mass_prf_all[mid_calc_mass_prf_all == 0] = np.NaN
@@ -243,11 +243,13 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
     ax[0].fill_between(middle_bins, lower_calc_mass_prf_orb, upper_calc_mass_prf_orb, color='b', alpha=fill_alpha)
     
     ax[0].set_title("ML Predicted vs Actual Mass Profile")
-    ax[0].set_xlabel("Radius $r/R_{200m}$")
-    ax[0].set_ylabel("Mass $M_\odot$")
+    ax[0].set_xlabel("Radius $r/R_{200m}$", fontsize=16)
+    ax[0].set_ylabel("Mass $M_\odot$", fontsize=16)
     ax[0].set_xscale("log")
     ax[0].set_yscale("log")
     ax[0].set_box_aspect(1)
+    ax[0].tick_params(axis='both',which='both',labelsize=14)
+    ax[0].tick_params(axis='both',which='both',labelsize=14)
     ax[0].legend()
     
     ax[1].plot(middle_bins, mid_calc_dens_prf_all, 'r-', label = "ML density profile all ptls")
@@ -262,28 +264,34 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
     ax[1].fill_between(middle_bins, lower_calc_dens_prf_orb, upper_calc_dens_prf_orb, color='b', alpha=fill_alpha)
     
     ax[1].set_title("ML Predicted vs Actual Density Profile")
-    ax[1].set_xlabel("Radius $r/R_{200m}$")
-    ax[1].set_ylabel("Density $M_\odot/kpc^3$")
+    ax[1].set_xlabel("Radius $r/R_{200m}$", fontsize=16)
+    ax[1].set_ylabel("Density $M_\odot/kpc^3$", fontsize=16)
     ax[1].set_xscale("log")
     ax[1].set_yscale("log")
     ax[1].set_box_aspect(1)
+    ax[1].tick_params(axis='both',which='both',labelsize=14)
+    ax[1].tick_params(axis='both',which='both',labelsize=14)
     ax[1].legend()
     
-    ax[2].plot(middle_bins, mid_all_ratio, 'r', label = "ML density profile / SPARTA density profile all")
-    ax[2].plot(middle_bins, mid_orb_ratio, 'b', label = "ML density profile / SPARTA density profile orb")
-    ax[2].plot(middle_bins, mid_inf_ratio, 'g', label = "ML density profile / SPARTA density profile inf")
+    ax[2].plot(middle_bins, mid_all_ratio, 'r', label = "(ML density profile / SPARTA density profile all) - 1")
+    ax[2].plot(middle_bins, mid_orb_ratio, 'b', label = "(ML density profile / SPARTA density profile orb) - 1")
+    ax[2].plot(middle_bins, mid_inf_ratio, 'g', label = "(ML density profile / SPARTA density profile inf) - 1")
     
     ax[2].fill_between(middle_bins, lower_all_dens_ratio, upper_all_dens_ratio, color='r', alpha=fill_alpha)
     ax[2].fill_between(middle_bins, lower_inf_dens_ratio, upper_inf_dens_ratio, color='g', alpha=fill_alpha)
     ax[2].fill_between(middle_bins, lower_orb_dens_ratio, upper_orb_dens_ratio, color='b', alpha=fill_alpha)    
     
-    ax[2].set_title("ML Predicted / Actual Density Profile")
-    ax[2].set_xlabel("Radius $r/R_{200m}$")
-    ax[2].set_ylabel("ML Dens Prf / Act Dens Prf")
-    ax[2].set_ylim(0.1,6)
-    ax[2].set_yscale("log")
+    ax[2].set_title("(ML Predicted / Actual Density Profile) - 1")
+    ax[2].set_xlabel("Radius $r/R_{200m}$", fontsize=16)
+    ax[2].set_ylabel("(ML Dens Prf / Act Dens Prf) - 1", fontsize=16)
+    #ax[2].set_ylim(0,8)
+    ax[2].set_yticks([-1, -0.5, -0.25, 0, 0.25, 0.5 ,1, 1.5, 2.5, 5, 10])
+    ax[2].set_xscale("log")
+    ax[2].set_yscale("symlog")
     ax[2].set_box_aspect(1)
-    ax[2].legend(loc="lower right")    
+    ax[2].tick_params(axis='both',which='both',labelsize=14)
+    ax[2].tick_params(axis='both',which='both',labelsize=14)
+    ax[2].legend()    
     
     if save_graph:
         fig.set_size_inches(50, 25)
