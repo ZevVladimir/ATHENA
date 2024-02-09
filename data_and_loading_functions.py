@@ -184,7 +184,7 @@ def choose_halo_split(indices, snap, halo_props, particle_props, num_features):
     return dataset
 
 def find_closest_z(value):
-    all_red_shift = np.zeros(total_num_snaps)
+    all_red_shift = np.ones(total_num_snaps) * -1000
     for i in range(total_num_snaps):
         # Sometimes not all snaps exist
         if os.path.isfile(path_to_snaps + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i)):
@@ -194,11 +194,12 @@ def find_closest_z(value):
 
     return idx, all_red_shift[idx]
 
-
 def find_closest_snap(value, cosmology):
-    all_times = np.zeros(total_num_snaps)
+    all_times = np.ones(total_num_snaps) * -1000
     for i in range(total_num_snaps):
-        all_times[i] = cosmology.age(readheader(path_to_snaps + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift'))
+        # Sometimes not all snaps exist
+        if os.path.isfile(path_to_snaps + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i)):
+            all_times[i] = cosmology.age(readheader(path_to_snaps + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift'))
 
     idx = (np.abs(all_times - value)).argmin()
     return idx
