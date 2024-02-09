@@ -186,7 +186,9 @@ def choose_halo_split(indices, snap, halo_props, particle_props, num_features):
 def find_closest_z(value):
     all_red_shift = np.zeros(total_num_snaps)
     for i in range(total_num_snaps):
-        all_red_shift[i] = readheader(path_to_snaps + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift')
+        # Sometimes not all snaps exist
+        if os.path.isfile(path_to_snaps + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i)):
+            all_red_shift[i] = readheader(path_to_snaps + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift')
 
     idx = (np.abs(all_red_shift - value)).argmin()
 

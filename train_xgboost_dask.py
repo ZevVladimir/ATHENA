@@ -310,7 +310,7 @@ if __name__ == "__main__":
             dtrain,
             num_boost_round=100,
             evals=[(dtrain, "train"), (dtest,"test")],
-            early_stopping_rounds=20,            
+            early_stopping_rounds=10,            
             )
         bst = output["booster"]
         history = output["history"]
