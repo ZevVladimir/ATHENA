@@ -22,7 +22,7 @@ from visualization_functions import *
 # LOAD CONFIG PARAMETERS
 import configparser
 config = configparser.ConfigParser()
-config.read("config.ini")
+config.read("/home/zvladimi/MLOIS/config.ini")
 on_zaratan = config.getboolean("MISC","on_zaratan")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
@@ -116,7 +116,7 @@ def create_matrix(client, X_loc, y_loc, key_loc, frac_use_data = 1, calc_scale_p
     num_features = X_cpu.shape[1]
     
     num_use_data = int(np.floor(X_cpu.shape[0] * frac_use_data))
-    print("Tot num of train particles:", X_cpu.shape[0], "Num use train particles:", num_use_data)
+    print("Tot num of particles:", X_cpu.shape[0], "Num use particles:", num_use_data)
     X = da.from_array(X_cpu,chunks=(chunk_size,num_features))
     y = da.from_array(y_cpu,chunks=(chunk_size))
         
@@ -234,7 +234,9 @@ if __name__ == "__main__":
             params = pickle.load(pickle_file)
         print("Loaded Booster")
     else:
+        print("Training Set:")
         dtrain,X_train,y_train,scale_pos_weight = create_matrix(client, train_dataset_loc, train_labels_loc, train_keys_loc, frac_use_data=frac_training_data, calc_scale_pos_weight=True)
+        print("Testing set:")
         dtest,X_test,y_test = create_matrix(client, test_dataset_loc, test_labels_loc, test_keys_loc, frac_use_data=1, calc_scale_pos_weight=False)
         print("scale_pos_weight:", scale_pos_weight)
         

@@ -187,11 +187,12 @@ def find_closest_z(value):
     all_red_shift = np.ones(total_num_snaps) * -1000
     for i in range(total_num_snaps):
         # Sometimes not all snaps exist
-        if os.path.isfile(path_to_snaps + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i)):
+        if os.path.isdir(path_to_snaps + "snapdir_" + snap_format.format(i)):
             all_red_shift[i] = readheader(path_to_snaps + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift')
 
     idx = (np.abs(all_red_shift - value)).argmin()
-
+    print(all_red_shift)
+    print(idx)
     return idx, all_red_shift[idx]
 
 def find_closest_snap(value, cosmology):

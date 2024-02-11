@@ -16,6 +16,7 @@ from scipy.ndimage import rotate
 import matplotlib.colors as colors
 import multiprocessing as mp
 from itertools import repeat
+import time
 
 def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r200_per_part, red_shift, hubble_constant, little_h):
     start_bin_val = 0.001
@@ -108,6 +109,8 @@ def create_dens_prf(radii, orbit_assn, act_mass_prf_all, act_mass_prf_1halo, prf
     return calc_mass_prf_orb, calc_mass_prf_inf, calc_mass_prf_all, calc_dens_prf_orb, calc_dens_prf_inf, calc_dens_prf_all, diff_n_orb_ptls, diff_n_inf_ptls, diff_n_all_ptls 
 
 def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_prf_orb, mass, orbit_assn, prf_bins, title, save_location, show_graph = False, save_graph = False):
+    t1 = time.time()
+    print("Starting Density Profile Plot")
     act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
     create_directory(save_location + "dens_prfl_ratio/")
     curr_num_halos = halo_first.shape[0]
@@ -300,6 +303,9 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
     if show_graph:
         plt.show()
     plt.close()
+
+    t2 = time.time()
+    print("Finished Density Profile Plot in: ", np.round((t2-t1),2), "seconds", np.round(((t2-t1)/60),2), "minutes")
     return diff_n_inf_ptls, diff_n_orb_ptls, diff_n_all_ptls, middle_bins
     
 def brute_force(curr_particles_pos, r200, halo_x, halo_y, halo_z):
@@ -473,6 +479,9 @@ def calc_misclassified(correct_labels, ml_labels, r, rv, tv, r_range, rv_range, 
     return min_ptl, max_diff, max_all_ptl, all_inc_r_rv, all_inc_r_tv, all_inc_rv_tv, scaled_inf_r_rv, scaled_inf_r_tv, scaled_inf_rv_tv, scaled_orb_r_rv, scaled_orb_r_tv, scaled_orb_rv_tv, scaled_all_r_rv, scaled_all_r_tv, scaled_all_rv_tv
     
 def plot_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, c_tv, title, num_bins, save_location, model_save_location):
+    t1 = time.time()
+    print("Starting Misclassified Particle Plot")
+
     max_r = np.max(p_r)
     max_rv = np.max(p_rv)
     min_rv = np.min(p_rv)
@@ -567,7 +576,12 @@ def plot_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, c
     create_directory(save_location + "/2dhist/")
     scal_miss_class_fig.savefig(save_location + "/2dhist/" + title + "_scaled_miss_class.png")
 
+    t2 = time.time()
+    print("Finished Misclassified Particle Plot in: ", np.round((t2-t1),2), "seconds", np.round(((t2-t1)/60),2), "minutes")
+
 def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, show, save, save_location, model_save_location):
+    t1 = time.time()
+    print("Starting r vs rv vs tv Plot")
     create_directory(save_location + "2dhist/")
     mpl.rcParams.update({'font.size': 8})
     plt.rcParams['figure.constrained_layout.use'] = True
@@ -689,6 +703,9 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sho
     perr_color_bar = plt.colorbar(perr_imshow_img, cax=plt.subplot(gs[:,-1]), pad = 0.1)
     
     err_fig.savefig(save_location + "/2dhist/" + title + "_percent_error.png") 
+
+    t2 = time.time()
+    print("Finished r vs rv vs tv Plot in: ", np.round((t2-t1),2), "seconds", np.round(((t2-t1)/60),2), "minutes")
     
 def graph_feature_importance(feature_names, feature_importance, title, plot, save, save_location):
     mpl.rcParams.update({'font.size': 8})
