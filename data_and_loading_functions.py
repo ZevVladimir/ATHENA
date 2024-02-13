@@ -5,6 +5,8 @@ import numpy as np
 import multiprocessing as mp
 from sklearn.model_selection import train_test_split
 from itertools import repeat
+from contextlib import contextmanager
+import time
 
 def create_directory(path):
     if os.path.exists(path) != True:
@@ -49,6 +51,13 @@ sys.path.insert(0, path_to_sparta)
 from pygadgetreader import readsnap, readheader
 from sparta import sparta
 ##################################################################################################################
+@contextmanager
+def timed(txt):
+    t0 = time.time()
+    yield
+    t1 = time.time()
+    print("%32s time:  %8.5f" % (txt, t1 - t0))
+
 
 def check_pickle_exist_gadget(sparta_name, ptl_property, snapshot, snapshot_path):
     # save to folder containing pickled data to be accessed easily later
@@ -184,23 +193,21 @@ def choose_halo_split(indices, snap, halo_props, particle_props, num_features):
     return dataset
 
 def find_closest_z(value):
-    all_red_shift = np.ones(total_num_snaps) * -1000
+    all_z = np.ones(total_num_snaps) * -1000
     for i in range(total_num_snaps):
         # Sometimes not all snaps exist
-        if os.path.isfile(path_to_snaps + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i)):
-            all_red_shift[i] = readheader(path_to_snaps + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift')
+        if os.path.isdir(path_to_snaps + "snapdir_" + snap_format.format(i)):
+            all_z[i] = readheader(path_to_snaps + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift')
 
-    idx = (np.abs(all_red_shift - value)).argmin()
-
-    return idx, all_red_shift[idx]
+    idx = (np.abs(all_z - value)).argmin()
+    return idx, all_z[idx]
 
 def find_closest_snap(value, cosmology):
     all_times = np.ones(total_num_snaps) * -1000
     for i in range(total_num_snaps):
         # Sometimes not all snaps exist
-        if os.path.isfile(path_to_snaps + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i)):
+        if os.path.isdir(path_to_snaps + "snapdir_" + snap_format.format(i)):
             all_times[i] = cosmology.age(readheader(path_to_snaps + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift'))
-
     idx = (np.abs(all_times - value)).argmin()
     return idx
 
@@ -234,7 +241,9 @@ def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red
     c_box_size = c_box_size + 0.001 # NEED TO MAKE WORK FOR PARTICLES ON THE VERY EDGE
     
     # load particle data and SPARTA data for the comparison snap
-    c_particles_pid, c_particles_vel, c_particles_pos = load_or_pickle_ptl_data(curr_sparta_file, str(c_snap), snapshot_path, c_scale_factor)
-    c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap, mass = load_or_pickle_SPARTA_data(curr_sparta_file, c_scale_factor, c_snap, c_sparta_snap)
+    with timed("c_snap ptl load"):
+        c_particles_pid, c_particles_vel, c_particles_pos = load_or_pickle_ptl_data(curr_sparta_file, str(c_snap), snapshot_path, c_scale_factor)
+    with timed("c_snap SPARTA load"):
+        c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap, mass = load_or_pickle_SPARTA_data(curr_sparta_file, c_scale_factor, c_snap, c_sparta_snap)
 
     return c_snap, c_sparta_snap, c_box_size, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_particles_pid, c_particles_vel, c_particles_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap

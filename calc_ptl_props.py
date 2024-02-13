@@ -148,10 +148,10 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     scaled_radii = (ptl_rad / halo_r200m)
 
     scaled_radii_inds = scaled_radii.argsort()
-    scaled_radii = scaled_radii[scaled_radii_inds[::1]]
-    fnd_HIPIDs = fnd_HIPIDs[scaled_radii_inds[::1]]
-    scaled_rad_vel = scaled_rad_vel[scaled_radii_inds[::1]]
-    scaled_tang_vel = scaled_tang_vel[scaled_radii_inds[::1]]
+    scaled_radii = scaled_radii[scaled_radii_inds]
+    fnd_HIPIDs = fnd_HIPIDs[scaled_radii_inds]
+    scaled_rad_vel = scaled_rad_vel[scaled_radii_inds]
+    scaled_tang_vel = scaled_tang_vel[scaled_radii_inds]
 
     
     # if create_dens_prf:
@@ -391,7 +391,7 @@ cosmol = cosmology.setCosmology("bolshoi")
 
 p_snap, p_red_shift = find_closest_z(p_red_shift)
 print("Snapshot number found:", p_snap, "Closest redshift found:", p_red_shift)
-sparta_output = sparta.load(filename=path_to_hdf5_file, log_level= 0)
+sparta_output = sparta.load(filename=path_to_hdf5_file, load_halo_data=False, log_level= 0)
 all_red_shifts = sparta_output["simulation"]["snap_z"][:]
 p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
 print("corresponding SPARTA snap num:", p_sparta_snap)
@@ -417,13 +417,16 @@ p_snap_dict = {
 p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
 
 # load all information needed for the primary snap
-p_ptls_pid, p_ptls_vel, p_ptls_pos = load_or_pickle_ptl_data(curr_sparta_file, str(p_snap), p_snapshot_path, p_scale_factor)
+with timed("p_snap ptl load"):
+    p_ptls_pid, p_ptls_vel, p_ptls_pos = load_or_pickle_ptl_data(curr_sparta_file, str(p_snap), p_snapshot_path, p_scale_factor)
 
-p_halos_pos, p_halos_r200m, p_halos_id, p_halos_status, p_halos_last_snap, mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
+with timed("p_snap SPARTA load"):
+    p_halos_pos, p_halos_r200m, p_halos_id, p_halos_status, p_halos_last_snap, mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
 
 t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], p_red_shift)
 
-c_snap, c_sparta_snap, c_box_size, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_ptls_pid, c_ptls_vel, c_ptls_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts, snap_format=snap_format)
+with timed("c_snap load"):
+    c_snap, c_sparta_snap, c_box_size, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_ptls_pid, c_ptls_vel, c_ptls_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts, snap_format=snap_format)
 c_snap_dict = {
     "snap":c_snap,
     "red_shift":c_red_shift,
@@ -480,17 +483,19 @@ with open(save_location + "test_indices.pickle", "wb") as pickle_file:
 with open(save_location + "train_indices.pickle", "wb") as pickle_file:
     pickle.dump(train_indices, pickle_file)
 
-with mp.Pool(processes=num_processes) as p:
-    # halo position, halo r200m, if comparison snap, want mass?, want indices?
-    train_num_ptls = p.starmap(initial_search, zip(p_halos_pos[train_indices], p_halos_r200m[train_indices], repeat(False), repeat(False), repeat(False)), chunksize=curr_chunk_size)
-p.close()
-p.join() 
+with timed("p_snap initial search"):
+    with mp.Pool(processes=num_processes) as p:
+        # halo position, halo r200m, if comparison snap, want mass?, want indices?
+        train_num_ptls = p.starmap(initial_search, zip(p_halos_pos[train_indices], p_halos_r200m[train_indices], repeat(False), repeat(False), repeat(False)), chunksize=curr_chunk_size)
+    p.close()
+    p.join() 
 
-with mp.Pool(processes=num_processes) as p:
-    # halo position, halo r200m, if comparison snap, want mass?, want indices?
-    test_num_ptls = p.starmap(initial_search, zip(p_halos_pos[test_indices], p_halos_r200m[test_indices], repeat(False), repeat(False), repeat(False)), chunksize=curr_chunk_size)
-p.close()
-p.join() 
+with timed("c_snap initial search"):
+    with mp.Pool(processes=num_processes) as p:
+        # halo position, halo r200m, if comparison snap, want mass?, want indices?
+        test_num_ptls = p.starmap(initial_search, zip(p_halos_pos[test_indices], p_halos_r200m[test_indices], repeat(False), repeat(False), repeat(False)), chunksize=curr_chunk_size)
+    p.close()
+    p.join() 
 
 train_tot_num_ptls = np.sum(train_num_ptls)
 test_tot_num_ptls = np.sum(test_num_ptls)
