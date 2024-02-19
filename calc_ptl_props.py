@@ -15,7 +15,7 @@ import os
 import multiprocessing as mp
 from itertools import repeat
 from data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z
-from visualization_functions import compare_density_prf, brute_force
+from visualization_functions import compare_density_prf, plot_r_rv_tv_graph
 from calculation_functions import *
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -280,6 +280,9 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_pt
         p_all_rad_vel = p_all_rad_vel.astype(np.float32)
         p_all_tang_vel = p_all_tang_vel.astype(np.float32)
         p_all_scal_rad = p_all_scal_rad.astype(np.float32)
+        
+        num_bins = 30
+        plot_r_rv_tv_graph(np.zeros(p_all_orb_assn.size),p_all_scal_rad,p_all_rad_vel,p_all_tang_vel,p_all_orb_assn,"Calc ptl test", num_bins, "/home/zvladimi/MLOIS/Random_figures/")
         
         # If multiple snaps also search the comparison snaps in the same manner as with the primary snap
         if prim_only == False:

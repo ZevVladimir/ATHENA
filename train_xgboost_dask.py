@@ -50,6 +50,8 @@ global p_snap
 p_snap = config.getint("XGBOOST","p_snap")
 c_snap = config.getint("XGBOOST","c_snap")
 model_name = config["XGBOOST"]["model_name"]
+model_sparta_file = config["XGBOOST"]["model_sparta_file"]
+model_name = model_name + "_" + model_sparta_file
 radii_splits = config.get("XGBOOST","rad_splits").split(',')
 snapshot_list = [p_snap, c_snap]
 global search_rad
@@ -333,7 +335,8 @@ if __name__ == "__main__":
     
 
     file = open(model_save_location + "model_info.txt", 'w')
-    file.write("SPARTA File: " +curr_sparta_file+ "\n")
+    file.write("Model trained on: " + model_sparta_file+ "\n")
+    file.write("Model tested on: " + curr_sparta_file+ "\n")
     snap_str = "Snapshots used: "
     for snapshot in snapshot_list:
         snap_str += (str(snapshot) + " ")
@@ -417,9 +420,10 @@ if __name__ == "__main__":
     density_prf_1halo_within = np.sum(dens_prf_1halo, axis=0)
     num_bins = 30
     bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
-    bins = np.insert(bins, 0, 0)
-    compare_density_prf(radii=X_np[:,p_scal_rad_loc], halo_first=test_halo_first, halo_n=test_halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=ptl_mass, orbit_assn=test_preds, prf_bins=bins, title = model_name, use_mp =True, show_graph = False, save_graph = True, save_location = plot_save_location)
-    plot_r_rv_tv_graph(test_preds, X_np[:,p_scal_rad_loc], X_np[:,p_rad_vel_loc], X_np[:,p_tan_vel_loc], y_np, title=model_name, num_bins=num_bins, show = False, save = True, save_location=plot_save_location, model_save_location=model_save_location)
+    bins = np.insert(bins, 0, 0) 
+
+    compare_density_prf(radii=X_np[:,p_scal_rad_loc], halo_first=test_halo_first, halo_n=test_halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=ptl_mass, orbit_assn=test_preds, prf_bins=bins, title=model_name, save_location=plot_save_location, use_mp=True, save_graph=True)
+    plot_r_rv_tv_graph(test_preds, X_np[:,p_scal_rad_loc], X_np[:,p_rad_vel_loc], X_np[:,p_tan_vel_loc], y_np, title=model_name, num_bins=num_bins, save_location=plot_save_location)
     plot_misclassified(p_corr_labels=y_np, p_ml_labels=test_preds, p_r=X_np[:,p_scal_rad_loc], p_rv=X_np[:,p_rad_vel_loc], p_tv=X_np[:,p_tan_vel_loc], c_r=X_np[:,c_scal_rad_loc], c_rv=X_np[:,c_rad_vel_loc], c_tv=X_np[:,c_tan_vel_loc], title=model_name, num_bins=num_bins, save_location=plot_save_location, model_save_location=model_save_location)
     #graph_acc_by_bin(test_prediction, y_np, X_np[:,scaled_radii_loc], num_bins, model_name + " Predicts", plot = False, save = True, save_location = plot_save_location)
     client.close()
