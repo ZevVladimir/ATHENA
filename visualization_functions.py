@@ -127,11 +127,16 @@ def med_prf(prf, num_halo, dtype):
         prf = np.reshape(prf, (prf.size,1))
     
     prf = prf.astype(dtype)
-    med_prf = np.median(prf,axis=1)
+
+    # For median want to have one value for each bin (1,80)
+    med_prf = np.median(prf,axis=0)
 
     return prf, med_prf
     
 def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_prf_orb, mass, orbit_assn, prf_bins, title, save_location, use_mp = False, show_graph = False, save_graph = False):
+    # Shape of profiles should be (halo,density cols)
+    # EX: 10 halos, 80 bins (10,80)
+    
     t1 = time.time()
     print("Starting Density Profile Plot")
     act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
@@ -206,72 +211,68 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
         if np.where(calc_mass_prf_orb[:,i] > 0)[0].shape[0] < min_disp_halos:
             calc_mass_prf_orb[:,i] = np.NaN
             act_mass_prf_orb[:,i] = np.NaN
-            med_calc_mass_prf_orb[:,i] = np.NaN
-            med_act_mass_prf_orb[:,i] = np.NaN
+            med_calc_mass_prf_orb[i] = np.NaN
+            med_act_mass_prf_orb[i] = np.NaN
         if np.where(calc_mass_prf_inf[:,i] > 0)[0].shape[0] < min_disp_halos:
             calc_mass_prf_inf[:,i] = np.NaN
             act_mass_prf_inf[:,i] = np.NaN
-            med_calc_mass_prf_inf[:,i] = np.NaN
-            med_act_mass_prf_inf[:,i] = np.NaN
+            med_calc_mass_prf_inf[i] = np.NaN
+            med_act_mass_prf_inf[i] = np.NaN
         if np.where(calc_mass_prf_all[:,i] > 0)[0].shape[0] < min_disp_halos:
             calc_mass_prf_all[:,i] = np.NaN
             act_mass_prf_all[:,i] = np.NaN
-            med_calc_mass_prf_all[:,i] = np.NaN
-            med_act_mass_prf_all[:,i] = np.NaN
+            med_calc_mass_prf_all[i] = np.NaN
+            med_act_mass_prf_all[i] = np.NaN
         if np.where(calc_dens_prf_orb[:,i] > 0)[0].shape[0] < min_disp_halos:
             calc_dens_prf_orb[:,i] = np.NaN
             act_dens_prf_orb[:,i] = np.NaN
-            med_calc_dens_prf_orb[:,i] = np.NaN
-            med_act_dens_prf_orb[:,i] = np.NaN
+            med_calc_dens_prf_orb[i] = np.NaN
+            med_act_dens_prf_orb[i] = np.NaN
         if np.where(calc_dens_prf_inf[:,i] > 0)[0].shape[0] < min_disp_halos:
             calc_dens_prf_inf[:,i] = np.NaN
             act_dens_prf_inf[:,i] = np.NaN
-            med_calc_dens_prf_inf[:,i] = np.NaN
-            med_act_dens_prf_inf[:,i] = np.NaN
+            med_calc_dens_prf_inf[i] = np.NaN
+            med_act_dens_prf_inf[i] = np.NaN
         if np.where(calc_dens_prf_all[:,i] > 0)[0].shape[0] < min_disp_halos:
             calc_dens_prf_all[:,i] = np.NaN
             act_dens_prf_all[:,i] = np.NaN
-            med_calc_dens_prf_all[:,i] = np.NaN
-            med_act_dens_prf_all[:,i] = np.NaN
+            med_calc_dens_prf_all[i] = np.NaN
+            med_act_dens_prf_all[i] = np.NaN
     
     # Get the ratio of the calculated profile with the actual profile
     with np.errstate(divide='ignore', invalid='ignore'):
-        med_act_dens_prf_all = np.reshape(med_act_dens_prf_all, (med_act_dens_prf_all.size,1))
-        med_act_dens_prf_inf = np.reshape(med_act_dens_prf_inf, (med_act_dens_prf_inf.size,1))
-        med_act_dens_prf_orb = np.reshape(med_act_dens_prf_orb, (med_act_dens_prf_orb.size,1))
-
         all_dens_ratio = np.divide(calc_dens_prf_all,med_act_dens_prf_all) - 1
         inf_dens_ratio = np.divide(calc_dens_prf_inf,med_act_dens_prf_inf) - 1
         orb_dens_ratio = np.divide(calc_dens_prf_orb,med_act_dens_prf_orb) - 1
 
     
     # Find the upper and lower bound for scatter for calculated profiles
-    upper_calc_mass_prf_orb = np.percentile(calc_mass_prf_orb, q=84.1, axis=1)
-    upper_calc_mass_prf_orb = np.percentile(calc_mass_prf_orb, q=84.1, axis=1)
-    lower_calc_mass_prf_orb = np.percentile(calc_mass_prf_orb, q=15.9, axis=1)
-    upper_calc_mass_prf_inf = np.percentile(calc_mass_prf_inf, q=84.1, axis=1)
-    lower_calc_mass_prf_inf = np.percentile(calc_mass_prf_inf, q=15.9, axis=1)
-    upper_calc_mass_prf_all = np.percentile(calc_mass_prf_all, q=84.1, axis=1)
-    lower_calc_mass_prf_all = np.percentile(calc_mass_prf_all, q=15.9, axis=1)
-    upper_calc_dens_prf_orb = np.percentile(calc_dens_prf_orb, q=84.1, axis=1)
-    lower_calc_dens_prf_orb = np.percentile(calc_dens_prf_orb, q=15.9, axis=1)
-    upper_calc_dens_prf_inf = np.percentile(calc_dens_prf_inf, q=84.1, axis=1)
-    lower_calc_dens_prf_inf = np.percentile(calc_dens_prf_inf, q=15.9, axis=1)
-    upper_calc_dens_prf_all = np.percentile(calc_dens_prf_all, q=84.1, axis=1)
-    lower_calc_dens_prf_all = np.percentile(calc_dens_prf_all, q=15.9, axis=1)
+    # Want shape to be (1,80)
+    upper_calc_mass_prf_orb = np.percentile(calc_mass_prf_orb, q=84.1, axis=0)
+    lower_calc_mass_prf_orb = np.percentile(calc_mass_prf_orb, q=15.9, axis=0)
+    upper_calc_mass_prf_inf = np.percentile(calc_mass_prf_inf, q=84.1, axis=0)
+    lower_calc_mass_prf_inf = np.percentile(calc_mass_prf_inf, q=15.9, axis=0)
+    upper_calc_mass_prf_all = np.percentile(calc_mass_prf_all, q=84.1, axis=0)
+    lower_calc_mass_prf_all = np.percentile(calc_mass_prf_all, q=15.9, axis=0)
+    upper_calc_dens_prf_orb = np.percentile(calc_dens_prf_orb, q=84.1, axis=0)
+    lower_calc_dens_prf_orb = np.percentile(calc_dens_prf_orb, q=15.9, axis=0)
+    upper_calc_dens_prf_inf = np.percentile(calc_dens_prf_inf, q=84.1, axis=0)
+    lower_calc_dens_prf_inf = np.percentile(calc_dens_prf_inf, q=15.9, axis=0)
+    upper_calc_dens_prf_all = np.percentile(calc_dens_prf_all, q=84.1, axis=0)
+    lower_calc_dens_prf_all = np.percentile(calc_dens_prf_all, q=15.9, axis=0)
     
     # Same for actual profiles    
-    upper_orb_dens_ratio = np.percentile(orb_dens_ratio, q=84.1, axis=1)
-    lower_orb_dens_ratio = np.percentile(orb_dens_ratio, q=15.9, axis=1)
-    upper_inf_dens_ratio = np.percentile(inf_dens_ratio, q=84.1, axis=1)
-    lower_inf_dens_ratio = np.percentile(inf_dens_ratio, q=15.9, axis=1)
-    upper_all_dens_ratio = np.percentile(all_dens_ratio, q=84.1, axis=1)
-    lower_all_dens_ratio = np.percentile(all_dens_ratio, q=15.9, axis=1)
-    
+    upper_orb_dens_ratio = np.percentile(orb_dens_ratio, q=84.1, axis=0)
+    lower_orb_dens_ratio = np.percentile(orb_dens_ratio, q=15.9, axis=0)
+    upper_inf_dens_ratio = np.percentile(inf_dens_ratio, q=84.1, axis=0)
+    lower_inf_dens_ratio = np.percentile(inf_dens_ratio, q=15.9, axis=0)
+    upper_all_dens_ratio = np.percentile(all_dens_ratio, q=84.1, axis=0)
+    lower_all_dens_ratio = np.percentile(all_dens_ratio, q=15.9, axis=0)
+
     # Take the median value of the ratios
-    med_all_ratio = np.median(all_dens_ratio, axis=1)
-    med_inf_ratio = np.median(inf_dens_ratio, axis=1)
-    med_orb_ratio = np.median(orb_dens_ratio, axis=1)
+    med_all_ratio = np.median(all_dens_ratio, axis=0)
+    med_inf_ratio = np.median(inf_dens_ratio, axis=0)
+    med_orb_ratio = np.median(orb_dens_ratio, axis=0)
 
     middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
 
@@ -634,7 +635,7 @@ def plot_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, c
     t2 = time.time()
     print("Finished Misclassified Particle Plot in: ", np.round((t2-t1),2), "seconds", np.round(((t2-t1)/60),2), "minutes")
 
-def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, show, save, save_location, model_save_location):
+def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, save_location):
     t1 = time.time()
     print("Starting r vs rv vs tv Plot")
     create_directory(save_location + "2dhist/")
