@@ -50,6 +50,8 @@ global p_snap
 p_snap = config.getint("XGBOOST","p_snap")
 c_snap = config.getint("XGBOOST","c_snap")
 model_name = config["XGBOOST"]["model_name"]
+model_sparta_file = config["XGBOOST"]["model_sparta_file"]
+model_name = model_name + "_" + model_sparta_file
 radii_splits = config.get("XGBOOST","rad_splits").split(',')
 snapshot_list = [p_snap, c_snap]
 global search_rad
@@ -333,7 +335,8 @@ if __name__ == "__main__":
     
 
     file = open(model_save_location + "model_info.txt", 'w')
-    file.write("SPARTA File: " +curr_sparta_file+ "\n")
+    file.write("Model trained on: " + model_sparta_file+ "\n")
+    file.write("Model tested on: " + curr_sparta_file+ "\n")
     snap_str = "Snapshots used: "
     for snapshot in snapshot_list:
         snap_str += (str(snapshot) + " ")
