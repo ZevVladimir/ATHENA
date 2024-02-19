@@ -152,28 +152,28 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     fnd_HIPIDs = fnd_HIPIDs[scaled_radii_inds]
     scaled_rad_vel = scaled_rad_vel[scaled_radii_inds]
     scaled_tang_vel = scaled_tang_vel[scaled_radii_inds]
-
+    if comp_snap == False:
+        curr_orb_assn = curr_orb_assn[scaled_radii_inds]
     
-    # if create_dens_prf:
-    #     if (curr_sparta_idx < 15) and (curr_sparta_idx > 5):
-    #     #if curr_halo_idx == 9504:
-    #         bins = np.insert(bins, 0, 0)
-    #         # print("num sparta n peri:",np.where(sparta_n_pericenter !=0)[0].size)
-    #         # print("num n peri adj:", np.where(adj_sparta_n_pericenter != 0)[0].size)
-    #         # print("num n_is_lower_limit:", np.where(sparta_n_is_lower_limit ==1)[0].size)
-    #         # print("num n_is_lower_limit adj:", np.where(adj_sparta_n_is_lower_limit==1)[0].size)
-    #         # print("no peri yes lower lim", np.where((adj_sparta_n_pericenter < 1)&(adj_sparta_n_is_lower_limit==1))[0].size)
-    #         # print("yes peri no lower lim", np.where((adj_sparta_n_pericenter >= 1)&(adj_sparta_n_is_lower_limit==0))[0].size)
-    #         # print("yes peri yes lower lim", np.where((adj_sparta_n_pericenter >= 1)&(adj_sparta_n_is_lower_limit==1))[0].size)
-    #         # print("no peri no lower lim", np.where((adj_sparta_n_pericenter < 1)&(adj_sparta_n_is_lower_limit==0))[0].size)
-    #         # print("curr_ptl_pids", curr_ptl_pids[:10], "num pids", curr_ptl_pids.shape)
-    #         # print("num sparta ids", sparta_tracer_ids.shape)
-    #         # print(*sparta_tracer_ids[np.where((adj_sparta_n_pericenter < 1)&(adj_sparta_n_is_lower_limit==0))[0]], sep=",")
-    #         # print("num matches:",matched_ids[0].size)
-    #         # print("total orbiting mass and num orbiting SPARTA:", dens_prf_1halo[-1], dens_prf_1halo[-1]/mass)
-    #         # print("total orbiting mass and num orbiting me:", np.where(curr_orb_assn != 0)[0].size, np.where(curr_orb_assn != 0)[0].size * mass)
-    #         #print("total num ptls at 3R200m:", dens_prf_all[-1]/mass)
-    #         # print(sparta_last_pericenter_snap[np.where(sparta_tracer_ids==161066)[0]])
+    if create_dens_prf:
+        if (curr_sparta_idx > 0) and (curr_sparta_idx < 2):
+            bins = np.insert(bins, 0, 0)
+            compare_density_prf(scaled_radii, np.array([0]), np.array([num_new_ptls]), np.array([dens_prf_all]), np.array([dens_prf_1halo]), mass, curr_orb_assn, bins, str(curr_halo_idx), path_to_MLOIS +  "Random_figures/", use_mp = False, show_graph = False, save_graph = True)
+            # print("num sparta n peri:",np.where(sparta_n_pericenter !=0)[0].size)
+            # print("num n peri adj:", np.where(adj_sparta_n_pericenter != 0)[0].size)
+            # print("num n_is_lower_limit:", np.where(sparta_n_is_lower_limit ==1)[0].size)
+            # print("num n_is_lower_limit adj:", np.where(adj_sparta_n_is_lower_limit==1)[0].size)
+            # print("no peri yes lower lim", np.where((adj_sparta_n_pericenter < 1)&(adj_sparta_n_is_lower_limit==1))[0].size)
+            # print("yes peri no lower lim", np.where((adj_sparta_n_pericenter >= 1)&(adj_sparta_n_is_lower_limit==0))[0].size)
+            # print("yes peri yes lower lim", np.where((adj_sparta_n_pericenter >= 1)&(adj_sparta_n_is_lower_limit==1))[0].size)
+            # print("no peri no lower lim", np.where((adj_sparta_n_pericenter < 1)&(adj_sparta_n_is_lower_limit==0))[0].size)
+            # print("curr_ptl_pids", curr_ptl_pids[:10], "num pids", curr_ptl_pids.shape)
+            # print("num sparta ids", sparta_tracer_ids.shape)
+            # print(*sparta_tracer_ids[np.where((adj_sparta_n_pericenter < 1)&(adj_sparta_n_is_lower_limit==0))[0]], sep=",")
+            # print("num matches:",matched_ids[0].size)
+            # print("total orbiting mass and num orbiting SPARTA:", dens_prf_1halo[-1], dens_prf_1halo[-1]/mass)
+            # print("total orbiting mass and num orbiting me:", np.where(curr_orb_assn != 0)[0].size, np.where(curr_orb_assn != 0)[0].size * mass)
+     
     #         compare_density_prf(scaled_radii, dens_prf_all, dens_prf_1halo, mass, curr_orb_assn, bins, str(curr_halo_idx), path_to_MLOIS +  "Random_figures/",save_graph=True)
             
     #         #plot_pos_loc = np.where((curr_ptl_pos[:,2] > np.average(curr_ptl_pos[:,2] - np.std(curr_ptl_pos[:,2]))) & (curr_ptl_pos[:,2] < np.average(curr_ptl_pos[:,2] + np.std(curr_ptl_pos[:,2]))))[0]
@@ -188,7 +188,6 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     #         ax.legend()
     #         fig.savefig(path_to_MLOIS + "Random_figures/halo_" + str(curr_halo_idx) + "my_vs_spta_plt.png")
     if comp_snap == False:
-        curr_orb_assn = curr_orb_assn[scaled_radii_inds[::1]]
         return fnd_HIPIDs, curr_orb_assn, scaled_rad_vel, scaled_tang_vel, scaled_radii
     else:
         return fnd_HIPIDs, scaled_rad_vel, scaled_tang_vel, scaled_radii
