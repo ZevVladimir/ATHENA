@@ -10,7 +10,7 @@ from visualization_functions import *
 # LOAD CONFIG PARAMETERS
 import configparser
 config = configparser.ConfigParser()
-config.read("config.ini")
+config.read("/home/zvladimi/scratch/MLOIS/config.ini")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
@@ -177,6 +177,8 @@ save_location = path_to_xgboost + specific_save
 
 create_directory(save_location)
 
+
+#TODO change to using sparta
 snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(snapshot_list[0]) + "/snapshot_" + snap_format.format(snapshot_list[0])
 
 ptl_mass = check_pickle_exist_gadget(curr_sparta_file, "mass", str(snapshot_list[0]), snapshot_path)
