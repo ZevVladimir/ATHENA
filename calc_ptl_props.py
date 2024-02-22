@@ -146,6 +146,13 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     scaled_rad_vel = fnd_rad_vel / curr_v200m
     scaled_tang_vel = fnd_tang_vel
     scaled_radii = (ptl_rad / halo_r200m)
+    
+    if np.where(np.abs(scaled_rad_vel[np.where(scaled_radii < 1.1)[0]]) > 40)[0].shape[0] > 0.1 * np.where(scaled_radii < 1.1)[0].shape[0]:
+        high_vel_idx = np.where((np.abs(scaled_rad_vel) > 50) & (scaled_radii < 1.1))[0]
+        fig,ax =plt.subplots(1)
+        ax.scatter(curr_ptl_pos[np.where(scaled_radii<1.1)[0],0],curr_ptl_pos[np.where(scaled_radii<1.1)[0],1], c='b')
+        ax.scatter(curr_ptl_pos[high_vel_idx,0],curr_ptl_pos[high_vel_idx,1],c='r')
+        fig.savefig("/home/zvladimi/scratch/MLOIS/Random_figs/high_vel_halo" + str(curr_halo_idx) + ".png")
 
     scaled_radii_inds = scaled_radii.argsort()
     scaled_radii = scaled_radii[scaled_radii_inds]
@@ -155,10 +162,12 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     if comp_snap == False:
         curr_orb_assn = curr_orb_assn[scaled_radii_inds]
     
-    if create_dens_prf:
-        if (curr_sparta_idx > 0) and (curr_sparta_idx < 2):
-            bins = np.insert(bins, 0, 0)
-            compare_density_prf(scaled_radii, np.array([0]), np.array([num_new_ptls]), np.array([dens_prf_all]), np.array([dens_prf_1halo]), mass, curr_orb_assn, bins, str(curr_halo_idx), path_to_MLOIS +  "Random_figures/", use_mp = False, show_graph = False, save_graph = True)
+    
+    
+    # if create_dens_prf:
+    #     if (curr_sparta_idx > 0) and (curr_sparta_idx < 2):
+    #         bins = np.insert(bins, 0, 0)
+    #         compare_density_prf(scaled_radii, np.array([0]), np.array([num_new_ptls]), np.array([dens_prf_all]), np.array([dens_prf_1halo]), mass, curr_orb_assn, bins, str(curr_halo_idx), path_to_MLOIS +  "Random_figures/", use_mp = False, show_graph = False, save_graph = True)
             # print("num sparta n peri:",np.where(sparta_n_pericenter !=0)[0].size)
             # print("num n peri adj:", np.where(adj_sparta_n_pericenter != 0)[0].size)
             # print("num n_is_lower_limit:", np.where(sparta_n_is_lower_limit ==1)[0].size)
@@ -264,7 +273,7 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_pt
                                         (sparta_output['anl_prf']['M_all'][l,p_sparta_snap,:] for l in range(curr_num_halos)),
                                         (sparta_output['anl_prf']['M_1halo'][l,p_sparta_snap,:] for l in range(curr_num_halos)),
                                         # Uncomment below to create dens profiles
-                                        repeat(sparta_output["config"]['anl_prf']["r_bins_lin"]),repeat(True) 
+                                        #repeat(sparta_output["config"]['anl_prf']["r_bins_lin"]),repeat(True) 
                                         ),chunksize=curr_chunk_size))
         p.close()
         p.join()
@@ -282,8 +291,7 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_pt
         p_all_scal_rad = p_all_scal_rad.astype(np.float32)
         
         num_bins = 30
-        plot_r_rv_tv_graph(np.zeros(p_all_orb_assn.size),p_all_scal_rad,p_all_rad_vel,p_all_tang_vel,p_all_orb_assn,"Calc ptl test", num_bins, "/home/zvladimi/MLOIS/Random_figures/")
-        
+    
         # If multiple snaps also search the comparison snaps in the same manner as with the primary snap
         if prim_only == False:
             c_use_halos_pos = sparta_output['halos']['position'][:,c_sparta_snap] * 10**3 * c_scale_factor
@@ -486,18 +494,30 @@ with open(save_location + "train_indices.pickle", "wb") as pickle_file:
     pickle.dump(train_indices, pickle_file)
 
 with timed("p_snap initial search"):
-    with mp.Pool(processes=num_processes) as p:
-        # halo position, halo r200m, if comparison snap, want mass?, want indices?
-        train_num_ptls = p.starmap(initial_search, zip(p_halos_pos[train_indices], p_halos_r200m[train_indices], repeat(False), repeat(False), repeat(False)), chunksize=curr_chunk_size)
-    p.close()
-    p.join() 
+    if os.path.isfile(save_location + "train_num_ptls.pickle"):
+        with open(save_location + "train_num_ptls.pickle", "rb") as pickle_file:
+            train_num_ptls = pickle.load(pickle_file)
+    else:
+        with mp.Pool(processes=num_processes) as p:
+            # halo position, halo r200m, if comparison snap, want mass?, want indices?
+            train_num_ptls = p.starmap(initial_search, zip(p_halos_pos[train_indices], p_halos_r200m[train_indices], repeat(False), repeat(False), repeat(False)), chunksize=curr_chunk_size)
+            with open(save_location + "train_num_ptls.pickle", "wb") as pickle_file:
+                pickle.dump(train_num_ptls, pickle_file)
+        p.close()
+        p.join() 
 
 with timed("c_snap initial search"):
-    with mp.Pool(processes=num_processes) as p:
-        # halo position, halo r200m, if comparison snap, want mass?, want indices?
-        test_num_ptls = p.starmap(initial_search, zip(p_halos_pos[test_indices], p_halos_r200m[test_indices], repeat(False), repeat(False), repeat(False)), chunksize=curr_chunk_size)
-    p.close()
-    p.join() 
+    if os.path.isfile(save_location + "test_num_ptls.pickle"):
+        with open(save_location + "test_num_ptls.pickle", "rb") as pickle_file:
+            test_num_ptls = pickle.load(pickle_file)
+    else:
+        with mp.Pool(processes=num_processes) as p:
+            # halo position, halo r200m, if comparison snap, want mass?, want indices?
+            test_num_ptls = p.starmap(initial_search, zip(p_halos_pos[test_indices], p_halos_r200m[test_indices], repeat(False), repeat(False), repeat(False)), chunksize=curr_chunk_size)
+            with open(save_location + "test_num_ptls.pickle") as pickle_file:
+                pickle.dump(test_num_ptls, pickle_file)
+        p.close()
+        p.join() 
 
 train_tot_num_ptls = np.sum(train_num_ptls)
 test_tot_num_ptls = np.sum(test_num_ptls)
