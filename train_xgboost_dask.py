@@ -402,6 +402,7 @@ if __name__ == "__main__":
     all_red_shifts = sparta_output["simulation"]["snap_z"][:]
     p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
 
+    #TODO make this to be taken from sparta
     p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
     p_red_shift = readheader(p_snapshot_path, 'redshift')
     p_scale_factor = 1/(1+p_red_shift)
