@@ -10,7 +10,7 @@ from visualization_functions import *
 # LOAD CONFIG PARAMETERS
 import configparser
 config = configparser.ConfigParser()
-config.read("/home/zvladimi/scratch/MLOIS/config.ini")
+config.read("/home/zvladimi/MLOIS/config.ini")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
