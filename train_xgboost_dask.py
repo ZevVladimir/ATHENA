@@ -404,7 +404,6 @@ if __name__ == "__main__":
 
     #TODO make this to be taken from sparta
     p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
-    p_red_shift = readheader(p_snapshot_path, 'redshift')
     p_scale_factor = 1/(1+p_red_shift)
     halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, ptl_mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
     cosmol = cosmology.setCosmology("bolshoi")

@@ -221,7 +221,7 @@ def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red
     # calculate one dynamical time ago and set that as the comparison snap
     curr_time = cosmol.age(p_red_shift)
     past_time = curr_time - (t_dyn_step * t_dyn)
-    c_snap = find_closest_snap(past_time, cosmol)
+    c_snap = find_closest_snap(past_time, cosmol, all_red_shifts)
     snapshot_list.append(c_snap)
 
     # switch to comparison snap
@@ -236,9 +236,9 @@ def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red
     c_scale_factor = 1/(1+c_red_shift)
     c_rho_m = cosmol.rho_m(c_red_shift)
     c_hubble_constant = cosmol.Hz(c_red_shift) * 0.001 # convert to units km/s/kpc
-    c_box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
-    c_box_size = c_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
-    c_box_size = c_box_size + 0.001 # NEED TO MAKE WORK FOR PARTICLES ON THE VERY EDGE
+    # c_box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
+    # c_box_size = c_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
+    # c_box_size = c_box_size + 0.001 # NEED TO MAKE WORK FOR PARTICLES ON THE VERY EDGE
     
     # load particle data and SPARTA data for the comparison snap
     with timed("c_snap ptl load"):
@@ -246,4 +246,4 @@ def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red
     with timed("c_snap SPARTA load"):
         c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap, mass = load_or_pickle_SPARTA_data(curr_sparta_file, c_scale_factor, c_snap, c_sparta_snap)
 
-    return c_snap, c_sparta_snap, c_box_size, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_particles_pid, c_particles_vel, c_particles_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap
+    return c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_particles_pid, c_particles_vel, c_particles_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap

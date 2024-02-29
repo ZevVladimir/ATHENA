@@ -147,12 +147,28 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     scaled_tang_vel = fnd_tang_vel
     scaled_radii = (ptl_rad / halo_r200m)
     
-    if np.where(np.abs(scaled_rad_vel[np.where(scaled_radii < 1.1)[0]]) > 40)[0].shape[0] > 0.1 * np.where(scaled_radii < 1.1)[0].shape[0]:
-        high_vel_idx = np.where((np.abs(scaled_rad_vel) > 50) & (scaled_radii < 1.1))[0]
-        fig,ax =plt.subplots(1)
-        ax.scatter(curr_ptl_pos[np.where(scaled_radii<1.1)[0],0],curr_ptl_pos[np.where(scaled_radii<1.1)[0],1], c='b')
-        ax.scatter(curr_ptl_pos[high_vel_idx,0],curr_ptl_pos[high_vel_idx,1],c='r')
-        fig.savefig("/home/zvladimi/scratch/MLOIS/Random_figs/high_vel_halo" + str(curr_halo_idx) + ".png")
+    if comp_snap == False:
+        # particles with very high radial velocities at small radii should be considered infalling
+        # incorrectly classified
+        curr_orb_assn[np.where((scaled_radii < 1.1) & (np.abs(scaled_rad_vel)>10))] = 0
+    
+    # if np.where(np.abs(scaled_rad_vel[np.where(scaled_radii < 1.1)[0]]) > 40)[0].shape[0] > 0.5 * np.where(scaled_radii < 1.1)[0].shape[0]:
+    #     high_vel_idx = np.where((np.abs(scaled_rad_vel) > 50) & (scaled_radii < 1.1))[0]
+    #     within_rad = np.where(scaled_radii<1.1)[0]
+        
+    #     plot_rhat = calc_rhat(physical_vel[:,0], physical_vel[:,1], physical_vel[:,2])
+
+    #     print("num high vel ptls in 1.1R200m:", high_vel_idx.shape[0], "num total ptls in 1.1R200m:", np.where(scaled_radii<1.1)[0].shape)
+
+    #     transparency = np.abs(physical_vel)/np.max(np.abs(physical_vel))
+    #     fig = plt.figure()
+    #     ax = fig.add_subplot(projection='3d')
+    #     # ax.quiver(curr_ptl_pos[within_rad,0],curr_ptl_pos[within_rad,1],curr_ptl_pos[within_rad,2], plot_rhat[within_rad,0], plot_rhat[within_rad,1], plot_rhat[within_rad,2], alpha=transparency[within_rad], length=2, color='b')
+    #     # ax.quiver(curr_ptl_pos[high_vel_idx,0],curr_ptl_pos[high_vel_idx,1],curr_ptl_pos[high_vel_idx,2], plot_rhat[high_vel_idx,0], plot_rhat[high_vel_idx,1], plot_rhat[high_vel_idx,2], alpha=transparency[high_vel_idx],length=2, color='r')
+    #     ax.quiver(curr_ptl_pos[within_rad,0],curr_ptl_pos[within_rad,1],curr_ptl_pos[within_rad,2], plot_rhat[within_rad,0], plot_rhat[within_rad,1], plot_rhat[within_rad,2], length=2, color='b')
+    #     ax.quiver(curr_ptl_pos[high_vel_idx,0],curr_ptl_pos[high_vel_idx,1],curr_ptl_pos[high_vel_idx,2], plot_rhat[high_vel_idx,0], plot_rhat[high_vel_idx,1], plot_rhat[high_vel_idx,2], length=2, color='r')
+    #     fig.savefig("/home/zvladimi/scratch/MLOIS/Random_figures/high_vel_halo" + str(curr_halo_idx) + ".png")
+    #     plt.close()
 
     scaled_radii_inds = scaled_radii.argsort()
     scaled_radii = scaled_radii[scaled_radii_inds]
@@ -161,6 +177,7 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     scaled_tang_vel = scaled_tang_vel[scaled_radii_inds]
     if comp_snap == False:
         curr_orb_assn = curr_orb_assn[scaled_radii_inds]
+        
     
     
     
@@ -399,32 +416,34 @@ t1 = time.time()
 
 cosmol = cosmology.setCosmology("bolshoi") 
 
-p_snap, p_red_shift = find_closest_z(p_red_shift)
-print("Snapshot number found:", p_snap, "Closest redshift found:", p_red_shift)
-sparta_output = sparta.load(filename=path_to_hdf5_file, load_halo_data=False, log_level= 0)
-all_red_shifts = sparta_output["simulation"]["snap_z"][:]
-p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
-print("corresponding SPARTA snap num:", p_sparta_snap)
-print("check sparta redshift:",sparta_output["simulation"]["snap_z"][p_sparta_snap])
-del sparta_output
+with timed("p_snap information load"):
+    p_snap, p_red_shift = find_closest_z(p_red_shift)
+    print("Snapshot number found:", p_snap, "Closest redshift found:", p_red_shift)
+    sparta_output = sparta.load(filename=path_to_hdf5_file, load_halo_data=False, log_level= 0)
+    all_red_shifts = sparta_output["simulation"]["snap_z"][:]
+    p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
+    print("corresponding SPARTA snap num:", p_sparta_snap)
+    print("check sparta redshift:",all_red_shifts[p_sparta_snap])
+    
 
-# Set constants
-p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
+    # Set constants
+    p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
 
-p_scale_factor = 1/(1+p_red_shift)
-p_rho_m = cosmol.rho_m(p_red_shift)
-p_hubble_constant = cosmol.Hz(p_red_shift) * 0.001 # convert to units km/s/kpc
-p_box_size = readheader(p_snapshot_path, 'boxsize') #units Mpc/h comoving
-p_box_size = p_box_size * 10**3 * p_scale_factor #convert to Kpc/h physical
-p_snap_dict = {
-    "snap":p_snap,
-    "red_shift":p_red_shift,
-    "scale_factor": p_scale_factor,
-    "hubble_const": p_hubble_constant,
-    "box_size": p_box_size,
-}
+    p_scale_factor = 1/(1+p_red_shift)
+    p_rho_m = cosmol.rho_m(p_red_shift)
+    p_hubble_constant = cosmol.Hz(p_red_shift) * 0.001 # convert to units km/s/kpc
+    sim_box_size = sparta_output["simulation"]["box_size"] #units Mpc/h comoving
+    p_box_size = sim_box_size * 10**3 * p_scale_factor #convert to Kpc/h physical
 
-p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
+    p_snap_dict = {
+        "snap":p_snap,
+        "red_shift":p_red_shift,
+        "scale_factor": p_scale_factor,
+        "hubble_const": p_hubble_constant,
+        "box_size": p_box_size,
+    }
+
+    p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
 
 # load all information needed for the primary snap
 with timed("p_snap ptl load"):
@@ -433,10 +452,11 @@ with timed("p_snap ptl load"):
 with timed("p_snap SPARTA load"):
     p_halos_pos, p_halos_r200m, p_halos_id, p_halos_status, p_halos_last_snap, mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
 
-t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], p_red_shift)
-
 with timed("c_snap load"):
-    c_snap, c_sparta_snap, c_box_size, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_ptls_pid, c_ptls_vel, c_ptls_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts, snap_format=snap_format)
+    t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], p_red_shift)
+    c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_ptls_pid, c_ptls_vel, c_ptls_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts, snap_format=snap_format)
+    c_box_size = sim_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
+
 c_snap_dict = {
     "snap":c_snap,
     "red_shift":c_red_shift,
@@ -444,7 +464,7 @@ c_snap_dict = {
     "hubble_const": c_hubble_constant,
     "box_size": c_box_size
 }
-
+del sparta_output
 snapshot_list = [p_snap, c_snap]
 
 if prim_only:
@@ -514,7 +534,7 @@ with timed("c_snap initial search"):
         with mp.Pool(processes=num_processes) as p:
             # halo position, halo r200m, if comparison snap, want mass?, want indices?
             test_num_ptls = p.starmap(initial_search, zip(p_halos_pos[test_indices], p_halos_r200m[test_indices], repeat(False), repeat(False), repeat(False)), chunksize=curr_chunk_size)
-            with open(save_location + "test_num_ptls.pickle") as pickle_file:
+            with open(save_location + "test_num_ptls.pickle", "wb") as pickle_file:
                 pickle.dump(test_num_ptls, pickle_file)
         p.close()
         p.join() 
