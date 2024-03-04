@@ -173,6 +173,7 @@ def make_preds(client, bst, dataset_loc, labels_loc, report_name="Classification
     
     preds = dxgb.inplace_predict(client, bst, X).compute()
     preds = np.round(preds)
+    preds = preds.astype(np.int8)
     
     if print_report:   
         report = classification_report(y_np, preds)
@@ -182,7 +183,51 @@ def make_preds(client, bst, dataset_loc, labels_loc, report_name="Classification
         file.write(report)
         file.close()
     
-    return preds
+    return X_np, y_np, preds
+
+def eval_model(X, y, dataset_name, dens_prf = False, r_rv_tv = False, preds = None, misclass=False):
+    num_bins = 30
+    with open(dataset_location + dataset_name + "_dataset_all_keys.pickle", "rb") as file:
+        all_keys = pickle.load(file)
+    p_r_loc = np.where(all_keys == "Scaled_radii_" + str(p_snap))[0][0]
+    c_r_loc = np.where(all_keys == "Scaled_radii_" + str(c_snap))[0][0]
+    p_rv_loc = np.where(all_keys == "Radial_vel_" + str(p_snap))[0][0]
+    c_rv_loc = np.where(all_keys == "Radial_vel_" + str(c_snap))[0][0]
+    p_tv_loc = np.where(all_keys == "Tangential_vel_" + str(p_snap))[0][0]
+    c_tv_loc = np.where(all_keys == "Tangential_vel_" + str(c_snap))[0][0]
+    
+    if dens_prf:
+        with open(dataset_location + dataset_name.lower() + "_all_rad_halo_first.pickle", "rb") as file:
+            halo_first = pickle.load(file) 
+        with open(dataset_location + dataset_name.lower() + "_all_rad_halo_n.pickle", "rb") as file:
+            halo_n = pickle.load(file)   
+
+        with open(path_to_calc_info + specific_save + "test_indices.pickle", "rb") as pickle_file:
+            test_indices = pickle.load(pickle_file)
+        
+        p_snap, p_red_shift = find_closest_z(p_red_shift)
+        p_scale_factor = 1/(1+p_red_shift)
+        halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, ptl_mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
+
+        use_halo_ids = halos_id[test_indices]
+        sparta_output = sparta.load(filename=path_to_hdf5_file, halo_ids=use_halo_ids, log_level=0)
+        all_red_shifts = sparta_output["simulation"]["snap_z"][:]
+        p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
+        new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta resort the indices
+        dens_prf_all = sparta_output['anl_prf']['M_all'][new_idxs,p_sparta_snap,:]
+        dens_prf_1halo = sparta_output['anl_prf']['M_1halo'][new_idxs,p_sparta_snap,:]
+        
+        bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
+        bins = np.insert(bins, 0, 0) 
+        
+        compare_density_prf(radii=X[:,p_r_loc], halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=ptl_mass, orbit_assn=test_preds, prf_bins=bins, title=dataset_name + " Dataset", save_location=plot_save_location, use_mp=True, save_graph=True)
+    
+    if r_rv_tv:
+        plot_r_rv_tv_graph(preds, X[:,p_r_loc], X[:,p_rv_loc], X[:,p_tv_loc], y, title=dataset_name + " Dataset", num_bins=num_bins, save_location=plot_save_location)
+    
+    if misclass:
+        plot_misclassified(p_corr_labels=y, p_ml_labels=preds, p_r=X[:,p_r_loc], p_rv=X[:,p_rv_loc], p_tv=X[:,p_tv_loc], c_r=X[:,c_r_loc], c_rv=X[:,c_rv_loc], c_tv=X[:,c_tv_loc], title=model_name + " Dataset", num_bins=num_bins, save_location=plot_save_location, model_save_location=model_save_location)
+    
 
 if __name__ == "__main__":
     if on_zaratan:
@@ -350,12 +395,18 @@ if __name__ == "__main__":
     file.close()
 
 
-    # with timed("Train Predictions"):
-    #     train_preds = make_preds(client, bst, train_dataset_loc, train_labels_loc, report_name="Train Report", print_report=False)
+    with timed("Train Predictions"):
+        train_x, train_y, train_preds = make_preds(client, bst, train_dataset_loc, train_labels_loc, report_name="Train Report", print_report=False)
+    with timed("Train Plots"):
+        eval_model(X=train_x, y=train_y, dataset_name="Train", dens_prf=False, r_rv_tv=True, preds=train_preds, misclass=True)
+    
+    
     with timed("Test Predictions"):
-        test_preds = make_preds(client, bst, test_dataset_loc, test_labels_loc, report_name="Test Report", print_report=False)
+        test_x, test_y, test_preds = make_preds(client, bst, test_dataset_loc, test_labels_loc, report_name="Test Report", print_report=False)
+    with timed("Test Plots"):
+        eval_model(X=test_x, y=test_y, dataset_name="Test", dens_prf=False, r_rv_tv=True, preds=test_preds, misclass=True)    
+        
     bst.save_model(model_save_location + model_name + ".json")
-
 
     feature_important = bst.get_score(importance_type='weight')
     keys = list(feature_important.keys())
@@ -373,57 +424,7 @@ if __name__ == "__main__":
     # fig = plt.gcf()
     # fig.set_size_inches(110, 25)
     # fig.savefig('/home/zvladimi/MLOIS/Random_figures/' + model_name + 'tree' + str(tree_num) + '.png')
-    t1 = time.time()
-    with open(test_dataset_loc, "rb") as file:
-        X_np = pickle.load(file)
-    with open(test_labels_loc, "rb") as file:
-        y_np = pickle.load(file)
-    
-    with open(save_location + "datasets/" + "test_dataset_all_keys.pickle", "rb") as file:
-        test_all_keys = pickle.load(file)
-    with open(save_location + "datasets/" + "test_all_rad_halo_first.pickle", "rb") as file:
-        test_halo_first = pickle.load(file) 
-    with open(save_location + "datasets/" + "test_all_rad_halo_n.pickle", "rb") as file:
-        test_halo_n = pickle.load(file)    
-        
 
-    p_scal_rad_loc = np.where(test_all_keys == "Scaled_radii_" + str(p_snap))[0][0]
-    c_scal_rad_loc = np.where(test_all_keys == "Scaled_radii_" + str(c_snap))[0][0]
-    p_rad_vel_loc = np.where(test_all_keys == "Radial_vel_" + str(p_snap))[0][0]
-    c_rad_vel_loc = np.where(test_all_keys == "Radial_vel_" + str(c_snap))[0][0]
-    p_tan_vel_loc = np.where(test_all_keys == "Tangential_vel_" + str(p_snap))[0][0]
-    c_tan_vel_loc = np.where(test_all_keys == "Tangential_vel_" + str(c_snap))[0][0]
-
-    with open(path_to_calc_info + specific_save + "test_indices.pickle", "rb") as pickle_file:
-        test_indices = pickle.load(pickle_file)
     
-    p_snap, p_red_shift = find_closest_z(p_red_shift)
-    sparta_output = sparta.load(filename=path_to_hdf5_file, log_level= 0)
-    all_red_shifts = sparta_output["simulation"]["snap_z"][:]
-    p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
 
-    #TODO make this to be taken from sparta
-    p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
-    p_scale_factor = 1/(1+p_red_shift)
-    halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, ptl_mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
-    cosmol = cosmology.setCosmology("bolshoi")
-    use_halo_ids = halos_id[test_indices]
-    sparta_output = sparta.load(filename=path_to_hdf5_file, halo_ids=use_halo_ids, log_level=0)
-    new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta resort the indices
-    dens_prf_all = sparta_output['anl_prf']['M_all'][new_idxs,p_sparta_snap,:]
-    dens_prf_1halo = sparta_output['anl_prf']['M_1halo'][new_idxs,p_sparta_snap,:]
-    
-    
-    # test indices are the indices of the match halo idxs used (see find_particle_properties_ML.py to see how test_indices are created)
-    num_test_halos = test_indices.shape[0]
-    density_prf_all_within = np.sum(dens_prf_all, axis=0)
-    density_prf_1halo_within = np.sum(dens_prf_1halo, axis=0)
-    num_bins = 30
-    bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
-    bins = np.insert(bins, 0, 0) 
-
-    compare_density_prf(radii=X_np[:,p_scal_rad_loc], halo_first=test_halo_first, halo_n=test_halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=ptl_mass, orbit_assn=test_preds, prf_bins=bins, title=model_name, save_location=plot_save_location, use_mp=True, save_graph=True)
-    plot_r_rv_tv_graph(test_preds, X_np[:,p_scal_rad_loc], X_np[:,p_rad_vel_loc], X_np[:,p_tan_vel_loc], y_np, title=model_name, num_bins=num_bins, save_location=plot_save_location)
-    plot_misclassified(p_corr_labels=y_np, p_ml_labels=test_preds, p_r=X_np[:,p_scal_rad_loc], p_rv=X_np[:,p_rad_vel_loc], p_tv=X_np[:,p_tan_vel_loc], c_r=X_np[:,c_scal_rad_loc], c_rv=X_np[:,c_rad_vel_loc], c_tv=X_np[:,c_tan_vel_loc], title=model_name, num_bins=num_bins, save_location=plot_save_location, model_save_location=model_save_location)
-    #graph_acc_by_bin(test_prediction, y_np, X_np[:,scaled_radii_loc], num_bins, model_name + " Predicts", plot = False, save = True, save_location = plot_save_location)
     client.close()
