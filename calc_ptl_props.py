@@ -177,42 +177,9 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     scaled_tang_vel = scaled_tang_vel[scaled_radii_inds]
     if comp_snap == False:
         curr_orb_assn = curr_orb_assn[scaled_radii_inds]
-        
     
-    
-    
-    # if create_dens_prf:
-    #     if (curr_sparta_idx > 0) and (curr_sparta_idx < 2):
-    #         bins = np.insert(bins, 0, 0)
-    #         compare_density_prf(scaled_radii, np.array([0]), np.array([num_new_ptls]), np.array([dens_prf_all]), np.array([dens_prf_1halo]), mass, curr_orb_assn, bins, str(curr_halo_idx), path_to_MLOIS +  "Random_figures/", use_mp = False, show_graph = False, save_graph = True)
-            # print("num sparta n peri:",np.where(sparta_n_pericenter !=0)[0].size)
-            # print("num n peri adj:", np.where(adj_sparta_n_pericenter != 0)[0].size)
-            # print("num n_is_lower_limit:", np.where(sparta_n_is_lower_limit ==1)[0].size)
-            # print("num n_is_lower_limit adj:", np.where(adj_sparta_n_is_lower_limit==1)[0].size)
-            # print("no peri yes lower lim", np.where((adj_sparta_n_pericenter < 1)&(adj_sparta_n_is_lower_limit==1))[0].size)
-            # print("yes peri no lower lim", np.where((adj_sparta_n_pericenter >= 1)&(adj_sparta_n_is_lower_limit==0))[0].size)
-            # print("yes peri yes lower lim", np.where((adj_sparta_n_pericenter >= 1)&(adj_sparta_n_is_lower_limit==1))[0].size)
-            # print("no peri no lower lim", np.where((adj_sparta_n_pericenter < 1)&(adj_sparta_n_is_lower_limit==0))[0].size)
-            # print("curr_ptl_pids", curr_ptl_pids[:10], "num pids", curr_ptl_pids.shape)
-            # print("num sparta ids", sparta_tracer_ids.shape)
-            # print(*sparta_tracer_ids[np.where((adj_sparta_n_pericenter < 1)&(adj_sparta_n_is_lower_limit==0))[0]], sep=",")
-            # print("num matches:",matched_ids[0].size)
-            # print("total orbiting mass and num orbiting SPARTA:", dens_prf_1halo[-1], dens_prf_1halo[-1]/mass)
-            # print("total orbiting mass and num orbiting me:", np.where(curr_orb_assn != 0)[0].size, np.where(curr_orb_assn != 0)[0].size * mass)
-     
-    #         compare_density_prf(scaled_radii, dens_prf_all, dens_prf_1halo, mass, curr_orb_assn, bins, str(curr_halo_idx), path_to_MLOIS +  "Random_figures/",save_graph=True)
-            
-    #         #plot_pos_loc = np.where((curr_ptl_pos[:,2] > np.average(curr_ptl_pos[:,2] - np.std(curr_ptl_pos[:,2]))) & (curr_ptl_pos[:,2] < np.average(curr_ptl_pos[:,2] + np.std(curr_ptl_pos[:,2]))))[0]
-            
-    #         sparta_matches = np.intersect1d(p_ptls_pid, sparta_tracer_ids, return_indices=True)
-    #         sparta_pos = p_ptls_pos[sparta_matches[1]]
-    #         #sparta_pos_loc = np.where((sparta_pos[:,2] > np.average(curr_ptl_pos[:,2] - np.std(curr_ptl_pos[:,2]))) & (sparta_pos[:,2] < np.average(curr_ptl_pos[:,2] + np.std(curr_ptl_pos[:,2]))))[0]
 
-    #         fig, ax = plt.subplots(1, layout="constrained")
-    #         ax.scatter(curr_ptl_pos[:,0], curr_ptl_pos[:,1], c="b", alpha=.5, label="my tree")
-    #         ax.scatter(sparta_pos[:,0], sparta_pos[:,1], c="r", alpha=.5, label="sparta")
-    #         ax.legend()
-    #         fig.savefig(path_to_MLOIS + "Random_figures/halo_" + str(curr_halo_idx) + "my_vs_spta_plt.png")
+        
     if comp_snap == False:
         return fnd_HIPIDs, curr_orb_assn, scaled_rad_vel, scaled_tang_vel, scaled_radii
     else:
@@ -381,6 +348,8 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_pt
             save_scale_radii = p_all_scal_rad
             save_rad_vel = p_all_rad_vel
             save_tang_vel = p_all_tang_vel
+            
+        plot_r_rv_tv_graph(orb_inf=np.zeros(p_all_orb_assn.size), r=p_all_scal_rad, rv=p_all_rad_vel, tv=p_all_tang_vel, correct_orb_inf=p_all_scal_rad, title="test rv plot", num_bins=30, save_location="/home/zvladimi/scratch/MLOIS/Random_figures/")
         
         # Save all data in hdf5 file depending on if training or testing halos]
         save_cols = ["Halo_first", "Halo_n", "HIPIDS", "Orbit_Infall", "Svaled_radii_", "Radial_vel_", "Tangential_vel_"]
@@ -410,7 +379,8 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_pt
         hdf5_ptl_idx += p_tot_num_use_ptls
         hdf5_halo_idx += p_start_num_ptls.shape[0]
         t4 = time.time()
-        print("Bin", (i+1),"/",num_iter,"complete:",t4-t3,"sec")      
+        del sparta_output
+        print("Bin", (i+1),"/",num_iter,"complete:",np.round(((t4-t3)/60),2), "min", np.round((t4-t3),2),"sec")      
                 
 t1 = time.time()
 
@@ -549,8 +519,8 @@ print("train num ptls:", train_tot_num_ptls)
 print("test num ptls:", test_tot_num_ptls)
 
 t2 = time.time()
-print("Start up finished in:",t2-t1,"seconds", (t2-t1)/60, "minutes")
+print("Start up finished in:",np.round((t2-t1),2),"seconds", np.round(((t2-t1)/60),2), "minutes")
 halo_loop(train=True, indices=train_indices, tot_num_ptls=train_tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
 halo_loop(train=False, indices=test_indices, tot_num_ptls=test_tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
 t3 = time.time()
-print("Finished in:",t3-t1,"seconds", (t3-t1)/60, "minutes")
+print("Finished in:",np.round((t3-t1),2),"seconds", np.round(((t3-t1)/60),2), "minutes")

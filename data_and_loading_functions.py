@@ -202,7 +202,7 @@ def find_closest_z(value):
     idx = (np.abs(all_z - value)).argmin()
     return idx, all_z[idx]
 
-def find_closest_snap(value, cosmology):
+def find_closest_snap(value, cosmology, all_red_shifts):
     all_times = np.ones(total_num_snaps) * -1000
     for i in range(total_num_snaps):
         # Sometimes not all snaps exist
