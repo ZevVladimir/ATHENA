@@ -186,8 +186,10 @@ def make_preds(client, bst, dataset_loc, labels_loc, report_name="Classification
     return X_np, y_np, preds
 
 def eval_model(X, y, dataset_name, dens_prf = False, r_rv_tv = False, preds = None, misclass=False):
+    global p_snap
+    global c_snap
     num_bins = 30
-    with open(dataset_location + dataset_name + "_dataset_all_keys.pickle", "rb") as file:
+    with open(dataset_location + dataset_name.lower() + "_dataset_all_keys.pickle", "rb") as file:
         all_keys = pickle.load(file)
     p_r_loc = np.where(all_keys == "Scaled_radii_" + str(p_snap))[0][0]
     c_r_loc = np.where(all_keys == "Scaled_radii_" + str(c_snap))[0][0]
@@ -205,7 +207,7 @@ def eval_model(X, y, dataset_name, dens_prf = False, r_rv_tv = False, preds = No
         with open(path_to_calc_info + specific_save + "test_indices.pickle", "rb") as pickle_file:
             test_indices = pickle.load(pickle_file)
         
-        p_snap, p_red_shift = find_closest_z(p_red_shift)
+        new_p_snap, p_red_shift = find_closest_z(p_red_shift)
         p_scale_factor = 1/(1+p_red_shift)
         halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, ptl_mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
 
@@ -220,13 +222,13 @@ def eval_model(X, y, dataset_name, dens_prf = False, r_rv_tv = False, preds = No
         bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
         bins = np.insert(bins, 0, 0) 
         
-        compare_density_prf(radii=X[:,p_r_loc], halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=ptl_mass, orbit_assn=test_preds, prf_bins=bins, title=dataset_name + " Dataset", save_location=plot_save_location, use_mp=True, save_graph=True)
+        compare_density_prf(radii=X[:,p_r_loc], halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=ptl_mass, orbit_assn=test_preds, prf_bins=bins, title=dataset_name + "_dataset", save_location=plot_save_location, use_mp=True, save_graph=True)
     
     if r_rv_tv:
-        plot_r_rv_tv_graph(preds, X[:,p_r_loc], X[:,p_rv_loc], X[:,p_tv_loc], y, title=dataset_name + " Dataset", num_bins=num_bins, save_location=plot_save_location)
+        plot_r_rv_tv_graph(preds, X[:,p_r_loc], X[:,p_rv_loc], X[:,p_tv_loc], y, title=dataset_name + "_dataset", num_bins=num_bins, save_location=plot_save_location)
     
     if misclass:
-        plot_misclassified(p_corr_labels=y, p_ml_labels=preds, p_r=X[:,p_r_loc], p_rv=X[:,p_rv_loc], p_tv=X[:,p_tv_loc], c_r=X[:,c_r_loc], c_rv=X[:,c_rv_loc], c_tv=X[:,c_tv_loc], title=model_name + " Dataset", num_bins=num_bins, save_location=plot_save_location, model_save_location=model_save_location)
+        plot_misclassified(p_corr_labels=y, p_ml_labels=preds, p_r=X[:,p_r_loc], p_rv=X[:,p_rv_loc], p_tv=X[:,p_tv_loc], c_r=X[:,c_r_loc], c_rv=X[:,c_rv_loc], c_tv=X[:,c_tv_loc], title=model_name + "_dataset", num_bins=num_bins, save_location=plot_save_location, model_save_location=model_save_location)
     
 
 if __name__ == "__main__":
@@ -378,7 +380,6 @@ if __name__ == "__main__":
         del dtrain
         del dtest
     
-
     file = open(model_save_location + "model_info.txt", 'w')
     file.write("Model trained on: " + model_sparta_file+ "\n")
     file.write("Model tested on: " + curr_sparta_file+ "\n")
@@ -394,12 +395,10 @@ if __name__ == "__main__":
         file.write(str(item[0]) + ": " + str(item[1]) + "\n")
     file.close()
 
-
     with timed("Train Predictions"):
         train_x, train_y, train_preds = make_preds(client, bst, train_dataset_loc, train_labels_loc, report_name="Train Report", print_report=False)
     with timed("Train Plots"):
         eval_model(X=train_x, y=train_y, dataset_name="Train", dens_prf=False, r_rv_tv=True, preds=train_preds, misclass=True)
-    
     
     with timed("Test Predictions"):
         test_x, test_y, test_preds = make_preds(client, bst, test_dataset_loc, test_labels_loc, report_name="Test Report", print_report=False)
@@ -418,13 +417,10 @@ if __name__ == "__main__":
     ax.set_yticks(pos, keys)
     fig.savefig(plot_save_location + "feature_importance.png")
 
-
     # tree_num = 2
     # xgb.plot_tree(bst, num_trees=tree_num)
     # fig = plt.gcf()
     # fig.set_size_inches(110, 25)
     # fig.savefig('/home/zvladimi/MLOIS/Random_figures/' + model_name + 'tree' + str(tree_num) + '.png')
-
-    
 
     client.close()
