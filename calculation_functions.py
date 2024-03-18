@@ -80,8 +80,8 @@ def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200m, red_shift, 
     
     # Get the corresponding components, distances, and halo v200m for every particle
     v_hubble = np.zeros(particle_dist.size, dtype = np.float32)
-    corresponding_hubble_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200c") 
-    curr_v200m = calc_v200m(corresponding_hubble_m200m, halo_r200m)
+    corr_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200c") 
+    curr_v200m = calc_v200m(corr_m200m, halo_r200m)
         
     # calculate the unit vector of the halo to the particle  
     rhat = calc_rhat(coord_sep[:,0], coord_sep[:,1], coord_sep[:,2])
@@ -91,10 +91,11 @@ def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200m, red_shift, 
     
     v_hubble = rhat * v_hubble[:, np.newaxis] 
     
-    physical_vel = peculiar_vel + v_hubble    
+    phys_vel_comp = peculiar_vel + v_hubble    
 
-    radial_vel_comp = physical_vel * rhat
+    radial_vel_comp = phys_vel_comp * rhat
     radial_vel = np.sum(radial_vel_comp, axis = 1)
+    phys_vel = np.linalg.norm(phys_vel_comp, axis = 1)
     
     # Dot the velocity with rhat to get the radial component
     #radial_component_vel = np.sum(np.multiply(peculiar_vel, rhat), axis = 1)
@@ -103,7 +104,7 @@ def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200m, red_shift, 
     #radial_vel = radial_component_vel + v_hubble
 
     # scale all the radial velocities by v200m of the halo
-    return radial_vel, curr_v200m, physical_vel, rhat
+    return radial_vel, curr_v200m, phys_vel, phys_vel_comp, rhat
 
 def calc_tang_vel(radial_vel, physical_vel, rhat):
     component_rad_vel = rhat * radial_vel[:, np.newaxis] 
