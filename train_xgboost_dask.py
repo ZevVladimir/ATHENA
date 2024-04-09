@@ -15,6 +15,8 @@ import sys
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import h5py
+from pairing import depair
 
 from data_and_loading_functions import create_directory, load_or_pickle_SPARTA_data, conv_halo_id_spid, find_closest_z
 from visualization_functions import *
@@ -23,6 +25,7 @@ from visualization_functions import *
 import configparser
 config = configparser.ConfigParser()
 config.read("/home/zvladimi/MLOIS/config.ini")
+rand_seed = config.getint("MISC","random_seed")
 on_zaratan = config.getboolean("MISC","on_zaratan")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
@@ -90,7 +93,7 @@ else:
 sys.path.insert(0, path_to_pygadgetreader)
 sys.path.insert(0, path_to_sparta)
 from pygadgetreader import readsnap, readheader
-from sparta import sparta
+from sparta_tools import sparta
 @contextmanager
 def timed(txt):
     t0 = time.time()

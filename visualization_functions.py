@@ -405,10 +405,15 @@ def split_orb_inf(data, labels):
     orbit = data[np.where(labels == 1)]
     return infall, orbit
  
-def phase_plot(ax, x, y, min_ptl, max_ptl, range, num_bins, cmap, x_label="", y_label="", hide_xticks=False, hide_yticks=False,text="", title=""):
-    ax.hist2d(x, y, bins=num_bins, range=range, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm="log", vmin=min_ptl, vmax=max_ptl)
+def phase_plot(ax, x, y, min_ptl, max_ptl, range, num_bins, cmap, x_label="", y_label="", norm = "log", xrange=None, yrange=None, hide_xticks=False, hide_yticks=False,text="", title=""):
+    ax.hist2d(x, y, bins=num_bins, range=range, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm=norm, vmin=min_ptl, vmax=max_ptl)
+    
+    if xrange != None:
+        ax.set_xlim(xrange)
+    if yrange != None:
+        ax.set_ylim(yrange)
     if text != "":
-        ax.text(.01,.03, text, ha="left", va="bottom", transform=ax.transAxes, fontsize="large", bbox={"facecolor":'white',"alpha":.9,})
+        ax.text(.01,.03, text, ha="left", va="bottom", transform=ax.transAxes, fontsize="xlarge", bbox={"facecolor":'white',"alpha":.9,})
     if title != "":
         ax.set_title(title)
     if x_label != "":
@@ -564,7 +569,9 @@ def plot_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, c
     c_corr_labels[np.argwhere(np.isnan(c_r)).flatten()] = -99
     c_ml_labels[np.argwhere(np.isnan(c_r)).flatten()] = -99
     
+    print("Primary Snap Misclassification")
     p_min_ptl, p_max_diff, p_max_all_ptl, p_all_inc_r_rv, p_all_inc_r_tv, p_all_inc_rv_tv, p_scaled_inf_r_rv, p_scaled_inf_r_tv, p_scaled_inf_rv_tv, p_scaled_orb_r_rv, p_scaled_orb_r_tv, p_scaled_orb_rv_tv, p_scaled_all_r_rv, p_scaled_all_r_tv, p_scaled_all_rv_tv = calc_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, r_range, rv_range, tv_range, num_bins=num_bins, model_save_location=model_save_location)
+    print("Secondary Snap Misclassification")
     c_min_ptl, c_max_diff, c_max_all_ptl, c_all_inc_r_rv, c_all_inc_r_tv, c_all_inc_rv_tv, c_scaled_inf_r_rv, c_scaled_inf_r_tv, c_scaled_inf_rv_tv, c_scaled_orb_r_rv, c_scaled_orb_r_tv, c_scaled_orb_rv_tv, c_scaled_all_r_rv, c_scaled_all_r_tv, c_scaled_all_rv_tv = calc_misclassified(c_corr_labels, c_ml_labels, c_r, c_rv, c_tv, r_range, rv_range, tv_range, num_bins=num_bins, model_save_location=model_save_location)
     
     cividis_cmap = plt.get_cmap("cividis_r")

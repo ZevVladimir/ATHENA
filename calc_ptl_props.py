@@ -59,7 +59,7 @@ import sys
 sys.path.insert(0, path_to_pygadgetreader)
 sys.path.insert(0, path_to_sparta)
 from pygadgetreader import readsnap, readheader
-from sparta import sparta
+from sparta_tools import sparta
 ##################################################################################################################
 @contextmanager
 def timed(txt):
@@ -422,7 +422,6 @@ with timed("p_snap information load"):
         "box_size": p_box_size,
     }
 
-    p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
 
 # load all information needed for the primary snap
 with timed("p_snap ptl load"):

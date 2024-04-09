@@ -53,7 +53,7 @@ import sys
 sys.path.insert(0, path_to_pygadgetreader)
 sys.path.insert(0, path_to_sparta)
 from pygadgetreader import readsnap, readheader
-from sparta import sparta
+from sparta_tools import sparta
 ##################################################################################################################
 
 def take_ptl_within(dataset, labels, scal_rad_loc, max_rad):
@@ -155,8 +155,6 @@ def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapsh
         
         with open(save_path + dataset_name + "_all_rad_halo_first.pickle", "wb") as pickle_file:
             pickle.dump(all_rad_halo_first, pickle_file)
-            
-        
             
     # if there are already pickle files just open them
     else:
