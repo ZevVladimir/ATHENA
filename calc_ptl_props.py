@@ -16,7 +16,7 @@ import multiprocessing as mp
 from itertools import repeat
 import sys
 
-from data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z
+from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z
 from calculation_functions import *
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -60,7 +60,7 @@ num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 sys.path.insert(1, path_to_pygadgetreader)
 sys.path.insert(1, path_to_sparta)
 sys.path.insert(1, path_to_plotting)
-from visualization_functions import compare_density_prf, plot_r_rv_tv_graph
+from utils.visualization_functions import compare_density_prf, plot_r_rv_tv_graph
 from pygadgetreader import readsnap, readheader
 from sparta_tools import sparta
 ##################################################################################################################

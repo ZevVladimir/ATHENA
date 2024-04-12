@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import h5py
 from pairing import depair
 
-from data_and_loading_functions import create_directory, load_or_pickle_SPARTA_data, conv_halo_id_spid, find_closest_z
+from utils.data_and_loading_functions import create_directory, load_or_pickle_SPARTA_data, conv_halo_id_spid, find_closest_z
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
@@ -71,7 +71,7 @@ frac_training_data = config.getfloat("XGBOOST","frac_train_data")
 chunk_size = int(np.floor(1e9 / (num_save_ptl_params * 4)))
 
 sys.path.insert(1, path_to_plotting)
-from visualization_functions import *
+from utils.visualization_functions import *
 
 import subprocess
 

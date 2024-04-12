@@ -18,7 +18,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from pairing import depair
 from colossus.cosmology import cosmology
-from data_and_loading_functions import create_directory, load_or_pickle_SPARTA_data, conv_halo_id_spid
+from utils.data_and_loading_functions import create_directory, load_or_pickle_SPARTA_data, conv_halo_id_spid
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
@@ -76,7 +76,7 @@ except Exception: # this command not being found can raise quite a few different
 sys.path.insert(1, path_to_pygadgetreader)
 sys.path.insert(1, path_to_sparta)
 sys.path.insert(1, path_to_plotting)
-from visualization_functions import *
+from utils.visualization_functions import *
 from pygadgetreader import readsnap, readheader
 from sparta_dev import sparta
 @contextmanager

@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import pickle
 mpl.use('agg')
 import matplotlib.gridspec as gridspec
 from calculation_functions import calculate_distance
@@ -8,7 +9,7 @@ from calculation_functions import calculate_distance
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from sklearn.metrics import classification_report
 from colossus.halo import mass_so
-from data_and_loading_functions import check_pickle_exist_gadget, create_directory
+from utils.data_and_loading_functions import check_pickle_exist_gadget, create_directory
 from calculation_functions import calc_v200m, calculate_density
 # import general_plotting as gp
 from textwrap import wrap
@@ -17,6 +18,25 @@ import matplotlib.colors as colors
 import multiprocessing as mp
 from itertools import repeat
 import time
+from sparta_tools import sparta
+
+##################################################################################################################
+# LOAD CONFIG PARAMETERS
+import configparser
+config = configparser.ConfigParser()
+config.read("/home/zvladimi/MLOIS/config.ini")
+curr_sparta_file = config["MISC"]["curr_sparta_file"]
+rand_seed = config.getint("MISC","random_seed")
+path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
+path_to_snaps = config["PATHS"]["path_to_snaps"]
+path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
+path_to_plotting = config["PATHS"]["path_to_plotting"]
+path_to_hdf5_file = path_to_SPARTA_data + curr_sparta_file + ".hdf5"
+path_to_pickle = config["PATHS"]["path_to_pickle"]
+path_to_calc_info = config["PATHS"]["path_to_calc_info"]
+path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
+path_to_sparta = config["PATHS"]["path_to_sparta"]
+snap_format = config["MISC"]["snap_format"]
 
 def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r200_per_part, red_shift, hubble_constant, little_h):
     start_bin_val = 0.001
@@ -963,3 +983,179 @@ def plot_halo_ptls(pos, act_labels, save_path, pred_labels = None):
     ax.set_ylabel("Y position (kpc)")
     ax.legend()
     fig.savefig(save_path + "plot_of_halo_label_dist.png")
+    
+def update_anim(curr_frame, ax, halo_pos, halo_vel, ptl_pos, ptl_vel, radius, num_halo_search, halo_clrs, alphas, p_snap, p_box_size, num_plt_snaps):
+    for i in range(num_halo_search):
+        if curr_frame == 1:
+            ax.scatter(np.array([]),np.array([]),color=halo_clrs[i], label=("Halo " + str(i)))
+        
+        ax.quiver(halo_pos[curr_frame,i,0],halo_pos[curr_frame,i,1],halo_pos[curr_frame,i,2],halo_vel[curr_frame,i,0],halo_vel[curr_frame,i,1],halo_vel[curr_frame,i,2], alpha=alphas[curr_frame], color=halo_clrs[i])
+        # u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
+        # x = halo_pos[i,j,0] + radius[i,j] * np.cos(u)*np.sin(v)
+        # y = halo_pos[i,j,1] + radius[i,j] * np.sin(u)*np.sin(v)
+        # z = halo_pos[i,j,2] + radius[i,j] * np.cos(v)
+
+        # ax.plot_wireframe(x, y, z, color=halo_clrs[j])
+        # ax.set_box_aspect([1,1,1])
+    
+    if curr_frame == 1:
+        ax.scatter(np.array([]),np.array([]), color="blue", label = "Ptl")
+        ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    
+    ax.quiver(ptl_pos[curr_frame,0],ptl_pos[curr_frame,1],ptl_pos[curr_frame,2],ptl_vel[curr_frame,0],ptl_vel[curr_frame,1],ptl_vel[curr_frame,2], color="blue", alpha=alphas[curr_frame])
+
+    if curr_frame == 0:    
+        min_x = np.amin([np.amin(halo_pos[:,:,0]),np.amin(ptl_pos[:,0])])
+        max_x = np.amax([np.amax(halo_pos[:,:,0]),np.amin(ptl_pos[:,0])])
+        min_y = np.amin([np.amin(halo_pos[:,:,1]),np.amin(ptl_pos[:,1])])
+        max_y = np.amax([np.amax(halo_pos[:,:,1]),np.amin(ptl_pos[:,1])])
+        min_z = np.amin([np.amin(halo_pos[:,:,2]),np.amin(ptl_pos[:,2])])
+        max_z = np.amax([np.amax(halo_pos[:,:,2]),np.amin(ptl_pos[:,2])])
+        
+        # x_adj = 0.5*(max_x-min_x)
+        # y_adj = 0.5*(max_y-min_y)
+        # z_adj = 0.5*(max_z-min_z)
+        x_adj=0
+        y_adj=0
+        z_adj=0
+
+        ax.set_xlim(np.max([min_x-x_adj,0]), np.min([(max_x+x_adj),p_box_size]))
+        ax.set_ylim(np.max([min_y-y_adj,0]), np.min([(max_y+y_adj),p_box_size]))
+        ax.set_zlim(np.max([min_z-z_adj,0]), np.min([(max_z+z_adj),p_box_size]))
+
+    ax.text2D(.01,.95, s=str("Snapshot: " + str(p_snap-num_plt_snaps+curr_frame+1)), ha="left", va="top", transform=ax.transAxes, fontsize="x-large", bbox={"facecolor":'white',"alpha":.9,})
+    return
+    #return q,
+
+def anim_ptl_path(cosmology, num_halo_search):
+    import h5py
+    from pairing import depair
+    from scipy.spatial import cKDTree
+    import sys
+    from matplotlib.animation import FuncAnimation
+    from utils.data_and_loading_functions import find_closest_z
+    from utils.data_and_loading_functions import load_or_pickle_ptl_data
+    sys.path.insert(1, path_to_pygadgetreader)  
+    from pygadgetreader import readsnap, readheader
+    num_processes = mp.cpu_count()
+    
+    cosmol = cosmology.setCosmology("bolshoi") 
+
+    with open("/home/zvladimi/MLOIS/xgboost_datasets_plots/sparta_cbol_l0063_n0256_10r200m_190to166_10.0r200msearch/datasets/test_dataset_all_keys.pickle","rb") as file:
+        print(pickle.load(file))
+
+    with h5py.File(("/home/zvladimi/MLOIS/SPARTA_data/tcr_3674654_sparta_cbol_l0063_n0256_10r200m.hdf5")) as file:
+        tjy_pos = file['tcr_ptl']['res_tjy']['x'][:]
+        tjy_vel = file['tcr_ptl']['res_tjy']['v'][:]
+        tjy_id = file["tcr_ptl"]['res_tjy']['tracer_id'][:]
+        
+        p_snap, p_red_shift = find_closest_z(p_red_shift)
+        print("Snapshot number found:", p_snap, "Closest redshift found:", p_red_shift)
+        sparta_output = sparta.load(filename=path_to_hdf5_file, load_halo_data=False, log_level= 0)
+        all_red_shifts = sparta_output["simulation"]["snap_z"][:]
+        p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
+        print("corresponding SPARTA snap num:", p_sparta_snap)
+        print("check sparta redshift:",all_red_shifts[p_sparta_snap])
+        
+        # Set constants
+        p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
+
+        p_scale_factor = 1/(1+p_red_shift)
+        p_rho_m = cosmol.rho_m(p_red_shift)
+        p_hubble_constant = cosmol.Hz(p_red_shift) * 0.001 # convert to units km/s/kpc
+        sim_box_size = sparta_output["simulation"]["box_size"] #units Mpc/h comoving
+        p_box_size = sim_box_size * 10**3 * p_scale_factor #convert to Kpc/h physical
+
+        p_snap_dict = {
+            "snap":p_snap,
+            "red_shift":p_red_shift,
+            "scale_factor": p_scale_factor,
+            "hubble_const": p_hubble_constant,
+            "box_size": p_box_size,
+        }
+        halos_pos = file['halos']['position'][:,:,:] * 10**3 * p_scale_factor
+        halos_vel = file['halos']['velocity'][:,:,:]
+        halos_r200m = file['halos']['R200m'][:]
+
+        p_ptls_pid, p_ptls_vel, p_ptls_pos = load_or_pickle_ptl_data(curr_sparta_file, str(p_snap), p_snapshot_path, p_scale_factor)
+
+    with h5py.File(("/home/zvladimi/MLOIS/calculated_info/sparta_cbol_l0063_n0256_10r200m_190to166_10.0r200msearch/train_all_particle_properties_" + curr_sparta_file + ".hdf5"), 'a') as all_particle_properties:
+        scal_sqr_phys_vel = all_particle_properties["scal_sqr_phys_vel"][:]
+        scaled_rad_vel = all_particle_properties["Radial_vel_"][:,0]
+        halo_first = all_particle_properties["Halo_first"][:]
+        halo_n = all_particle_properties["Halo_first"][:]
+        scal_rad = all_particle_properties["Scaled_radii_"][:,0]
+        hipids = all_particle_properties["HIPIDS"][:]
+        labels = all_particle_properties["Orbit_Infall"][:]
+
+    # conditions
+    low_mask = np.logical_and.reduce(((scal_rad>=0.9), (scal_rad<1.05), (labels==1)))
+    high_mask = np.logical_and.reduce(((scal_rad>=1.05), (scal_rad<1.2), (labels==1)))
+    # find where in original array the array with the conditions applied is max
+    low_id = depair(hipids[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[low_mask])))])
+    high_id = depair(hipids[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[high_mask])))])
+
+    low_tjy_loc = np.where(p_ptls_pid==low_id[0])[0]
+    high_tjy_loc = np.where(p_ptls_pid==high_id[0])[0]
+
+    tree = cKDTree(data = halos_pos[:,p_sparta_snap,:], leafsize = 3, balanced_tree = False, boxsize = p_box_size)
+    low_dist, low_idxs = tree.query(p_ptls_pos[low_tjy_loc,:], k=num_halo_search, workers=num_processes)
+    high_dist, high_idxs = tree.query(p_ptls_pos[high_tjy_loc,:], k=num_halo_search, workers=num_processes)
+    low_idxs = low_idxs[0]
+    high_idxs = high_idxs[0]
+
+    num_plt_snaps = 40
+
+    all_low_use_ptl_pos = np.zeros((num_plt_snaps,3))
+    all_low_use_ptl_vel = np.zeros((num_plt_snaps,3))
+    all_high_use_ptl_pos = np.zeros((num_plt_snaps,3))
+    all_high_use_ptl_vel = np.zeros((num_plt_snaps,3))
+    all_low_use_halo_pos = np.zeros((num_plt_snaps,num_halo_search,3))
+    all_low_use_halo_vel = np.zeros((num_plt_snaps,num_halo_search,3))
+    all_low_use_halo_r200m = np.zeros((num_plt_snaps,num_halo_search))
+    all_high_use_halo_pos = np.zeros((num_plt_snaps,num_halo_search,3))
+    all_high_use_halo_vel = np.zeros((num_plt_snaps,num_halo_search,3))
+    all_high_use_halo_r200m = np.zeros((num_plt_snaps,num_halo_search))
+
+    for i in range(num_plt_snaps):
+        curr_snap = (p_snap-num_plt_snaps) + i + 1
+        curr_red_shift = all_red_shifts[curr_snap]
+        curr_scale_factor = 1/(1+curr_red_shift)
+        
+        snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(curr_snap) + "/snapshot_" + snap_format.format(curr_snap)
+
+        ptls_pos = readsnap(snapshot_path, 'pos', 'dm', suppress=1) * 10**3 * curr_scale_factor
+        ptls_vel = readsnap(snapshot_path, 'vel', 'dm', suppress=1)
+        
+        all_low_use_ptl_pos[i] = ptls_pos[low_tjy_loc,:]
+        all_low_use_ptl_vel[i] = ptls_vel[low_tjy_loc,:]
+        all_high_use_ptl_pos[i] = ptls_pos[high_tjy_loc,:]
+        all_high_use_ptl_vel[i] = ptls_vel[high_tjy_loc,:]
+        
+        all_low_use_halo_pos[i,:,:] = halos_pos[low_idxs,curr_snap]
+        all_low_use_halo_vel[i,:,:] = halos_vel[low_idxs,curr_snap]
+        all_low_use_halo_r200m[i,:] = halos_r200m[low_idxs,curr_snap]
+        
+        all_high_use_halo_pos[i,:,:] = halos_pos[high_idxs,curr_snap]
+        all_high_use_halo_vel[i,:,:] = halos_vel[high_idxs,curr_snap]
+        all_high_use_halo_r200m[i,:] = halos_r200m[high_idxs,curr_snap]
+
+    halo_clrs = plt.cm.viridis(np.linspace(0, 1, num_halo_search))
+    alphas = np.logspace(np.log10(0.1),np.log10(1),num_plt_snaps)
+
+    low_fig = plt.figure()
+    low_ax = low_fig.add_subplot(projection='3d')
+    q = low_ax.quiver([], [], [], [], [], [], color='r')
+
+    high_fig = plt.figure()
+    high_ax = high_fig.add_subplot(projection='3d')
+    q = high_ax.quiver([], [], [], [], [], [], color='r')
+
+    fps = 3
+        
+    ani = FuncAnimation(low_fig, update_anim, frames=num_plt_snaps, fargs=(low_ax, all_low_use_halo_pos, all_low_use_halo_vel, all_low_use_ptl_pos, all_low_use_ptl_vel, all_low_use_halo_r200m, num_halo_search, halo_clrs), interval=200, blit=True)
+    ani.save("/home/zvladimi/MLOIS/Random_figures/low_ptl_track.mp4", writer='ffmpeg', fps=fps)
+
+    ani = FuncAnimation(high_fig, update_anim, frames=num_plt_snaps, fargs=(high_ax, all_high_use_halo_pos, all_high_use_halo_vel, all_high_use_ptl_pos, all_high_use_ptl_vel, all_high_use_halo_r200m, num_halo_search, halo_clrs), interval=200, blit=True)
+    ani.save("/home/zvladimi/MLOIS/Random_figures/high_ptl_track.mp4", writer='ffmpeg', fps=fps)
+
