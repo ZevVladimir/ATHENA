@@ -19,7 +19,6 @@ import h5py
 from pairing import depair
 
 from data_and_loading_functions import create_directory, load_or_pickle_SPARTA_data, conv_halo_id_spid, find_closest_z
-from visualization_functions import *
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
@@ -31,6 +30,7 @@ curr_sparta_file = config["MISC"]["curr_sparta_file"]
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
 path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
+path_to_plotting = config["PATHS"]["path_to_plotting"]
 path_to_hdf5_file = path_to_SPARTA_data + curr_sparta_file + ".hdf5"
 path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
@@ -70,6 +70,9 @@ frac_training_data = config.getfloat("XGBOOST","frac_train_data")
 # size float32 is 4 bytes
 chunk_size = int(np.floor(1e9 / (num_save_ptl_params * 4)))
 
+sys.path.insert(1, path_to_plotting)
+from visualization_functions import *
+
 import subprocess
 
 try:
@@ -77,7 +80,7 @@ try:
     gpu_use = True
 except Exception: # this command not being found can raise quite a few different errors depending on the configuration
     gpu_use = False
-    
+
 if on_zaratan:
     from dask_mpi import initialize
     from mpi4py import MPI
@@ -86,7 +89,7 @@ if on_zaratan:
     #from dask_jobqueue import SLURMCluster
 else:
     from dask_cuda import LocalCUDACluster
-    from cuml.metrics.accuracy import accuracy_score
+    #from cuml.metrics.accuracy import accuracy_score #TODO fix cupy installation??
     from sklearn.metrics import make_scorer
     import dask_ml.model_selection as dcv
 ###############################################################################################################
@@ -225,13 +228,13 @@ def eval_model(X, y, dataset_name, dens_prf = False, r_rv_tv = False, preds = No
         bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
         bins = np.insert(bins, 0, 0) 
         
-        compare_density_prf(radii=X[:,p_r_loc], halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=ptl_mass, orbit_assn=test_preds, prf_bins=bins, title=dataset_name + "_dataset", save_location=plot_save_location, use_mp=True, save_graph=True)
+        compare_density_prf(radii=X[:,p_r_loc], halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=ptl_mass, orbit_assn=test_preds, prf_bins=bins, title=dataset_name + "_dataset" + "_" + "model_" + model_name, save_location=plot_save_location, use_mp=True, save_graph=True)
     
     if r_rv_tv:
         plot_r_rv_tv_graph(preds, X[:,p_r_loc], X[:,p_rv_loc], X[:,p_tv_loc], y, title=dataset_name + "_dataset", num_bins=num_bins, save_location=plot_save_location)
     
     if misclass:
-        plot_misclassified(p_corr_labels=y, p_ml_labels=preds, p_r=X[:,p_r_loc], p_rv=X[:,p_rv_loc], p_tv=X[:,p_tv_loc], c_r=X[:,c_r_loc], c_rv=X[:,c_rv_loc], c_tv=X[:,c_tv_loc], title=model_name + "_dataset", num_bins=num_bins, save_location=plot_save_location, model_save_location=model_save_location)
+        plot_misclassified(p_corr_labels=y, p_ml_labels=preds, p_r=X[:,p_r_loc], p_rv=X[:,p_rv_loc], p_tv=X[:,p_tv_loc], c_r=X[:,c_r_loc], c_rv=X[:,c_rv_loc], c_tv=X[:,c_tv_loc], title=dataset_name + "_dataset" + "_" + "model_" + model_name, num_bins=num_bins, save_location=plot_save_location, model_save_location=model_save_location)
     
 
 if __name__ == "__main__":

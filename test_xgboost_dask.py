@@ -19,7 +19,6 @@ import matplotlib.pyplot as plt
 from pairing import depair
 from colossus.cosmology import cosmology
 from data_and_loading_functions import create_directory, load_or_pickle_SPARTA_data, conv_halo_id_spid
-from visualization_functions import *
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
@@ -29,6 +28,7 @@ curr_sparta_file = config["MISC"]["curr_sparta_file"]
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
 path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
+path_to_plotting = config["PATHS"]["path_to_plotting"]
 path_to_hdf5_file = path_to_SPARTA_data + curr_sparta_file + ".hdf5"
 path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
@@ -73,10 +73,12 @@ try:
 except Exception: # this command not being found can raise quite a few different errors depending on the configuration
     gpu_use = False
 ###############################################################################################################
-sys.path.insert(0, path_to_pygadgetreader)
-sys.path.insert(0, path_to_sparta)
+sys.path.insert(1, path_to_pygadgetreader)
+sys.path.insert(1, path_to_sparta)
+sys.path.insert(1, path_to_plotting)
+from visualization_functions import *
 from pygadgetreader import readsnap, readheader
-from sparta import sparta
+from sparta_dev import sparta
 @contextmanager
 def timed(txt):
     t0 = time.time()

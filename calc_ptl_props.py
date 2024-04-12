@@ -14,8 +14,9 @@ import pickle
 import os
 import multiprocessing as mp
 from itertools import repeat
+import sys
+
 from data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z
-from visualization_functions import compare_density_prf, plot_r_rv_tv_graph
 from calculation_functions import *
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -27,6 +28,7 @@ rand_seed = config.getint("MISC","random_seed")
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
 path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
+path_to_plotting = config["PATHS"]["path_to_plotting"]
 path_to_hdf5_file = path_to_SPARTA_data + curr_sparta_file + ".hdf5"
 path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
@@ -55,9 +57,10 @@ curr_chunk_size = config.getint("SEARCH","chunk_size")
 global num_save_ptl_params
 num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 ##################################################################################################################
-import sys
-sys.path.insert(0, path_to_pygadgetreader)
-sys.path.insert(0, path_to_sparta)
+sys.path.insert(1, path_to_pygadgetreader)
+sys.path.insert(1, path_to_sparta)
+sys.path.insert(1, path_to_plotting)
+from visualization_functions import compare_density_prf, plot_r_rv_tv_graph
 from pygadgetreader import readsnap, readheader
 from sparta_tools import sparta
 ##################################################################################################################
@@ -234,6 +237,8 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_pt
         p_curr_ptl_indices = p_curr_ptl_indices[has_ptls]
         p_use_halo_idxs = use_halo_idxs[has_ptls]
        
+        # We need to correct for having previous halos being searched so the final halo_first quantity is for all halos
+        # First obtain the halo_first values for this batch and then adjust to where the hdf5 file currently is
         p_start_num_ptls = [np.sum(p_use_num_ptls[0:i+1]) for i in range(p_use_num_ptls.shape[0])]
         p_start_num_ptls = np.insert(p_start_num_ptls, 0, 0)
         p_start_num_ptls = np.delete(p_start_num_ptls, -1)

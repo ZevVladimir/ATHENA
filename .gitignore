@@ -1,4 +1,3 @@
-#ignore np arrays
 /calculated_info/
 /Original_Data/
 /particle_data/
@@ -18,5 +17,6 @@ qiskit-vscode-log.out
 /pygadgetreader/
 .python-version
 /sparta/
+/sparta_dev/
 /xgboost_datasets_plots/
 /pickle_data/
