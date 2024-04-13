@@ -4,13 +4,13 @@ import matplotlib as mpl
 import pickle
 mpl.use('agg')
 import matplotlib.gridspec as gridspec
-from calculation_functions import calculate_distance
+from utils.calculation_functions import calculate_distance
 #import seaborn as sns
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from sklearn.metrics import classification_report
 from colossus.halo import mass_so
 from utils.data_and_loading_functions import check_pickle_exist_gadget, create_directory
-from calculation_functions import calc_v200m, calculate_density
+from utils.calculation_functions import calc_v200m, calculate_density
 # import general_plotting as gp
 from textwrap import wrap
 from scipy.ndimage import rotate
@@ -1159,3 +1159,104 @@ def anim_ptl_path(cosmology, num_halo_search):
     ani = FuncAnimation(high_fig, update_anim, frames=num_plt_snaps, fargs=(high_ax, all_high_use_halo_pos, all_high_use_halo_vel, all_high_use_ptl_pos, all_high_use_ptl_vel, all_high_use_halo_r200m, num_halo_search, halo_clrs), interval=200, blit=True)
     ani.save("/home/zvladimi/MLOIS/Random_figures/high_ptl_track.mp4", writer='ffmpeg', fps=fps)
 
+def halo_plot_3d(ptl_pos, halo_pos, real_labels, preds):
+    axis_cut = 2
+    
+    slice_test_halo_pos = np.where((ptl_pos[:,axis_cut] > 0.9 * halo_pos[axis_cut]) & (ptl_pos[:,axis_cut] < 1.1 * halo_pos[axis_cut]))[0]
+
+    real_inf = np.where(real_labels == 0)[0]
+    real_orb = np.where(real_labels == 1)[0]
+    pred_inf = np.where(preds == 0)[0]
+    pred_orb = np.where(preds == 1)[0]
+    
+    real_inf_slice = np.intersect1d(slice_test_halo_pos, real_inf)
+    real_orb_slice = np.intersect1d(slice_test_halo_pos, real_orb)
+    pred_inf_slice = np.intersect1d(slice_test_halo_pos, pred_inf)
+    pred_orb_slice = np.intersect1d(slice_test_halo_pos, pred_orb)
+
+    # actually orb labeled inf
+    inc_orb = np.where((real_labels == 1) & (preds == 0))[0]
+    # actually inf labeled orb
+    inc_inf = np.where((real_labels == 0) & (preds == 1))[0]
+    inc_orb_slice = np.intersect1d(slice_test_halo_pos, inc_orb)
+    inc_inf_slice = np.intersect1d(slice_test_halo_pos, inc_inf)
+    
+    print(inc_orb.shape[0])
+    print(inc_inf.shape[0])
+    print(real_inf.shape[0])
+    print(real_orb.shape[0])
+    print(pred_inf.shape[0])
+    print(pred_orb.shape[0])
+
+    axis_fontsize=14
+    title_fontsize=24
+    
+    fig = plt.figure(figsize=(30,10))
+    ax1 = fig.add_subplot(131,projection='3d')
+    ax1.scatter(ptl_pos[real_inf,0],ptl_pos[real_inf,1],ptl_pos[real_inf,2],c='orange', alpha=0.1)
+    ax1.scatter(ptl_pos[real_orb,0],ptl_pos[real_orb,1],ptl_pos[real_orb,2],c='b', alpha=0.1)
+    ax1.set_xlabel("X position (kpc/h)",fontsize=axis_fontsize)
+    ax1.set_ylabel("Y position (kpc/h)",fontsize=axis_fontsize)
+    ax1.set_zlabel("Z position (kpc/h)",fontsize=axis_fontsize)
+    ax1.set_title("Correctly Labeled Particles", fontsize=title_fontsize)
+    ax1.scatter([],[],[],c="orange",label="Infalling Particles")
+    ax1.scatter([],[],[],c="b",label="Orbiting Particles")
+    ax1.legend(fontsize=axis_fontsize)
+
+    ax2 = fig.add_subplot(132,projection='3d')
+    ax2.scatter(ptl_pos[pred_inf,0],ptl_pos[pred_inf,1],ptl_pos[pred_inf,2],c='orange', alpha=0.1)
+    ax2.scatter(ptl_pos[pred_orb,0],ptl_pos[pred_orb,1],ptl_pos[pred_orb,2],c='b', alpha=0.1)
+    ax2.set_xlabel("X position (kpc/h)",fontsize=axis_fontsize)
+    ax2.set_ylabel("Y position (kpc/h)",fontsize=axis_fontsize)
+    ax2.set_zlabel("Z position (kpc/h)",fontsize=axis_fontsize)
+    ax2.set_title("Model Predicted Labels", fontsize=title_fontsize)
+    ax2.scatter([],[],[],c="orange",label="Infalling Particles")
+    ax2.scatter([],[],[],c="b",label="Orbiting Particles")
+    ax2.legend(fontsize=axis_fontsize)
+
+    ax3 = fig.add_subplot(133,projection='3d')
+    ax3.scatter(ptl_pos[inc_inf,0],ptl_pos[inc_inf,1],ptl_pos[inc_inf,2],c='r', alpha=0.1)
+    ax3.scatter(ptl_pos[inc_orb,0],ptl_pos[inc_orb,1],ptl_pos[inc_orb,2],c='k', alpha=0.1)
+    ax3.set_xlim(np.min(ptl_pos[:,0]),np.max(ptl_pos[:,0]))
+    ax3.set_ylim(np.min(ptl_pos[:,1]),np.max(ptl_pos[:,1]))
+    ax3.set_zlim(np.min(ptl_pos[:,2]),np.max(ptl_pos[:,2]))
+    ax3.set_xlabel("X position (kpc/h)",fontsize=axis_fontsize)
+    ax3.set_ylabel("Y position (kpc/h)",fontsize=axis_fontsize)
+    ax3.set_zlabel("Z position (kpc/h)",fontsize=axis_fontsize)
+    ax3.set_title("Model Incorrect Labels", fontsize=title_fontsize)
+    ax3.scatter([],[],[],c="r",label="Pred: Orbiting \n Actual: Infalling")
+    ax3.scatter([],[],[],c="k",label="Pred: Inalling \n Actual: Orbiting")
+    ax3.legend(fontsize=axis_fontsize)
+
+    fig.subplots_adjust(wspace=0.05)
+    
+    fig.savefig("/home/zvladimi/MLOIS/Random_figures/3d_one_halo_all.png")
+
+    fig, ax = plt.subplots(1, 3,figsize=(30,10))
+    
+    alpha = 0.25
+
+    ax[0].scatter(ptl_pos[real_inf_slice,0],ptl_pos[real_inf_slice,1],c='orange', alpha = alpha, label="Inalling ptls")
+    ax[0].scatter(ptl_pos[real_orb_slice,0],ptl_pos[real_orb_slice,1],c='b', alpha = alpha, label="Orbiting ptls")
+    ax[0].set_xlabel("X position (kpc/h)",fontsize=axis_fontsize)
+    ax[0].set_ylabel("Y position (kpc/h)",fontsize=axis_fontsize)
+    ax[0].set_title("Particles Labeled by SPARTA",fontsize=title_fontsize)
+    ax[0].legend(fontsize=axis_fontsize)
+    
+    ax[1].scatter(ptl_pos[pred_inf_slice,0],ptl_pos[pred_inf_slice,1],c='orange', alpha = alpha, label="Predicted Inalling ptls")
+    ax[1].scatter(ptl_pos[pred_orb_slice,0],ptl_pos[pred_orb_slice,1],c='b', alpha = alpha, label="Predicted Orbiting ptls")
+    ax[1].set_xlabel("X position (kpc/h)",fontsize=axis_fontsize)
+    ax[1].set_title("Particles Labeled by ML Model",fontsize=title_fontsize)
+    ax[1].tick_params(axis='y', which='both',left=False,labelleft=False)
+    ax[1].legend(fontsize=axis_fontsize)
+    
+    ax[2].scatter(ptl_pos[inc_orb_slice,0],ptl_pos[inc_orb_slice,1],c='r', marker='x', label="Pred: Inalling \n Actual: Orbiting")
+    ax[2].scatter(ptl_pos[inc_inf_slice,0],ptl_pos[inc_inf_slice,1],c='r', marker='+', label="Pred: Orbiting \n Actual: Infalling")
+    ax[2].set_xlabel("X position (kpc/h)",fontsize=axis_fontsize)
+    ax[2].set_title("Incorrectly Labeled Particles",fontsize=title_fontsize)
+    ax[2].tick_params(axis='y', which='both',left=False,labelleft=False)
+    ax[2].legend(fontsize=axis_fontsize)
+    
+    fig.savefig("/home/zvladimi/MLOIS/Random_figures/one_halo.png")
+    
+    

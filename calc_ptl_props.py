@@ -17,7 +17,7 @@ from itertools import repeat
 import sys
 
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z
-from calculation_functions import *
+from utils.calculation_functions import *
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser

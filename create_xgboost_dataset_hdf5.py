@@ -6,7 +6,7 @@ import os
 import multiprocessing as mp
 import h5py
 from itertools import repeat
-from data_and_loading_functions import check_pickle_exist_gadget, choose_halo_split, create_directory
+from utils.data_and_loading_functions import check_pickle_exist_gadget, choose_halo_split, create_directory
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
@@ -55,7 +55,7 @@ import sys
 sys.path.insert(1, path_to_pygadgetreader)
 sys.path.insert(1, path_to_sparta)
 sys.path.insert(1, path_to_plotting)
-from visualization_functions import *
+from utils.visualization_functions import *
 from pygadgetreader import readsnap, readheader
 from sparta_tools import sparta
 ##################################################################################################################
