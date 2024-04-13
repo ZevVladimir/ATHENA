@@ -3,9 +3,10 @@ import time
 from colossus.cosmology import cosmology
 import pickle
 import os
+import multiprocessing as mp
 import h5py
-from data_and_loading_functions import check_pickle_exist_gadget, choose_halo_split, create_directory
-from visualization_functions import *
+from itertools import repeat
+from utils.data_and_loading_functions import check_pickle_exist_gadget, choose_halo_split, create_directory
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
@@ -15,6 +16,7 @@ curr_sparta_file = config["MISC"]["curr_sparta_file"]
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
 path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
+path_to_plotting = config["PATHS"]["path_to_plotting"]
 path_to_hdf5_file = path_to_SPARTA_data + curr_sparta_file + ".hdf5"
 path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
@@ -50,10 +52,12 @@ num_processes = mp.cpu_count()
 ##################################################################################################################
 # import pygadgetreader and sparta
 import sys
-sys.path.insert(0, path_to_pygadgetreader)
-sys.path.insert(0, path_to_sparta)
+sys.path.insert(1, path_to_pygadgetreader)
+sys.path.insert(1, path_to_sparta)
+sys.path.insert(1, path_to_plotting)
+from utils.visualization_functions import *
 from pygadgetreader import readsnap, readheader
-from sparta import sparta
+from sparta_tools import sparta
 ##################################################################################################################
 
 def take_ptl_within(dataset, labels, scal_rad_loc, max_rad):
@@ -155,8 +159,6 @@ def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapsh
         
         with open(save_path + dataset_name + "_all_rad_halo_first.pickle", "wb") as pickle_file:
             pickle.dump(all_rad_halo_first, pickle_file)
-            
-        
             
     # if there are already pickle files just open them
     else:

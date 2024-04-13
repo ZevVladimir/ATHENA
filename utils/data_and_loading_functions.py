@@ -49,7 +49,7 @@ import sys
 sys.path.insert(0, path_to_pygadgetreader)
 sys.path.insert(0, path_to_sparta)
 from pygadgetreader import readsnap, readheader
-from sparta import sparta
+from sparta_tools import sparta
 ##################################################################################################################
 @contextmanager
 def timed(txt):
@@ -79,7 +79,7 @@ def load_or_pickle_ptl_data(sparta_name, snapshot, snapshot_path, scale_factor):
     ptl_pid = check_pickle_exist_gadget(sparta_name, "pid", snapshot, snapshot_path)
     ptl_vel = check_pickle_exist_gadget(sparta_name, "vel", snapshot, snapshot_path)
     ptl_pos = check_pickle_exist_gadget(sparta_name, "pos", snapshot, snapshot_path)
-    
+    #TODO save the ptl_pos to be adjusted to kpc/h phyiscal
     ptl_pos = ptl_pos * 10**3 * scale_factor # convert to kpc/h and physical
 
     return ptl_pid, ptl_vel, ptl_pos
