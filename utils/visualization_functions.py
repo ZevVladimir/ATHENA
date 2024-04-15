@@ -19,6 +19,8 @@ import multiprocessing as mp
 from itertools import repeat
 import time
 from sparta_tools import sparta
+import os
+from contextlib import contextmanager
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -30,13 +32,19 @@ rand_seed = config.getint("MISC","random_seed")
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
 path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
-path_to_plotting = config["PATHS"]["path_to_plotting"]
 path_to_hdf5_file = path_to_SPARTA_data + curr_sparta_file + ".hdf5"
 path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
 path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
 path_to_sparta = config["PATHS"]["path_to_sparta"]
 snap_format = config["MISC"]["snap_format"]
+
+@contextmanager
+def timed(txt):
+    t0 = time.time()
+    yield
+    t1 = time.time()
+    print("%32s time:  %8.5f" % (txt, t1 - t0))
 
 def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r200_per_part, red_shift, hubble_constant, little_h):
     start_bin_val = 0.001
@@ -1043,54 +1051,57 @@ def anim_ptl_path(red_shift,cosmol,num_halo_search,num_plt_snaps,sparta_path,ptl
     from pygadgetreader import readsnap, readheader
     num_processes = mp.cpu_count()
 
-    with h5py.File(sparta_path,"r") as file:      
-        p_snap, p_red_shift = find_closest_z(red_shift)
-        print("Snapshot number found:", p_snap, "Closest redshift found:", p_red_shift)
-        sparta_output = sparta.load(filename=path_to_hdf5_file, load_halo_data=False, log_level= 0)
-        all_red_shifts = sparta_output["simulation"]["snap_z"][:]
-        p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
-        print("corresponding SPARTA snap num:", p_sparta_snap)
-        print("check sparta redshift:",all_red_shifts[p_sparta_snap])
-        
-        # Set constants
-        p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
+    with timed("sparta info load time"):
+        with h5py.File(sparta_path,"r") as file:      
+            p_snap, p_red_shift = find_closest_z(red_shift)
+            print("Snapshot number found:", p_snap, "Closest redshift found:", p_red_shift)
+            with timed("SPARTA load:"):
+                sparta_output = sparta.load(filename=path_to_hdf5_file, load_halo_data=False, log_level= 0)
+            all_red_shifts = sparta_output["simulation"]["snap_z"][:]
+            p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
+            print("corresponding SPARTA snap num:", p_sparta_snap)
+            print("check sparta redshift:",all_red_shifts[p_sparta_snap])
+            
+            # Set constants
+            p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
 
-        p_scale_factor = 1/(1+p_red_shift)
-        p_hubble_constant = cosmol.Hz(p_red_shift) * 0.001 # convert to units km/s/kpc
-        sim_box_size = sparta_output["simulation"]["box_size"] #units Mpc/h comoving
-        p_box_size = sim_box_size * 10**3 * p_scale_factor #convert to Kpc/h physical
+            p_scale_factor = 1/(1+p_red_shift)
+            p_hubble_constant = cosmol.Hz(p_red_shift) * 0.001 # convert to units km/s/kpc
+            sim_box_size = sparta_output["simulation"]["box_size"] #units Mpc/h comoving
+            p_box_size = sim_box_size * 10**3 * p_scale_factor #convert to Kpc/h physical
 
-        p_snap_dict = {
-            "snap":p_snap,
-            "red_shift":p_red_shift,
-            "scale_factor": p_scale_factor,
-            "hubble_const": p_hubble_constant,
-            "box_size": p_box_size,
-        }
-        halos_pos = file['halos']['position'][:,:,:] * 10**3 * p_scale_factor
-        halos_vel = file['halos']['velocity'][:,:,:]
-        halos_r200m = file['halos']['R200m'][:]
-        tcr_id = file['tcr_ptl']['res_oct']['tracer_id'][:]
+            p_snap_dict = {
+                "snap":p_snap,
+                "red_shift":p_red_shift,
+                "scale_factor": p_scale_factor,
+                "hubble_const": p_hubble_constant,
+                "box_size": p_box_size,
+            }
+            halos_pos = file['halos']['position'][:,:,:] * 10**3 * p_scale_factor
+            halos_vel = file['halos']['velocity'][:,:,:]
+            halos_r200m = file['halos']['R200m'][:]
+            tcr_id = file['tcr_ptl']['res_oct']['tracer_id'][:]
 
-        p_ptls_pid, p_ptls_vel, p_ptls_pos = load_or_pickle_ptl_data(curr_sparta_file, str(p_snap), p_snapshot_path, p_scale_factor)
-        
-        snap_hist = file['tcr_ptl']['res_oct']['snap_hist'][:]
+            with timed("ptl info load"):
+                p_ptls_pid, p_ptls_vel, p_ptls_pos = load_or_pickle_ptl_data(curr_sparta_file, str(p_snap), p_snapshot_path, p_scale_factor)
+            
+            snap_hist = file['tcr_ptl']['res_oct']['snap_hist'][:]
 
-    with h5py.File(ptl_props_path, 'a') as all_particle_properties:
-        scal_sqr_phys_vel = all_particle_properties["scal_sqr_phys_vel"][:]
-        scaled_rad_vel = all_particle_properties["Radial_vel_"][:,0]
-        halo_first = all_particle_properties["Halo_first"][:]
-        halo_n = all_particle_properties["Halo_first"][:]
-        scal_rad = all_particle_properties["Scaled_radii_"][:,0]
-        hipids = all_particle_properties["HIPIDS"][:]
-        labels = all_particle_properties["Orbit_Infall"][:]
+    with timed("ptl prop load time"):
+        with h5py.File(ptl_props_path, 'a') as all_particle_properties:
+            scaled_rad_vel = all_particle_properties["Radial_vel_"][:,0]
+            scal_rad = all_particle_properties["Scaled_radii_"][:,0]
+            hipids = all_particle_properties["HIPIDS"][:]
+            labels = all_particle_properties["Orbit_Infall"][:]
 
     # conditions
     low_mask = np.logical_and.reduce(((scal_rad>=0.9), (scal_rad<1.05), (labels==1)))
     high_mask = np.logical_and.reduce(((scal_rad>=1.05), (scal_rad<1.2), (labels==1)))
     # find where in original array the array with the conditions applied is max
-    low_id = depair(hipids[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[low_mask])))])
-    high_id = depair(hipids[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[high_mask])))])
+    print(np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[low_mask])))[0].shape)
+    print(hipids[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[low_mask])))[0][0]])
+    low_id = depair(hipids[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[low_mask])))[0][0]])
+    high_id = depair(hipids[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[high_mask])))[0][0]])
 
     low_tjy_loc = np.where(p_ptls_pid==low_id[0])[0]
     high_tjy_loc = np.where(p_ptls_pid==high_id[0])[0]
@@ -1117,27 +1128,27 @@ def anim_ptl_path(red_shift,cosmol,num_halo_search,num_plt_snaps,sparta_path,ptl
     all_high_use_halo_r200m = np.zeros((num_plt_snaps,num_halo_search))
 
     for i in range(num_plt_snaps):
-        curr_snap = (p_snap-num_plt_snaps) + i + 1
-        curr_red_shift = all_red_shifts[curr_snap]
-        curr_scale_factor = 1/(1+curr_red_shift)
-        
         snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(curr_snap) + "/snapshot_" + snap_format.format(curr_snap)
+        if os.path.isdir(path_to_snaps + "snapdir_" + snap_format.format(i)):
+            curr_snap = (p_snap-num_plt_snaps) + i + 1
+            curr_red_shift = all_red_shifts[curr_snap]
+            curr_scale_factor = 1/(1+curr_red_shift)
 
-        ptls_pos = readsnap(snapshot_path, 'pos', 'dm', suppress=1) * 10**3 * curr_scale_factor
-        ptls_vel = readsnap(snapshot_path, 'vel', 'dm', suppress=1)
-        
-        all_low_use_ptl_pos[i] = ptls_pos[low_tjy_loc,:]
-        all_low_use_ptl_vel[i] = ptls_vel[low_tjy_loc,:]
-        all_high_use_ptl_pos[i] = ptls_pos[high_tjy_loc,:]
-        all_high_use_ptl_vel[i] = ptls_vel[high_tjy_loc,:]
-        
-        all_low_use_halo_pos[i,:,:] = halos_pos[low_idxs,curr_snap]
-        all_low_use_halo_vel[i,:,:] = halos_vel[low_idxs,curr_snap]
-        all_low_use_halo_r200m[i,:] = halos_r200m[low_idxs,curr_snap]
-        
-        all_high_use_halo_pos[i,:,:] = halos_pos[high_idxs,curr_snap]
-        all_high_use_halo_vel[i,:,:] = halos_vel[high_idxs,curr_snap]
-        all_high_use_halo_r200m[i,:] = halos_r200m[high_idxs,curr_snap]
+            ptls_pos = readsnap(snapshot_path, 'pos', 'dm', suppress=1) * 10**3 * curr_scale_factor
+            ptls_vel = readsnap(snapshot_path, 'vel', 'dm', suppress=1)
+            
+            all_low_use_ptl_pos[i] = ptls_pos[low_tjy_loc,:]
+            all_low_use_ptl_vel[i] = ptls_vel[low_tjy_loc,:]
+            all_high_use_ptl_pos[i] = ptls_pos[high_tjy_loc,:]
+            all_high_use_ptl_vel[i] = ptls_vel[high_tjy_loc,:]
+            
+            all_low_use_halo_pos[i,:,:] = halos_pos[low_idxs,curr_snap]
+            all_low_use_halo_vel[i,:,:] = halos_vel[low_idxs,curr_snap]
+            all_low_use_halo_r200m[i,:] = halos_r200m[low_idxs,curr_snap]
+            
+            all_high_use_halo_pos[i,:,:] = halos_pos[high_idxs,curr_snap]
+            all_high_use_halo_vel[i,:,:] = halos_vel[high_idxs,curr_snap]
+            all_high_use_halo_r200m[i,:] = halos_r200m[high_idxs,curr_snap]
 
     halo_clrs = plt.cm.viridis(np.linspace(0, 1, num_halo_search))
     alphas = np.logspace(np.log10(0.1),np.log10(1),num_plt_snaps)

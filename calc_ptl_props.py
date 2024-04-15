@@ -28,7 +28,6 @@ rand_seed = config.getint("MISC","random_seed")
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
 path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
-path_to_plotting = config["PATHS"]["path_to_plotting"]
 path_to_hdf5_file = path_to_SPARTA_data + curr_sparta_file + ".hdf5"
 path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
@@ -59,8 +58,6 @@ num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 ##################################################################################################################
 sys.path.insert(1, path_to_pygadgetreader)
 sys.path.insert(1, path_to_sparta)
-sys.path.insert(1, path_to_plotting)
-from utils.visualization_functions import compare_density_prf, plot_r_rv_tv_graph
 from pygadgetreader import readsnap, readheader
 from sparta_tools import sparta
 ##################################################################################################################
