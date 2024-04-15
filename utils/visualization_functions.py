@@ -1039,7 +1039,7 @@ def update_anim(curr_frame, ax, q, halo_pos, halo_vel, ptl_pos, ptl_vel, radius,
     
     return q,
 
-def anim_ptl_path(red_shift,cosmol,num_halo_search,num_plt_snaps,sparta_path,ptl_props_path,save_path):
+def anim_ptl_path(red_shift,cosmol,num_halo_search,num_plt_snaps,ptl_props_path,save_path):
     import h5py
     from pairing import depair
     from scipy.spatial import cKDTree
@@ -1052,11 +1052,15 @@ def anim_ptl_path(red_shift,cosmol,num_halo_search,num_plt_snaps,sparta_path,ptl
     num_processes = mp.cpu_count()
 
     with timed("sparta info load time"):
-        with h5py.File(sparta_path,"r") as file:      
+        with h5py.File(path_to_hdf5_file,"r") as file:      
             p_snap, p_red_shift = find_closest_z(red_shift)
             print("Snapshot number found:", p_snap, "Closest redshift found:", p_red_shift)
+            tot_num_halos = file['halos']['id'][:].shape[0]
+            use_halos = np.zeros(tot_num_halos)
+            use_halos[0]=1
+            # num_halos = file
             with timed("SPARTA load:"):
-                sparta_output = sparta.load(filename=path_to_hdf5_file, load_halo_data=False, log_level= 0)
+                sparta_output = sparta.load(filename=path_to_hdf5_file, load_halo_data=False, halo_mask = use_halos, log_level= 0)
             all_red_shifts = sparta_output["simulation"]["snap_z"][:]
             p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
             print("corresponding SPARTA snap num:", p_sparta_snap)
@@ -1099,15 +1103,16 @@ def anim_ptl_path(red_shift,cosmol,num_halo_search,num_plt_snaps,sparta_path,ptl
     high_mask = np.logical_and.reduce(((scal_rad>=1.05), (scal_rad<1.2), (labels==1)))
     # find where in original array the array with the conditions applied is max
     print(np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[low_mask])))[0].shape)
-    print(hipids[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[low_mask])))[0][0]])
+    
     low_id = depair(hipids[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[low_mask])))[0][0]])
     high_id = depair(hipids[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[high_mask])))[0][0]])
 
     low_tjy_loc = np.where(p_ptls_pid==low_id[0])[0]
     high_tjy_loc = np.where(p_ptls_pid==high_id[0])[0]
 
-    low_snap_hist = snap_hist[np.where(tcr_id==low_id[0])][0]
-    high_snap_hist = snap_hist[np.where(tcr_id==high_id[0])][0]
+    low_snap_hist = snap_hist[np.where(tcr_id==low_id[0])[0]].ravel()
+    high_snap_hist = snap_hist[np.where(tcr_id==high_id[0])[0]].ravel()
+
     print(low_snap_hist,high_snap_hist)
 
     tree = cKDTree(data = halos_pos[:,p_sparta_snap,:], leafsize = 3, balanced_tree = False, boxsize = p_box_size)
@@ -1128,9 +1133,9 @@ def anim_ptl_path(red_shift,cosmol,num_halo_search,num_plt_snaps,sparta_path,ptl
     all_high_use_halo_r200m = np.zeros((num_plt_snaps,num_halo_search))
 
     for i in range(num_plt_snaps):
+        curr_snap = (p_snap-num_plt_snaps) + i + 1
         snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(curr_snap) + "/snapshot_" + snap_format.format(curr_snap)
-        if os.path.isdir(path_to_snaps + "snapdir_" + snap_format.format(i)):
-            curr_snap = (p_snap-num_plt_snaps) + i + 1
+        if os.path.isdir(path_to_snaps + "snapdir_" + snap_format.format(curr_snap)):
             curr_red_shift = all_red_shifts[curr_snap]
             curr_scale_factor = 1/(1+curr_red_shift)
 
