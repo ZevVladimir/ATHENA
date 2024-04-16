@@ -23,7 +23,7 @@ from utils.data_and_loading_functions import create_directory, load_or_pickle_SP
 # LOAD CONFIG PARAMETERS
 import configparser
 config = configparser.ConfigParser()
-config.read("config.ini")
+config.read(os.environ.get('PWD') + "/config.ini")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]

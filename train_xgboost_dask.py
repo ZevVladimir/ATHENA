@@ -23,7 +23,7 @@ from utils.data_and_loading_functions import create_directory, load_or_pickle_SP
 # LOAD CONFIG PARAMETERS
 import configparser
 config = configparser.ConfigParser()
-config.read("/home/zvladimi/MLOIS/config.ini")
+config.read(os.environ.get('PWD') + "/config.ini")
 rand_seed = config.getint("MISC","random_seed")
 on_zaratan = config.getboolean("MISC","on_zaratan")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]

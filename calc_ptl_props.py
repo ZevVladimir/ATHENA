@@ -22,7 +22,7 @@ from utils.calculation_functions import *
 # LOAD CONFIG PARAMETERS
 import configparser
 config = configparser.ConfigParser()
-config.read("/home/zvladimi/MLOIS/config.ini")
+config.read(os.environ.get('PWD') + "/config.ini")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 rand_seed = config.getint("MISC","random_seed")
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]

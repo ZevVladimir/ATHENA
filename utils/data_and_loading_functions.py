@@ -15,7 +15,7 @@ def create_directory(path):
 # LOAD CONFIG PARAMETERS
 import configparser
 config = configparser.ConfigParser()
-config.read("/home/zvladimi/MLOIS/config.ini")
+config.read(os.environ.get('PWD') + "/config.ini")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
