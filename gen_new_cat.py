@@ -132,16 +132,9 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     halo_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200c")       
     halo_id = p_halos_id[curr_halo_idx]
     
-    
-    with h5py.File(save_location + "member_catologue_" + curr_sparta_file + ".hdf5", 'a') as file:
-        # Create a group for the halo if it doesn't exist
-        if str(halo_id) not in file:
-            file.create_group(str(halo_id))
-        curr_orb_ptl = curr_ptl_pids[np.where(curr_orb_assn == 1)[0]]
-        file[str(halo_id)]['particle_ids'] = curr_orb_ptl
+    curr_orb_pid = curr_ptl_pids[np.where(curr_orb_assn == 1)[0]]
 
-
-    return halo_id, halo_pos, halo_vel, m_orb, halo_m200m, halo_r200m
+    return halo_id, halo_pos, halo_vel, m_orb, halo_m200m, halo_r200m, curr_orb_pid
 
 
 def halo_loop(indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos, p_ptls_vel):
@@ -199,7 +192,7 @@ def halo_loop(indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos,
         
         # Use multiprocessing to search multiple halos at the same time and add information to shared arrays
         with mp.Pool(processes=num_processes) as p:
-            all_halo_id, all_halo_pos, all_halo_vel, all_m_orb, all_halo_m200m, all_halo_r200m = zip(*p.starmap(search_halos, 
+            all_halo_id, all_halo_pos, all_halo_vel, all_m_orb, all_halo_m200m, all_halo_r200m, all_orb_pid = zip(*p.starmap(search_halos, 
                                         zip(repeat(False), repeat(p_dict), p_use_halo_idxs, np.arange(curr_num_halos),
                                         (p_ptls_pid[p_curr_ptl_indices[i]] for i in range(curr_num_halos)), 
                                         (p_ptls_pos[p_curr_ptl_indices[j]] for j in range(curr_num_halos)),
@@ -233,6 +226,13 @@ def halo_loop(indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos,
         all_m_orb = all_m_orb.astype(np.float32)
         all_halo_m200m = all_halo_m200m.astype(np.float32)
         all_halo_r200m = all_halo_r200m.astype(np.float32)
+        
+        with h5py.File(save_location + "member_catologue_" + curr_sparta_file + ".hdf5", 'a') as file:
+            for j,halo_id in enumerate(all_halo_id):
+                if str(halo_id) not in file:
+                    file.create_group(str(halo_id))
+               
+                file[str(halo_id)]['particle_ids'] = all_orb_pid[j]
 
         num_save_ptl_params=6
         if os.path.isfile(save_location + "catologue_" + curr_sparta_file + ".hdf5") and i == 0:
@@ -327,6 +327,9 @@ tot_num_ptls = np.sum(num_ptls)
 
 print("Total num halos:", total_num_halos)
 print("Total num ptls:", tot_num_ptls)
+
+if os.path.isfile(save_location + "member_catologue_" + curr_sparta_file + ".hdf5"):
+    os.remove(save_location + "member_catologue_" + curr_sparta_file + ".hdf5")
 
 t2 = time.time()
 print("Start up finished in:",np.round((t2-t1),2),"seconds", np.round(((t2-t1)/60),2), "minutes")
