@@ -229,10 +229,11 @@ def halo_loop(indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos,
         
         with h5py.File(save_location + "member_catologue_" + curr_sparta_file + ".hdf5", 'a') as file:
             for j,halo_id in enumerate(all_halo_id):
-                if str(halo_id) not in file:
-                    file.create_group(str(halo_id))
-               
-                file[str(halo_id)]['particle_ids'] = all_orb_pid[j]
+                if all_orb_pid[j].shape[0] * mass > 1e13:
+                    if str(halo_id) not in file:
+                        file.create_group(str(halo_id))
+                
+                    file[str(halo_id)]['particle_ids'] = all_orb_pid[j]
 
         num_save_ptl_params=6
         if os.path.isfile(save_location + "catologue_" + curr_sparta_file + ".hdf5") and i == 0:

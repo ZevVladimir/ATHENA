@@ -26,6 +26,7 @@ from pairing import depair
 from scipy.spatial import cKDTree
 import sys
 from matplotlib.animation import FuncAnimation
+import seaborn as sns
 
 num_processes = mp.cpu_count()
 
@@ -829,22 +830,46 @@ def graph_feature_importance(feature_names, feature_importance, title, plot, sav
         fig2.savefig(save_location + "feature_importance_plots/" + title + ".png", bbox_inches="tight")
     plt.close()
 
-def graph_correlation_matrix(data, save_location, title, show, save):
-    return
-    # create_directory(save_location + "/corr_matrix/")
-    # mpl.rcParams.update({'font.size': 12})
+def graph_correlation_matrix(data, labels, save_location, show, save):
+    mpl.rcParams.update({'font.size': 12})
+    masked_data = np.ma.masked_invalid(data)
+    corr_mtrx = np.ma.corrcoef(masked_data, rowvar=False)
+    print(corr_mtrx)
+    heatmap = sns.heatmap(corr_mtrx, annot = True, cbar = True, xticklabels=labels, yticklabels=labels)
+    heatmap.set_title("Feature Correlation Heatmap")
 
-    # heatmap = sns.heatmap(data.corr(), annot = True, cbar = True)
-    # heatmap.set_title("Feature Correlation Heatmap")
-    # heatmap.set_xticklabels(heatmap.get_xticklabels(),rotation=45)
+    if show:
+        plt.show()
+    if save:
+        fig = heatmap.get_figure()
+        fig.set_size_inches(21, 13)
+        fig.savefig(save_location + "corr_matrix.png")
+    plt.close()
+    
+def plot_data_dist(data, labels, num_bins, save_location, show, save):
+    num_feat = data.shape[1] 
+    num_rows = int(np.ceil(np.sqrt(num_feat)))
+    num_cols = int(np.ceil(num_feat / num_rows))
+    
+    fig, axes = plt.subplots(num_rows, num_cols)
+    
+    axes = axes.flatten()
 
-    # if show:
-    #     plt.show()
-    # if save:
-    #     fig = heatmap.get_figure()
-    #     fig.set_size_inches(21, 13)
-    #     fig.savefig(save_location + "/corr_matrix/" + title + ".png")
-    # plt.close()
+    for i in range(num_feat, num_rows*num_cols):
+        fig.delaxes(axes[i])
+        
+    for i in range(num_feat):
+        axes[i].hist(data[:,i],bins=num_bins)
+        axes[i].set_title(labels[i])
+        axes[i].set_ylabel("Frequency")
+        axes[i].set_yscale('log')
+
+    if show:
+        plt.show()
+    if save:
+        fig.set_size_inches(15, 15)
+        fig.savefig(save_location + "data_hist.png")
+    plt.close()
     
 def graph_acc_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, title, plot, save, save_location):
     bin_width = (np.max(radius) - 0) / num_bins
@@ -1131,7 +1156,8 @@ def anim_ptl_path(red_shift,cosmol,num_halo_search,num_plt_snaps,ptl_props_path,
     high_mask = np.logical_and.reduce(((scal_rad>=1.05), (scal_rad<1.2), (labels==1)))
     # find where in original array the array with the conditions applied is max
     print(np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[low_mask])))[0].shape)
-    
+    print("radial vel low rad ptl:",scaled_rad_vel[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[low_mask])))[0][0]])
+    print("radial vel high rad ptl:",scaled_rad_vel[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[high_mask])))[0][0]])
     low_id = depair(hipids[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[low_mask])))[0][0]])
     high_id = depair(hipids[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[high_mask])))[0][0]])
 

@@ -70,6 +70,7 @@ frac_training_data = config.getfloat("XGBOOST","frac_train_data")
 chunk_size = int(np.floor(1e9 / (num_save_ptl_params * 4)))
 
 from utils.visualization_functions import *
+from utils.ML_support import *
 
 import subprocess
 
@@ -87,7 +88,7 @@ if on_zaratan:
     #from dask_jobqueue import SLURMCluster
 else:
     from dask_cuda import LocalCUDACluster
-    #from cuml.metrics.accuracy import accuracy_score #TODO fix cupy installation??
+    from cuml.metrics.accuracy import accuracy_score #TODO fix cupy installation??
     from sklearn.metrics import make_scorer
     import dask_ml.model_selection as dcv
 ###############################################################################################################
@@ -109,31 +110,7 @@ def get_CUDA_cluster():
     client = Client(cluster)
     return client
 
-def create_matrix(client, X_loc, y_loc, key_loc, frac_use_data = 1, calc_scale_pos_weight = False):
-    with open(X_loc, "rb") as file:
-        X_cpu = pickle.load(file) 
-    with open(y_loc, "rb") as file:
-        y_cpu = pickle.load(file)
-    with open(key_loc, "rb") as file:
-        features = pickle.load(file)
-    
-    scale_pos_weight = np.where(y_cpu == 0)[0].size / np.where(y_cpu == 1)[0].size
-    
-    num_features = X_cpu.shape[1]
-    
-    num_use_data = int(np.floor(X_cpu.shape[0] * frac_use_data))
-    print("Tot num of particles:", X_cpu.shape[0], "Num use particles:", num_use_data)
-    X = da.from_array(X_cpu,chunks=(chunk_size,num_features))
-    y = da.from_array(y_cpu,chunks=(chunk_size))
-        
-    print("X Number of total bytes:", X.nbytes, "X Number of Gigabytes:", (X.nbytes)/(10**9))
-    print("y Number of total bytes:", y.nbytes, "y Number of Gigabytes:", (y.nbytes)/(10**9))
-    
-    dqmatrix = xgb.dask.DaskDMatrix(client, X, y, feature_names=features)
-    
-    if calc_scale_pos_weight:
-        return dqmatrix, X, y_cpu, scale_pos_weight 
-    return dqmatrix, X, y_cpu
+
 
 def accuracy_score_wrapper(y, y_hat): 
     y = y.astype("float32") 
@@ -168,11 +145,7 @@ def print_acc(model, X_train, y_train, X_test, y_test, mode_str="Default"):
     score = accuracy_score(y_pred, y_test.astype('float32'), convert_dtype=True)
     print("{} model accuracy: {}".format(mode_str, score))
 
-def make_preds(client, bst, dataset_loc, labels_loc, report_name="Classification Report", print_report=False):
-    with open(dataset_loc, "rb") as file:
-        X_np = pickle.load(file)
-    with open(labels_loc, "rb") as file:
-        y_np = pickle.load(file)
+def make_preds(client, bst, X_np, y_np, report_name="Classification Report", print_report=False):
     X = da.from_array(X_np,chunks=(chunk_size,X_np.shape[1]))
     
     preds = dxgb.inplace_predict(client, bst, X).compute()
@@ -187,53 +160,7 @@ def make_preds(client, bst, dataset_loc, labels_loc, report_name="Classification
         file.write(report)
         file.close()
     
-    return X_np, y_np, preds
-
-def eval_model(X, y, dataset_name, dens_prf = False, r_rv_tv = False, preds = None, misclass=False):
-    global p_snap
-    global c_snap
-    num_bins = 30
-    with open(dataset_location + dataset_name.lower() + "_dataset_all_keys.pickle", "rb") as file:
-        all_keys = pickle.load(file)
-    p_r_loc = np.where(all_keys == "Scaled_radii_" + str(p_snap))[0][0]
-    c_r_loc = np.where(all_keys == "Scaled_radii_" + str(c_snap))[0][0]
-    p_rv_loc = np.where(all_keys == "Radial_vel_" + str(p_snap))[0][0]
-    c_rv_loc = np.where(all_keys == "Radial_vel_" + str(c_snap))[0][0]
-    p_tv_loc = np.where(all_keys == "Tangential_vel_" + str(p_snap))[0][0]
-    c_tv_loc = np.where(all_keys == "Tangential_vel_" + str(c_snap))[0][0]
-    
-    if dens_prf:
-        with open(dataset_location + dataset_name.lower() + "_all_rad_halo_first.pickle", "rb") as file:
-            halo_first = pickle.load(file) 
-        with open(dataset_location + dataset_name.lower() + "_all_rad_halo_n.pickle", "rb") as file:
-            halo_n = pickle.load(file)   
-
-        with open(path_to_calc_info + specific_save + "test_indices.pickle", "rb") as pickle_file:
-            test_indices = pickle.load(pickle_file)
-        
-        new_p_snap, p_red_shift = find_closest_z(p_red_shift)
-        p_scale_factor = 1/(1+p_red_shift)
-        halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, ptl_mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
-
-        use_halo_ids = halos_id[test_indices]
-        sparta_output = sparta.load(filename=path_to_hdf5_file, halo_ids=use_halo_ids, log_level=0)
-        all_red_shifts = sparta_output["simulation"]["snap_z"][:]
-        p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
-        new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta resort the indices
-        dens_prf_all = sparta_output['anl_prf']['M_all'][new_idxs,p_sparta_snap,:]
-        dens_prf_1halo = sparta_output['anl_prf']['M_1halo'][new_idxs,p_sparta_snap,:]
-        
-        bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
-        bins = np.insert(bins, 0, 0) 
-        
-        compare_density_prf(radii=X[:,p_r_loc], halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=ptl_mass, orbit_assn=test_preds, prf_bins=bins, title=dataset_name + "_dataset" + "_" + "model_" + model_name, save_location=plot_save_location, use_mp=True, save_graph=True)
-    
-    if r_rv_tv:
-        plot_r_rv_tv_graph(preds, X[:,p_r_loc], X[:,p_rv_loc], X[:,p_tv_loc], y, title=dataset_name + "_dataset", num_bins=num_bins, save_location=plot_save_location)
-    
-    if misclass:
-        plot_misclassified(p_corr_labels=y, p_ml_labels=preds, p_r=X[:,p_r_loc], p_rv=X[:,p_rv_loc], p_tv=X[:,p_tv_loc], c_r=X[:,c_r_loc], c_rv=X[:,c_rv_loc], c_tv=X[:,c_tv_loc], title=dataset_name + "_dataset" + "_" + "model_" + model_name, num_bins=num_bins, save_location=plot_save_location, model_save_location=model_save_location)
-    
+    return preds
 
 if __name__ == "__main__":
     if on_zaratan:
@@ -279,18 +206,46 @@ if __name__ == "__main__":
     train_keys_loc = dataset_location + "train_dataset_all_keys.pickle"
     test_keys_loc = dataset_location + "test_dataset_all_keys.pickle"
     
+    if os.path.isfile(model_save_location + "model_info.pickle"):
+        with open(model_save_location + "model_info.pickle", "rb") as pickle_file:
+            model_info = pickle.load(pickle_file)
+    else:
+        model_info = {
+            'Misc Info':{
+                'Model trained on': model_sparta_file,
+                'Model tested on': curr_sparta_file,
+                'Snapshots used': snapshot_list,
+                'Max Radius': search_rad,}}
     
     if os.path.isfile(model_save_location + model_name + ".json"):
         bst = xgb.Booster()
         bst.load_model(model_save_location + model_name + ".json")
-        with open(model_save_location + "used_params.pickle", "rb") as pickle_file:
-            params = pickle.load(pickle_file)
+        params = model_info.get('Training Info',{}).get('Training Params')
         print("Loaded Booster")
     else:
         print("Training Set:")
-        dtrain,X_train,y_train,scale_pos_weight = create_matrix(client, train_dataset_loc, train_labels_loc, train_keys_loc, frac_use_data=frac_training_data, calc_scale_pos_weight=True)
+        with open(train_dataset_loc, "rb") as file:
+            train_X = pickle.load(file) 
+        with open(train_labels_loc, "rb") as file:
+            train_y = pickle.load(file)
+        with open(train_keys_loc, "rb") as file:
+            train_features = pickle.load(file)
+        dtrain,X_train,y_train,scale_pos_weight = create_dmatrix(client, train_X, train_y, train_features, chunk_size=chunk_size, frac_use_data=frac_training_data, calc_scale_pos_weight=True)
+        del train_X
+        del train_y
+        del train_features
+        
         print("Testing set:")
-        dtest,X_test,y_test = create_matrix(client, test_dataset_loc, test_labels_loc, test_keys_loc, frac_use_data=1, calc_scale_pos_weight=False)
+        with open(test_dataset_loc, "rb") as file:
+            test_X = pickle.load(file) 
+        with open(test_labels_loc, "rb") as file:
+            test_y = pickle.load(file)
+        with open(test_keys_loc, "rb") as file:
+            test_features = pickle.load(file)
+        dtest,X_test,y_test = create_dmatrix(client, test_X, test_y, test_features, chunk_size=chunk_size, frac_use_data=1, calc_scale_pos_weight=False)
+        del test_X
+        del test_y
+        del test_features
         print("scale_pos_weight:", scale_pos_weight)
         
         if on_zaratan == False and do_hpo == True and os.path.isfile(model_save_location + "used_params.pickle") == False:  
@@ -341,12 +296,12 @@ if __name__ == "__main__":
                 
                 params = results.best_params_
                 
-                with open(model_save_location + "used_params.pickle", "wb") as pickle_file:
-                    pickle.dump(results.best_params_, pickle_file)
+                model_info['Training Info']={
+                'Fraction of Training Data Used': frac_training_data,
+                'Training Params': params}            
                 
-        elif os.path.isfile(model_save_location + "used_params.pickle"):
-            with open(model_save_location + "used_params.pickle", "rb") as pickle_file:
-                params = pickle.load(pickle_file)
+        elif 'Training Info' in model_info: 
+            params = model_info.get('Training Info',{}).get('Training Params')
         else:
             params = {
                 "verbosity": 1,
@@ -355,8 +310,9 @@ if __name__ == "__main__":
                 "scale_pos_weight":scale_pos_weight,
                 "device": "cuda",
                 }
-            with open(model_save_location + "used_params.pickle", "wb") as pickle_file:
-                pickle.dump(params, pickle_file)
+            model_info['Training Info']={
+                'Fraction of Training Data Used': frac_training_data,
+                'Training Params': params}
             
         print("Starting train using params:", params)
         output = dxgb.train(
@@ -383,31 +339,24 @@ if __name__ == "__main__":
     
         del dtrain
         del dtest
-    
-    file = open(model_save_location + "model_info.txt", 'w')
-    file.write("Model trained on: " + model_sparta_file+ "\n")
-    file.write("Model tested on: " + curr_sparta_file+ "\n")
-    snap_str = "Snapshots used: "
-    for snapshot in snapshot_list:
-        snap_str += (str(snapshot) + " ")
-    file.write(snap_str)
-    file.write("\nSearch Radius: " + str(search_rad) + "\n")
-    file.write("Fraction of training data used: "+str(frac_training_data)+"\n")
-    file = open(model_save_location + "model_info.txt", 'a')
-    file.write("Params:\n")
-    for item in params.items():
-        file.write(str(item[0]) + ": " + str(item[1]) + "\n")
-    file.close()
 
     with timed("Train Predictions"):
-        train_x, train_y, train_preds = make_preds(client, bst, train_dataset_loc, train_labels_loc, report_name="Train Report", print_report=False)
+        with open(train_dataset_loc, "rb") as file:
+            train_X = pickle.load(file)
+        with open(train_labels_loc, "rb") as file:
+            train_y = pickle.load(file)
+        train_preds = make_preds(client, bst, train_X, train_y, report_name="Train Report", print_report=False)
     with timed("Train Plots"):
-        eval_model(X=train_x, y=train_y, dataset_name="Train", dens_prf=False, r_rv_tv=True, preds=train_preds, misclass=True)
+        eval_model(X=train_X, y=train_y, dataset_name="Train", dens_prf=False, r_rv_tv=True, preds=train_preds, misclass=True)
     
     with timed("Test Predictions"):
-        test_x, test_y, test_preds = make_preds(client, bst, test_dataset_loc, test_labels_loc, report_name="Test Report", print_report=False)
+        with open(test_dataset_loc, "rb") as file:
+            test_X = pickle.load(file)
+        with open(test_labels_loc, "rb") as file:
+            test_y = pickle.load(file)
+        test_preds = make_preds(client, bst, test_X, test_y, report_name="Test Report", print_report=False)
     with timed("Test Plots"):
-        eval_model(X=test_x, y=test_y, dataset_name="Test", dens_prf=False, r_rv_tv=True, preds=test_preds, misclass=True)    
+        eval_model(X=test_X, y=test_y, dataset_name="Test", dens_prf=False, r_rv_tv=True, preds=test_preds, misclass=True)    
         
     bst.save_model(model_save_location + model_name + ".json")
 
@@ -427,4 +376,6 @@ if __name__ == "__main__":
     # fig.set_size_inches(110, 25)
     # fig.savefig('/home/zvladimi/MLOIS/Random_figures/' + model_name + 'tree' + str(tree_num) + '.png')
 
+    with open(model_save_location + "model_info.pickle", "wb") as pickle_file:
+        pickle.dump(model_info, pickle_file) 
     client.close()
