@@ -1,12 +1,7 @@
-import numexpr as ne
 import numpy as np
 from scipy.spatial import cKDTree
 from colossus.cosmology import cosmology
 from colossus.halo import mass_so
-from colossus.lss import peaks
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-mpl.rcParams.update(mpl.rcParamsDefault)
 from contextlib import contextmanager
 import time
 import h5py
@@ -14,12 +9,11 @@ import pickle
 import os
 import multiprocessing as mp
 from itertools import repeat
+import configparser
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z
-from utils.visualization_functions import compare_density_prf, plot_r_rv_tv_graph
 from utils.calculation_functions import *
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
-import configparser
 config = configparser.ConfigParser()
 config.read(os.environ.get('PWD') + "/config.ini")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
@@ -28,37 +22,24 @@ path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
 path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
 path_to_hdf5_file = path_to_SPARTA_data + curr_sparta_file + ".hdf5"
-path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
-path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
 path_to_sparta = config["PATHS"]["path_to_sparta"]
 create_directory(path_to_MLOIS)
 create_directory(path_to_snaps)
 create_directory(path_to_SPARTA_data)
 create_directory(path_to_hdf5_file)
-create_directory(path_to_pickle)
 create_directory(path_to_calc_info)
 snap_format = config["MISC"]["snap_format"]
-global prim_only
-prim_only = config.getboolean("SEARCH","prim_only")
-t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
-global p_red_shift
 p_red_shift = config.getfloat("SEARCH","p_red_shift")
-global search_rad
 search_rad = config.getfloat("SEARCH","search_rad")
 total_num_snaps = config.getint("SEARCH","total_num_snaps")
 per_n_halo_per_split = config.getfloat("SEARCH","per_n_halo_per_split")
-test_halos_ratio = config.getfloat("SEARCH","test_halos_ratio")
-# num_processes = int(os.environ['SLURM_CPUS_PER_TASK'])
 num_processes = mp.cpu_count()
 curr_chunk_size = config.getint("SEARCH","chunk_size")
-global num_save_ptl_params
 num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 ##################################################################################################################
 import sys
-sys.path.insert(0, path_to_pygadgetreader)
 sys.path.insert(0, path_to_sparta)
-from pygadgetreader import readsnap, readheader
 from sparta_tools import sparta
 ##################################################################################################################
 @contextmanager
@@ -235,7 +216,6 @@ def halo_loop(indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos,
                 
                     file[str(halo_id)]['particle_ids'] = all_orb_pid[j]
 
-        num_save_ptl_params=6
         if os.path.isfile(save_location + "catologue_" + curr_sparta_file + ".hdf5") and i == 0:
             os.remove(save_location + "catologue_" + curr_sparta_file + ".hdf5")
         with h5py.File((save_location + "catologue_" + curr_sparta_file + ".hdf5"), 'a') as file:
@@ -291,7 +271,7 @@ with timed("p_snap ptl load"):
 with timed("p_snap SPARTA load"):
     p_halos_pos, p_halos_r200m, p_halos_id, p_halos_status, p_halos_last_snap, mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
 
-save_location =  path_to_MLOIS +  "calculated_info/" + curr_sparta_file + "_" + str(p_snap) + "_" + str(search_rad) + "r200msearch/"
+save_location =  path_to_calc_info + curr_sparta_file + "_" + str(p_snap) + "_" + str(search_rad) + "r200msearch/"
 
 if os.path.exists(save_location) != True:
     os.makedirs(save_location)
