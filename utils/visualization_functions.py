@@ -26,6 +26,7 @@ from pairing import depair
 from scipy.spatial import cKDTree
 import sys
 from matplotlib.animation import FuncAnimation
+import seaborn as sns
 
 num_processes = mp.cpu_count()
 
@@ -173,7 +174,7 @@ def med_prf(prf, num_halo, dtype):
     return prf, med_prf
     
 def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_prf_orb, mass, orbit_assn, prf_bins, title, save_location, use_mp = False, show_graph = False, save_graph = False):
-    # Shape of profiles should be (halo,density cols)
+    # Shape of profiles should be (num halo,num bins)
     # EX: 10 halos, 80 bins (10,80)
     
     t1 = time.time()
@@ -223,6 +224,7 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
             diff_n_all_ptls.append(np.array(halo_diff_n_all_ptls))
 
     # For each profile combine all halos and obtain their median values for each bin
+    # calc_mass_prf_xxx has shape (num_halo, num_bins)
     calc_mass_prf_orb, med_calc_mass_prf_orb = med_prf(calc_mass_prf_orb, curr_num_halos, np.float32)
     calc_mass_prf_inf, med_calc_mass_prf_inf = med_prf(calc_mass_prf_inf, curr_num_halos, np.float32)
     calc_mass_prf_all, med_calc_mass_prf_all = med_prf(calc_mass_prf_all, curr_num_halos, np.float32)
@@ -280,9 +282,9 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
     
     # Get the ratio of the calculated profile with the actual profile
     with np.errstate(divide='ignore', invalid='ignore'):
-        all_dens_ratio = np.divide(calc_dens_prf_all,med_act_dens_prf_all) - 1
-        inf_dens_ratio = np.divide(calc_dens_prf_inf,med_act_dens_prf_inf) - 1
-        orb_dens_ratio = np.divide(calc_dens_prf_orb,med_act_dens_prf_orb) - 1
+        all_dens_ratio = np.divide(calc_dens_prf_all,act_dens_prf_all) - 1
+        inf_dens_ratio = np.divide(calc_dens_prf_inf,act_dens_prf_inf) - 1
+        orb_dens_ratio = np.divide(calc_dens_prf_orb,act_dens_prf_orb) - 1
 
     
     # Find the upper and lower bound for scatter for calculated profiles
@@ -527,12 +529,6 @@ def calc_misclassified(correct_labels, ml_labels, r, rv, tv, r_range, rv_range, 
     print("num incorrect inf", inc_inf.shape[0], ",", np.round(((inc_inf.shape[0]/num_inf)*100),2), "% of infalling ptls")
     print("num incorrect orb", inc_orb.shape[0], ",", np.round(((inc_orb.shape[0]/num_orb) * 100),2), "% of orbiting ptls")
     print("num incorrect tot", tot_num_inc, ",", np.round(((tot_num_inc/tot_num_ptl) * 100),2), "% of all ptls")
-
-    file = open(model_save_location + "model_info.txt", 'a')
-    file.write("Percent of Orbiting Particles Mislabeled: " + str(np.round(((inc_orb.shape[0]/num_orb)*100),2)) + "%\n")
-    file.write("Percent of Infalling Particles Mislabeled: " + str(np.round(((inc_inf.shape[0]/num_inf)*100),2)) + "%\n")
-    file.write("Percent of Total Particles Misclassified: " + str(np.round(((tot_num_inc/tot_num_ptl)*100),2)) + "%\n")
-    file.close()
     
     inc_orb_r = r[inc_orb]
     inc_inf_r = r[inc_inf]
@@ -601,7 +597,7 @@ def plot_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, c
     r_range = [0, max_r]
     rv_range = [min_rv, max_rv]
     tv_range = [min_tv, max_tv]
-    
+
     c_corr_labels = np.copy(p_corr_labels)
     c_ml_labels = np.copy(p_ml_labels)
 
@@ -829,22 +825,46 @@ def graph_feature_importance(feature_names, feature_importance, title, plot, sav
         fig2.savefig(save_location + "feature_importance_plots/" + title + ".png", bbox_inches="tight")
     plt.close()
 
-def graph_correlation_matrix(data, save_location, title, show, save):
-    return
-    # create_directory(save_location + "/corr_matrix/")
-    # mpl.rcParams.update({'font.size': 12})
+def graph_correlation_matrix(data, labels, save_location, show, save):
+    mpl.rcParams.update({'font.size': 12})
+    masked_data = np.ma.masked_invalid(data)
+    corr_mtrx = np.ma.corrcoef(masked_data, rowvar=False)
+    print(corr_mtrx)
+    heatmap = sns.heatmap(corr_mtrx, annot = True, cbar = True, xticklabels=labels, yticklabels=labels)
+    heatmap.set_title("Feature Correlation Heatmap")
 
-    # heatmap = sns.heatmap(data.corr(), annot = True, cbar = True)
-    # heatmap.set_title("Feature Correlation Heatmap")
-    # heatmap.set_xticklabels(heatmap.get_xticklabels(),rotation=45)
+    if show:
+        plt.show()
+    if save:
+        fig = heatmap.get_figure()
+        fig.set_size_inches(21, 13)
+        fig.savefig(save_location + "corr_matrix.png")
+    plt.close()
+    
+def plot_data_dist(data, labels, num_bins, save_location, show, save):
+    num_feat = data.shape[1] 
+    num_rows = int(np.ceil(np.sqrt(num_feat)))
+    num_cols = int(np.ceil(num_feat / num_rows))
+    
+    fig, axes = plt.subplots(num_rows, num_cols)
+    
+    axes = axes.flatten()
 
-    # if show:
-    #     plt.show()
-    # if save:
-    #     fig = heatmap.get_figure()
-    #     fig.set_size_inches(21, 13)
-    #     fig.savefig(save_location + "/corr_matrix/" + title + ".png")
-    # plt.close()
+    for i in range(num_feat, num_rows*num_cols):
+        fig.delaxes(axes[i])
+        
+    for i in range(num_feat):
+        axes[i].hist(data[:,i],bins=num_bins)
+        axes[i].set_title(labels[i])
+        axes[i].set_ylabel("Frequency")
+        axes[i].set_yscale('log')
+
+    if show:
+        plt.show()
+    if save:
+        fig.set_size_inches(15, 15)
+        fig.savefig(save_location + "data_hist.png")
+    plt.close()
     
 def graph_acc_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, title, plot, save, save_location):
     bin_width = (np.max(radius) - 0) / num_bins
@@ -1131,7 +1151,8 @@ def anim_ptl_path(red_shift,cosmol,num_halo_search,num_plt_snaps,ptl_props_path,
     high_mask = np.logical_and.reduce(((scal_rad>=1.05), (scal_rad<1.2), (labels==1)))
     # find where in original array the array with the conditions applied is max
     print(np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[low_mask])))[0].shape)
-    
+    print("radial vel low rad ptl:",scaled_rad_vel[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[low_mask])))[0][0]])
+    print("radial vel high rad ptl:",scaled_rad_vel[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[high_mask])))[0][0]])
     low_id = depair(hipids[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[low_mask])))[0][0]])
     high_id = depair(hipids[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[high_mask])))[0][0]])
 
