@@ -174,7 +174,7 @@ def med_prf(prf, num_halo, dtype):
     return prf, med_prf
     
 def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_prf_orb, mass, orbit_assn, prf_bins, title, save_location, use_mp = False, show_graph = False, save_graph = False):
-    # Shape of profiles should be (halo,density cols)
+    # Shape of profiles should be (num halo,num bins)
     # EX: 10 halos, 80 bins (10,80)
     
     t1 = time.time()
@@ -224,6 +224,7 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
             diff_n_all_ptls.append(np.array(halo_diff_n_all_ptls))
 
     # For each profile combine all halos and obtain their median values for each bin
+    # calc_mass_prf_xxx has shape (num_halo, num_bins)
     calc_mass_prf_orb, med_calc_mass_prf_orb = med_prf(calc_mass_prf_orb, curr_num_halos, np.float32)
     calc_mass_prf_inf, med_calc_mass_prf_inf = med_prf(calc_mass_prf_inf, curr_num_halos, np.float32)
     calc_mass_prf_all, med_calc_mass_prf_all = med_prf(calc_mass_prf_all, curr_num_halos, np.float32)
@@ -281,9 +282,9 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
     
     # Get the ratio of the calculated profile with the actual profile
     with np.errstate(divide='ignore', invalid='ignore'):
-        all_dens_ratio = np.divide(calc_dens_prf_all,med_act_dens_prf_all) - 1
-        inf_dens_ratio = np.divide(calc_dens_prf_inf,med_act_dens_prf_inf) - 1
-        orb_dens_ratio = np.divide(calc_dens_prf_orb,med_act_dens_prf_orb) - 1
+        all_dens_ratio = np.divide(calc_dens_prf_all,act_dens_prf_all) - 1
+        inf_dens_ratio = np.divide(calc_dens_prf_inf,act_dens_prf_inf) - 1
+        orb_dens_ratio = np.divide(calc_dens_prf_orb,act_dens_prf_orb) - 1
 
     
     # Find the upper and lower bound for scatter for calculated profiles
