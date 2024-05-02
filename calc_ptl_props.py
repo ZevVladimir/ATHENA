@@ -36,7 +36,6 @@ path_to_sparta = config["PATHS"]["path_to_sparta"]
 create_directory(path_to_MLOIS)
 create_directory(path_to_snaps)
 create_directory(path_to_SPARTA_data)
-create_directory(path_to_hdf5_file)
 create_directory(path_to_pickle)
 create_directory(path_to_calc_info)
 snap_format = config["MISC"]["snap_format"]

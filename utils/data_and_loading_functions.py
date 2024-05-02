@@ -117,6 +117,12 @@ def load_or_pickle_SPARTA_data(sparta_name, scale_factor, snap, sparta_snap):
             halos_status = pickle.load(pickle_file)
     else:
         reload_sparta = True
+
+    if os.path.isfile(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/parent_id.pickle"):
+        with open(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/parent_id.pickle", "rb") as pickle_file:
+            parent_id = pickle.load(pickle_file)
+    else:
+        reload_sparta = True
         
     if os.path.isfile(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/ptl_mass.pickle"):
         with open(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/ptl_mass.pickle", "rb") as pickle_file:
@@ -141,11 +147,14 @@ def load_or_pickle_SPARTA_data(sparta_name, scale_factor, snap, sparta_snap):
         halos_status = sparta_output['halos']['status'][:,sparta_snap]
         with open(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/halos_status.pickle", "wb") as pickle_file:
             pickle.dump(halos_status, pickle_file)
+        parent_id = sparta_output['halos']['parent_id'][:,sparta_snap]
+        with open(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/parent_id.pickle", "wb") as pickle_file:
+            pickle.dump(parent_id, pickle_file)
         ptl_mass = sparta_output["simulation"]["particle_mass"]
         with open(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/ptl_mass.pickle", "wb") as pickle_file:
             pickle.dump(ptl_mass, pickle_file)
 
-    return halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, ptl_mass 
+    return halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass 
 
 def split_dataset_by_mass(halo_first, halo_n, path_to_dataset, curr_dataset):
     with h5py.File((path_to_dataset), 'r') as all_ptl_properties:
