@@ -356,7 +356,6 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_pt
             save_rad_vel = p_all_rad_vel
             save_tang_vel = p_all_tang_vel
            
-            
         #plot_r_rv_tv_graph(orb_inf=np.zeros(p_all_orb_assn.size), r=p_all_scal_rad, rv=p_all_rad_vel, tv=p_all_tang_vel, correct_orb_inf=p_all_scal_rad, title="test rv plot", num_bins=30, save_location="/home/zvladimi/scratch/MLOIS/Random_figures/")
         
         # Save all data in hdf5 file depending on if training or testing halos]
@@ -429,7 +428,7 @@ with timed("p_snap ptl load"):
     p_ptls_pid, p_ptls_vel, p_ptls_pos = load_or_pickle_ptl_data(curr_sparta_file, str(p_snap), p_snapshot_path, p_scale_factor)
 
 with timed("p_snap SPARTA load"):
-    p_halos_pos, p_halos_r200m, p_halos_id, p_halos_status, p_halos_last_snap, mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
+    p_halos_pos, p_halos_r200m, p_halos_id, p_halos_status, p_halos_last_snap, p_parent_id, mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
 
 with timed("c_snap load"):
     t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], p_red_shift)

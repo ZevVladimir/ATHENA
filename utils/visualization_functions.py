@@ -529,12 +529,6 @@ def calc_misclassified(correct_labels, ml_labels, r, rv, tv, r_range, rv_range, 
     print("num incorrect inf", inc_inf.shape[0], ",", np.round(((inc_inf.shape[0]/num_inf)*100),2), "% of infalling ptls")
     print("num incorrect orb", inc_orb.shape[0], ",", np.round(((inc_orb.shape[0]/num_orb) * 100),2), "% of orbiting ptls")
     print("num incorrect tot", tot_num_inc, ",", np.round(((tot_num_inc/tot_num_ptl) * 100),2), "% of all ptls")
-
-    file = open(model_save_location + "model_info.txt", 'a')
-    file.write("Percent of Orbiting Particles Mislabeled: " + str(np.round(((inc_orb.shape[0]/num_orb)*100),2)) + "%\n")
-    file.write("Percent of Infalling Particles Mislabeled: " + str(np.round(((inc_inf.shape[0]/num_inf)*100),2)) + "%\n")
-    file.write("Percent of Total Particles Misclassified: " + str(np.round(((tot_num_inc/tot_num_ptl)*100),2)) + "%\n")
-    file.close()
     
     inc_orb_r = r[inc_orb]
     inc_inf_r = r[inc_inf]
@@ -603,7 +597,7 @@ def plot_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, c
     r_range = [0, max_r]
     rv_range = [min_rv, max_rv]
     tv_range = [min_tv, max_tv]
-    
+
     c_corr_labels = np.copy(p_corr_labels)
     c_ml_labels = np.copy(p_ml_labels)
 

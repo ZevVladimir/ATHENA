@@ -48,7 +48,6 @@ global prim_only
 prim_only = config.getboolean("SEARCH","prim_only")
 t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
 p_red_shift = config.getfloat("SEARCH","p_red_shift")
-global p_snap
 p_snap = config.getint("XGBOOST","p_snap")
 c_snap = config.getint("XGBOOST","c_snap")
 model_name = config["XGBOOST"]["model_name"]
@@ -56,7 +55,6 @@ model_sparta_file = config["XGBOOST"]["model_sparta_file"]
 model_name = model_name + "_" + model_sparta_file
 radii_splits = config.get("XGBOOST","rad_splits").split(',')
 snapshot_list = [p_snap, c_snap]
-global search_rad
 search_rad = config.getfloat("SEARCH","search_rad")
 total_num_snaps = config.getint("SEARCH","total_num_snaps")
 per_n_halo_per_split = config.getfloat("SEARCH","per_n_halo_per_split")
@@ -152,14 +150,6 @@ def make_preds(client, bst, X_np, y_np, report_name="Classification Report", pri
     preds = np.round(preds)
     preds = preds.astype(np.int8)
     
-    if print_report:   
-        report = classification_report(y_np, preds)
-        print(report_name, "\n", report)
-        file = open(model_save_location + "model_info.txt", 'a')
-        file.write(report_name+"\n")
-        file.write(report)
-        file.close()
-    
     return preds
 
 if __name__ == "__main__":
@@ -230,6 +220,8 @@ if __name__ == "__main__":
             train_y = pickle.load(file)
         with open(train_keys_loc, "rb") as file:
             train_features = pickle.load(file)
+        train_features = train_features.tolist()
+
         dtrain,X_train,y_train,scale_pos_weight = create_dmatrix(client, train_X, train_y, train_features, chunk_size=chunk_size, frac_use_data=frac_training_data, calc_scale_pos_weight=True)
         del train_X
         del train_y
@@ -242,6 +234,7 @@ if __name__ == "__main__":
             test_y = pickle.load(file)
         with open(test_keys_loc, "rb") as file:
             test_features = pickle.load(file)
+        test_features = test_features.tolist()
         dtest,X_test,y_test = create_dmatrix(client, test_X, test_y, test_features, chunk_size=chunk_size, frac_use_data=1, calc_scale_pos_weight=False)
         del test_X
         del test_y
@@ -332,7 +325,6 @@ if __name__ == "__main__":
         plt.plot(history["test"]["rmse"], label="Validation loss")
         plt.axvline(21, color="gray", label="Optimal tree number")
         plt.xlabel("Number of trees")
-        test_preds = make_preds(client, bst, test_dataset_loc, test_labels_loc, report_name="Test Report", print_report=False)
         plt.ylabel("Loss")
         plt.legend()
         plt.savefig(plot_save_location + "training_loss_graph.png")
@@ -340,14 +332,14 @@ if __name__ == "__main__":
         del dtrain
         del dtest
 
-    with timed("Train Predictions"):
-        with open(train_dataset_loc, "rb") as file:
-            train_X = pickle.load(file)
-        with open(train_labels_loc, "rb") as file:
-            train_y = pickle.load(file)
-        train_preds = make_preds(client, bst, train_X, train_y, report_name="Train Report", print_report=False)
-    with timed("Train Plots"):
-        eval_model(X=train_X, y=train_y, dataset_name="Train", dens_prf=False, r_rv_tv=True, preds=train_preds, misclass=True)
+    # with timed("Train Predictions"):
+    #     with open(train_dataset_loc, "rb") as file:
+    #         train_X = pickle.load(file)
+    #     with open(train_labels_loc, "rb") as file:
+    #         train_y = pickle.load(file)
+    #     train_preds = make_preds(client, bst, train_X, train_y, report_name="Train Report", print_report=False)
+    # with timed("Train Plots"):
+    #     eval_model(X=train_X, y=train_y,preds=train_preds,dataset_name="Train",dataset_location=dataset_location,plot_save_location=plot_save_location,model_save_location=model_save_location,dens_prf=False, r_rv_tv=True,misclass=True)
     
     with timed("Test Predictions"):
         with open(test_dataset_loc, "rb") as file:
@@ -356,7 +348,7 @@ if __name__ == "__main__":
             test_y = pickle.load(file)
         test_preds = make_preds(client, bst, test_X, test_y, report_name="Test Report", print_report=False)
     with timed("Test Plots"):
-        eval_model(X=test_X, y=test_y, dataset_name="Test", dens_prf=False, r_rv_tv=True, preds=test_preds, misclass=True)    
+        eval_model(X=test_X, y=test_y,preds=test_preds,dataset_name="Test", dataset_location=dataset_location,plot_save_location=plot_save_location,model_save_location=model_save_location,dens_prf=False, r_rv_tv=True, misclass=True)    
         
     bst.save_model(model_save_location + model_name + ".json")
 

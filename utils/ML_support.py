@@ -24,6 +24,13 @@ path_to_calc_info = config["PATHS"]["path_to_calc_info"]
 path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
 path_to_sparta = config["PATHS"]["path_to_sparta"]
 path_to_xgboost = config["PATHS"]["path_to_xgboost"]
+p_snap = config.getint("XGBOOST","p_snap")
+c_snap = config.getint("XGBOOST","c_snap")
+snapshot_list = [p_snap, c_snap]
+search_rad = config.getfloat("SEARCH","search_rad")
+model_name = config["XGBOOST"]["model_name"]
+model_sparta_file = config["XGBOOST"]["model_sparta_file"]
+model_name = model_name + "_" + model_sparta_file
 
 def print_model_prop(model_dict, indent=''):
     # If using from command line and passing path to the pickled dictionary instead of dict load the dict from the file path
@@ -42,7 +49,6 @@ def print_model_prop(model_dict, indent=''):
         else:
             print(f"{indent}{key}: {value}")
             
-
 def create_dmatrix(client, X_cpu, y_cpu, features, chunk_size, frac_use_data = 1, calc_scale_pos_weight = False):    
     scale_pos_weight = np.where(y_cpu == 0)[0].size / np.where(y_cpu == 1)[0].size
     
@@ -62,7 +68,12 @@ def create_dmatrix(client, X_cpu, y_cpu, features, chunk_size, frac_use_data = 1
         return dqmatrix, X, y_cpu, scale_pos_weight 
     return dqmatrix, X, y_cpu
 
-def eval_model(X, y, test_preds, dataset_name, dataset_location, p_snap, c_snap, plot_save_location, dens_prf = False, r_rv_tv = False, preds = None, misclass=False):
+#TODO have the locations all be in a dictionary or some more general way
+def eval_model(X, y, preds, dataset_name, dataset_location, plot_save_location, model_save_location, dens_prf = False, r_rv_tv = False, misclass=False):
+    if len(snapshot_list) > 1:
+        specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "_" + str(search_rad) + "r200msearch/"
+    else:
+        specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(search_rad) + "r200msearch/"
 
     num_bins = 30
     with open(dataset_location + dataset_name.lower() + "_dataset_all_keys.pickle", "rb") as file:
@@ -98,7 +109,7 @@ def eval_model(X, y, test_preds, dataset_name, dataset_location, p_snap, c_snap,
         bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
         bins = np.insert(bins, 0, 0) 
         
-        compare_density_prf(radii=X[:,p_r_loc], halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=ptl_mass, orbit_assn=test_preds, prf_bins=bins, title=dataset_name + "_dataset" + "_" + "model_" + model_name, save_location=plot_save_location, use_mp=True, save_graph=True)
+        compare_density_prf(radii=X[:,p_r_loc], halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=ptl_mass, orbit_assn=preds, prf_bins=bins, title=dataset_name + "_dataset" + "_" + "model_" + model_name, save_location=plot_save_location, use_mp=True, save_graph=True)
     
     if r_rv_tv:
         plot_r_rv_tv_graph(preds, X[:,p_r_loc], X[:,p_rv_loc], X[:,p_tv_loc], y, title=dataset_name + "_dataset", num_bins=num_bins, save_location=plot_save_location)
