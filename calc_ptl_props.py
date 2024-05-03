@@ -446,9 +446,9 @@ del sparta_output
 snapshot_list = [p_snap, c_snap]
 
 if prim_only:
-    save_location =  path_to_MLOIS +  "calculated_info/" + curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(search_rad) + "r200msearch/"
+    save_location =  path_to_MLOIS +  "calculated_info/" + curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(search_rad) + "search/"
 else:
-    save_location =  path_to_MLOIS + "calculated_info/" + curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[1]) + "_" + str(search_rad) + "r200msearch/"
+    save_location =  path_to_MLOIS + "calculated_info/" + curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[1]) + "_" + str(search_rad) + "search/"
 
 if os.path.exists(save_location) != True:
     os.makedirs(save_location)

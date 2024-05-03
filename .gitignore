@@ -15,6 +15,6 @@ qiskit-vscode-log.out
 /MLOI_venv/
 /.pygadgetreader/
 .python-version
-/xgboost_datasets_plots/
+/xgboost_results/
 /pickle_data/
 /utils/__pycache__/
