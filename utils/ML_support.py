@@ -4,7 +4,7 @@ import sys
 import pickle
 from dask import array as da
 import xgboost as xgb
-from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, find_closest_z, conv_halo_id_spid
+from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, find_closest_z, conv_halo_id_spid, create_directory
 from utils.visualization_functions import compare_density_prf, plot_r_rv_tv_graph, plot_misclassified
 from sparta_tools import sparta
 ##################################################################################################################
@@ -27,10 +27,12 @@ path_to_xgboost = config["PATHS"]["path_to_xgboost"]
 p_snap = config.getint("XGBOOST","p_snap")
 c_snap = config.getint("XGBOOST","c_snap")
 snapshot_list = [p_snap, c_snap]
+global p_red_shift
+p_red_shift = config.getfloat("SEARCH","p_red_shift")
 search_rad = config.getfloat("SEARCH","search_rad")
-model_name = config["XGBOOST"]["model_name"]
+model_type = config["XGBOOST"]["model_type"]
 model_sparta_file = config["XGBOOST"]["model_sparta_file"]
-model_name = model_name + "_" + model_sparta_file
+model_name = model_type + "_" + model_sparta_file
 
 def print_model_prop(model_dict, indent=''):
     # If using from command line and passing path to the pickled dictionary instead of dict load the dict from the file path
@@ -69,14 +71,17 @@ def create_dmatrix(client, X_cpu, y_cpu, features, chunk_size, frac_use_data = 1
     return dqmatrix, X, y_cpu
 
 #TODO have the locations all be in a dictionary or some more general way
-def eval_model(X, y, preds, dataset_name, dataset_location, plot_save_location, model_save_location, dens_prf = False, r_rv_tv = False, misclass=False):
+def eval_model(model_info, sparta_file, X, y, preds, dataset_type, dataset_location, model_save_location, p_red_shift, dens_prf = False, r_rv_tv = False, misclass=False):
+    plot_save_location = model_save_location + dataset_type + "_" + sparta_file + "/"
+    create_directory(plot_save_location)
+    
     if len(snapshot_list) > 1:
-        specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "_" + str(search_rad) + "r200msearch/"
+        specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "_" + str(search_rad) + "search/"
     else:
-        specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(search_rad) + "r200msearch/"
+        specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(search_rad) + "search/"
 
     num_bins = 30
-    with open(dataset_location + dataset_name.lower() + "_dataset_all_keys.pickle", "rb") as file:
+    with open(dataset_location + dataset_type.lower() + "_dataset_all_keys.pickle", "rb") as file:
         all_keys = pickle.load(file)
     p_r_loc = np.where(all_keys == "Scaled_radii_" + str(p_snap))[0][0]
     c_r_loc = np.where(all_keys == "Scaled_radii_" + str(c_snap))[0][0]
@@ -86,9 +91,9 @@ def eval_model(X, y, preds, dataset_name, dataset_location, plot_save_location, 
     c_tv_loc = np.where(all_keys == "Tangential_vel_" + str(c_snap))[0][0]
     
     if dens_prf:
-        with open(dataset_location + dataset_name.lower() + "_all_rad_halo_first.pickle", "rb") as file:
+        with open(dataset_location + dataset_type.lower() + "_all_rad_halo_first.pickle", "rb") as file:
             halo_first = pickle.load(file) 
-        with open(dataset_location + dataset_name.lower() + "_all_rad_halo_n.pickle", "rb") as file:
+        with open(dataset_location + dataset_type.lower() + "_all_rad_halo_n.pickle", "rb") as file:
             halo_n = pickle.load(file)   
 
         with open(path_to_calc_info + specific_save + "test_indices.pickle", "rb") as pickle_file:
@@ -96,7 +101,10 @@ def eval_model(X, y, preds, dataset_name, dataset_location, plot_save_location, 
         
         new_p_snap, p_red_shift = find_closest_z(p_red_shift)
         p_scale_factor = 1/(1+p_red_shift)
-        halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, ptl_mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
+        sparta_output = sparta.load(filename=path_to_hdf5_file, load_halo_data=False, log_level= 0)
+        all_red_shifts = sparta_output["simulation"]["snap_z"][:]
+        p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
+        halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
 
         use_halo_ids = halos_id[test_indices]
         sparta_output = sparta.load(filename=path_to_hdf5_file, halo_ids=use_halo_ids, log_level=0)
@@ -108,13 +116,13 @@ def eval_model(X, y, preds, dataset_name, dataset_location, plot_save_location, 
         
         bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
         bins = np.insert(bins, 0, 0) 
-        
-        compare_density_prf(radii=X[:,p_r_loc], halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=ptl_mass, orbit_assn=preds, prf_bins=bins, title=dataset_name + "_dataset" + "_" + "model_" + model_name, save_location=plot_save_location, use_mp=True, save_graph=True)
+
+        compare_density_prf(radii=X[:,p_r_loc], halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=ptl_mass, orbit_assn=preds, prf_bins=bins, title="", save_location=plot_save_location, use_mp=True, save_graph=True)
     
     if r_rv_tv:
-        plot_r_rv_tv_graph(preds, X[:,p_r_loc], X[:,p_rv_loc], X[:,p_tv_loc], y, title=dataset_name + "_dataset", num_bins=num_bins, save_location=plot_save_location)
+        plot_r_rv_tv_graph(preds, X[:,p_r_loc], X[:,p_rv_loc], X[:,p_tv_loc], y, title="", num_bins=num_bins, save_location=plot_save_location)
     
     if misclass:
-        plot_misclassified(p_corr_labels=y, p_ml_labels=preds, p_r=X[:,p_r_loc], p_rv=X[:,p_rv_loc], p_tv=X[:,p_tv_loc], c_r=X[:,c_r_loc], c_rv=X[:,c_rv_loc], c_tv=X[:,c_tv_loc], title=dataset_name + "_dataset" + "_" + "model_" + model_name, num_bins=num_bins, save_location=plot_save_location, model_save_location=model_save_location)
+        plot_misclassified(p_corr_labels=y, p_ml_labels=preds, p_r=X[:,p_r_loc], p_rv=X[:,p_rv_loc], p_tv=X[:,p_tv_loc], c_r=X[:,c_r_loc], c_rv=X[:,c_rv_loc], c_tv=X[:,c_tv_loc],title="",num_bins=num_bins,save_location=plot_save_location,model_info=model_info,dataset_name=dataset_type + "_" + sparta_file)
     
 

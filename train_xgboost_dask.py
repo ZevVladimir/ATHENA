@@ -50,9 +50,9 @@ t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
 p_red_shift = config.getfloat("SEARCH","p_red_shift")
 p_snap = config.getint("XGBOOST","p_snap")
 c_snap = config.getint("XGBOOST","c_snap")
-model_name = config["XGBOOST"]["model_name"]
+model_type = config["XGBOOST"]["model_type"]
 model_sparta_file = config["XGBOOST"]["model_sparta_file"]
-model_name = model_name + "_" + model_sparta_file
+model_name = model_type + "_" + model_sparta_file
 radii_splits = config.get("XGBOOST","rad_splits").split(',')
 snapshot_list = [p_snap, c_snap]
 search_rad = config.getfloat("SEARCH","search_rad")
@@ -173,21 +173,21 @@ if __name__ == "__main__":
         client = get_CUDA_cluster()
         
     if len(snapshot_list) > 1:
-        specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "_" + str(search_rad) + "r200msearch/"
+        specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "_" + str(search_rad) + "search/"
     else:
-        specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(search_rad) + "r200msearch/"
+        specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(search_rad) + "search/"
 
     if gpu_use:
-        model_name = model_name + "_frac_" + str(frac_training_data) + "_gpu_model"
+        model_name = model_name + "_frac_" + str(frac_training_data) + "_gpu"
     else:
-        model_name = model_name + "_frac_" + str(frac_training_data) + "_cpu_model"
+        model_name = model_name + "_frac_" + str(frac_training_data) + "_cpu"
 
     save_location = path_to_xgboost + specific_save
     dataset_location = save_location + "datasets/"
-    model_save_location = save_location + model_name + "/"  
-    plot_save_location = model_save_location + "plots/"
+    model_save_location = save_location + model_type + "_" + str(frac_training_data) + "_gpu/"  
+    gen_plot_save_location = model_save_location + "plots/"
     create_directory(model_save_location)
-    create_directory(plot_save_location)
+    create_directory(gen_plot_save_location)
     
     train_dataset_loc = dataset_location + "train_within_rad_dataset.pickle"
     train_labels_loc = dataset_location + "train_within_rad_labels.pickle"
@@ -203,9 +203,9 @@ if __name__ == "__main__":
         model_info = {
             'Misc Info':{
                 'Model trained on': model_sparta_file,
-                'Model tested on': curr_sparta_file,
                 'Snapshots used': snapshot_list,
-                'Max Radius': search_rad,}}
+                'Max Radius': search_rad,
+                }}
     
     if os.path.isfile(model_save_location + model_name + ".json"):
         bst = xgb.Booster()
@@ -291,7 +291,10 @@ if __name__ == "__main__":
                 
                 model_info['Training Info']={
                 'Fraction of Training Data Used': frac_training_data,
-                'Training Params': params}            
+                'Trained on GPU': gpu_use,
+                'HPO used': do_hpo,
+                'Training Params': params,
+                }            
                 
         elif 'Training Info' in model_info: 
             params = model_info.get('Training Info',{}).get('Training Params')
@@ -327,7 +330,7 @@ if __name__ == "__main__":
         plt.xlabel("Number of trees")
         plt.ylabel("Loss")
         plt.legend()
-        plt.savefig(plot_save_location + "training_loss_graph.png")
+        plt.savefig(gen_plot_save_location + "training_loss_graph.png")
     
         del dtrain
         del dtest
@@ -339,7 +342,7 @@ if __name__ == "__main__":
     #         train_y = pickle.load(file)
     #     train_preds = make_preds(client, bst, train_X, train_y, report_name="Train Report", print_report=False)
     # with timed("Train Plots"):
-    #     eval_model(X=train_X, y=train_y,preds=train_preds,dataset_name="Train",dataset_location=dataset_location,plot_save_location=plot_save_location,model_save_location=model_save_location,dens_prf=False, r_rv_tv=True,misclass=True)
+    #     eval_model(model_info=model_info,sparta_file=model_sparta_file,X=train_X, y=train_y,preds=train_preds,dataset_type="Train",dataset_location=dataset_location,model_save_location=model_save_location,p_red_shift=p_red_shift,dens_prf=False, r_rv_tv=True,misclass=True)
     
     with timed("Test Predictions"):
         with open(test_dataset_loc, "rb") as file:
@@ -348,7 +351,7 @@ if __name__ == "__main__":
             test_y = pickle.load(file)
         test_preds = make_preds(client, bst, test_X, test_y, report_name="Test Report", print_report=False)
     with timed("Test Plots"):
-        eval_model(X=test_X, y=test_y,preds=test_preds,dataset_name="Test", dataset_location=dataset_location,plot_save_location=plot_save_location,model_save_location=model_save_location,dens_prf=False, r_rv_tv=True, misclass=True)    
+        eval_model(model_info=model_info,sparta_file=curr_sparta_file,X=test_X, y=test_y,preds=test_preds,dataset_type="Test", dataset_location=dataset_location,model_save_location=model_save_location,p_red_shift=p_red_shift,dens_prf=True, r_rv_tv=True, misclass=True)    
         
     bst.save_model(model_save_location + model_name + ".json")
 
@@ -360,7 +363,7 @@ if __name__ == "__main__":
     fig, ax = plt.subplots(1, figsize=(15,10))
     ax.barh(pos,values)
     ax.set_yticks(pos, keys)
-    fig.savefig(plot_save_location + "feature_importance.png")
+    fig.savefig(gen_plot_save_location + "feature_importance.png")
 
     # tree_num = 2
     # xgb.plot_tree(bst, num_trees=tree_num)

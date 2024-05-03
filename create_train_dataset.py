@@ -168,9 +168,9 @@ def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapsh
 
 # set what the paths should be for saving and getting the data
 if len(snapshot_list) > 1:
-    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "_" + str(search_rad) + "r200msearch/"
+    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "_" + str(search_rad) + "search/"
 else:
-    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(search_rad) + "r200msearch/"
+    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(search_rad) + "search/"
     
 data_location = path_to_calc_info + specific_save
 save_location = path_to_xgboost + specific_save
