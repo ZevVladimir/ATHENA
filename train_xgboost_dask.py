@@ -204,7 +204,8 @@ if __name__ == "__main__":
             'Misc Info':{
                 'Model trained on': model_sparta_file,
                 'Snapshots used': snapshot_list,
-                'Max Radius': search_rad,}}
+                'Max Radius': search_rad,
+                }}
     
     if os.path.isfile(model_save_location + model_name + ".json"):
         bst = xgb.Booster()
@@ -290,7 +291,10 @@ if __name__ == "__main__":
                 
                 model_info['Training Info']={
                 'Fraction of Training Data Used': frac_training_data,
-                'Training Params': params}            
+                'Trained on GPU': gpu_use,
+                'HPO used': do_hpo,
+                'Training Params': params,
+                }            
                 
         elif 'Training Info' in model_info: 
             params = model_info.get('Training Info',{}).get('Training Params')

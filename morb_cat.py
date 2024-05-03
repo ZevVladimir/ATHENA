@@ -348,9 +348,8 @@ print("Total num ptls:", tot_num_ptls)
 if os.path.isfile(save_location + "member_catologue_" + curr_sparta_file + ".hdf5"):
     os.remove(save_location + "member_catologue_" + curr_sparta_file + ".hdf5")
 
-t2 = time.time()
-print("Start up finished in:",np.round((t2-t1),2),"seconds", np.round(((t2-t1)/60),2), "minutes")
-halo_loop(indices=match_halo_idxs, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel)
+with timed("Host Halos"):
+    halo_loop(indices=match_halo_idxs, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel)
 
 
 # Now do the same but for subhalos
@@ -361,10 +360,7 @@ num_halo_per_split = int(np.ceil(per_n_halo_per_split * total_num_halos))
 
 print("Total num subhalos:", total_num_halos)
 
-t3 = time.time()
-print("Start up finished in:",np.round((t3-t2),2),"seconds", np.round(((t3-t2)/60),2), "minutes")
-
-halo_loop(indices=match_halo_idxs, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel,find_subhalos=False)
-
-t4 = time.time()
-print("Finished in:",np.round((t4-t1),2),"seconds", np.round(((t4-t1)/60),2), "minutes")
+with timed("Sub halos"):
+    halo_loop(indices=match_halo_idxs, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel,find_subhalos=False)
+t2 = time.time()
+print("Finished in:",np.round((t2-t1),2),"seconds", np.round(((t2-t1)/60),2), "minutes")
