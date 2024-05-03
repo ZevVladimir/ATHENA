@@ -180,7 +180,7 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
     t1 = time.time()
     print("Starting Density Profile Plot")
     act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
-    create_directory(save_location + "dens_prfl_ratio/")
+    create_directory(save_location + "plots/")
     curr_num_halos = halo_first.shape[0]
     min_disp_halos = int(np.ceil(0.5 * curr_num_halos))
     num_bins = prf_bins.size
@@ -399,8 +399,7 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
     
     if save_graph:
         fig.set_size_inches(50, 25)
-        create_directory(save_location + "dens_prfl_ratio/")
-        fig.savefig(save_location + "dens_prfl_ratio/" + title + ".png", bbox_inches='tight')
+        fig.savefig(save_location + "plots/" + title + "dens_prfl_rat.png", bbox_inches='tight')
     if show_graph:
         plt.show()
     plt.close()
@@ -516,7 +515,7 @@ def percent_error(pred, act):
 
 def calc_misclassified(correct_labels, ml_labels, r, rv, tv, r_range, rv_range, tv_range, num_bins, model_info,dataset_name): 
     min_ptl = 1e-4
-    act_min_ptl = 1
+    act_min_ptl = 10
        
     inc_inf = np.where((ml_labels == 1) & (correct_labels == 0))[0]
     num_orb = np.where(correct_labels == 1)[0].shape[0]
@@ -684,8 +683,8 @@ def plot_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, c
     scal_misclas_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=p_min_ptl, vmax=p_max_diff),cmap=magma_cmap), cax=plt.subplot(gs[2:,-1]))
     scal_misclas_color_bar.set_label("Num Incorrect Particles (inf/orb) / Total Particles (inf/orb)")
     
-    create_directory(save_location + "/2dhist/")
-    scal_miss_class_fig.savefig(save_location + "/2dhist/" + title + "scaled_miss_class.png")
+    create_directory(save_location + "/plots/")
+    scal_miss_class_fig.savefig(save_location + "/plots/" + title + "scaled_miss_class.png")
 
     t2 = time.time()
     print("Finished Misclassified Particle Plot in: ", np.round((t2-t1),2), "seconds", np.round(((t2-t1)/60),2), "minutes")
@@ -693,7 +692,7 @@ def plot_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, c
 def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, save_location):
     t1 = time.time()
     print("Starting r vs rv vs tv Plot")
-    create_directory(save_location + "2dhist/")
+    create_directory(save_location + "plots/")
     mpl.rcParams.update({'font.size': 8})
     plt.rcParams['figure.constrained_layout.use'] = True
 
@@ -755,7 +754,7 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sav
     
     inf_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]))
     
-    inf_fig.savefig(save_location + "/2dhist/" + title + "ptls_inf.png")
+    inf_fig.savefig(save_location + "/plots/" + title + "ptls_inf.png")
     
 #########################################################################################################################################################
     
@@ -772,7 +771,7 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sav
     
     orb_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]), pad = 0.1)
     
-    orb_fig.savefig(save_location + "/2dhist/" + title + "ptls_orb.png")    
+    orb_fig.savefig(save_location + "/plots/" + title + "ptls_orb.png")    
     
 #########################################################################################################################################################
     
@@ -789,7 +788,7 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sav
 
     
     only_r_rv_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]))
-    only_r_rv_fig.savefig(save_location + "/2dhist/" + title + "only_r_rv.png")
+    only_r_rv_fig.savefig(save_location + "/plots/" + title + "only_r_rv.png")
     
 #########################################################################################################################################################
 
@@ -813,7 +812,7 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sav
     
     perr_color_bar = plt.colorbar(perr_imshow_img, cax=plt.subplot(gs[:,-1]), pad = 0.1)
     
-    err_fig.savefig(save_location + "/2dhist/" + title + "percent_error.png") 
+    err_fig.savefig(save_location + "/plots/" + title + "percent_error.png") 
 
     t2 = time.time()
     print("Finished r vs rv vs tv Plot in: ", np.round((t2-t1),2), "seconds", np.round(((t2-t1)/60),2), "minutes")
