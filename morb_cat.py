@@ -279,8 +279,7 @@ with timed("p_snap information load"):
     sparta_output = sparta.load(filename=path_to_hdf5_file, load_halo_data=False, log_level= 0)
     all_red_shifts = sparta_output["simulation"]["snap_z"][:]
     p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
-    print("corresponding SPARTA snap num:", p_sparta_snap)
-    print("check sparta redshift:",all_red_shifts[p_sparta_snap])
+    print("corresponding SPARTA snap num:", p_sparta_snap,"sparta redshift:",all_red_shifts[p_sparta_snap])
     
     # Set constants
     p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
@@ -342,15 +341,13 @@ with timed("p_snap initial search"):
 
 tot_num_ptls = np.sum(num_ptls)
 
-print("Total num halos:", total_num_halos)
-print("Total num ptls:", tot_num_ptls)
+print("Total num halos:", total_num_halos, "Total num ptls:", tot_num_ptls)
 
 if os.path.isfile(save_location + "member_catologue_" + curr_sparta_file + ".hdf5"):
     os.remove(save_location + "member_catologue_" + curr_sparta_file + ".hdf5")
 
 with timed("Host Halos"):
     halo_loop(indices=match_halo_idxs, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel)
-
 
 # Now do the same but for subhalos
 match_halo_idxs = np.where((p_halos_status == 20) & (p_halos_last_snap >= p_sparta_snap))[0]

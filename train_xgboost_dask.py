@@ -335,14 +335,14 @@ if __name__ == "__main__":
         del dtrain
         del dtest
 
-    with timed("Train Predictions"):
-        with open(train_dataset_loc, "rb") as file:
-            train_X = pickle.load(file)
-        with open(train_labels_loc, "rb") as file:
-            train_y = pickle.load(file)
-        train_preds = make_preds(client, bst, train_X, train_y, report_name="Train Report", print_report=False)
-    with timed("Train Plots"):
-        eval_model(model_info=model_info,sparta_file=model_sparta_file,X=train_X, y=train_y,preds=train_preds,dataset_type="Train",dataset_location=dataset_location,model_save_location=model_save_location,p_red_shift=p_red_shift,dens_prf=False, r_rv_tv=True,misclass=True)
+    # with timed("Train Predictions"):
+    #     with open(train_dataset_loc, "rb") as file:
+    #         train_X = pickle.load(file)
+    #     with open(train_labels_loc, "rb") as file:
+    #         train_y = pickle.load(file)
+    #     train_preds = make_preds(client, bst, train_X, train_y, report_name="Train Report", print_report=False)
+    # with timed("Train Plots"):
+    #     eval_model(model_info=model_info,sparta_file=model_sparta_file,X=train_X, y=train_y,preds=train_preds,dataset_type="Train",dataset_location=dataset_location,model_save_location=model_save_location,p_red_shift=p_red_shift,dens_prf=False, r_rv_tv=True,misclass=True)
     
     with timed("Test Predictions"):
         with open(test_dataset_loc, "rb") as file:

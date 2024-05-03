@@ -3,17 +3,10 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import pickle
 mpl.use('agg')
-import matplotlib.gridspec as gridspec
 from utils.calculation_functions import calculate_distance
-#import seaborn as sns
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from sklearn.metrics import classification_report
 from colossus.halo import mass_so
-from utils.data_and_loading_functions import check_pickle_exist_gadget, create_directory, find_closest_z, load_or_pickle_ptl_data
-from utils.calculation_functions import calc_v200m, calculate_density
-# import general_plotting as gp
-from textwrap import wrap
-from scipy.ndimage import rotate
 import matplotlib.colors as colors
 import multiprocessing as mp
 from itertools import repeat
@@ -27,6 +20,9 @@ from scipy.spatial import cKDTree
 import sys
 from matplotlib.animation import FuncAnimation
 import seaborn as sns
+
+from utils.data_and_loading_functions import check_pickle_exist_gadget, create_directory, find_closest_z, load_or_pickle_ptl_data
+from utils.calculation_functions import calc_v200m, calculate_density
 
 num_processes = mp.cpu_count()
 
@@ -282,6 +278,9 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
     
     # Get the ratio of the calculated profile with the actual profile
     with np.errstate(divide='ignore', invalid='ignore'):
+        all_mass_ratio = np.divide(calc_mass_prf_all,act_mass_prf_all) - 1
+        inf_mass_ratio = np.divide(calc_mass_prf_inf,act_mass_prf_inf) - 1
+        orb_mass_ratio = np.divide(calc_mass_prf_orb,act_mass_prf_orb) - 1
         all_dens_ratio = np.divide(calc_dens_prf_all,act_dens_prf_all) - 1
         inf_dens_ratio = np.divide(calc_dens_prf_inf,act_dens_prf_inf) - 1
         orb_dens_ratio = np.divide(calc_dens_prf_orb,act_dens_prf_orb) - 1
@@ -317,8 +316,11 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
 
     middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
 
-    fig, ax = plt.subplots(1,3)
-    plt.rcParams.update({'font.size': 20})
+    fig, ax = plt.subplots(1,3, figsize=(15,30))
+    titlefntsize=26
+    axisfntsize=20
+    tickfntsize=16
+    legendfntsize=18
     fill_alpha = 0.2
     
     # Get rid of the jump from 0 to the first occupied bin by setting them to nan
@@ -342,19 +344,19 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
     ax[0].plot(middle_bins, med_act_mass_prf_orb, 'b--', label = "SPARTA mass profile orb ptls")
     ax[0].plot(middle_bins, med_act_mass_prf_inf, 'g--', label = "SPARTA mass profile inf ptls")
     
-    ax[0].fill_between(middle_bins, lower_calc_mass_prf_all, upper_calc_mass_prf_all, color='r', alpha=fill_alpha)
-    ax[0].fill_between(middle_bins, lower_calc_mass_prf_inf, upper_calc_mass_prf_inf, color='g', alpha=fill_alpha)
-    ax[0].fill_between(middle_bins, lower_calc_mass_prf_orb, upper_calc_mass_prf_orb, color='b', alpha=fill_alpha)
+    # ax[0].fill_between(middle_bins, lower_calc_mass_prf_all, upper_calc_mass_prf_all, color='r', alpha=fill_alpha)
+    # ax[0].fill_between(middle_bins, lower_calc_mass_prf_inf, upper_calc_mass_prf_inf, color='g', alpha=fill_alpha)
+    # ax[0].fill_between(middle_bins, lower_calc_mass_prf_orb, upper_calc_mass_prf_orb, color='b', alpha=fill_alpha)
     
-    ax[0].set_title("ML Predicted vs Actual Mass Profile")
-    ax[0].set_xlabel("Radius $r/R_{200m}$", fontsize=16)
-    ax[0].set_ylabel("Mass $M_\odot$", fontsize=16)
+    ax[0].set_title("ML Predicted vs Actual Mass Profile",fontsize=titlefntsize)
+    ax[0].set_xlabel("Radius $r/R_{200m}$", fontsize=axisfntsize)
+    ax[0].set_ylabel("Mass $M_\odot$", fontsize=axisfntsize)
     ax[0].set_xscale("log")
     ax[0].set_yscale("log")
     ax[0].set_box_aspect(1)
-    ax[0].tick_params(axis='both',which='both',labelsize=14)
-    ax[0].tick_params(axis='both',which='both',labelsize=14)
-    ax[0].legend()
+    ax[0].tick_params(axis='both',which='both',labelsize=tickfntsize)
+    ax[0].tick_params(axis='both',which='both',labelsize=tickfntsize)
+    ax[0].legend(fontsize=legendfntsize)
     
     ax[1].plot(middle_bins, med_calc_dens_prf_all, 'r-', label = "ML density profile all ptls")
     ax[1].plot(middle_bins, med_calc_dens_prf_orb, 'b-', label = "ML density profile orb ptls")
@@ -363,19 +365,19 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
     ax[1].plot(middle_bins, med_act_dens_prf_orb, 'b--', label = "SPARTA density profile orb ptls")
     ax[1].plot(middle_bins, med_act_dens_prf_inf, 'g--', label = "SPARTA density profile inf ptls")
     
-    ax[1].fill_between(middle_bins, lower_calc_dens_prf_all, upper_calc_dens_prf_all, color='r', alpha=fill_alpha)
-    ax[1].fill_between(middle_bins, lower_calc_dens_prf_inf, upper_calc_dens_prf_inf, color='g', alpha=fill_alpha)
-    ax[1].fill_between(middle_bins, lower_calc_dens_prf_orb, upper_calc_dens_prf_orb, color='b', alpha=fill_alpha)
+    # ax[1].fill_between(middle_bins, lower_calc_dens_prf_all, upper_calc_dens_prf_all, color='r', alpha=fill_alpha)
+    # ax[1].fill_between(middle_bins, lower_calc_dens_prf_inf, upper_calc_dens_prf_inf, color='g', alpha=fill_alpha)
+    # ax[1].fill_between(middle_bins, lower_calc_dens_prf_orb, upper_calc_dens_prf_orb, color='b', alpha=fill_alpha)
     
-    ax[1].set_title("ML Predicted vs Actual Density Profile")
-    ax[1].set_xlabel("Radius $r/R_{200m}$", fontsize=16)
-    ax[1].set_ylabel("Density $M_\odot/kpc^3$", fontsize=16)
+    ax[1].set_title("ML Predicted vs Actual Density Profile",fontsize=titlefntsize)
+    ax[1].set_xlabel("Radius $r/R_{200m}$", fontsize=axisfntsize)
+    ax[1].set_ylabel("Density $M_\odot/kpc^3$", fontsize=axisfntsize)
     ax[1].set_xscale("log")
     ax[1].set_yscale("log")
     ax[1].set_box_aspect(1)
-    ax[1].tick_params(axis='both',which='both',labelsize=14)
-    ax[1].tick_params(axis='both',which='both',labelsize=14)
-    ax[1].legend()
+    ax[1].tick_params(axis='both',which='both',labelsize=tickfntsize)
+    ax[1].tick_params(axis='both',which='both',labelsize=tickfntsize)
+    ax[1].legend(fontsize=legendfntsize)
     
     ax[2].plot(middle_bins, med_all_ratio, 'r', label = "(ML density profile / SPARTA density profile all) - 1")
     ax[2].plot(middle_bins, med_orb_ratio, 'b', label = "(ML density profile / SPARTA density profile orb) - 1")
@@ -385,17 +387,21 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
     ax[2].fill_between(middle_bins, lower_inf_dens_ratio, upper_inf_dens_ratio, color='g', alpha=fill_alpha)
     ax[2].fill_between(middle_bins, lower_orb_dens_ratio, upper_orb_dens_ratio, color='b', alpha=fill_alpha)    
     
-    ax[2].set_title("(ML Predicted / Actual Density Profile) - 1")
-    ax[2].set_xlabel("Radius $r/R_{200m}$", fontsize=16)
-    ax[2].set_ylabel("(ML Dens Prf / Act Dens Prf) - 1", fontsize=16)
+    ax[2].set_title("(ML Predicted / Actual Density Profile) - 1",fontsize=titlefntsize)
+    ax[2].set_xlabel("Radius $r/R_{200m}$", fontsize=axisfntsize)
+    ax[2].set_ylabel("(ML Dens Prf / Act Dens Prf) - 1", fontsize=axisfntsize)
     #ax[2].set_ylim(0,8)
-    #ax[2].set_yticks([-1, -0.5, -0.25, 0, 0.25, 0.5 ,1, 1.5, 2.5, 5, 10])
+    top_orb_tick = np.round(np.nanmax(upper_orb_dens_ratio),2)
+    bot_orb_tick = np.round(np.nanmin(lower_orb_dens_ratio),2)
+    top_inf_tick = np.round(np.nanmax(upper_inf_dens_ratio),2)
+    bot_inf_tick = np.round(np.nanmin(lower_inf_dens_ratio),2)
+    print(top_orb_tick,bot_orb_tick,top_inf_tick,bot_inf_tick)
     ax[2].set_xscale("log")
     ax[2].set_yscale("symlog")
     ax[2].set_box_aspect(1)
-    ax[2].tick_params(axis='both',which='both',labelsize=14)
-    ax[2].tick_params(axis='both',which='both',labelsize=14)
-    ax[2].legend()    
+    ax[2].tick_params(axis='both',which='both',labelsize=tickfntsize)
+    ax[2].set_yticks([bot_inf_tick, bot_orb_tick, 0, top_inf_tick, top_orb_tick])
+    ax[2].legend(fontsize=legendfntsize)    
     
     if save_graph:
         fig.set_size_inches(50, 25)
@@ -531,10 +537,10 @@ def calc_misclassified(correct_labels, ml_labels, r, rv, tv, r_range, rv_range, 
         "Num Incorrect All Particles": str(tot_num_inc)+", "+str(np.round(((tot_num_inc/tot_num_ptl)*100),2))+"% of all ptls",
     }
 
-    print("tot num ptl:",tot_num_ptl)
-    print("num incorrect inf", inc_inf.shape[0], ",", np.round(((inc_inf.shape[0]/num_inf)*100),2), "% of infalling ptls")
-    print("num incorrect orb", inc_orb.shape[0], ",", np.round(((inc_orb.shape[0]/num_orb)*100),2), "% of orbiting ptls")
-    print("num incorrect tot", tot_num_inc, ",", np.round(((tot_num_inc/tot_num_ptl) * 100),2), "% of all ptls")
+    # print("tot num ptl:",tot_num_ptl)
+    # print("num incorrect inf", inc_inf.shape[0], ",", np.round(((inc_inf.shape[0]/num_inf)*100),2), "% of infalling ptls")
+    # print("num incorrect orb", inc_orb.shape[0], ",", np.round(((inc_orb.shape[0]/num_orb)*100),2), "% of orbiting ptls")
+    # print("num incorrect tot", tot_num_inc, ",", np.round(((tot_num_inc/tot_num_ptl) * 100),2), "% of all ptls")
     
     inc_orb_r = r[inc_orb]
     inc_inf_r = r[inc_inf]
