@@ -178,7 +178,7 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
     act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
     create_directory(save_location + "plots/")
     curr_num_halos = halo_first.shape[0]
-    min_disp_halos = int(np.ceil(0.5 * curr_num_halos))
+    min_disp_halos = int(np.ceil(0.3 * curr_num_halos))
     num_bins = prf_bins.size
     
     # for each halo get the corresponding mass and density profile that the model predicts for it
@@ -395,7 +395,7 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
     bot_orb_tick = np.round(np.nanmin(lower_orb_dens_ratio),2)
     top_inf_tick = np.round(np.nanmax(upper_inf_dens_ratio),2)
     bot_inf_tick = np.round(np.nanmin(lower_inf_dens_ratio),2)
-    print(top_orb_tick,bot_orb_tick,top_inf_tick,bot_inf_tick)
+
     ax[2].set_xscale("log")
     ax[2].set_yscale("symlog")
     ax[2].set_box_aspect(1)

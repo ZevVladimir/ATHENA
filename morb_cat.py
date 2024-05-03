@@ -232,6 +232,8 @@ def halo_loop(indices, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos, p_ptls_vel, f
         all_halo_r200m = all_halo_r200m.astype(np.float32)
 
         if find_subhalos:
+            if os.path.isfile(save_location + "catologue_" + curr_sparta_file + ".hdf5") and i == 0:
+                os.remove(save_location + "catologue_" + curr_sparta_file + ".hdf5")
             with h5py.File(save_location + "member_catologue_" + curr_sparta_file + ".hdf5", 'a') as file:
                 if "Halos" not in file:
                     file.create_group("Halos")
@@ -242,6 +244,17 @@ def halo_loop(indices, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos, p_ptls_vel, f
                     
                         file["Halos"][str(halo_id)]['particle_ids'] = all_orb_pid[j]
                         file["Halos"][str(halo_id)]['sub_halo_ids'] = all_subhalo_id[j]
+            with h5py.File((save_location + "catologue_" + curr_sparta_file + ".hdf5"), 'a') as file:
+                if "Halos" not in file:
+                    file.create_group("Halos")
+                save_location + "catologue_" + curr_sparta_file + ".hdf5"
+                save_to_hdf5(file["Halos"], "Halo_ID", dataset = all_halo_id, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(file["Halos"], "Halo_pos", dataset = all_halo_pos, chunk = True, max_shape = ((total_num_halos,3)), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(file["Halos"], "Halo_vel", dataset = all_halo_vel, chunk = True, max_shape = ((total_num_halos,3)), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(file["Halos"], "M_orb", dataset = all_m_orb, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(file["Halos"], "M200m", dataset = all_halo_m200m, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(file["Halos"], "R200m", dataset = all_halo_r200m, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+
         else:
             with h5py.File(save_location + "member_catologue_" + curr_sparta_file + ".hdf5", 'a') as file:
                 if "Sub_Halos" not in file:
@@ -251,18 +264,18 @@ def halo_loop(indices, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos, p_ptls_vel, f
                         file["Sub_Halos"].create_group(str(halo_id))
                 
                     file["Sub_Halos"][str(halo_id)]['particle_ids'] = all_orb_pid[j]
+            with h5py.File((save_location + "catologue_" + curr_sparta_file + ".hdf5"), 'a') as file:
+                if "Sub_Halos" not in file:
+                    file.create_group("Sub_Halos")
+                save_location + "catologue_" + curr_sparta_file + ".hdf5"
+                save_to_hdf5(file["Sub_Halos"], "Halo_ID", dataset = all_halo_id, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(file["Sub_Halos"], "Halo_pos", dataset = all_halo_pos, chunk = True, max_shape = ((total_num_halos,3)), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(file["Sub_Halos"], "Halo_vel", dataset = all_halo_vel, chunk = True, max_shape = ((total_num_halos,3)), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(file["Sub_Halos"], "M_orb", dataset = all_m_orb, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(file["Sub_Halos"], "M200m", dataset = all_halo_m200m, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+                save_to_hdf5(file["Sub_Halos"], "R200m", dataset = all_halo_r200m, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
 
-        if os.path.isfile(save_location + "catologue_" + curr_sparta_file + ".hdf5") and i == 0:
-            os.remove(save_location + "catologue_" + curr_sparta_file + ".hdf5")
-        with h5py.File((save_location + "catologue_" + curr_sparta_file + ".hdf5"), 'a') as file:
-            save_location + "catologue_" + curr_sparta_file + ".hdf5"
-            save_to_hdf5(file, "Halo_ID", dataset = all_halo_id, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(file, "Halo_pos", dataset = all_halo_pos, chunk = True, max_shape = ((total_num_halos,3)), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(file, "Halo_vel", dataset = all_halo_vel, chunk = True, max_shape = ((total_num_halos,3)), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(file, "M_orb", dataset = all_m_orb, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(file, "M200m", dataset = all_halo_m200m, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(file, "R200m", dataset = all_halo_r200m, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-
+        
         hdf5_ptl_idx += p_tot_num_use_ptls
         hdf5_halo_idx += p_start_num_ptls.shape[0]
         t4 = time.time()
