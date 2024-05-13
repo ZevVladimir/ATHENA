@@ -48,13 +48,16 @@ global prim_only
 prim_only = config.getboolean("SEARCH","prim_only")
 t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
 p_red_shift = config.getfloat("SEARCH","p_red_shift")
-p_snap = config.getint("XGBOOST","p_snap")
-c_snap = config.getint("XGBOOST","c_snap")
+model_p_snap = config.getint("XGBOOST","model_p_snap")
+model_c_snap = config.getint("XGBOOST","model_c_snap")
+test_p_snap = config.getint("XGBOOST","test_p_snap")
+test_c_snap = config.getint("XGBOOST","test_c_snap")
+model_snapshot_list = [model_p_snap, model_c_snap]
+test_snapshot_list = [test_p_snap, test_c_snap]
 model_type = config["XGBOOST"]["model_type"]
 model_sparta_file = config["XGBOOST"]["model_sparta_file"]
 model_name = model_type + "_" + model_sparta_file
 radii_splits = config.get("XGBOOST","rad_splits").split(',')
-snapshot_list = [p_snap, c_snap]
 search_rad = config.getfloat("SEARCH","search_rad")
 total_num_snaps = config.getint("SEARCH","total_num_snaps")
 per_n_halo_per_split = config.getfloat("SEARCH","per_n_halo_per_split")
@@ -172,19 +175,20 @@ if __name__ == "__main__":
     else:
         client = get_CUDA_cluster()
         
-    if len(snapshot_list) > 1:
-        specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "_" + str(search_rad) + "search/"
+    if len(model_snapshot_list) > 1:
+        model_specific_save = model_sparta_file + "_" + str(model_snapshot_list[0]) + "to" + str(model_snapshot_list[-1]) + "_" + str(search_rad) + "search/"
+        test_specific_save = curr_sparta_file + "_" + str(test_snapshot_list[0]) + "to" + str(test_snapshot_list[-1]) + "_" + str(search_rad) + "search/"
     else:
-        specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(search_rad) + "search/"
+        model_specific_save = model_sparta_file + "_" + str(model_snapshot_list[0]) + "_" + str(search_rad) + "search/"
+        test_specific_save = curr_sparta_file + "_" + str(test_snapshot_list[0]) + "_" + str(search_rad) + "search/"
 
     if gpu_use:
         model_name = model_name + "_frac_" + str(frac_training_data) + "_gpu"
     else:
         model_name = model_name + "_frac_" + str(frac_training_data) + "_cpu"
 
-    save_location = path_to_xgboost + specific_save
-    dataset_location = save_location + "datasets/"
-    model_save_location = save_location + model_type + "_" + str(frac_training_data) + "_gpu/"  
+    dataset_location = path_to_xgboost + test_specific_save + "datasets/"
+    model_save_location = path_to_xgboost + model_specific_save + model_type + "_" + str(frac_training_data) + "_gpu/"  
     gen_plot_save_location = model_save_location + "plots/"
     create_directory(model_save_location)
     create_directory(gen_plot_save_location)
@@ -195,7 +199,7 @@ if __name__ == "__main__":
     test_labels_loc = dataset_location + "test_labels.pickle"
     train_keys_loc = dataset_location + "train_dataset_all_keys.pickle"
     test_keys_loc = dataset_location + "test_dataset_all_keys.pickle"
-    
+     
     if os.path.isfile(model_save_location + "model_info.pickle"):
         with open(model_save_location + "model_info.pickle", "rb") as pickle_file:
             model_info = pickle.load(pickle_file)
@@ -203,7 +207,7 @@ if __name__ == "__main__":
         model_info = {
             'Misc Info':{
                 'Model trained on': model_sparta_file,
-                'Snapshots used': snapshot_list,
+                'Snapshots used': model_snapshot_list,
                 'Max Radius': search_rad,
                 }}
     
@@ -257,13 +261,13 @@ if __name__ == "__main__":
             N_FOLDS = 5
             N_ITER = 25
             
-            model = dxgb.XGBClassifier(tree_method='gpu_hist', n_estimators=100, use_label_encoder=False, scale_pos_weight=scale_pos_weight)
+            model = dxgb.XGBClassifier(tree_method='hist', device="cuda", eval_metric="logloss", n_estimators=100, use_label_encoder=False, scale_pos_weight=scale_pos_weight)
             accuracy_wrapper_scorer = make_scorer(accuracy_score_wrapper)
             cuml_accuracy_scorer = make_scorer(accuracy_score, convert_dtype=True)
             print_acc(model, X_train, y_train, X_test, y_test)
             
             mode = "gpu-random"
-
+            #TODO fix so it takes from model_info.pickle
             if os.path.isfile(model_save_location + "hyper_param_res.pickle") and os.path.isfile(model_save_location + "hyper_param_results.pickle"):
                 with open(model_save_location + "hyper_param_res.pickle", "rb") as pickle_file:
                     res = pickle.load(pickle_file)

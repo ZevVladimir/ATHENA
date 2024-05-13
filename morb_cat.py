@@ -117,6 +117,7 @@ def search_halos(snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_pids, curr_
 
     if find_subhalos:
         subhalo_ids = p_halos_id[np.where(p_parent_id == halo_id)[0]]
+
         return halo_id, halo_pos, halo_vel, m_orb, halo_m200m, halo_r200m, curr_orb_pid, subhalo_ids
     return halo_id, halo_pos, halo_vel, m_orb, halo_m200m, halo_r200m, curr_orb_pid
 
@@ -238,12 +239,11 @@ def halo_loop(indices, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos, p_ptls_vel, f
                 if "Halos" not in file:
                     file.create_group("Halos")
                 for j,halo_id in enumerate(all_halo_id):
-                    if all_orb_pid[j].shape[0] * mass > 1e13:
-                        if str(halo_id) not in file["Halos"]:
-                            file["Halos"].create_group(str(halo_id))
-                    
-                        file["Halos"][str(halo_id)]['particle_ids'] = all_orb_pid[j]
-                        file["Halos"][str(halo_id)]['sub_halo_ids'] = all_subhalo_id[j]
+                    if str(halo_id) not in file["Halos"]:
+                        file["Halos"].create_group(str(halo_id))
+                
+                    file["Halos"][str(halo_id)]['particle_ids'] = all_orb_pid[j]
+                    file["Halos"][str(halo_id)]['sub_halo_ids'] = all_subhalo_id[j]
             with h5py.File((save_location + "catologue_" + curr_sparta_file + ".hdf5"), 'a') as file:
                 if "Halos" not in file:
                     file.create_group("Halos")
