@@ -142,11 +142,6 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     fnd_tang_vel_comp = calc_tang_vel(fnd_rad_vel, phys_vel_comp, rhat)
     fnd_tang_vel = np.linalg.norm(fnd_tang_vel_comp, axis = 1)
     
-    # scal_sqr_phys_vel = np.log(np.divide(np.square(phys_vel),np.square(curr_v200m)))
-    
-    # scal_sqr_phys_vel[np.where(np.isinf(scal_sqr_phys_vel) == True)[0]]=0
-  
-    
     scaled_rad_vel = fnd_rad_vel / curr_v200m
     scaled_tang_vel = fnd_tang_vel / curr_v200m
     scaled_radii = ptl_rad / halo_r200m
@@ -155,25 +150,7 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
         # particles with very high radial velocities at small radii should be considered infalling
         # incorrectly classified
         curr_orb_assn[np.where((scaled_radii < 1.1) & (np.abs(scaled_rad_vel)>10))] = 0
-    
-    # if np.where(np.abs(scaled_rad_vel[np.where(scaled_radii < 1.1)[0]]) > 40)[0].shape[0] > 0.5 * np.where(scaled_radii < 1.1)[0].shape[0]:
-    #     high_vel_idx = np.where((np.abs(scaled_rad_vel) > 50) & (scaled_radii < 1.1))[0]
-    #     within_rad = np.where(scaled_radii<1.1)[0]
         
-    #     plot_rhat = calc_rhat(physical_vel[:,0], physical_vel[:,1], physical_vel[:,2])
-
-    #     print("num high vel ptls in 1.1R200m:", high_vel_idx.shape[0], "num total ptls in 1.1R200m:", np.where(scaled_radii<1.1)[0].shape)
-
-    #     transparency = np.abs(physical_vel)/np.max(np.abs(physical_vel))
-    #     fig = plt.figure()
-    #     ax = fig.add_subplot(projection='3d')
-    #     # ax.quiver(curr_ptl_pos[within_rad,0],curr_ptl_pos[within_rad,1],curr_ptl_pos[within_rad,2], plot_rhat[within_rad,0], plot_rhat[within_rad,1], plot_rhat[within_rad,2], alpha=transparency[within_rad], length=2, color='b')
-    #     # ax.quiver(curr_ptl_pos[high_vel_idx,0],curr_ptl_pos[high_vel_idx,1],curr_ptl_pos[high_vel_idx,2], plot_rhat[high_vel_idx,0], plot_rhat[high_vel_idx,1], plot_rhat[high_vel_idx,2], alpha=transparency[high_vel_idx],length=2, color='r')
-    #     ax.quiver(curr_ptl_pos[within_rad,0],curr_ptl_pos[within_rad,1],curr_ptl_pos[within_rad,2], plot_rhat[within_rad,0], plot_rhat[within_rad,1], plot_rhat[within_rad,2], length=2, color='b')
-    #     ax.quiver(curr_ptl_pos[high_vel_idx,0],curr_ptl_pos[high_vel_idx,1],curr_ptl_pos[high_vel_idx,2], plot_rhat[high_vel_idx,0], plot_rhat[high_vel_idx,1], plot_rhat[high_vel_idx,2], length=2, color='r')
-    #     fig.savefig("/home/zvladimi/scratch/MLOIS/Random_figures/high_vel_halo" + str(curr_halo_idx) + ".png")
-    #     plt.close()
-
     scaled_radii_inds = scaled_radii.argsort()
     scaled_radii = scaled_radii[scaled_radii_inds]
     fnd_HIPIDs = fnd_HIPIDs[scaled_radii_inds]
@@ -188,7 +165,7 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     else:
         return fnd_HIPIDs, scaled_rad_vel, scaled_tang_vel, scaled_radii
 
-def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos, p_ptls_vel, c_dict, c_ptls_pid, c_ptls_pos, c_ptls_vel):
+def halo_loop(indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos, p_ptls_vel, c_dict, c_ptls_pid, c_ptls_pos, c_ptls_vel):
     num_iter = int(np.ceil(indices.shape[0] / num_halo_per_split))
     print("Num halo per", num_iter, "splits:", num_halo_per_split)
     hdf5_ptl_idx = 0
@@ -360,36 +337,24 @@ def halo_loop(train, indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_pt
         
         # Save all data in hdf5 file depending on if training or testing halos]
         #save_cols = ["Halo_first", "Halo_n", "HIPIDS", "Orbit_Infall", "Svaled_radii_", "Radial_vel_", "Tangential_vel_"]
-        if train:
-            if os.path.isfile(save_location + "train_all_particle_properties_" + curr_sparta_file + ".hdf5") and i == 0:
-                os.remove(save_location + "train_all_particle_properties_" + curr_sparta_file + ".hdf5")
-            with h5py.File((save_location + "train_all_particle_properties_" + curr_sparta_file + ".hdf5"), 'a') as all_particle_properties:
-                save_location + "train_all_particle_properties_" + curr_sparta_file + ".hdf5"
-                save_to_hdf5(all_particle_properties, "Halo_first", dataset = p_start_num_ptls, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
-                save_to_hdf5(all_particle_properties, "Halo_n", dataset = p_use_num_ptls, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
-                save_to_hdf5(all_particle_properties, "HIPIDS", dataset = p_all_HIPIDs, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-                save_to_hdf5(all_particle_properties, "Orbit_Infall", dataset = p_all_orb_assn, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-                save_to_hdf5(all_particle_properties, "Scaled_radii_", dataset = save_scale_radii, chunk = True, max_shape = use_max_shape, curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-                save_to_hdf5(all_particle_properties, "Radial_vel_", dataset = save_rad_vel, chunk = True, max_shape = use_max_shape, curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-                save_to_hdf5(all_particle_properties, "Tangential_vel_", dataset = save_tang_vel, chunk = True, max_shape = use_max_shape, curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-                #save_to_hdf5(all_particle_properties, "scal_sqr_phys_vel", dataset = p_scal_sqr_phys_vel, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-        else:
-            if os.path.isfile(save_location + "test_all_particle_properties_" + curr_sparta_file + ".hdf5") and i == 0:
-                os.remove(save_location + "test_all_particle_properties_" + curr_sparta_file + ".hdf5")
-            with h5py.File((save_location + "test_all_particle_properties_" + curr_sparta_file + ".hdf5"), 'a') as all_particle_properties:
-                save_to_hdf5(all_particle_properties, "Halo_first", dataset = p_start_num_ptls, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
-                save_to_hdf5(all_particle_properties, "Halo_n", dataset = p_use_num_ptls, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
-                save_to_hdf5(all_particle_properties, "HIPIDS", dataset = p_all_HIPIDs, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-                save_to_hdf5(all_particle_properties, "Orbit_Infall", dataset = p_all_orb_assn, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-                save_to_hdf5(all_particle_properties, "Scaled_radii_", dataset = save_scale_radii, chunk = True, max_shape = use_max_shape, curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-                save_to_hdf5(all_particle_properties, "Radial_vel_", dataset = save_rad_vel, chunk = True, max_shape = use_max_shape, curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-                save_to_hdf5(all_particle_properties, "Tangential_vel_", dataset = save_tang_vel, chunk = True, max_shape = use_max_shape, curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-                #save_to_hdf5(all_particle_properties, "scal_sqr_phys_vel", dataset = p_scal_sqr_phys_vel, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+
+        if os.path.isfile(save_location + "all_particle_properties.hdf5") and i == 0:
+            os.remove(save_location + "all_particle_properties.hdf5")
+        with h5py.File((save_location + "all_particle_properties.hdf5"), 'a') as all_particle_properties:
+            save_to_hdf5(all_particle_properties, "Halo_first", dataset = p_start_num_ptls, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(all_particle_properties, "Halo_n", dataset = p_use_num_ptls, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(all_particle_properties, "HIPIDS", dataset = p_all_HIPIDs, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(all_particle_properties, "Orbit_Infall", dataset = p_all_orb_assn, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(all_particle_properties, "Scaled_radii_", dataset = save_scale_radii, chunk = True, max_shape = use_max_shape, curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(all_particle_properties, "Radial_vel_", dataset = save_rad_vel, chunk = True, max_shape = use_max_shape, curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(all_particle_properties, "Tangential_vel_", dataset = save_tang_vel, chunk = True, max_shape = use_max_shape, curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+            #save_to_hdf5(all_particle_properties, "scal_sqr_phys_vel", dataset = p_scal_sqr_phys_vel, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+
         hdf5_ptl_idx += p_tot_num_use_ptls
         hdf5_halo_idx += p_start_num_ptls.shape[0]
         t4 = time.time()
         del sparta_output
-        print("Bin", (i+1),"/",num_iter,"complete:",np.round(((t4-t3)/60),2), "min", np.round((t4-t3),2),"sec")      
+        print("Split", (i+1),"/",num_iter,"complete:",np.round(((t4-t3)/60),2), "min", np.round((t4-t3),2),"sec")      
                 
 t1 = time.time()
 
@@ -446,9 +411,9 @@ del sparta_output
 snapshot_list = [p_snap, c_snap]
 
 if prim_only:
-    save_location =  path_to_MLOIS +  "calculated_info/" + curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(search_rad) + "search/"
+    save_location =  path_to_MLOIS +  "calculated_info/" + curr_sparta_file + "_" + str(snapshot_list[0]) + "/"
 else:
-    save_location =  path_to_MLOIS + "calculated_info/" + curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[1]) + "_" + str(search_rad) + "search/"
+    save_location =  path_to_MLOIS + "calculated_info/" + curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[1]) + "/"
 
 if os.path.exists(save_location) != True:
     os.makedirs(save_location)
@@ -475,60 +440,31 @@ if prim_only:
 else:
     match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap) & (c_halos_status > 0) & (c_halos_last_snap >= c_sparta_snap))[0]
     
-rng = np.random.default_rng(rand_seed)    
 total_num_halos = match_halo_idxs.shape[0]
-rng.shuffle(match_halo_idxs)
-# split all indices into train and test groups
-train_indices, test_indices = np.split(match_halo_idxs, [int((1-test_halos_ratio) * total_num_halos)])
-# need to sort indices otherwise sparta.load breaks...
-train_indices = np.sort(train_indices)
-test_indices = np.sort(test_indices)
-
 num_halo_per_split = int(np.ceil(per_n_halo_per_split * total_num_halos))
 
-with open(save_location + "test_indices.pickle", "wb") as pickle_file:
-    pickle.dump(test_indices, pickle_file)
-with open(save_location + "train_indices.pickle", "wb") as pickle_file:
-    pickle.dump(train_indices, pickle_file)
+with open(save_location + "all_indices.pickle", "wb") as pickle_file:
+    pickle.dump(match_halo_idxs, pickle_file)
 
-with timed("p_snap initial search"):
-    if os.path.isfile(save_location + "train_num_ptls.pickle"):
-        with open(save_location + "train_num_ptls.pickle", "rb") as pickle_file:
-            train_num_ptls = pickle.load(pickle_file)
-    else:
-        with mp.Pool(processes=num_processes) as p:
-            # halo position, halo r200m, if comparison snap, want mass?, want indices?
-            train_num_ptls = p.starmap(initial_search, zip(p_halos_pos[train_indices], p_halos_r200m[train_indices], repeat(False), repeat(False), repeat(False)), chunksize=curr_chunk_size)
-            with open(save_location + "train_num_ptls.pickle", "wb") as pickle_file:
-                pickle.dump(train_num_ptls, pickle_file)
-        p.close()
-        p.join() 
+if os.path.isfile(save_location + "tot_num_ptls.pickle"):
+    with open(save_location + "tot_num_ptls.pickle", "rb") as pickle_file:
+        tot_num_ptls = pickle.load(pickle_file)
+else:
+    with mp.Pool(processes=num_processes) as p:
+        # halo position, halo r200m, if comparison snap, want mass?, want indices?
+        num_ptls = p.starmap(initial_search, zip(p_halos_pos[match_halo_idxs], p_halos_r200m[match_halo_idxs], repeat(False), repeat(False), repeat(False)), chunksize=curr_chunk_size)
+        tot_num_ptls = np.sum(num_ptls)
+        with open(save_location + "tot_num_ptls.pickle", "wb") as pickle_file:
+            pickle.dump(tot_num_ptls, pickle_file)
+    p.close()
+    p.join() 
 
-with timed("c_snap initial search"):
-    if os.path.isfile(save_location + "test_num_ptls.pickle"):
-        with open(save_location + "test_num_ptls.pickle", "rb") as pickle_file:
-            test_num_ptls = pickle.load(pickle_file)
-    else:
-        with mp.Pool(processes=num_processes) as p:
-            # halo position, halo r200m, if comparison snap, want mass?, want indices?
-            test_num_ptls = p.starmap(initial_search, zip(p_halos_pos[test_indices], p_halos_r200m[test_indices], repeat(False), repeat(False), repeat(False)), chunksize=curr_chunk_size)
-            with open(save_location + "test_num_ptls.pickle", "wb") as pickle_file:
-                pickle.dump(test_num_ptls, pickle_file)
-        p.close()
-        p.join() 
 
-train_tot_num_ptls = np.sum(train_num_ptls)
-test_tot_num_ptls = np.sum(test_num_ptls)
-
-print("Total num halos:", total_num_halos)
-print("Num train halos:", train_indices.shape[0])
-print("Num test halos:", test_indices.shape[0])
-print("train num ptls:", train_tot_num_ptls)
-print("test num ptls:", test_tot_num_ptls)
+print(f"Total num halos: {total_num_halos:,}")
+print(f"Total num ptls: {tot_num_ptls:,}")
 
 t2 = time.time()
 print("Start up finished in:",np.round((t2-t1),2),"seconds", np.round(((t2-t1)/60),2), "minutes")
-halo_loop(train=True, indices=train_indices, tot_num_ptls=train_tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
-halo_loop(train=False, indices=test_indices, tot_num_ptls=test_tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
+halo_loop(indices=match_halo_idxs, tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
 t3 = time.time()
 print("Finished in:",np.round((t3-t1),2),"seconds", np.round(((t3-t1)/60),2), "minutes")

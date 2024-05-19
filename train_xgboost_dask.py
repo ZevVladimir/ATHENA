@@ -36,13 +36,13 @@ path_to_calc_info = config["PATHS"]["path_to_calc_info"]
 path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
 path_to_sparta = config["PATHS"]["path_to_sparta"]
 path_to_xgboost = config["PATHS"]["path_to_xgboost"]
-create_directory(path_to_MLOIS)
-create_directory(path_to_snaps)
-create_directory(path_to_SPARTA_data)
-create_directory(path_to_hdf5_file)
-create_directory(path_to_pickle)
-create_directory(path_to_calc_info)
-create_directory(path_to_xgboost)
+# create_directory(path_to_MLOIS)
+# create_directory(path_to_snaps)
+# create_directory(path_to_SPARTA_data)
+# create_directory(path_to_hdf5_file)
+# create_directory(path_to_pickle)
+# create_directory(path_to_calc_info)
+# create_directory(path_to_xgboost)
 snap_format = config["MISC"]["snap_format"]
 global prim_only
 prim_only = config.getboolean("SEARCH","prim_only")
@@ -176,19 +176,15 @@ if __name__ == "__main__":
         client = get_CUDA_cluster()
         
     if len(model_snapshot_list) > 1:
-        model_specific_save = model_sparta_file + "_" + str(model_snapshot_list[0]) + "to" + str(model_snapshot_list[-1]) + "_" + str(search_rad) + "search/"
-        test_specific_save = curr_sparta_file + "_" + str(test_snapshot_list[0]) + "to" + str(test_snapshot_list[-1]) + "_" + str(search_rad) + "search/"
+        model_specific_save = model_sparta_file + "_" + str(model_snapshot_list[0]) + "to" + str(model_snapshot_list[-1]) + "/"
+        test_specific_save = curr_sparta_file + "_" + str(test_snapshot_list[0]) + "to" + str(test_snapshot_list[-1]) + "/"
     else:
-        model_specific_save = model_sparta_file + "_" + str(model_snapshot_list[0]) + "_" + str(search_rad) + "search/"
-        test_specific_save = curr_sparta_file + "_" + str(test_snapshot_list[0]) + "_" + str(search_rad) + "search/"
+        model_specific_save = model_sparta_file + "_" + str(model_snapshot_list[0]) + "/"
+        test_specific_save = curr_sparta_file + "_" + str(test_snapshot_list[0]) + "/"
 
-    if gpu_use:
-        model_name = model_name + "_frac_" + str(frac_training_data) + "_gpu"
-    else:
-        model_name = model_name + "_frac_" + str(frac_training_data) + "_cpu"
 
     dataset_location = path_to_xgboost + test_specific_save + "datasets/"
-    model_save_location = path_to_xgboost + model_specific_save + model_type + "_" + str(frac_training_data) + "_gpu/"  
+    model_save_location = path_to_xgboost + model_specific_save + model_type + "_" + str(frac_training_data) + "/"
     gen_plot_save_location = model_save_location + "plots/"
     create_directory(model_save_location)
     create_directory(gen_plot_save_location)
@@ -211,6 +207,7 @@ if __name__ == "__main__":
                 'Max Radius': search_rad,
                 }}
     
+
     if os.path.isfile(model_save_location + model_name + ".json"):
         bst = xgb.Booster()
         bst.load_model(model_save_location + model_name + ".json")

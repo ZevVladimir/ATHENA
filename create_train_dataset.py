@@ -1,10 +1,13 @@
 import numpy as np
 import time 
+import matplotlib.pyplot as plt
 from colossus.cosmology import cosmology
+from colossus.lss import peaks
 import pickle
 import os
 import multiprocessing as mp
 import h5py
+import json
 from itertools import repeat
 from utils.data_and_loading_functions import check_pickle_exist_gadget, choose_halo_split, create_directory
 ##################################################################################################################
@@ -31,13 +34,18 @@ create_directory(path_to_pickle)
 create_directory(path_to_calc_info)
 create_directory(path_to_xgboost)
 snap_format = config["MISC"]["snap_format"]
-global prim_only
-prim_only = config.getboolean("SEARCH","prim_only")
 t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
-global p_snap
-p_snap = config.getint("XGBOOST","p_snap")
-c_snap = config.getint("XGBOOST","c_snap")
-snapshot_list = [p_snap, c_snap]
+p_red_shift = config.getfloat("SEARCH","p_red_shift")
+
+use_sims = json.loads(config.get("DATASET","use_sims"))
+
+model_p_snap = config.getint("XGBOOST","model_p_snap")
+model_c_snap = config.getint("XGBOOST","model_c_snap")
+test_p_snap = config.getint("XGBOOST","test_p_snap")
+test_c_snap = config.getint("XGBOOST","test_c_snap")
+model_snapshot_list = [model_p_snap, model_c_snap]
+test_snapshot_list = [test_p_snap, test_c_snap]
+
 global search_rad
 search_rad = config.getfloat("SEARCH","search_rad")
 total_num_snaps = config.getint("SEARCH","total_num_snaps")
@@ -64,7 +72,7 @@ def take_ptl_within(dataset, labels, scal_rad_loc, max_rad):
     within_rad_labels = labels[within_rad]
     return within_rad.shape[0], within_rad_dataset, within_rad_labels
 
-def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapshot_list, p_snap, max_rad):
+def build_sim_dataset(save_path, data_loc, sparta_name, dataset_name, snapshot_list, p_snap, max_rad):
     save_path = save_path + "datasets/"
     create_directory(save_path)
     dataset_path = save_path + dataset_name + "_dataset" + ".pickle"
@@ -73,7 +81,7 @@ def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapsh
         os.makedirs(save_path)
     if os.path.exists(dataset_path) != True:
         num_cols = 0
-        with h5py.File((data_location + dataset_name + "_all_particle_properties_" + sparta_name + ".hdf5"), 'r') as all_ptl_properties: 
+        with h5py.File((data_loc + dataset_name + "_all_particle_properties_" + sparta_name + ".hdf5"), 'r') as all_ptl_properties: 
             for key in all_ptl_properties.keys():
                 if key != "Halo_first" and key != "Halo_n" and key != "HIPIDS" and key != "Orbit_Infall":
                     if all_ptl_properties[key].ndim > 1:
@@ -166,11 +174,26 @@ def build_ml_dataset(save_path, data_location, sparta_name, dataset_name, snapsh
             all_keys = pickle.load(pickle_file)
     return full_dataset, all_keys
 
+def build_mass_dataset(init_z):
+    p_snap, z = find_closest_z(init_z)
+    nus = []
+    for sim in use_sims:
+        curr_file = path_to_calc_info + sim + "_" + str(model_snapshot_list[0]) + "to" + str(model_snapshot_list[-1]) + "/"
+        curr_file += "all_particle_properties.hdf5"
+        with h5py.File(curr_file,"r") as f:
+            nus.append(peaks.peakHeight((f["Halo_n"][:]*mass), z))
+   
+    fig, ax = plt.subplots(1)
+    ax.hist(nus)
+    fig.savefig("/home/zvladimi/MLOIS/Random_figs/nu_dist.png")
+            
+        
+
 # set what the paths should be for saving and getting the data
-if len(snapshot_list) > 1:
-    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[-1]) + "_" + str(search_rad) + "search/"
+if len(model_snapshot_list) > 1:
+    specific_save = curr_sparta_file + "_" + str(model_snapshot_list[0]) + "to" + str(model_snapshot_list[-1]) + "/"
 else:
-    specific_save = curr_sparta_file + "_" + str(snapshot_list[0]) + "_" + str(search_rad) + "search/"
+    specific_save = curr_sparta_file + "_" + str(model_snapshot_list[0]) + "/"
     
 data_location = path_to_calc_info + specific_save
 save_location = path_to_xgboost + specific_save
@@ -179,22 +202,23 @@ create_directory(save_location)
 
 
 #TODO change to using sparta
-snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(snapshot_list[0]) + "/snapshot_" + snap_format.format(snapshot_list[0])
+snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(model_snapshot_list[0]) + "/snapshot_" + snap_format.format(model_snapshot_list[0])
 
-ptl_mass = check_pickle_exist_gadget(curr_sparta_file, "mass", str(snapshot_list[0]), snapshot_path)
+ptl_mass = check_pickle_exist_gadget(curr_sparta_file, "mass", str(model_snapshot_list[0]), snapshot_path)
 mass = ptl_mass[0] * 10**10 #units M_sun/h
 cosmol = cosmology.setCosmology("bolshoi")
 
 np.random.seed(11)
+build_mass_dataset(p_red_shift)
 
-t1 = time.time()
-print("Start train dataset creation")
-# Create the separate datasets for training and testing
-train_dataset, train_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "train", snapshot_list = snapshot_list, p_snap=p_snap, max_rad=training_rad)
-t2 = time.time()
-print("Time taken:", np.round((t2-t1),2),"seconds")
+# t1 = time.time()
+# print("Start train dataset creation")
+# # Create the separate datasets for training and testing
+# train_dataset, train_all_keys = build_sim_dataset(save_path = save_location, data_loc = data_location, sparta_name = curr_sparta_file, dataset_name = "train", snapshot_list = snapshot_list, p_snap=p_snap, max_rad=training_rad)
+# t2 = time.time()
+# print("Time taken:", np.round((t2-t1),2),"seconds")
 
-print("Start test dataset creation")
-test_dataset, test_all_keys = build_ml_dataset(save_path = save_location, data_location = data_location, sparta_name = curr_sparta_file, dataset_name = "test", snapshot_list = snapshot_list, p_snap=p_snap, max_rad=search_rad)
-t3 = time.time()
-print("Time taken:", np.round((t3-t1),2),"seconds")
+# print("Start test dataset creation")
+# test_dataset, test_all_keys = build_sim_dataset(save_path = save_location, data_loc = data_location, sparta_name = curr_sparta_file, dataset_name = "test", snapshot_list = snapshot_list, p_snap=p_snap, max_rad=search_rad)
+# t3 = time.time()
+# print("Time taken:", np.round((t3-t1),2),"seconds")
