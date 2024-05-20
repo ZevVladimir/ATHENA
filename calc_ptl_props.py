@@ -33,9 +33,6 @@ path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
 path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
 path_to_sparta = config["PATHS"]["path_to_sparta"]
-create_directory(path_to_MLOIS)
-create_directory(path_to_snaps)
-create_directory(path_to_SPARTA_data)
 create_directory(path_to_pickle)
 create_directory(path_to_calc_info)
 snap_format = config["MISC"]["snap_format"]

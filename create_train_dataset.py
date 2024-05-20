@@ -26,13 +26,8 @@ path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
 path_to_sparta = config["PATHS"]["path_to_sparta"]
 path_to_xgboost = config["PATHS"]["path_to_xgboost"]
 
-create_directory(path_to_MLOIS)
-create_directory(path_to_snaps)
-create_directory(path_to_SPARTA_data)
-create_directory(path_to_hdf5_file)
-create_directory(path_to_pickle)
-create_directory(path_to_calc_info)
 create_directory(path_to_xgboost)
+
 snap_format = config["MISC"]["snap_format"]
 t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
 p_red_shift = config.getfloat("SEARCH","p_red_shift")
@@ -184,7 +179,11 @@ def build_mass_dataset(init_z):
             nus.append(peaks.peakHeight((f["Halo_n"][:]*mass), z))
    
     fig, ax = plt.subplots(1)
-    ax.hist(nus)
+    ax.hist(nus, histtype="barstacked", stacked=True, label=use_sims)
+    ax.set_xlabel(r"$\nu$")
+    ax.set_ylabel("Counts")
+    ax.set_yscale("log")
+    ax.legend()
     fig.savefig("/home/zvladimi/MLOIS/Random_figs/nu_dist.png")
             
         
