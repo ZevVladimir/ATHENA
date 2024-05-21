@@ -130,8 +130,7 @@ def build_sim_dataset(curr_sim, snapshot_list):
 
     return full_dataset, dataset_keys, hipids, labels, halo_first, halo_n
 
-def build_mass_dataset():
-    #TODO find some way to do the exact redshift for each simulation
+def plot_mass_dataset():
     nus = []
     fig, ax = plt.subplots(1, figsize=(30,15))
     for sim in use_sims:
@@ -170,7 +169,7 @@ def build_mass_dataset():
 cosmol = cosmology.setCosmology("bolshoi")
 
 np.random.seed(11)
-build_mass_dataset()
+plot_mass_dataset()
 
 # Create all the datasets for the simulations
 combined_name = ""

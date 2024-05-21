@@ -16,6 +16,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import h5py
+import json
+import re
 from pairing import depair
 
 from utils.data_and_loading_functions import create_directory, load_or_pickle_SPARTA_data, conv_halo_id_spid
@@ -42,15 +44,11 @@ global prim_only
 prim_only = config.getboolean("SEARCH","prim_only")
 t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
 p_red_shift = config.getfloat("SEARCH","p_red_shift")
-model_p_snap = config.getint("XGBOOST","model_p_snap")
-model_c_snap = config.getint("XGBOOST","model_c_snap")
-test_p_snap = config.getint("XGBOOST","test_p_snap")
-test_c_snap = config.getint("XGBOOST","test_c_snap")
-model_snapshot_list = [model_p_snap, model_c_snap]
-test_snapshot_list = [test_p_snap, test_c_snap]
+use_sims = json.loads(config.get("DATASET","use_sims"))
+
+model_snapshot_list = json.loads(config.get("XGBOOST","model_snaps"))
+test_snapshot_list = json.loads(config.get("XGBOOST","test_snaps"))
 model_type = config["XGBOOST"]["model_type"]
-model_sparta_file = config["XGBOOST"]["model_sparta_file"]
-model_name = model_type + "_" + model_sparta_file
 radii_splits = config.get("XGBOOST","rad_splits").split(',')
 search_rad = config.getfloat("SEARCH","search_rad")
 total_num_snaps = config.getint("SEARCH","total_num_snaps")
@@ -169,16 +167,28 @@ if __name__ == "__main__":
     else:
         client = get_CUDA_cluster()
         
-    if len(model_snapshot_list) > 1:
-        model_specific_save = model_sparta_file + "_" + str(model_snapshot_list[0]) + "to" + str(model_snapshot_list[-1]) + "/"
-        test_specific_save = curr_sparta_file + "_" + str(test_snapshot_list[0]) + "to" + str(test_snapshot_list[-1]) + "/"
-    else:
-        model_specific_save = model_sparta_file + "_" + str(model_snapshot_list[0]) + "/"
-        test_specific_save = curr_sparta_file + "_" + str(test_snapshot_list[0]) + "/"
+        
+    combined_name = ""
+    for i,sim in enumerate(use_sims):
+        pattern = r"(\d+)to(\d+)"
+        match = re.search(pattern, sim)
 
+        if match:
+            curr_snap_list = [match.group(1), match.group(2)] 
+            print(f"First number: {match.group(1)}")
+            print(f"Second number: {match.group(2)}")
+        else:
+            print("Pattern not found in the string.")
+        parts = sim.split("_")
+        combined_name += parts[1] + parts[2] + "s" + parts[4] 
+        if i != len(use_sims)-1:
+            combined_name += "_"
+        
+    model_name = model_type + "_" + combined_name
 
-    dataset_location = path_to_xgboost + test_specific_save + "datasets/"
-    model_save_location = path_to_xgboost + model_specific_save + model_type + "_" + str(frac_training_data) + "/"
+    dataset_location = path_to_xgboost + combined_name + "/datasets/"
+    model_save_location = path_to_xgboost + model_name + "/"
+    
     gen_plot_save_location = model_save_location + "plots/"
     create_directory(model_save_location)
     create_directory(gen_plot_save_location)
