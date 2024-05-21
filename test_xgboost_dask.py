@@ -34,13 +34,7 @@ path_to_calc_info = config["PATHS"]["path_to_calc_info"]
 path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
 path_to_sparta = config["PATHS"]["path_to_sparta"]
 path_to_xgboost = config["PATHS"]["path_to_xgboost"]
-create_directory(path_to_MLOIS)
-create_directory(path_to_snaps)
-create_directory(path_to_SPARTA_data)
-create_directory(path_to_hdf5_file)
-create_directory(path_to_pickle)
-create_directory(path_to_calc_info)
-create_directory(path_to_xgboost)
+
 snap_format = config["MISC"]["snap_format"]
 global prim_only
 prim_only = config.getboolean("SEARCH","prim_only")

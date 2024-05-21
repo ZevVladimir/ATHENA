@@ -24,10 +24,6 @@ path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
 path_to_hdf5_file = path_to_SPARTA_data + curr_sparta_file + ".hdf5"
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
 path_to_sparta = config["PATHS"]["path_to_sparta"]
-create_directory(path_to_MLOIS)
-create_directory(path_to_snaps)
-create_directory(path_to_SPARTA_data)
-create_directory(path_to_hdf5_file)
 create_directory(path_to_calc_info)
 snap_format = config["MISC"]["snap_format"]
 p_red_shift = config.getfloat("SEARCH","p_red_shift")

@@ -355,7 +355,6 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
     ax[0].set_yscale("log")
     ax[0].set_box_aspect(1)
     ax[0].tick_params(axis='both',which='both',labelsize=tickfntsize)
-    ax[0].tick_params(axis='both',which='both',labelsize=tickfntsize)
     ax[0].legend(fontsize=legendfntsize)
     
     ax[1].plot(middle_bins, med_calc_dens_prf_all, 'r-', label = "ML density profile all ptls")
