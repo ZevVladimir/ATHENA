@@ -184,7 +184,7 @@ def halo_loop(indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos,
         sparta_output = sparta.load(filename = path_to_hdf5_file, halo_ids=use_halo_ids, log_level=0)
 
         global c_sparta_snap
-        c_sparta_snap = np.abs(sparta_output["simulation"]["snap_z"][:] - c_red_shift).argmin()
+        c_sparta_snap = np.abs(dic_sim["snap_z"][:] - c_red_shift).argmin()
         
         new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta re-sort the indices
         use_halo_idxs = use_indices[new_idxs]
@@ -360,8 +360,13 @@ cosmol = cosmology.setCosmology("bolshoi")
 with timed("p_snap information load"):
     p_snap, p_red_shift = find_closest_z(p_red_shift)
     print("Snapshot number found:", p_snap, "Closest redshift found:", p_red_shift)
-    sparta_output = sparta.load(filename=path_to_hdf5_file, load_halo_data=False, log_level= 0)
-    all_red_shifts = sparta_output["simulation"]["snap_z"][:]
+    with h5py.File(path_to_hdf5_file,"r") as f:
+        dic_sim = {}
+        grp_sim = f['simulation']
+        for f in grp_sim.attrs:
+            dic_sim[f] = grp_sim.attrs[f]
+        
+    all_red_shifts = dic_sim['snap_z']
     p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
     print("corresponding SPARTA snap num:", p_sparta_snap)
     print("check sparta redshift:",all_red_shifts[p_sparta_snap])
@@ -373,7 +378,7 @@ with timed("p_snap information load"):
     p_scale_factor = 1/(1+p_red_shift)
     p_rho_m = cosmol.rho_m(p_red_shift)
     p_hubble_constant = cosmol.Hz(p_red_shift) * 0.001 # convert to units km/s/kpc
-    sim_box_size = sparta_output["simulation"]["box_size"] #units Mpc/h comoving
+    sim_box_size = dic_sim["box_size"] #units Mpc/h comoving
     p_box_size = sim_box_size * 10**3 * p_scale_factor #convert to Kpc/h physical
 
     p_snap_dict = {
@@ -404,7 +409,7 @@ c_snap_dict = {
     "hubble_const": c_hubble_constant,
     "box_size": c_box_size
 }
-del sparta_output
+
 snapshot_list = [p_snap, c_snap]
 
 if prim_only:

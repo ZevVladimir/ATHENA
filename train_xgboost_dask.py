@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import h5py
 from pairing import depair
 
-from utils.data_and_loading_functions import create_directory, load_or_pickle_SPARTA_data, conv_halo_id_spid, find_closest_z
+from utils.data_and_loading_functions import create_directory, load_or_pickle_SPARTA_data, conv_halo_id_spid
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
