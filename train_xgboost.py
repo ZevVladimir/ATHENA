@@ -51,7 +51,7 @@ radii_splits = config.get("XGBOOST","rad_splits").split(',')
 search_rad = config.getfloat("SEARCH","search_rad")
 total_num_snaps = config.getint("SEARCH","total_num_snaps")
 per_n_halo_per_split = config.getfloat("SEARCH","per_n_halo_per_split")
-test_halos_ratio = config.getfloat("SEARCH","test_halos_ratio")
+test_halos_ratio = config.getfloat("DATASET","test_halos_ratio")
 curr_chunk_size = config.getint("SEARCH","chunk_size")
 global num_save_ptl_params
 num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
@@ -59,6 +59,7 @@ do_hpo = config.getboolean("XGBOOST","hpo")
 frac_training_data = config.getfloat("XGBOOST","frac_train_data")
 # size float32 is 4 bytes
 chunk_size = int(np.floor(1e9 / (num_save_ptl_params * 4)))
+eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
 
 from utils.visualization_functions import *
 from utils.ML_support import *
@@ -134,15 +135,6 @@ def print_acc(model, X_train, y_train, X_test, y_test, mode_str="Default"):
     score = accuracy_score(y_pred, y_test.astype('float32'), convert_dtype=True)
     print("{} model accuracy: {}".format(mode_str, score))
 
-def make_preds(client, bst, X_np, y_np, report_name="Classification Report", print_report=False):
-    X = da.from_array(X_np,chunks=(chunk_size,X_np.shape[1]))
-    
-    preds = dxgb.inplace_predict(client, bst, X).compute()
-    preds = np.round(preds)
-    preds = preds.astype(np.int8)
-    
-    return preds
-
 if __name__ == "__main__":
     if on_zaratan:
         if 'SLURM_CPUS_PER_TASK' in os.environ:
@@ -182,23 +174,23 @@ if __name__ == "__main__":
         
     model_name = model_type + "_" + combined_name
 
-    dataset_location = path_to_xgboost + combined_name + "/datasets/"
-    model_save_location = path_to_xgboost + combined_name + "/" + model_name + "/"
+    dataset_loc = path_to_xgboost + combined_name + "/datasets/"
+    model_save_loc = path_to_xgboost + combined_name + "/" + model_name + "/"
     
-    gen_plot_save_location = model_save_location + "plots/"
-    create_directory(model_save_location)
-    create_directory(gen_plot_save_location)
+    gen_plot_save_loc = model_save_loc + "plots/"
+    create_directory(model_save_loc)
+    create_directory(gen_plot_save_loc)
     
-    train_dataset_loc = dataset_location + "train_dataset/train_dataset.pickle"
-    train_labels_loc = dataset_location + "train_dataset/train_labels.pickle"
-    test_dataset_loc = dataset_location + "test_dataset/test_dataset.pickle"
-    test_labels_loc = dataset_location + "test_dataset/test_labels.pickle"
+    train_dataset_loc = dataset_loc + "train_dataset/dataset.pickle"
+    train_labels_loc = dataset_loc + "train_dataset/labels.pickle"
+    test_dataset_loc = dataset_loc + "test_dataset/dataset.pickle"
+    test_labels_loc = dataset_loc + "test_dataset/labels.pickle"
     #TODO condense this in the code to use the same keys
-    train_keys_loc = dataset_location + "train_dataset/keys.pickle"
-    test_keys_loc = dataset_location + "train_dataset/keys.pickle"
+    train_keys_loc = dataset_loc + "train_dataset/keys.pickle"
+    test_keys_loc = dataset_loc + "train_dataset/keys.pickle"
      
-    if os.path.isfile(model_save_location + "model_info.pickle"):
-        with open(model_save_location + "model_info.pickle", "rb") as pickle_file:
+    if os.path.isfile(model_save_loc + "model_info.pickle"):
+        with open(model_save_loc + "model_info.pickle", "rb") as pickle_file:
             model_info = pickle.load(pickle_file)
     else:
         train_sims = ""
@@ -214,9 +206,9 @@ if __name__ == "__main__":
                 }}
     
 
-    if os.path.isfile(model_save_location + model_name + ".json"):
+    if os.path.isfile(model_save_loc + model_name + ".json"):
         bst = xgb.Booster()
-        bst.load_model(model_save_location + model_name + ".json")
+        bst.load_model(model_save_loc + model_name + ".json")
         params = model_info.get('Training Info',{}).get('Training Params')
         print("Loaded Booster")
     else:
@@ -248,7 +240,7 @@ if __name__ == "__main__":
         del test_features
         print("scale_pos_weight:", scale_pos_weight)
         
-        if on_zaratan == False and do_hpo == True and os.path.isfile(model_save_location + "used_params.pickle") == False:  
+        if on_zaratan == False and do_hpo == True and os.path.isfile(model_save_loc + "used_params.pickle") == False:  
             params = {
             # Parameters that we are going to tune.
             'max_depth':np.arange(2,4,1),
@@ -271,10 +263,10 @@ if __name__ == "__main__":
             
             mode = "gpu-random"
             #TODO fix so it takes from model_info.pickle
-            if os.path.isfile(model_save_location + "hyper_param_res.pickle") and os.path.isfile(model_save_location + "hyper_param_results.pickle"):
-                with open(model_save_location + "hyper_param_res.pickle", "rb") as pickle_file:
+            if os.path.isfile(model_save_loc + "hyper_param_res.pickle") and os.path.isfile(model_save_loc + "hyper_param_results.pickle"):
+                with open(model_save_loc + "hyper_param_res.pickle", "rb") as pickle_file:
                     res = pickle.load(pickle_file)
-                with open(model_save_location + "hyper_param_results.pickle", "rb") as pickle_file:
+                with open(model_save_loc + "hyper_param_results.pickle", "rb") as pickle_file:
                     results = pickle.load(pickle_file)
             else:
                 with timed("XGB-"+mode):
@@ -285,9 +277,9 @@ if __name__ == "__main__":
                                             y_train,
                                             mode=mode,
                                             n_iter=N_ITER)
-                with open(model_save_location + "hyper_param_res.pickle", "wb") as pickle_file:
+                with open(model_save_loc + "hyper_param_res.pickle", "wb") as pickle_file:
                     pickle.dump(res, pickle_file)
-                with open(model_save_location + "hyper_param_results.pickle", "wb") as pickle_file:
+                with open(model_save_loc + "hyper_param_results.pickle", "wb") as pickle_file:
                     pickle.dump(results, pickle_file)
                     
                 print("Searched over {} parameters".format(len(results.cv_results_['mean_test_score'])))
@@ -329,7 +321,7 @@ if __name__ == "__main__":
             )
         bst = output["booster"]
         history = output["history"]
-        bst.save_model(model_save_location + model_name + ".json")
+        bst.save_model(model_save_loc + model_name + ".json")
 
         plt.figure(figsize=(10,7))
         plt.plot(history["train"]["rmse"], label="Training loss")
@@ -338,30 +330,20 @@ if __name__ == "__main__":
         plt.xlabel("Number of trees")
         plt.ylabel("Loss")
         plt.legend()
-        plt.savefig(gen_plot_save_location + "training_loss_graph.png")
+        plt.savefig(gen_plot_save_loc + "training_loss_graph.png")
     
         del dtrain
         del dtest
 
-    # with timed("Train Predictions"):
-    #     with open(train_dataset_loc, "rb") as file:
-    #         train_X = pickle.load(file)
-    #     with open(train_labels_loc, "rb") as file:
-    #         train_y = pickle.load(file)
-    #     train_preds = make_preds(client, bst, train_X, train_y, report_name="Train Report", print_report=False)
-    # with timed("Train Plots"):
-    #     eval_model(model_info=model_info,sparta_file=model_sparta_file,X=train_X, y=train_y,preds=train_preds,dataset_type="Train",dataset_location=dataset_location,model_save_location=model_save_location,p_red_shift=p_red_shift,dens_prf=False, r_rv_tv=True,misclass=True)
-    
-    with timed("Test Predictions"):
-        with open(test_dataset_loc, "rb") as file:
-            test_X = pickle.load(file)
-        with open(test_labels_loc, "rb") as file:
-            test_y = pickle.load(file)
-        test_preds = make_preds(client, bst, test_X, test_y, report_name="Test Report", print_report=False)
-    with timed("Test Plots"):
-        eval_model(model_info=model_info,sparta_file=curr_sparta_file,X=test_X, y=test_y,preds=test_preds,dataset_type="Test", dataset_location=dataset_location,model_save_location=model_save_location,p_red_shift=p_red_shift,dens_prf=True, r_rv_tv=True, misclass=True)    
-        
-    bst.save_model(model_save_location + model_name + ".json")
+
+    for dst_type in eval_datasets:
+        with timed(dst_type + " Plots"):
+            plot_loc = model_save_loc + dst_type + "_" + combined_name + "/plots/"
+            create_directory(model_save_loc + dst_type + combined_name)
+            create_directory(plot_loc)
+            eval_model(model_info, client, bst, use_sims=model_sims, dst_type=dst_type, dst_loc=dataset_loc, combined_name=combined_name, plot_save_loc=plot_loc, p_red_shift=p_red_shift, dens_prf = True, r_rv_tv = True, misclass=True)
+   
+    bst.save_model(model_save_loc + model_name + ".json")
 
     feature_important = bst.get_score(importance_type='weight')
     keys = list(feature_important.keys())
@@ -371,7 +353,7 @@ if __name__ == "__main__":
     fig, ax = plt.subplots(1, figsize=(15,10))
     ax.barh(pos,values)
     ax.set_yticks(pos, keys)
-    fig.savefig(gen_plot_save_location + "feature_importance.png")
+    fig.savefig(gen_plot_save_loc + "feature_importance.png")
 
     # tree_num = 2
     # xgb.plot_tree(bst, num_trees=tree_num)
@@ -379,6 +361,6 @@ if __name__ == "__main__":
     # fig.set_size_inches(110, 25)
     # fig.savefig('/home/zvladimi/MLOIS/Random_figures/' + model_name + 'tree' + str(tree_num) + '.png')
 
-    with open(model_save_location + "model_info.pickle", "wb") as pickle_file:
+    with open(model_save_loc + "model_info.pickle", "wb") as pickle_file:
         pickle.dump(model_info, pickle_file) 
     client.close()
