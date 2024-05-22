@@ -4,6 +4,7 @@ import sys
 import pickle
 from dask import array as da
 import xgboost as xgb
+import json
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, find_closest_z, conv_halo_id_spid, create_directory
 from utils.visualization_functions import compare_density_prf, plot_r_rv_tv_graph, plot_misclassified
 from sparta_tools import sparta
@@ -24,12 +25,10 @@ path_to_calc_info = config["PATHS"]["path_to_calc_info"]
 path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
 path_to_sparta = config["PATHS"]["path_to_sparta"]
 path_to_xgboost = config["PATHS"]["path_to_xgboost"]
-model_p_snap = config.getint("XGBOOST","model_p_snap")
-model_c_snap = config.getint("XGBOOST","model_c_snap")
-test_p_snap = config.getint("XGBOOST","test_p_snap")
-test_c_snap = config.getint("XGBOOST","test_c_snap")
-model_snapshot_list = [model_p_snap, model_c_snap]
-test_snapshot_list = [test_p_snap, test_c_snap]
+model_sims = json.loads(config.get("DATASET","model_sims"))
+
+model_snapshot_list = json.loads(config.get("XGBOOST","model_snaps"))
+test_snapshot_list = json.loads(config.get("XGBOOST","test_snaps"))
 global p_red_shift
 p_red_shift = config.getfloat("SEARCH","p_red_shift")
 search_rad = config.getfloat("SEARCH","search_rad")

@@ -44,10 +44,8 @@ global prim_only
 prim_only = config.getboolean("SEARCH","prim_only")
 t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
 p_red_shift = config.getfloat("SEARCH","p_red_shift")
-use_sims = json.loads(config.get("DATASET","use_sims"))
+model_sims = json.loads(config.get("DATASET","model_sims"))
 
-model_snapshot_list = json.loads(config.get("XGBOOST","model_snaps"))
-test_snapshot_list = json.loads(config.get("XGBOOST","test_snaps"))
 model_type = config["XGBOOST"]["model_type"]
 radii_splits = config.get("XGBOOST","rad_splits").split(',')
 search_rad = config.getfloat("SEARCH","search_rad")
@@ -102,8 +100,6 @@ def get_CUDA_cluster():
                                jit_unspill=True)
     client = Client(cluster)
     return client
-
-
 
 def accuracy_score_wrapper(y, y_hat): 
     y = y.astype("float32") 
@@ -169,7 +165,7 @@ if __name__ == "__main__":
         
         
     combined_name = ""
-    for i,sim in enumerate(use_sims):
+    for i,sim in enumerate(model_sims):
         pattern = r"(\d+)to(\d+)"
         match = re.search(pattern, sim)
 
@@ -181,33 +177,39 @@ if __name__ == "__main__":
             print("Pattern not found in the string.")
         parts = sim.split("_")
         combined_name += parts[1] + parts[2] + "s" + parts[4] 
-        if i != len(use_sims)-1:
+        if i != len(model_sims)-1:
             combined_name += "_"
         
     model_name = model_type + "_" + combined_name
 
     dataset_location = path_to_xgboost + combined_name + "/datasets/"
-    model_save_location = path_to_xgboost + model_name + "/"
+    model_save_location = path_to_xgboost + combined_name + "/" + model_name + "/"
     
     gen_plot_save_location = model_save_location + "plots/"
     create_directory(model_save_location)
     create_directory(gen_plot_save_location)
     
-    train_dataset_loc = dataset_location + "train_within_rad_dataset.pickle"
-    train_labels_loc = dataset_location + "train_within_rad_labels.pickle"
-    test_dataset_loc = dataset_location + "test_dataset.pickle"
-    test_labels_loc = dataset_location + "test_labels.pickle"
-    train_keys_loc = dataset_location + "train_dataset_all_keys.pickle"
-    test_keys_loc = dataset_location + "test_dataset_all_keys.pickle"
+    train_dataset_loc = dataset_location + "train_dataset/train_dataset.pickle"
+    train_labels_loc = dataset_location + "train_dataset/train_labels.pickle"
+    test_dataset_loc = dataset_location + "test_dataset/test_dataset.pickle"
+    test_labels_loc = dataset_location + "test_dataset/test_labels.pickle"
+    #TODO condense this in the code to use the same keys
+    train_keys_loc = dataset_location + "train_dataset/keys.pickle"
+    test_keys_loc = dataset_location + "train_dataset/keys.pickle"
      
     if os.path.isfile(model_save_location + "model_info.pickle"):
         with open(model_save_location + "model_info.pickle", "rb") as pickle_file:
             model_info = pickle.load(pickle_file)
     else:
+        train_sims = ""
+        for i,sim in enumerate(model_sims):
+            if i != len(model_sims) - 1:
+                train_sims += sim + ", "
+            else:
+                train_sims += sim
         model_info = {
             'Misc Info':{
-                'Model trained on': model_sparta_file,
-                'Snapshots used': model_snapshot_list,
+                'Model trained on': train_sims,
                 'Max Radius': search_rad,
                 }}
     
@@ -255,7 +257,7 @@ if __name__ == "__main__":
             'scale_pos_weight':np.arange(scale_pos_weight,scale_pos_weight+10,1),
             'lambda':np.arange(0,3,.5),
             'alpha':np.arange(0,3,.5),
-            # 'subsample': 1,
+            'subsample': 0.5,
             # 'colsample_bytree': 1,
             }
         
@@ -310,6 +312,7 @@ if __name__ == "__main__":
                 # Golden line for GPU training
                 "scale_pos_weight":scale_pos_weight,
                 "device": "cuda",
+                "subsample": 0.5,
                 }
             model_info['Training Info']={
                 'Fraction of Training Data Used': frac_training_data,
