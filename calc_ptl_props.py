@@ -15,6 +15,7 @@ import os
 import multiprocessing as mp
 from itertools import repeat
 import sys
+import re
 
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z
 from utils.calculation_functions import *
@@ -28,7 +29,11 @@ rand_seed = config.getint("MISC","random_seed")
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
 path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
-path_to_hdf5_file = path_to_SPARTA_data + curr_sparta_file + ".hdf5"
+sim_pat = r"cbol_l(\d+)_n(\d+)"
+match = re.search(sim_pat, curr_sparta_file)
+if match:
+    sparta_name = match.group(0)
+path_to_hdf5_file = path_to_SPARTA_data + sparta_name + "/" + curr_sparta_file + ".hdf5"
 path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
 path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
@@ -45,7 +50,6 @@ global search_rad
 search_rad = config.getfloat("SEARCH","search_rad")
 total_num_snaps = config.getint("SEARCH","total_num_snaps")
 per_n_halo_per_split = config.getfloat("SEARCH","per_n_halo_per_split")
-test_halos_ratio = config.getfloat("SEARCH","test_halos_ratio")
 # num_processes = int(os.environ['SLURM_CPUS_PER_TASK'])
 num_processes = mp.cpu_count()
 curr_chunk_size = config.getint("SEARCH","chunk_size")
@@ -469,4 +473,4 @@ t2 = time.time()
 print("Start up finished in:",np.round((t2-t1),2),"seconds", np.round(((t2-t1)/60),2), "minutes")
 halo_loop(indices=match_halo_idxs, tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
 t3 = time.time()
-print("Finished in:",np.round((t3-t1),2),"seconds", np.round(((t3-t1)/60),2), "minutes")
+print("Finished in:",np.round((t3-t1),2),"seconds", np.round(((t3-t1)/60),2), "minutes", np.round(((t3-t1)/3600),2), "hours")

@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 from itertools import repeat
 from contextlib import contextmanager
 import time
+import re
 
 def create_directory(path):
     if os.path.exists(path) != True:
@@ -20,7 +21,11 @@ curr_sparta_file = config["MISC"]["curr_sparta_file"]
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
 path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
-path_to_hdf5_file = path_to_SPARTA_data + curr_sparta_file + ".hdf5"
+sim_pat = r"cbol_l(\d+)_n(\d+)"
+match = re.search(sim_pat, curr_sparta_file)
+if match:
+    sparta_name = match.group(0)
+path_to_hdf5_file = path_to_SPARTA_data + sparta_name + "/" + curr_sparta_file + ".hdf5"
 path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
 path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
@@ -35,7 +40,7 @@ global search_rad
 search_rad = config.getfloat("SEARCH","search_rad")
 total_num_snaps = config.getint("SEARCH","total_num_snaps")
 per_n_halo_per_split = config.getfloat("SEARCH","per_n_halo_per_split")
-test_halos_ratio = config.getfloat("SEARCH","test_halos_ratio")
+test_halos_ratio = config.getfloat("DATASET","test_halos_ratio")
 global num_save_ptl_params
 num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 num_processes = mp.cpu_count()
