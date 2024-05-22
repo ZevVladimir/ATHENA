@@ -130,11 +130,14 @@ def build_sim_dataset(curr_sim, snapshot_list):
                     for row in range(all_ptl_properties[key].ndim):
                         access_col = int((curr_col + (row * num_params_per_snap)))
                         full_dataset[:,access_col] = all_ptl_properties[key][:,row]
-                        dataset_keys[access_col] = (key + str(snapshot_list[row]))
+                        if row == 0:
+                            dataset_keys[access_col] = "p_" + key
+                        elif row == 1:
+                            dataset_keys[access_col] = "c_" + key
                     curr_col += 1
                 else:
                     full_dataset[:,curr_col] = all_ptl_properties[key]
-                    dataset_keys[curr_col] = (key + str(snapshot_list[0]))
+                    dataset_keys[curr_col] = "p_" + key
                     curr_col += 1
 
     return full_dataset, dataset_keys, hipids, labels, halo_first, halo_n
@@ -143,7 +146,15 @@ def plot_nu_dist():
     nus = []
     fig, ax = plt.subplots(1, figsize=(30,15))
     for sim in model_sims:
-        with h5py.File(path_to_hdf5_file,"r") as f:
+        sim_pat = r"cbol_l(\d+)_n(\d+)"
+        match = re.search(sim_pat, sim)
+        if match:
+            sparta_name = match.group(0)
+        sim_search_pat = sim_pat + r"_(\d+)r200m"
+        match = re.search(sim_search_pat, sim)
+        if match:
+            sparta_search_name = match.group(0)
+        with h5py.File(path_to_SPARTA_data + sparta_name + "/" +  sparta_search_name + ".hdf5","r") as f:
             dic_sim = {}
             grp_sim = f['simulation']
             for f in grp_sim.attrs:
@@ -158,7 +169,6 @@ def plot_nu_dist():
         p_snap_loc = transform_string(sim)
         with open(path_to_pickle + p_snap_loc + "/ptl_mass.pickle", "rb") as pickle_file:
             ptl_mass = pickle.load(pickle_file)
-        print(sim, ptl_mass)
         with h5py.File(curr_file,"r") as f:
             nus.append(peaks.peakHeight((f["Halo_n"][:]*ptl_mass), use_z))
    
@@ -212,8 +222,10 @@ for i,sim in enumerate(model_sims):
                 pickle.dump(curr_halo_n, pickle_file)    
 
 
+full_dset_loc = path_to_xgboost + combined_name + "/datasets/full_dataset/"
 train_dset_loc = path_to_xgboost + combined_name + "/datasets/train_dataset/"
 test_dset_loc = path_to_xgboost + combined_name + "/datasets/test_dataset/"
+create_directory(full_dset_loc)
 create_directory(train_dset_loc)
 create_directory(test_dset_loc)
 
@@ -227,8 +239,15 @@ test_hipids = np.array([])
 test_labels = np.array([])
 test_halo_first = np.array([])
 test_halo_n = np.array([])
+full_dataset = np.array([])
+full_hipids = np.array([])
+full_labels = np.array([])
+full_halo_first = np.array([])
+full_halo_n = np.array([])
 
-curr_start=0
+# Now that we know all the simulations have datasets go through all the ones we wanted and combine them into 
+# one large dataset that is split into training and testing
+
 for j,sim in enumerate(model_sims):
     with timed("Datasets for: "+sim+" stacked"):
         sim_name, curr_snap_list = shorten_sim_name(sim)
@@ -248,66 +267,106 @@ for j,sim in enumerate(model_sims):
             curr_halo_n = pickle.load(pickle_file)
         
         # TODO ensure that key order is the same for all simulations
-        
+        with open(path_to_calc_info + sim + "/all_indices.pickle", "rb") as pickle_file:
+            all_idxs = pickle.load(pickle_file)
+            
         halo_splt_idx = int(np.ceil((1-test_halos_ratio) * curr_halo_n.size))
-        train_halo_n = curr_halo_n[:halo_splt_idx]
-        test_halo_n = curr_halo_n[halo_splt_idx:]
-        train_halo_first = curr_halo_first[:halo_splt_idx]
-        test_halo_first = curr_halo_first[halo_splt_idx:]
-        
-        # ensure that halo indexing works even with stacked simulations
-        curr_train_start = train_halo_first[-1] + train_halo_n[-1]
-        curr_test_start = test_halo_first[-1] + test_halo_n[-1]
 
-        ptl_splt_idx = np.sum(train_halo_n)
+        # Indexing: when stacking the simulations the halo_first catergory no longer indexes the entire dataset
+        # It still corresponds to each individual simulation (indicating where it starts at 0). 
+        # In addition when splitting into training and testing datasets we set the halo_first to 0 for the testing
+        # set at the beginning as otherwise it will be starting at some random point.
         if j == 0:
+            full_halo_first = curr_halo_first
+            train_halo_first = curr_halo_first[:halo_splt_idx]
+            test_halo_first = curr_halo_first[halo_splt_idx:] - curr_halo_first[halo_splt_idx]
+            full_halo_n = curr_halo_n
+            train_halo_n = curr_halo_n[:halo_splt_idx]
+            test_halo_n = curr_halo_n[halo_splt_idx:]
+            full_idxs = all_idxs
+            train_idxs = all_idxs[:halo_splt_idx]
+            test_idxs = all_idxs[halo_splt_idx:]
+            
+            ptl_splt_idx = np.sum(train_halo_n)
+            
             full_dataset_keys = curr_dataset_keys
+            full_dataset = curr_dataset
             train_dataset = curr_dataset[:ptl_splt_idx]
             test_dataset = curr_dataset[ptl_splt_idx:]
+            full_hipids = curr_hipids
             train_hipids = curr_hipids[:ptl_splt_idx]
             test_hipids = curr_hipids[ptl_splt_idx:]
+            full_labels = curr_labels
             train_labels = curr_labels[:ptl_splt_idx]
             test_labels = curr_labels[ptl_splt_idx:]
-            train_halo_first = curr_halo_first[:ptl_splt_idx] + curr_train_start
-            test_halo_first = curr_halo_first[ptl_splt_idx:] + curr_test_start
-            train_halo_n = curr_halo_n[:ptl_splt_idx]
-            test_halo_n = curr_halo_n[ptl_splt_idx:]
         else:
-            curr_halo_first = curr_halo_first + curr_start
+            full_halo_first = np.vstack((full_halo_first,curr_halo_first))
+            train_halo_first = np.vstack((train_halo_first,curr_halo_first[:halo_splt_idx]))
+            test_halo_first = np.vstack((test_halo_first,curr_halo_first[halo_splt_idx:] - curr_halo_first[halo_splt_idx]))
+            full_halo_n = np.vstack((full_halo_n,curr_halo_n))
+            train_halo_n = np.vstack((train_halo_n,curr_halo_n[:halo_splt_idx]))
+            test_halo_n = np.vstack((test_halo_n,curr_halo_n[halo_splt_idx:]))
+            full_idxs = np.vstack((full_idxs,all_idxs))
+            train_idxs = np.vstack((train_idxs,all_idxs[:halo_splt_idx]))
+            test_idxs = np.vstack((test_idxs,all_idxs[halo_splt_idx:]))
+            
+            ptl_splt_idx = np.sum(train_halo_n)
+            
+            full_dataset = np.vstack((full_dataset,curr_dataset))
             train_dataset = np.vstack((train_dataset,curr_dataset[:ptl_splt_idx]))
             test_dataset = np.vstack((test_dataset,curr_dataset[ptl_splt_idx:]))
+            full_hipids = np.vstack((full_hipids,curr_hipids))
             train_hipids = np.vstack((train_hipids,curr_hipids[:ptl_splt_idx]))
             test_hipids = np.vstack((test_hipids,curr_hipids[ptl_splt_idx:]))
+            full_labels = np.vstack((full_labels,curr_labels))
             train_labels = np.vstack((train_labels,curr_labels[:ptl_splt_idx]))
             test_labels = np.vstack((test_labels,curr_labels[ptl_splt_idx:]))
-            train_halo_first = np.vstack((train_halo_first,curr_halo_first[:ptl_splt_idx] + curr_train_start))
-            test_halo_first = np.vstack((test_halo_first,curr_halo_first[ptl_splt_idx:] + curr_test_start))
-            train_halo_n = np.vstack((train_halo_n,curr_halo_n[:ptl_splt_idx]))
-            test_halo_n = np.vstack((test_halo_n,curr_halo_n[ptl_splt_idx:]))
     
+
+with open(full_dset_loc + "keys.pickle", "wb") as pickle_file:
+    pickle.dump(full_dataset_keys, pickle_file)
+with open(full_dset_loc + "dataset.pickle", "wb") as pickle_file:
+    pickle.dump(full_dataset, pickle_file)
+with open(full_dset_loc + "hipids.pickle", "wb") as pickle_file:
+    pickle.dump(full_hipids, pickle_file)
+with open(full_dset_loc + "labels.pickle", "wb") as pickle_file:
+    pickle.dump(full_labels, pickle_file)
+with open(full_dset_loc + "halo_first.pickle", "wb") as pickle_file:
+    pickle.dump(full_halo_first, pickle_file)
+with open(full_dset_loc + "halo_n.pickle", "wb") as pickle_file:
+    pickle.dump(full_halo_n, pickle_file) 
+with open(full_dset_loc + "halo_indices.pickle","wb") as pickle_file:
+    pickle.dump(full_idxs, pickle_file)
+
 
 with open(train_dset_loc + "keys.pickle", "wb") as pickle_file:
     pickle.dump(full_dataset_keys, pickle_file)
-
-with open(train_dset_loc + "train_dataset.pickle", "wb") as pickle_file:
+with open(train_dset_loc + "dataset.pickle", "wb") as pickle_file:
     pickle.dump(train_dataset, pickle_file)
-with open(train_dset_loc + "train_hipids.pickle", "wb") as pickle_file:
+with open(train_dset_loc + "hipids.pickle", "wb") as pickle_file:
     pickle.dump(train_hipids, pickle_file)
-with open(train_dset_loc + "train_labels.pickle", "wb") as pickle_file:
+with open(train_dset_loc + "labels.pickle", "wb") as pickle_file:
     pickle.dump(train_labels, pickle_file)
-with open(train_dset_loc + "train_halo_first.pickle", "wb") as pickle_file:
+with open(train_dset_loc + "halo_first.pickle", "wb") as pickle_file:
     pickle.dump(train_halo_first, pickle_file)
-with open(train_dset_loc + "train_halo_n.pickle", "wb") as pickle_file:
+with open(train_dset_loc + "halo_n.pickle", "wb") as pickle_file:
     pickle.dump(train_halo_n, pickle_file)    
+with open(train_dset_loc + "halo_indices.pickle","wb") as pickle_file:
+    pickle.dump(train_idxs, pickle_file)
     
-with open(test_dset_loc + "test_dataset.pickle", "wb") as pickle_file:
+with open(test_dset_loc + "keys.pickle", "wb") as pickle_file:
+    pickle.dump(full_dataset_keys, pickle_file)
+with open(test_dset_loc + "dataset.pickle", "wb") as pickle_file:
     pickle.dump(test_dataset, pickle_file)
-with open(test_dset_loc + "test_hipids.pickle", "wb") as pickle_file:
+with open(test_dset_loc + "hipids.pickle", "wb") as pickle_file:
     pickle.dump(test_hipids, pickle_file)
-with open(test_dset_loc + "test_labels.pickle", "wb") as pickle_file:
+with open(test_dset_loc + "labels.pickle", "wb") as pickle_file:
     pickle.dump(test_labels, pickle_file)
-with open(test_dset_loc + "test_halo_first.pickle", "wb") as pickle_file:
+with open(test_dset_loc + "halo_first.pickle", "wb") as pickle_file:
     pickle.dump(test_halo_first, pickle_file)
-with open(test_dset_loc + "test_halo_n.pickle", "wb") as pickle_file:
+with open(test_dset_loc + "halo_n.pickle", "wb") as pickle_file:
     pickle.dump(test_halo_n, pickle_file)    
+with open(test_dset_loc + "halo_indices.pickle","wb") as pickle_file:
+    pickle.dump(test_idxs, pickle_file)
+
     

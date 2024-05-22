@@ -15,6 +15,7 @@ import os
 import multiprocessing as mp
 from itertools import repeat
 import sys
+import re
 
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z
 from utils.calculation_functions import *
@@ -28,7 +29,11 @@ rand_seed = config.getint("MISC","random_seed")
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
 path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
-path_to_hdf5_file = path_to_SPARTA_data + curr_sparta_file + ".hdf5"
+sim_pat = r"cbol_l(\d+)_n(\d+)"
+match = re.search(sim_pat, curr_sparta_file)
+if match:
+    sparta_name = match.group(0)
+path_to_hdf5_file = path_to_SPARTA_data + sparta_name + "/" + curr_sparta_file + ".hdf5"
 path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
 path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]

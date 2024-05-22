@@ -339,7 +339,7 @@ if __name__ == "__main__":
     for dst_type in eval_datasets:
         with timed(dst_type + " Plots"):
             plot_loc = model_save_loc + dst_type + "_" + combined_name + "/plots/"
-            create_directory(model_save_loc + dst_type + combined_name)
+            create_directory(model_save_loc + dst_type + "_" + combined_name)
             create_directory(plot_loc)
             eval_model(model_info, client, bst, use_sims=model_sims, dst_type=dst_type, dst_loc=dataset_loc, combined_name=combined_name, plot_save_loc=plot_loc, p_red_shift=p_red_shift, dens_prf = True, r_rv_tv = True, misclass=True)
    
