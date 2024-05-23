@@ -95,14 +95,13 @@ def create_dmatrix(client, X_cpu, y_cpu, features, chunk_size, frac_use_data = 1
 #TODO have the locations all be in a dictionary or some more general way
 def eval_model(model_info, client, model, use_sims, dst_type, dst_loc, combined_name, plot_save_loc, p_red_shift, dens_prf = False, r_rv_tv = False, misclass=False): 
     with timed(dst_type + " Predictions"):
-        with open(dst_loc + dst_type.lower() + "_dataset/dataset.pickle", "rb") as file:
-            X = pickle.load(file)
-        with open(dst_loc + dst_type.lower() + "_dataset/labels.pickle", "rb") as file:
-            y = pickle.load(file)
+        with h5py.File(dst_loc + dst_type.lower() + "_dset.hdf5", "r") as file:
+            X = file["Dataset"][:]
+            y = file["Labels"][:]
         preds = make_preds(client, model, X, y, report_name=dst_type + " Report", print_report=False)
         
     num_bins = 30
-    with open(dst_loc + "full_dataset/keys.pickle", "rb") as file:
+    with open(dst_loc + "keys.pickle", "rb") as file:
         all_keys = pickle.load(file)
     p_r_loc = np.where(all_keys == "p_Scaled_radii_")[0][0]
     c_r_loc = np.where(all_keys == "c_Scaled_radii_")[0][0]
@@ -112,12 +111,10 @@ def eval_model(model_info, client, model, use_sims, dst_type, dst_loc, combined_
     c_tv_loc = np.where(all_keys == "c_Tangential_vel_")[0][0]
     
     if dens_prf:
-        with open(dst_loc + dst_type.lower() + "_dataset/halo_first.pickle", "rb") as file:
-            halo_first = pickle.load(file) 
-        with open(dst_loc + dst_type.lower() + "_dataset/halo_n.pickle", "rb") as file:
-            halo_n = pickle.load(file)   
-        with open(dst_loc + dst_type.lower() + "_dataset/halo_indices.pickle", "rb") as file:
-            all_idxs = pickle.load(file)
+        with h5py.File(dst_loc + dst_type.lower() + "_dset.hdf5", "r") as file:
+            halo_first = file["Halo_first"][:]
+            halo_n = file["Halo_n"][:]
+            all_idxs = file["Halo_Indices"][:]
         
         # Know where each simulation's data starts in the stacekd dataset based on when the indexing starts from 0 again
         sim_splits = np.where(halo_first == 0)[0]

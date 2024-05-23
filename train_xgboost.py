@@ -181,13 +181,10 @@ if __name__ == "__main__":
     create_directory(model_save_loc)
     create_directory(gen_plot_save_loc)
     
-    train_dataset_loc = dataset_loc + "train_dataset/dataset.pickle"
-    train_labels_loc = dataset_loc + "train_dataset/labels.pickle"
-    test_dataset_loc = dataset_loc + "test_dataset/dataset.pickle"
-    test_labels_loc = dataset_loc + "test_dataset/labels.pickle"
-    #TODO condense this in the code to use the same keys
-    train_keys_loc = dataset_loc + "train_dataset/keys.pickle"
-    test_keys_loc = dataset_loc + "train_dataset/keys.pickle"
+    train_dataset_loc = dataset_loc + "train_dset.hdf5"
+    test_dataset_loc = dataset_loc + "test_dset.hdf5"
+    
+    keys_loc = dataset_loc + "keys.pickle"
      
     if os.path.isfile(model_save_loc + "model_info.pickle"):
         with open(model_save_loc + "model_info.pickle", "rb") as pickle_file:
@@ -213,31 +210,26 @@ if __name__ == "__main__":
         print("Loaded Booster")
     else:
         print("Training Set:")
-        with open(train_dataset_loc, "rb") as file:
-            train_X = pickle.load(file) 
-        with open(train_labels_loc, "rb") as file:
-            train_y = pickle.load(file)
-        with open(train_keys_loc, "rb") as file:
-            train_features = pickle.load(file)
-        train_features = train_features.tolist()
+        with h5py.File(train_dataset_loc, "r") as file:
+            train_X = file["Dataset"][:] 
+            train_y = file["Labels"][:]
+        with open(keys_loc, "rb") as file:
+            features = pickle.load(file)
+        features = features.tolist()
 
-        dtrain,X_train,y_train,scale_pos_weight = create_dmatrix(client, train_X, train_y, train_features, chunk_size=chunk_size, frac_use_data=frac_training_data, calc_scale_pos_weight=True)
+        dtrain,X_train,y_train,scale_pos_weight = create_dmatrix(client, train_X, train_y, features, chunk_size=chunk_size, frac_use_data=frac_training_data, calc_scale_pos_weight=True)
         del train_X
         del train_y
-        del train_features
         
         print("Testing set:")
-        with open(test_dataset_loc, "rb") as file:
-            test_X = pickle.load(file) 
-        with open(test_labels_loc, "rb") as file:
-            test_y = pickle.load(file)
-        with open(test_keys_loc, "rb") as file:
-            test_features = pickle.load(file)
-        test_features = test_features.tolist()
-        dtest,X_test,y_test = create_dmatrix(client, test_X, test_y, test_features, chunk_size=chunk_size, frac_use_data=1, calc_scale_pos_weight=False)
+        with h5py.File(test_dataset_loc, "r") as file:
+            test_X = file["Dataset"][:] 
+            test_y = file["Labels"][:]
+        
+        dtest,X_test,y_test = create_dmatrix(client, test_X, test_y, features, chunk_size=chunk_size, frac_use_data=1, calc_scale_pos_weight=False)
         del test_X
         del test_y
-        del test_features
+        
         print("scale_pos_weight:", scale_pos_weight)
         
         if on_zaratan == False and do_hpo == True and os.path.isfile(model_save_loc + "used_params.pickle") == False:  
