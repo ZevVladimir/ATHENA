@@ -412,15 +412,6 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
     t2 = time.time()
     print("Finished Density Profile Plot in: ", np.round((t2-t1),2), "seconds", np.round(((t2-t1)/60),2), "minutes")
     return diff_n_inf_ptls, diff_n_orb_ptls, diff_n_all_ptls, middle_bins
-    
-def brute_force(curr_particles_pos, r200, halo_x, halo_y, halo_z):
-    within_box = curr_particles_pos[np.where((curr_particles_pos[:,0] < r200 + halo_x) & (curr_particles_pos[:,0] > r200 - halo_x) & (curr_particles_pos[:,1] < r200 + halo_y) & (curr_particles_pos[:,1] > r200 - halo_y) & (curr_particles_pos[:,2] < r200 + halo_z) & (curr_particles_pos[:,2] > r200 - halo_z))]
-    brute_radii = calculate_distance(halo_x, halo_y, halo_z, within_box[:,0], within_box[:,1], within_box[:,2], within_box.shape[0])
-    return within_box[np.where(brute_radii <= r200)]
-
-#TODO add brute force comparison graph
-
-#TODO add radial vel vs position graph
 
 def rv_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = None):
     if ax == None:

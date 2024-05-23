@@ -12,7 +12,7 @@ import re
 from contextlib import contextmanager
 from itertools import repeat
 from sklearn.model_selection import train_test_split
-from utils.data_and_loading_functions import check_pickle_exist_gadget, choose_halo_split, create_directory
+from utils.data_and_loading_functions import check_pickle_exist_gadget, choose_halo_split, create_directory, save_to_hdf5
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
@@ -193,6 +193,10 @@ plot_nu_dist()
 
 # Create all the datasets for the simulations
 combined_name = ""
+tot_num_halos = 0
+tot_num_ptls = 0
+hdf5_ptl_idx=0
+hdf5_halo_idx=0
 
 for i,sim in enumerate(model_sims):
     with timed("Datasets for: "+sim+" created"):
@@ -201,172 +205,102 @@ for i,sim in enumerate(model_sims):
         if i != len(model_sims)-1:
             combined_name += "_"
             
-        create_directory(path_to_xgboost + sim_name + "/datasets/")
-        curr_loc = path_to_xgboost + sim_name + "/datasets/full_dataset/"
+        curr_loc = path_to_xgboost + sim_name + "/datasets/"
         create_directory(curr_loc)
+    
+        curr_dataset,curr_keys,curr_hipids,curr_labels,curr_halo_first,curr_halo_n = build_sim_dataset(sim,curr_snap_list)
+        tot_num_halos = tot_num_halos + curr_halo_first.shape[0]
+        tot_num_ptls = tot_num_ptls + curr_labels.shape[0]
+    
+        if os.path.isfile(curr_loc + "full_dset.hdf5") and i == 0:
+            os.remove(curr_loc + "full_dset.hdf5")
+        with h5py.File((curr_loc + "full_dset.hdf5"), 'a') as curr_dset:
+            save_to_hdf5(curr_dset, "Halo_first", dataset = curr_halo_first, chunk = True, max_shape = (tot_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "Halo_n", dataset = curr_halo_n, chunk = True, max_shape = (tot_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "HIPIDS", dataset = curr_hipids, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "Labels", dataset = curr_labels, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "Dataset", dataset = curr_dataset, chunk = True, max_shape = (tot_num_ptls,curr_keys.shape[0]), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
         
-        if not os.path.exists(curr_loc + "dataset.pickle"):
-            curr_dataset,curr_dataset_keys,curr_hipids,curr_labels,curr_halo_first,curr_halo_n = build_sim_dataset(sim,curr_snap_list)
-            
-            with open(curr_loc + "dataset.pickle", "wb") as pickle_file:
-                pickle.dump(curr_dataset, pickle_file)
-            with open(curr_loc + "keys.pickle", "wb") as pickle_file:
-                pickle.dump(curr_dataset_keys, pickle_file)
-            with open(curr_loc + "hipids.pickle", "wb") as pickle_file:
-                pickle.dump(curr_hipids, pickle_file)
-            with open(curr_loc + "labels.pickle", "wb") as pickle_file:
-                pickle.dump(curr_labels, pickle_file)
-            with open(curr_loc + "halo_first.pickle", "wb") as pickle_file:
-                pickle.dump(curr_halo_first, pickle_file)
-            with open(curr_loc + "halo_n.pickle", "wb") as pickle_file:
-                pickle.dump(curr_halo_n, pickle_file)    
+        with open(curr_loc + "keys.pickle","wb") as file:
+            pickle.dump(curr_keys, file)
 
 
-full_dset_loc = path_to_xgboost + combined_name + "/datasets/full_dataset/"
-train_dset_loc = path_to_xgboost + combined_name + "/datasets/train_dataset/"
-test_dset_loc = path_to_xgboost + combined_name + "/datasets/test_dataset/"
+full_dset_loc = path_to_xgboost + combined_name + "/datasets/"
 create_directory(full_dset_loc)
-create_directory(train_dset_loc)
-create_directory(test_dset_loc)
-
-train_dataset = np.array([])
-train_hipids = np.array([])
-train_labels = np.array([])
-train_halo_first = np.array([])
-train_halo_n = np.array([])
-test_dataset = np.array([])
-test_hipids = np.array([])
-test_labels = np.array([])
-test_halo_first = np.array([])
-test_halo_n = np.array([])
-full_dataset = np.array([])
-full_hipids = np.array([])
-full_labels = np.array([])
-full_halo_first = np.array([])
-full_halo_n = np.array([])
 
 # Now that we know all the simulations have datasets go through all the ones we wanted and combine them into 
 # one large dataset that is split into training and testing
+hdf5_ptl_idx=0
+hdf5_halo_idx=0
+train_hdf5_ptl_idx=0
+train_hdf5_halo_idx=0
+test_hdf5_ptl_idx=0
+test_hdf5_halo_idx=0
 
 for j,sim in enumerate(model_sims):
     with timed("Datasets for: "+sim+" stacked"):
         sim_name, curr_snap_list = shorten_sim_name(sim)
-        curr_loc = path_to_xgboost + sim_name + "/datasets/full_dataset/"
+        curr_loc = path_to_xgboost + sim_name + "/datasets/"
 
-        with open(curr_loc + "dataset.pickle", "rb") as pickle_file:
-            curr_dataset = pickle.load(pickle_file)
-        with open(curr_loc + "keys.pickle", "rb") as pickle_file:
-            curr_dataset_keys = pickle.load(pickle_file)
-        with open(curr_loc + "hipids.pickle", "rb") as pickle_file:
-            curr_hipids = pickle.load(pickle_file)
-        with open(curr_loc + "labels.pickle", "rb") as pickle_file:
-            curr_labels = pickle.load(pickle_file)
-        with open(curr_loc + "halo_first.pickle", "rb") as pickle_file:
-            curr_halo_first = pickle.load(pickle_file)
-        with open(curr_loc + "halo_n.pickle", "rb") as pickle_file:
-            curr_halo_n = pickle.load(pickle_file)
+        with h5py.File(curr_loc + 'full_dset.hdf5', "r") as file:
+            curr_dataset = file["Dataset"][:]
+            curr_hipids = file["HIPIDS"][:]
+            curr_labels = file["Labels"][:]
+            curr_halo_first = file["Halo_first"][:]
+            curr_halo_n = file["Halo_n"][:]
+        with open(curr_loc + "keys.pickle","rb") as file:
+            curr_keys = pickle.load(file)
         
         # TODO ensure that key order is the same for all simulations
         with open(path_to_calc_info + sim + "/all_indices.pickle", "rb") as pickle_file:
             all_idxs = pickle.load(pickle_file)
             
         halo_splt_idx = int(np.ceil((1-test_halos_ratio) * curr_halo_n.size))
-
+        
         # Indexing: when stacking the simulations the halo_first catergory no longer indexes the entire dataset
         # It still corresponds to each individual simulation (indicating where it starts at 0). 
         # In addition when splitting into training and testing datasets we set the halo_first to 0 for the testing
         # set at the beginning as otherwise it will be starting at some random point.
-        if j == 0:
-            full_halo_first = curr_halo_first
-            train_halo_first = curr_halo_first[:halo_splt_idx]
-            test_halo_first = curr_halo_first[halo_splt_idx:] - curr_halo_first[halo_splt_idx]
-            full_halo_n = curr_halo_n
-            train_halo_n = curr_halo_n[:halo_splt_idx]
-            test_halo_n = curr_halo_n[halo_splt_idx:]
-            full_idxs = all_idxs
-            train_idxs = all_idxs[:halo_splt_idx]
-            test_idxs = all_idxs[halo_splt_idx:]
+        
+        if os.path.isfile(full_dset_loc + "full_dset.hdf5") and i == 0:
+            os.remove(full_dset_loc + "full_dset.hdf5")
+        with h5py.File((full_dset_loc + "full_dset.hdf5"), 'a') as curr_dset:
+            save_to_hdf5(curr_dset, "Halo_first", dataset = curr_halo_first, chunk = True, max_shape = (tot_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "Halo_n", dataset = curr_halo_n, chunk = True, max_shape = (tot_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "HIPIDS", dataset = curr_hipids, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "Labels", dataset = curr_labels, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "Halo_Indices", dataset = all_idxs, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "Dataset", dataset = curr_dataset, chunk = True, max_shape = (tot_num_ptls,curr_keys.shape[0]), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
             
-            ptl_splt_idx = np.sum(train_halo_n)
+        hdf5_ptl_idx += curr_dataset.shape[0]
+        hdf5_halo_idx += curr_halo_first.shape[0]
+        
+        ptl_splt_idx = np.sum(curr_halo_n[:halo_splt_idx])
+        
+        if os.path.isfile(full_dset_loc + "train_dset.hdf5") and i == 0:
+            os.remove(full_dset_loc + "train_dset.hdf5")
+        with h5py.File((full_dset_loc + "train_dset.hdf5"), 'a') as curr_dset:
+            save_to_hdf5(curr_dset, "Halo_first", dataset = curr_halo_first[:halo_splt_idx], chunk = True, max_shape = (tot_num_halos,), curr_idx = train_hdf5_halo_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "Halo_n", dataset = curr_halo_n[:halo_splt_idx], chunk = True, max_shape = (tot_num_halos,), curr_idx = train_hdf5_halo_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "HIPIDS", dataset = curr_hipids[:ptl_splt_idx], chunk = True, max_shape = (tot_num_ptls,), curr_idx = train_hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "Labels", dataset = curr_labels[:ptl_splt_idx], chunk = True, max_shape = (tot_num_ptls,), curr_idx = train_hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "Halo_Indices", dataset = all_idxs[:halo_splt_idx], chunk = True, max_shape = (tot_num_ptls,), curr_idx = train_hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "Dataset", dataset = curr_dataset[:ptl_splt_idx], chunk = True, max_shape = (tot_num_ptls,curr_keys.shape[0]), curr_idx = train_hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
             
-            full_dataset_keys = curr_dataset_keys
-            full_dataset = curr_dataset
-            train_dataset = curr_dataset[:ptl_splt_idx]
-            test_dataset = curr_dataset[ptl_splt_idx:]
-            full_hipids = curr_hipids
-            train_hipids = curr_hipids[:ptl_splt_idx]
-            test_hipids = curr_hipids[ptl_splt_idx:]
-            full_labels = curr_labels
-            train_labels = curr_labels[:ptl_splt_idx]
-            test_labels = curr_labels[ptl_splt_idx:]
-        else:
-            full_halo_first = np.vstack((full_halo_first,curr_halo_first))
-            train_halo_first = np.vstack((train_halo_first,curr_halo_first[:halo_splt_idx]))
-            test_halo_first = np.vstack((test_halo_first,curr_halo_first[halo_splt_idx:] - curr_halo_first[halo_splt_idx]))
-            full_halo_n = np.vstack((full_halo_n,curr_halo_n))
-            train_halo_n = np.vstack((train_halo_n,curr_halo_n[:halo_splt_idx]))
-            test_halo_n = np.vstack((test_halo_n,curr_halo_n[halo_splt_idx:]))
-            full_idxs = np.vstack((full_idxs,all_idxs))
-            train_idxs = np.vstack((train_idxs,all_idxs[:halo_splt_idx]))
-            test_idxs = np.vstack((test_idxs,all_idxs[halo_splt_idx:]))
+        train_hdf5_ptl_idx += curr_dataset[:ptl_splt_idx].shape[0]
+        train_hdf5_halo_idx += curr_halo_first[:halo_splt_idx].shape[0]
+        
+        if os.path.isfile(full_dset_loc + "test_dset.hdf5") and i == 0:
+            os.remove(full_dset_loc + "test_dset.hdf5")
+        with h5py.File((full_dset_loc + "test_dset.hdf5"), 'a') as curr_dset:
+            save_to_hdf5(curr_dset, "Halo_first", dataset = (curr_halo_first[halo_splt_idx:]- curr_halo_first[halo_splt_idx]), chunk = True, max_shape = (tot_num_halos,), curr_idx = test_hdf5_halo_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "Halo_n", dataset = curr_halo_n[halo_splt_idx:], chunk = True, max_shape = (tot_num_halos,), curr_idx = test_hdf5_halo_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "HIPIDS", dataset = curr_hipids[ptl_splt_idx:], chunk = True, max_shape = (tot_num_ptls,), curr_idx = test_hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "Labels", dataset = curr_labels[ptl_splt_idx:], chunk = True, max_shape = (tot_num_ptls,), curr_idx = test_hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "Halo_Indices", dataset = all_idxs[halo_splt_idx:], chunk = True, max_shape = (tot_num_ptls,), curr_idx = test_hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "Dataset", dataset = curr_dataset[ptl_splt_idx:], chunk = True, max_shape = (tot_num_ptls,curr_keys.shape[0]), curr_idx = test_hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
             
-            ptl_splt_idx = np.sum(train_halo_n)
-            
-            full_dataset = np.vstack((full_dataset,curr_dataset))
-            train_dataset = np.vstack((train_dataset,curr_dataset[:ptl_splt_idx]))
-            test_dataset = np.vstack((test_dataset,curr_dataset[ptl_splt_idx:]))
-            full_hipids = np.vstack((full_hipids,curr_hipids))
-            train_hipids = np.vstack((train_hipids,curr_hipids[:ptl_splt_idx]))
-            test_hipids = np.vstack((test_hipids,curr_hipids[ptl_splt_idx:]))
-            full_labels = np.vstack((full_labels,curr_labels))
-            train_labels = np.vstack((train_labels,curr_labels[:ptl_splt_idx]))
-            test_labels = np.vstack((test_labels,curr_labels[ptl_splt_idx:]))
-    
+        test_hdf5_ptl_idx += curr_dataset[ptl_splt_idx:].shape[0]
+        test_hdf5_halo_idx += curr_halo_first[halo_splt_idx:].shape[0]
 
-with open(full_dset_loc + "keys.pickle", "wb") as pickle_file:
-    pickle.dump(full_dataset_keys, pickle_file)
-with open(full_dset_loc + "dataset.pickle", "wb") as pickle_file:
-    pickle.dump(full_dataset, pickle_file)
-with open(full_dset_loc + "hipids.pickle", "wb") as pickle_file:
-    pickle.dump(full_hipids, pickle_file)
-with open(full_dset_loc + "labels.pickle", "wb") as pickle_file:
-    pickle.dump(full_labels, pickle_file)
-with open(full_dset_loc + "halo_first.pickle", "wb") as pickle_file:
-    pickle.dump(full_halo_first, pickle_file)
-with open(full_dset_loc + "halo_n.pickle", "wb") as pickle_file:
-    pickle.dump(full_halo_n, pickle_file) 
-with open(full_dset_loc + "halo_indices.pickle","wb") as pickle_file:
-    pickle.dump(full_idxs, pickle_file)
-
-
-with open(train_dset_loc + "keys.pickle", "wb") as pickle_file:
-    pickle.dump(full_dataset_keys, pickle_file)
-with open(train_dset_loc + "dataset.pickle", "wb") as pickle_file:
-    pickle.dump(train_dataset, pickle_file)
-with open(train_dset_loc + "hipids.pickle", "wb") as pickle_file:
-    pickle.dump(train_hipids, pickle_file)
-with open(train_dset_loc + "labels.pickle", "wb") as pickle_file:
-    pickle.dump(train_labels, pickle_file)
-with open(train_dset_loc + "halo_first.pickle", "wb") as pickle_file:
-    pickle.dump(train_halo_first, pickle_file)
-with open(train_dset_loc + "halo_n.pickle", "wb") as pickle_file:
-    pickle.dump(train_halo_n, pickle_file)    
-with open(train_dset_loc + "halo_indices.pickle","wb") as pickle_file:
-    pickle.dump(train_idxs, pickle_file)
-    
-with open(test_dset_loc + "keys.pickle", "wb") as pickle_file:
-    pickle.dump(full_dataset_keys, pickle_file)
-with open(test_dset_loc + "dataset.pickle", "wb") as pickle_file:
-    pickle.dump(test_dataset, pickle_file)
-with open(test_dset_loc + "hipids.pickle", "wb") as pickle_file:
-    pickle.dump(test_hipids, pickle_file)
-with open(test_dset_loc + "labels.pickle", "wb") as pickle_file:
-    pickle.dump(test_labels, pickle_file)
-with open(test_dset_loc + "halo_first.pickle", "wb") as pickle_file:
-    pickle.dump(test_halo_first, pickle_file)
-with open(test_dset_loc + "halo_n.pickle", "wb") as pickle_file:
-    pickle.dump(test_halo_n, pickle_file)    
-with open(test_dset_loc + "halo_indices.pickle","wb") as pickle_file:
-    pickle.dump(test_idxs, pickle_file)
-
-    
+        
