@@ -178,11 +178,11 @@ def split_dataset_by_mass(halo_first, halo_n, path_to_dataset, curr_dataset):
                         curr_dataset = np.column_stack((curr_dataset,all_ptl_properties[key][halo_first:halo_first+halo_n]))
     return curr_dataset
 
-def save_to_hdf5(hdf5_file, data_name, dataset, chunk, max_shape, curr_idx, max_num_keys):
-    if len(list(hdf5_file.keys())) < (max_num_keys):
+def save_to_hdf5(hdf5_file, data_name, dataset, chunk, max_shape):
+    if data_name not in list(hdf5_file.keys()):
         hdf5_file.create_dataset(data_name, data = dataset, chunks = chunk, maxshape = max_shape, dtype=dataset.dtype)
     # with a new file adding on additional data to the datasets
-    elif len(list(hdf5_file.keys())) == (max_num_keys):
+    elif data_name in list(hdf5_file.keys()):
         hdf5_file[data_name].resize((hdf5_file[data_name].shape[0] + dataset.shape[0]), axis = 0)
         hdf5_file[data_name][-dataset.shape[0]:] = dataset   
         

@@ -9,6 +9,7 @@ import json
 import time
 import h5py
 import re
+import matplotlib.pyplot as plt
 from contextlib import contextmanager
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, find_closest_z, conv_halo_id_spid, create_directory
 from utils.visualization_functions import compare_density_prf, plot_r_rv_tv_graph, plot_misclassified
@@ -182,3 +183,7 @@ def eval_model(model_info, client, model, use_sims, dst_type, dst_loc, combined_
         plot_misclassified(p_corr_labels=y, p_ml_labels=preds, p_r=X[:,p_r_loc], p_rv=X[:,p_rv_loc], p_tv=X[:,p_tv_loc], c_r=X[:,c_r_loc], c_rv=X[:,c_rv_loc], c_tv=X[:,c_tv_loc],title="",num_bins=num_bins,save_location=plot_save_loc,model_info=model_info,dataset_name=dst_type + "_" + combined_name)
     
 
+def print_tree(bst,tree_num):
+    fig, ax = plt.subplots(figsize=(400, 10))
+    xgb.plot_tree(bst, num_trees=tree_num, ax=ax)
+    plt.savefig(path_to_MLOIS + "Random_figs/tree_plot.png")

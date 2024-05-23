@@ -192,12 +192,13 @@ np.random.seed(11)
 plot_nu_dist()
 
 # Create all the datasets for the simulations
-combined_name = ""
-tot_num_halos = 0
-tot_num_ptls = 0
+combined_name=""
+tot_num_halos=0
+tot_num_ptls=0
 hdf5_ptl_idx=0
 hdf5_halo_idx=0
 
+# Create individual datasets for each model requested
 for i,sim in enumerate(model_sims):
     with timed("Datasets for: "+sim+" created"):
         sim_name, curr_snap_list = shorten_sim_name(sim)
@@ -209,17 +210,18 @@ for i,sim in enumerate(model_sims):
         create_directory(curr_loc)
     
         curr_dataset,curr_keys,curr_hipids,curr_labels,curr_halo_first,curr_halo_n = build_sim_dataset(sim,curr_snap_list)
-        tot_num_halos = tot_num_halos + curr_halo_first.shape[0]
-        tot_num_ptls = tot_num_ptls + curr_labels.shape[0]
+        curr_num_halos = curr_halo_first.shape[0]
+        curr_num_ptls = curr_labels.shape[0]
+        tot_num_halos = tot_num_halos + curr_num_halos
+        tot_num_ptls = tot_num_ptls + curr_num_ptls
     
-        if os.path.isfile(curr_loc + "full_dset.hdf5") and i == 0:
-            os.remove(curr_loc + "full_dset.hdf5")
+        # Don't have to delete file here because we aren't actually iteratively adding to the same file
         with h5py.File((curr_loc + "full_dset.hdf5"), 'a') as curr_dset:
-            save_to_hdf5(curr_dset, "Halo_first", dataset = curr_halo_first, chunk = True, max_shape = (tot_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(curr_dset, "Halo_n", dataset = curr_halo_n, chunk = True, max_shape = (tot_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(curr_dset, "HIPIDS", dataset = curr_hipids, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(curr_dset, "Labels", dataset = curr_labels, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(curr_dset, "Dataset", dataset = curr_dataset, chunk = True, max_shape = (tot_num_ptls,curr_keys.shape[0]), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "Halo_first", dataset = curr_halo_first, chunk = True, max_shape = (curr_num_halos,))
+            save_to_hdf5(curr_dset, "Halo_n", dataset = curr_halo_n, chunk = True, max_shape = (curr_num_halos,))
+            save_to_hdf5(curr_dset, "HIPIDS", dataset = curr_hipids, chunk = True, max_shape = (curr_num_ptls,))
+            save_to_hdf5(curr_dset, "Labels", dataset = curr_labels, chunk = True, max_shape = (curr_num_ptls,))
+            save_to_hdf5(curr_dset, "Dataset", dataset = curr_dataset, chunk = True, max_shape = (curr_num_ptls,curr_keys.shape[0]))
         
         with open(curr_loc + "keys.pickle","wb") as file:
             pickle.dump(curr_keys, file)
@@ -230,13 +232,6 @@ create_directory(full_dset_loc)
 
 # Now that we know all the simulations have datasets go through all the ones we wanted and combine them into 
 # one large dataset that is split into training and testing
-hdf5_ptl_idx=0
-hdf5_halo_idx=0
-train_hdf5_ptl_idx=0
-train_hdf5_halo_idx=0
-test_hdf5_ptl_idx=0
-test_hdf5_halo_idx=0
-
 for j,sim in enumerate(model_sims):
     with timed("Datasets for: "+sim+" stacked"):
         sim_name, curr_snap_list = shorten_sim_name(sim)
@@ -265,42 +260,34 @@ for j,sim in enumerate(model_sims):
         if os.path.isfile(full_dset_loc + "full_dset.hdf5") and i == 0:
             os.remove(full_dset_loc + "full_dset.hdf5")
         with h5py.File((full_dset_loc + "full_dset.hdf5"), 'a') as curr_dset:
-            save_to_hdf5(curr_dset, "Halo_first", dataset = curr_halo_first, chunk = True, max_shape = (tot_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(curr_dset, "Halo_n", dataset = curr_halo_n, chunk = True, max_shape = (tot_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(curr_dset, "HIPIDS", dataset = curr_hipids, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(curr_dset, "Labels", dataset = curr_labels, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(curr_dset, "Halo_Indices", dataset = all_idxs, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(curr_dset, "Dataset", dataset = curr_dataset, chunk = True, max_shape = (tot_num_ptls,curr_keys.shape[0]), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            
-        hdf5_ptl_idx += curr_dataset.shape[0]
-        hdf5_halo_idx += curr_halo_first.shape[0]
+            save_to_hdf5(curr_dset, "Halo_first", dataset = curr_halo_first, chunk = True, max_shape = (tot_num_halos,))
+            save_to_hdf5(curr_dset, "Halo_n", dataset = curr_halo_n, chunk = True, max_shape = (tot_num_halos,))
+            save_to_hdf5(curr_dset, "HIPIDS", dataset = curr_hipids, chunk = True, max_shape = (tot_num_ptls,))
+            save_to_hdf5(curr_dset, "Labels", dataset = curr_labels, chunk = True, max_shape = (tot_num_ptls,))
+            save_to_hdf5(curr_dset, "Halo_Indices", dataset = all_idxs, chunk = True, max_shape = (tot_num_ptls,))
+            save_to_hdf5(curr_dset, "Dataset", dataset = curr_dataset, chunk = True, max_shape = (tot_num_ptls,curr_keys.shape[0]))
         
         ptl_splt_idx = np.sum(curr_halo_n[:halo_splt_idx])
         
         if os.path.isfile(full_dset_loc + "train_dset.hdf5") and i == 0:
             os.remove(full_dset_loc + "train_dset.hdf5")
         with h5py.File((full_dset_loc + "train_dset.hdf5"), 'a') as curr_dset:
-            save_to_hdf5(curr_dset, "Halo_first", dataset = curr_halo_first[:halo_splt_idx], chunk = True, max_shape = (tot_num_halos,), curr_idx = train_hdf5_halo_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(curr_dset, "Halo_n", dataset = curr_halo_n[:halo_splt_idx], chunk = True, max_shape = (tot_num_halos,), curr_idx = train_hdf5_halo_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(curr_dset, "HIPIDS", dataset = curr_hipids[:ptl_splt_idx], chunk = True, max_shape = (tot_num_ptls,), curr_idx = train_hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(curr_dset, "Labels", dataset = curr_labels[:ptl_splt_idx], chunk = True, max_shape = (tot_num_ptls,), curr_idx = train_hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(curr_dset, "Halo_Indices", dataset = all_idxs[:halo_splt_idx], chunk = True, max_shape = (tot_num_ptls,), curr_idx = train_hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(curr_dset, "Dataset", dataset = curr_dataset[:ptl_splt_idx], chunk = True, max_shape = (tot_num_ptls,curr_keys.shape[0]), curr_idx = train_hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            
-        train_hdf5_ptl_idx += curr_dataset[:ptl_splt_idx].shape[0]
-        train_hdf5_halo_idx += curr_halo_first[:halo_splt_idx].shape[0]
+            save_to_hdf5(curr_dset, "Halo_first", dataset = curr_halo_first[:halo_splt_idx], chunk = True, max_shape = (tot_num_halos,))
+            save_to_hdf5(curr_dset, "Halo_n", dataset = curr_halo_n[:halo_splt_idx], chunk = True, max_shape = (tot_num_halos,))
+            save_to_hdf5(curr_dset, "HIPIDS", dataset = curr_hipids[:ptl_splt_idx], chunk = True, max_shape = (tot_num_ptls,))
+            save_to_hdf5(curr_dset, "Labels", dataset = curr_labels[:ptl_splt_idx], chunk = True, max_shape = (tot_num_ptls,))
+            save_to_hdf5(curr_dset, "Halo_Indices", dataset = all_idxs[:halo_splt_idx], chunk = True, max_shape = (tot_num_ptls,))
+            save_to_hdf5(curr_dset, "Dataset", dataset = curr_dataset[:ptl_splt_idx], chunk = True, max_shape = (tot_num_ptls,curr_keys.shape[0]))
         
         if os.path.isfile(full_dset_loc + "test_dset.hdf5") and i == 0:
             os.remove(full_dset_loc + "test_dset.hdf5")
         with h5py.File((full_dset_loc + "test_dset.hdf5"), 'a') as curr_dset:
-            save_to_hdf5(curr_dset, "Halo_first", dataset = (curr_halo_first[halo_splt_idx:]- curr_halo_first[halo_splt_idx]), chunk = True, max_shape = (tot_num_halos,), curr_idx = test_hdf5_halo_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(curr_dset, "Halo_n", dataset = curr_halo_n[halo_splt_idx:], chunk = True, max_shape = (tot_num_halos,), curr_idx = test_hdf5_halo_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(curr_dset, "HIPIDS", dataset = curr_hipids[ptl_splt_idx:], chunk = True, max_shape = (tot_num_ptls,), curr_idx = test_hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(curr_dset, "Labels", dataset = curr_labels[ptl_splt_idx:], chunk = True, max_shape = (tot_num_ptls,), curr_idx = test_hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(curr_dset, "Halo_Indices", dataset = all_idxs[halo_splt_idx:], chunk = True, max_shape = (tot_num_ptls,), curr_idx = test_hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(curr_dset, "Dataset", dataset = curr_dataset[ptl_splt_idx:], chunk = True, max_shape = (tot_num_ptls,curr_keys.shape[0]), curr_idx = test_hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(curr_dset, "Halo_first", dataset = (curr_halo_first[halo_splt_idx:]- curr_halo_first[halo_splt_idx]), chunk = True, max_shape = (tot_num_halos,))
+            save_to_hdf5(curr_dset, "Halo_n", dataset = curr_halo_n[halo_splt_idx:], chunk = True, max_shape = (tot_num_halos,))
+            save_to_hdf5(curr_dset, "HIPIDS", dataset = curr_hipids[ptl_splt_idx:], chunk = True, max_shape = (tot_num_ptls,))
+            save_to_hdf5(curr_dset, "Labels", dataset = curr_labels[ptl_splt_idx:], chunk = True, max_shape = (tot_num_ptls,))
+            save_to_hdf5(curr_dset, "Halo_Indices", dataset = all_idxs[halo_splt_idx:], chunk = True, max_shape = (tot_num_ptls,))
+            save_to_hdf5(curr_dset, "Dataset", dataset = curr_dataset[ptl_splt_idx:], chunk = True, max_shape = (tot_num_ptls,curr_keys.shape[0]))
             
-        test_hdf5_ptl_idx += curr_dataset[ptl_splt_idx:].shape[0]
-        test_hdf5_halo_idx += curr_halo_first[halo_splt_idx:].shape[0]
 
         

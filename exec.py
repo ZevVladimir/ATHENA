@@ -16,8 +16,8 @@ if create_train_dataset_enable:
     subprocess.run(["python3", "create_train_dataset.py"],check=True)
 
 if train_xgboost_enable:
-    subprocess.run(["python3", "train_xgboost_dask.py"],check=True)
+    subprocess.run(["python3", "train_xgboost.py"],check=True)
 
 if test_xgboost_enable:
-    subprocess.run(["python3", "test_xgboost_dask.py"],check=True)
+    subprocess.run(["python3", "test_xgboost.py"],check=True)
 
