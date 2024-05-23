@@ -6,13 +6,14 @@ from dask import array as da
 import xgboost as xgb
 from xgboost import dask as dxgb
 import json
+import time
 import h5py
 import re
 import matplotlib.pyplot as plt
-
-from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, find_closest_z, conv_halo_id_spid, timed
+from contextlib import contextmanager
+from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, find_closest_z, conv_halo_id_spid, create_directory
 from utils.visualization_functions import compare_density_prf, plot_r_rv_tv_graph, plot_misclassified
-from sparta_tools import sparta # type: ignore
+from sparta_tools import sparta
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
@@ -39,6 +40,13 @@ model_type = config["XGBOOST"]["model_type"]
 num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 # size float32 is 4 bytes
 chunk_size = int(np.floor(1e9 / (num_save_ptl_params * 4)))
+
+@contextmanager
+def timed(txt):
+    t0 = time.time()
+    yield
+    t1 = time.time()
+    print("%32s time:  %8.5f" % (txt, t1 - t0))
 
 def make_preds(client, bst, X_np, y_np, report_name="Classification Report", print_report=False):
     X = da.from_array(X_np,chunks=(chunk_size,X_np.shape[1]))
@@ -85,8 +93,8 @@ def create_dmatrix(client, X_cpu, y_cpu, features, chunk_size, frac_use_data = 1
         return dqmatrix, X, y_cpu, scale_pos_weight 
     return dqmatrix, X, y_cpu
 
-
-def eval_model(model_info, client, model, use_sims, dst_type, dst_loc, combined_name, plot_save_loc, dens_prf = False, r_rv_tv = False, misclass=False): 
+#TODO have the locations all be in a dictionary or some more general way
+def eval_model(model_info, client, model, use_sims, dst_type, dst_loc, combined_name, plot_save_loc, p_red_shift, dens_prf = False, r_rv_tv = False, misclass=False): 
     with timed(dst_type + " Predictions"):
         with h5py.File(dst_loc + dst_type.lower() + "_dset.hdf5", "r") as file:
             X = file["Dataset"][:]
@@ -133,17 +141,17 @@ def eval_model(model_info, client, model, use_sims, dst_type, dst_loc, combined_
             if match:
                 sparta_search_name = match.group(0)
             
+            #TODO make this simulation dependent
+            new_p_snap, p_red_shift = find_closest_z(p_red_shift)
+            p_scale_factor = 1/(1+p_red_shift)
             with h5py.File(path_to_SPARTA_data + sparta_name + "/" + sparta_search_name + ".hdf5","r") as f:
                 dic_sim = {}
                 grp_sim = f['simulation']
                 for f in grp_sim.attrs:
                     dic_sim[f] = grp_sim.attrs[f]
-                curr_z = f["config"]["p_snap_info"]["red_shift"][()]
-                new_p_snap, curr_z = find_closest_z(curr_z)
-                p_scale_factor = 1/(1+curr_z)
             
             all_red_shifts = dic_sim['snap_z']
-            p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
+            p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
             halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_or_pickle_SPARTA_data(sparta_name, p_scale_factor, curr_snap_list[0], p_sparta_snap)
 
             use_halo_ids = halos_id[use_idxs]

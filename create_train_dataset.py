@@ -1,4 +1,5 @@
-import numpy as np 
+import numpy as np
+import time 
 import matplotlib.pyplot as plt
 from colossus.cosmology import cosmology
 from colossus.lss import peaks
@@ -8,9 +9,10 @@ import multiprocessing as mp
 import h5py
 import json
 import re
+from contextlib import contextmanager
 from itertools import repeat
 from sklearn.model_selection import train_test_split
-from utils.data_and_loading_functions import create_directory, save_to_hdf5, timed
+from utils.data_and_loading_functions import check_pickle_exist_gadget, choose_halo_split, create_directory, save_to_hdf5
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
@@ -50,9 +52,15 @@ import sys
 sys.path.insert(1, path_to_pygadgetreader)
 sys.path.insert(1, path_to_sparta)
 from utils.visualization_functions import *
-from pygadgetreader import readsnap, readheader # type: ignore
-from sparta_tools import sparta # type: ignore
+from pygadgetreader import readsnap, readheader
+from sparta_tools import sparta
 ##################################################################################################################
+@contextmanager
+def timed(txt):
+    t0 = time.time()
+    yield
+    t1 = time.time()
+    print("%32s time:  %8.5fs" % (txt, t1 - t0))
     
 def take_ptl_within(dataset, labels, scal_rad_loc, max_rad):
     within_rad = np.where(dataset[:,scal_rad_loc] <= max_rad)[0]

@@ -48,20 +48,18 @@ num_processes = mp.cpu_count()
 import sys
 sys.path.insert(0, path_to_pygadgetreader)
 sys.path.insert(0, path_to_sparta)
-from pygadgetreader import readsnap, readheader # type: ignore
-from sparta_tools import sparta # type: ignore
+from pygadgetreader import readsnap, readheader
+from sparta_tools import sparta
 ##################################################################################################################
 @contextmanager
 def timed(txt):
     t0 = time.time()
     yield
     t1 = time.time()
-    time_s = t1 - t0
-    time_min = time_s / 60
-    
-    print("%s time: %.5fs, %.2f min" % (txt, time_s, time_min))
+    print("%32s time:  %8.5f" % (txt, t1 - t0))
 
-def check_pickle_exist_gadget(sparta_name, ptl_property, snapshot, snapshot_path, scale_factor):
+
+def check_pickle_exist_gadget(sparta_name, ptl_property, snapshot, snapshot_path):
     # save to folder containing pickled data to be accessed easily later
     file_path = path_to_pickle + str(snapshot) + "_" + str(sparta_name) + "/" + ptl_property + "_" + str(snapshot) + ".pickle" 
     create_directory(path_to_pickle + str(snapshot) +  "_" + str(sparta_name) + "/")
@@ -69,20 +67,20 @@ def check_pickle_exist_gadget(sparta_name, ptl_property, snapshot, snapshot_path
     # check if the file has already been pickled if so just load it
     if os.path.isfile(file_path):
         with open(file_path, "rb") as pickle_file:
-            ptl_info = pickle.load(pickle_file)
+            particle_info = pickle.load(pickle_file)
     # otherwise load the specific information from the particle data and save it as a pickle file
     else:
-        ptl_info = readsnap(snapshot_path, ptl_property, 'dm')
-        if ptl_property == "pos":
-            ptl_info = ptl_info * 10**3 * scale_factor # convert position to kpc/h and physical
+        particle_info = readsnap(snapshot_path, ptl_property, 'dm')
         with open(file_path, "wb") as pickle_file:
-            pickle.dump(ptl_info, pickle_file)
-    return ptl_info
+            pickle.dump(particle_info, pickle_file)
+    return particle_info
 
 def load_or_pickle_ptl_data(sparta_name, snapshot, snapshot_path, scale_factor):
-    ptl_pid = check_pickle_exist_gadget(sparta_name, "pid", snapshot, snapshot_path, scale_factor=scale_factor)
-    ptl_vel = check_pickle_exist_gadget(sparta_name, "vel", snapshot, snapshot_path, scale_factor=scale_factor)
-    ptl_pos = check_pickle_exist_gadget(sparta_name, "pos", snapshot, snapshot_path, scale_factor=scale_factor)
+    ptl_pid = check_pickle_exist_gadget(sparta_name, "pid", snapshot, snapshot_path)
+    ptl_vel = check_pickle_exist_gadget(sparta_name, "vel", snapshot, snapshot_path)
+    ptl_pos = check_pickle_exist_gadget(sparta_name, "pos", snapshot, snapshot_path)
+    #TODO save the ptl_pos to be adjusted to kpc/h phyiscal
+    ptl_pos = ptl_pos * 10**3 * scale_factor # convert to kpc/h and physical
 
     return ptl_pid, ptl_vel, ptl_pos
 
@@ -180,26 +178,13 @@ def split_dataset_by_mass(halo_first, halo_n, path_to_dataset, curr_dataset):
                         curr_dataset = np.column_stack((curr_dataset,all_ptl_properties[key][halo_first:halo_first+halo_n]))
     return curr_dataset
 
-def save_dict_to_hdf5(hdf5_group, dictionary):
-    for key, value in dictionary.items():
-        if isinstance(value, dict):  # Check if the value is a dictionary
-            subgroup = hdf5_group.create_group(key)  # Create a subgroup
-            save_dict_to_hdf5(subgroup, value)  # Recursively save the subdictionary
-        else:
-            hdf5_group.create_dataset(key, data=value)  
-
 def save_to_hdf5(hdf5_file, data_name, dataset, chunk, max_shape):
-    if isinstance(dataset, dict):
-        hdf5_group = hdf5_file.create_group(data_name)
-        # recursively deal with dictionaries
-        save_dict_to_hdf5(hdf5_group, dataset)   
-    else: 
-        if data_name not in list(hdf5_file.keys()):
-            hdf5_file.create_dataset(data_name, data = dataset, chunks = chunk, maxshape = max_shape, dtype=dataset.dtype)
-        # with a new file adding on additional data to the datasets
-        elif data_name in list(hdf5_file.keys()):
-            hdf5_file[data_name].resize((hdf5_file[data_name].shape[0] + dataset.shape[0]), axis = 0)
-            hdf5_file[data_name][-dataset.shape[0]:] = dataset   
+    if data_name not in list(hdf5_file.keys()):
+        hdf5_file.create_dataset(data_name, data = dataset, chunks = chunk, maxshape = max_shape, dtype=dataset.dtype)
+    # with a new file adding on additional data to the datasets
+    elif data_name in list(hdf5_file.keys()):
+        hdf5_file[data_name].resize((hdf5_file[data_name].shape[0] + dataset.shape[0]), axis = 0)
+        hdf5_file[data_name][-dataset.shape[0]:] = dataset   
         
 def choose_halo_split(indices, snap, halo_props, particle_props, num_features):
     start_idxs = halo_props["Halo_start_ind_" + snap].to_numpy()
