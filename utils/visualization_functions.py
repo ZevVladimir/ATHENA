@@ -176,7 +176,6 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
     t1 = time.time()
     print("Starting Density Profile Plot")
     act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
-    create_directory(save_location + "plots/")
     curr_num_halos = halo_first.shape[0]
     min_disp_halos = int(np.ceil(0.3 * curr_num_halos))
     num_bins = prf_bins.size
@@ -709,7 +708,6 @@ def plot_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, c
 def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, save_location):
     t1 = time.time()
     print("Starting r vs rv vs tv Plot")
-    create_directory(save_location + "plots/")
     mpl.rcParams.update({'font.size': 8})
     plt.rcParams['figure.constrained_layout.use'] = True
 
