@@ -9,14 +9,13 @@ from xgboost import dask as dxgb
 from xgboost.dask import DaskDMatrix
 from sklearn.metrics import classification_report
 import pickle
-import time
 import os
 import sys
 import numpy as np
 import json
 import re
 from utils.ML_support import *
-from utils.data_and_loading_functions import create_directory, load_or_pickle_SPARTA_data, conv_halo_id_spid
+from utils.data_and_loading_functions import create_directory, timed
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
@@ -61,13 +60,6 @@ try:
 except Exception: # this command not being found can raise quite a few different errors depending on the configuration
     gpu_use = False
 ###############################################################################################################
-
-@contextmanager
-def timed(txt):
-    t0 = time.time()
-    yield
-    t1 = time.time()
-    print("%32s time:  %8.5f" % (txt, t1 - t0))
 
 def get_cluster():
     cluster = LocalCUDACluster(
@@ -132,7 +124,7 @@ if __name__ == "__main__":
             plot_loc = model_save_loc + dst_type + "_" + combined_test_name + "/plots/"
             create_directory(model_save_loc + dst_type + "_" + combined_test_name)
             create_directory(plot_loc)
-            eval_model(model_info, client, bst, use_sims=model_sims, dst_type=dst_type, dst_loc=test_dataset_loc, combined_name=combined_test_name, plot_save_loc=plot_loc, p_red_shift=p_red_shift, dens_prf = True, r_rv_tv = True, misclass=True)
+            eval_model(model_info, client, bst, use_sims=model_sims, dst_type=dst_type, dst_loc=test_dataset_loc, combined_name=combined_test_name, plot_save_loc=plot_loc, dens_prf = True, r_rv_tv = True, misclass=True)
     
     with open(model_save_loc + "model_info.pickle", "wb") as pickle_file:
         pickle.dump(model_info, pickle_file) 
