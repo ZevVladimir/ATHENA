@@ -11,6 +11,7 @@ import multiprocessing as mp
 from itertools import repeat
 import sys
 import re
+import pandas as pd
 
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed
 from utils.calculation_functions import *
@@ -319,16 +320,24 @@ def halo_loop(indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos,
                 save_rad_vel = p_all_rad_vel
                 save_tang_vel = p_all_tang_vel
             
-
-            with h5py.File((save_location + "all_particle_properties.hdf5"), 'a') as all_ptl_props:
-                save_to_hdf5(all_ptl_props, "Halo_first", dataset = p_start_num_ptls, chunk = True, max_shape = (total_num_halos,))
-                save_to_hdf5(all_ptl_props, "Halo_n", dataset = p_use_num_ptls, chunk = True, max_shape = (total_num_halos,))
-                save_to_hdf5(all_ptl_props, "HIPIDS", dataset = p_all_HIPIDs, chunk = True, max_shape = (tot_num_ptls,))
-                save_to_hdf5(all_ptl_props, "Orbit_Infall", dataset = p_all_orb_assn, chunk = True, max_shape = (tot_num_ptls,))
-                save_to_hdf5(all_ptl_props, "Scaled_radii_", dataset = save_scale_radii, chunk = True, max_shape = use_max_shape)
-                save_to_hdf5(all_ptl_props, "Radial_vel_", dataset = save_rad_vel, chunk = True, max_shape = use_max_shape)
-                save_to_hdf5(all_ptl_props, "Tangential_vel_", dataset = save_tang_vel, chunk = True, max_shape = use_max_shape)
-                #save_to_hdf5(all_particle_properties, "scal_sqr_phys_vel", dataset = p_scal_sqr_phys_vel, chunk = True, max_shape = (tot_num_ptls,))
+            halo_df = pd.DataFrame({
+                "Halo_first":p_start_num_ptls,
+                "Halo_n":p_use_num_ptls,
+            })
+            
+            ptl_df = pd.DataFrame({
+                "HIPIDS":p_all_HIPIDs,
+                "Orbit_Infall":p_all_orb_assn,
+                "p_Scaled_radii":save_scale_radii[:,0],
+                "p_Radial_vel":save_rad_vel[:,0],
+                "p_Tangential_vel":save_tang_vel[:,0],
+                "c_Scaled_radii":save_scale_radii[:,1],
+                "c_Radial_vel":save_rad_vel[:,1],
+                "c_Tangential_vel":save_tang_vel[:,1],
+                })
+            
+            halo_df.to_hdf(save_location + "halo_info/halo_" + str(i) + ".h5", key='data', mode='w',format='table')  
+            ptl_df.to_hdf(save_location + "ptl_info/ptl_" + str(i) + ".h5", key='data', mode='w',format='table')  
 
             hdf5_ptl_idx += p_tot_num_use_ptls
             hdf5_halo_idx += p_start_num_ptls.shape[0]
@@ -456,10 +465,11 @@ with timed("Startup"):
         "p_snap_info": p_snap_dict,
         "c_snap_info": c_snap_dict,
     }
-    if os.path.isfile(save_location + "all_particle_properties.hdf5"):
-        os.remove(save_location + "all_particle_properties.hdf5")
-    with h5py.File((save_location + "all_particle_properties.hdf5"), 'a') as all_ptl_props:
-        save_to_hdf5(all_ptl_props, "config", config_params, chunk=False, max_shape=1)
+    
+    with open((save_location + "config.pickle"), 'wb') as f:
+        pickle.dump(config_params,f)
+create_directory(save_location + "halo_info/")
+create_directory(save_location + "ptl_info/")
 
 with timed("Finished Calc"):   
     halo_loop(indices=match_halo_idxs, tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
