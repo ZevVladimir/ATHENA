@@ -1,26 +1,20 @@
 from dask import array as da
 from dask.distributed import Client
 
-from contextlib import contextmanager
-
 import xgboost as xgb
 from xgboost import dask as dxgb
-
-from colossus.cosmology import cosmology    
+    
 from sklearn.metrics import classification_report
 import pickle
-import time
 import os
 import sys
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import h5py
 import json
 import re
-from pairing import depair
 
-from utils.data_and_loading_functions import create_directory, load_or_pickle_SPARTA_data, conv_halo_id_spid
+from utils.data_and_loading_functions import create_directory, timed
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
@@ -85,14 +79,9 @@ else:
 ###############################################################################################################
 sys.path.insert(0, path_to_pygadgetreader)
 sys.path.insert(0, path_to_sparta)
-from pygadgetreader import readsnap, readheader
-from sparta_tools import sparta
-@contextmanager
-def timed(txt):
-    t0 = time.time()
-    yield
-    t1 = time.time()
-    print("%32s time:  %8.5f" % (txt, t1 - t0))
+from pygadgetreader import readsnap, readheader # type: ignore
+from sparta_tools import sparta # type: ignore
+
 
 def get_CUDA_cluster():
     cluster = LocalCUDACluster(
@@ -324,13 +313,12 @@ if __name__ == "__main__":
         del dtrain
         del dtest
 
-
     for dst_type in eval_datasets:
         with timed(dst_type + " Plots"):
             plot_loc = model_save_loc + dst_type + "_" + combined_name + "/plots/"
             create_directory(model_save_loc + dst_type + "_" + combined_name)
             create_directory(plot_loc)
-            eval_model(model_info, client, bst, use_sims=model_sims, dst_type=dst_type, dst_loc=dataset_loc, combined_name=combined_name, plot_save_loc=plot_loc, p_red_shift=p_red_shift, dens_prf = True, r_rv_tv = True, misclass=True)
+            eval_model(model_info, client, bst, use_sims=model_sims, dst_type=dst_type, dst_loc=dataset_loc, combined_name=combined_name, plot_save_loc=plot_loc, dens_prf = True, r_rv_tv = True, misclass=True)
    
     bst.save_model(model_save_loc + model_name + ".json")
 
