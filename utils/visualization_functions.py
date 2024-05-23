@@ -10,8 +10,7 @@ from colossus.halo import mass_so
 import matplotlib.colors as colors
 import multiprocessing as mp
 from itertools import repeat
-import time
-from sparta_tools import sparta
+from sparta_tools import sparta # type: ignore
 import os
 from contextlib import contextmanager
 import h5py
@@ -21,7 +20,7 @@ import sys
 from matplotlib.animation import FuncAnimation
 import seaborn as sns
 
-from utils.data_and_loading_functions import check_pickle_exist_gadget, create_directory, find_closest_z, load_or_pickle_ptl_data
+from utils.data_and_loading_functions import check_pickle_exist_gadget, create_directory, find_closest_z, load_or_pickle_ptl_data, timed
 from utils.calculation_functions import calc_v200m, calculate_density
 
 num_processes = mp.cpu_count()
@@ -45,14 +44,7 @@ snap_format = config["MISC"]["snap_format"]
 curr_chunk_size = config.getint("SEARCH","chunk_size")
 
 sys.path.insert(1, path_to_pygadgetreader)  
-from pygadgetreader import readsnap, readheader
-
-@contextmanager
-def timed(txt):
-    t0 = time.time()
-    yield
-    t1 = time.time()
-    print("%32s time:  %8.5f" % (txt, t1 - t0))
+from pygadgetreader import readsnap, readheader # type: ignore
 
 def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r200_per_part, red_shift, hubble_constant, little_h):
     start_bin_val = 0.001
@@ -173,243 +165,241 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
     # Shape of profiles should be (num halo,num bins)
     # EX: 10 halos, 80 bins (10,80)
     
-    t1 = time.time()
-    print("Starting Density Profile Plot")
-    act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
-    curr_num_halos = halo_first.shape[0]
-    min_disp_halos = int(np.ceil(0.3 * curr_num_halos))
-    num_bins = prf_bins.size
-    
-    # for each halo get the corresponding mass and density profile that the model predicts for it
-    # Can do this using either multiprocessing or a for loop
-    if use_mp:
-        num_processes = mp.cpu_count()
-        with mp.Pool(processes=num_processes) as p:
-            calc_mass_prf_orb, calc_mass_prf_inf, calc_mass_prf_all, calc_dens_prf_orb, calc_dens_prf_inf, calc_dens_prf_all, diff_n_orb_ptls, diff_n_inf_ptls, diff_n_all_ptls = zip(*p.starmap(create_dens_prf, 
-                                        zip((radii[halo_first[i]:halo_first[i]+halo_n[i]] for i in range(curr_num_halos)),
-                                            (orbit_assn[halo_first[i]:halo_first[i]+halo_n[i]] for i in range(curr_num_halos)),
-                                            (act_mass_prf_all[j] for j in range(curr_num_halos)),
-                                            (act_mass_prf_orb[j] for j in range(curr_num_halos)),
-                                            repeat(prf_bins),repeat(mass)),
-                                        chunksize=100))
-        p.close()
-        p.join()        
-
-    else:
-        calc_mass_prf_orb = []
-        calc_mass_prf_inf = []
-        calc_mass_prf_all = []
-        calc_dens_prf_orb = []
-        calc_dens_prf_inf = []
-        calc_dens_prf_all = []
-        diff_n_orb_ptls = []
-        diff_n_inf_ptls = []
-        diff_n_all_ptls = []
+    with timed("Finished Density Profile Plot"):
+        print("Starting Density Profile Plot")
+        act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
+        curr_num_halos = halo_first.shape[0]
+        min_disp_halos = int(np.ceil(0.3 * curr_num_halos))
+        num_bins = prf_bins.size
         
-        for i in range(curr_num_halos):
-            halo_mass_prf_orb, halo_mass_prf_inf, halo_mass_prf_all, halo_dens_prf_orb, halo_dens_prf_inf, halo_dens_prf_all, halo_diff_n_orb_ptls, halo_diff_n_inf_ptls, halo_diff_n_all_ptls = create_dens_prf(radii[halo_first[i]:halo_first[i]+halo_n[i]], orbit_assn[halo_first[i]:halo_first[i]+halo_n[i]], act_mass_prf_all[i], act_mass_prf_orb[i],prf_bins,mass)
-            calc_mass_prf_orb.append(np.array(halo_mass_prf_orb))
-            calc_mass_prf_inf.append(np.array(halo_mass_prf_inf))
-            calc_mass_prf_all.append(np.array(halo_mass_prf_all))
-            calc_dens_prf_orb.append(np.array(halo_dens_prf_orb))
-            calc_dens_prf_inf.append(np.array(halo_dens_prf_inf))
-            calc_dens_prf_all.append(np.array(halo_dens_prf_all))
-            diff_n_orb_ptls.append(np.array(halo_diff_n_orb_ptls))
-            diff_n_inf_ptls.append(np.array(halo_diff_n_inf_ptls))
-            diff_n_all_ptls.append(np.array(halo_diff_n_all_ptls))
+        # for each halo get the corresponding mass and density profile that the model predicts for it
+        # Can do this using either multiprocessing or a for loop
+        if use_mp:
+            num_processes = mp.cpu_count()
+            with mp.Pool(processes=num_processes) as p:
+                calc_mass_prf_orb, calc_mass_prf_inf, calc_mass_prf_all, calc_dens_prf_orb, calc_dens_prf_inf, calc_dens_prf_all, diff_n_orb_ptls, diff_n_inf_ptls, diff_n_all_ptls = zip(*p.starmap(create_dens_prf, 
+                                            zip((radii[halo_first[i]:halo_first[i]+halo_n[i]] for i in range(curr_num_halos)),
+                                                (orbit_assn[halo_first[i]:halo_first[i]+halo_n[i]] for i in range(curr_num_halos)),
+                                                (act_mass_prf_all[j] for j in range(curr_num_halos)),
+                                                (act_mass_prf_orb[j] for j in range(curr_num_halos)),
+                                                repeat(prf_bins),repeat(mass)),
+                                            chunksize=100))
+            p.close()
+            p.join()        
 
-    # For each profile combine all halos and obtain their median values for each bin
-    # calc_mass_prf_xxx has shape (num_halo, num_bins)
-    calc_mass_prf_orb, med_calc_mass_prf_orb = med_prf(calc_mass_prf_orb, curr_num_halos, np.float32)
-    calc_mass_prf_inf, med_calc_mass_prf_inf = med_prf(calc_mass_prf_inf, curr_num_halos, np.float32)
-    calc_mass_prf_all, med_calc_mass_prf_all = med_prf(calc_mass_prf_all, curr_num_halos, np.float32)
-    calc_dens_prf_orb, med_calc_dens_prf_orb = med_prf(calc_dens_prf_orb, curr_num_halos, np.float32)
-    calc_dens_prf_inf, med_calc_dens_prf_inf = med_prf(calc_dens_prf_inf, curr_num_halos, np.float32)
-    calc_dens_prf_all, med_calc_dens_prf_all = med_prf(calc_dens_prf_all, curr_num_halos, np.float32)
- 
-    # Get density profiles by dividing the mass profiles by the volume of each bin
-    act_dens_prf_all = calculate_density(act_mass_prf_all, prf_bins[1:])
-    act_dens_prf_orb = calculate_density(act_mass_prf_orb, prf_bins[1:])
-    act_dens_prf_inf = calculate_density(act_mass_prf_inf, prf_bins[1:])
-    
-    # Get the median value of the actual mass and density profiles
-    med_act_mass_prf_all = np.median(act_mass_prf_all, axis=0)
-    med_act_mass_prf_orb = np.median(act_mass_prf_orb, axis=0)
-    med_act_mass_prf_inf = np.median(act_mass_prf_inf, axis=0)
+        else:
+            calc_mass_prf_orb = []
+            calc_mass_prf_inf = []
+            calc_mass_prf_all = []
+            calc_dens_prf_orb = []
+            calc_dens_prf_inf = []
+            calc_dens_prf_all = []
+            diff_n_orb_ptls = []
+            diff_n_inf_ptls = []
+            diff_n_all_ptls = []
+            
+            for i in range(curr_num_halos):
+                halo_mass_prf_orb, halo_mass_prf_inf, halo_mass_prf_all, halo_dens_prf_orb, halo_dens_prf_inf, halo_dens_prf_all, halo_diff_n_orb_ptls, halo_diff_n_inf_ptls, halo_diff_n_all_ptls = create_dens_prf(radii[halo_first[i]:halo_first[i]+halo_n[i]], orbit_assn[halo_first[i]:halo_first[i]+halo_n[i]], act_mass_prf_all[i], act_mass_prf_orb[i],prf_bins,mass)
+                calc_mass_prf_orb.append(np.array(halo_mass_prf_orb))
+                calc_mass_prf_inf.append(np.array(halo_mass_prf_inf))
+                calc_mass_prf_all.append(np.array(halo_mass_prf_all))
+                calc_dens_prf_orb.append(np.array(halo_dens_prf_orb))
+                calc_dens_prf_inf.append(np.array(halo_dens_prf_inf))
+                calc_dens_prf_all.append(np.array(halo_dens_prf_all))
+                diff_n_orb_ptls.append(np.array(halo_diff_n_orb_ptls))
+                diff_n_inf_ptls.append(np.array(halo_diff_n_inf_ptls))
+                diff_n_all_ptls.append(np.array(halo_diff_n_all_ptls))
 
-    med_act_dens_prf_all = np.median(act_dens_prf_all, axis=0)
-    med_act_dens_prf_orb = np.median(act_dens_prf_orb, axis=0)
-    med_act_dens_prf_inf = np.median(act_dens_prf_inf, axis=0)
+        # For each profile combine all halos and obtain their median values for each bin
+        # calc_mass_prf_xxx has shape (num_halo, num_bins)
+        calc_mass_prf_orb, med_calc_mass_prf_orb = med_prf(calc_mass_prf_orb, curr_num_halos, np.float32)
+        calc_mass_prf_inf, med_calc_mass_prf_inf = med_prf(calc_mass_prf_inf, curr_num_halos, np.float32)
+        calc_mass_prf_all, med_calc_mass_prf_all = med_prf(calc_mass_prf_all, curr_num_halos, np.float32)
+        calc_dens_prf_orb, med_calc_dens_prf_orb = med_prf(calc_dens_prf_orb, curr_num_halos, np.float32)
+        calc_dens_prf_inf, med_calc_dens_prf_inf = med_prf(calc_dens_prf_inf, curr_num_halos, np.float32)
+        calc_dens_prf_all, med_calc_dens_prf_all = med_prf(calc_dens_prf_all, curr_num_halos, np.float32)
     
-    # for each bin checking how many halos have particles there
-    # if there are less than half the total number of halos then just treat that bin as having 0
-    for i in range(calc_mass_prf_orb.shape[1]):
-        if np.where(calc_mass_prf_orb[:,i] > 0)[0].shape[0] < min_disp_halos:
-            calc_mass_prf_orb[:,i] = np.NaN
-            act_mass_prf_orb[:,i] = np.NaN
-            med_calc_mass_prf_orb[i] = np.NaN
-            med_act_mass_prf_orb[i] = np.NaN
-        if np.where(calc_mass_prf_inf[:,i] > 0)[0].shape[0] < min_disp_halos:
-            calc_mass_prf_inf[:,i] = np.NaN
-            act_mass_prf_inf[:,i] = np.NaN
-            med_calc_mass_prf_inf[i] = np.NaN
-            med_act_mass_prf_inf[i] = np.NaN
-        if np.where(calc_mass_prf_all[:,i] > 0)[0].shape[0] < min_disp_halos:
-            calc_mass_prf_all[:,i] = np.NaN
-            act_mass_prf_all[:,i] = np.NaN
-            med_calc_mass_prf_all[i] = np.NaN
-            med_act_mass_prf_all[i] = np.NaN
-        if np.where(calc_dens_prf_orb[:,i] > 0)[0].shape[0] < min_disp_halos:
-            calc_dens_prf_orb[:,i] = np.NaN
-            act_dens_prf_orb[:,i] = np.NaN
-            med_calc_dens_prf_orb[i] = np.NaN
-            med_act_dens_prf_orb[i] = np.NaN
-        if np.where(calc_dens_prf_inf[:,i] > 0)[0].shape[0] < min_disp_halos:
-            calc_dens_prf_inf[:,i] = np.NaN
-            act_dens_prf_inf[:,i] = np.NaN
-            med_calc_dens_prf_inf[i] = np.NaN
-            med_act_dens_prf_inf[i] = np.NaN
-        if np.where(calc_dens_prf_all[:,i] > 0)[0].shape[0] < min_disp_halos:
-            calc_dens_prf_all[:,i] = np.NaN
-            act_dens_prf_all[:,i] = np.NaN
-            med_calc_dens_prf_all[i] = np.NaN
-            med_act_dens_prf_all[i] = np.NaN
-    
-    # Get the ratio of the calculated profile with the actual profile
-    with np.errstate(divide='ignore', invalid='ignore'):
-        all_mass_ratio = np.divide(calc_mass_prf_all,act_mass_prf_all) - 1
-        inf_mass_ratio = np.divide(calc_mass_prf_inf,act_mass_prf_inf) - 1
-        orb_mass_ratio = np.divide(calc_mass_prf_orb,act_mass_prf_orb) - 1
-        all_dens_ratio = np.divide(calc_dens_prf_all,act_dens_prf_all) - 1
-        inf_dens_ratio = np.divide(calc_dens_prf_inf,act_dens_prf_inf) - 1
-        orb_dens_ratio = np.divide(calc_dens_prf_orb,act_dens_prf_orb) - 1
+        # Get density profiles by dividing the mass profiles by the volume of each bin
+        act_dens_prf_all = calculate_density(act_mass_prf_all, prf_bins[1:])
+        act_dens_prf_orb = calculate_density(act_mass_prf_orb, prf_bins[1:])
+        act_dens_prf_inf = calculate_density(act_mass_prf_inf, prf_bins[1:])
+        
+        # Get the median value of the actual mass and density profiles
+        med_act_mass_prf_all = np.median(act_mass_prf_all, axis=0)
+        med_act_mass_prf_orb = np.median(act_mass_prf_orb, axis=0)
+        med_act_mass_prf_inf = np.median(act_mass_prf_inf, axis=0)
 
-    
-    # Find the upper and lower bound for scatter for calculated profiles
-    # Want shape to be (1,80)
-    upper_calc_mass_prf_orb = np.percentile(calc_mass_prf_orb, q=84.1, axis=0)
-    lower_calc_mass_prf_orb = np.percentile(calc_mass_prf_orb, q=15.9, axis=0)
-    upper_calc_mass_prf_inf = np.percentile(calc_mass_prf_inf, q=84.1, axis=0)
-    lower_calc_mass_prf_inf = np.percentile(calc_mass_prf_inf, q=15.9, axis=0)
-    upper_calc_mass_prf_all = np.percentile(calc_mass_prf_all, q=84.1, axis=0)
-    lower_calc_mass_prf_all = np.percentile(calc_mass_prf_all, q=15.9, axis=0)
-    upper_calc_dens_prf_orb = np.percentile(calc_dens_prf_orb, q=84.1, axis=0)
-    lower_calc_dens_prf_orb = np.percentile(calc_dens_prf_orb, q=15.9, axis=0)
-    upper_calc_dens_prf_inf = np.percentile(calc_dens_prf_inf, q=84.1, axis=0)
-    lower_calc_dens_prf_inf = np.percentile(calc_dens_prf_inf, q=15.9, axis=0)
-    upper_calc_dens_prf_all = np.percentile(calc_dens_prf_all, q=84.1, axis=0)
-    lower_calc_dens_prf_all = np.percentile(calc_dens_prf_all, q=15.9, axis=0)
-    
-    # Same for actual profiles    
-    upper_orb_dens_ratio = np.percentile(orb_dens_ratio, q=84.1, axis=0)
-    lower_orb_dens_ratio = np.percentile(orb_dens_ratio, q=15.9, axis=0)
-    upper_inf_dens_ratio = np.percentile(inf_dens_ratio, q=84.1, axis=0)
-    lower_inf_dens_ratio = np.percentile(inf_dens_ratio, q=15.9, axis=0)
-    upper_all_dens_ratio = np.percentile(all_dens_ratio, q=84.1, axis=0)
-    lower_all_dens_ratio = np.percentile(all_dens_ratio, q=15.9, axis=0)
+        med_act_dens_prf_all = np.median(act_dens_prf_all, axis=0)
+        med_act_dens_prf_orb = np.median(act_dens_prf_orb, axis=0)
+        med_act_dens_prf_inf = np.median(act_dens_prf_inf, axis=0)
+        
+        # for each bin checking how many halos have particles there
+        # if there are less than half the total number of halos then just treat that bin as having 0
+        for i in range(calc_mass_prf_orb.shape[1]):
+            if np.where(calc_mass_prf_orb[:,i] > 0)[0].shape[0] < min_disp_halos:
+                calc_mass_prf_orb[:,i] = np.NaN
+                act_mass_prf_orb[:,i] = np.NaN
+                med_calc_mass_prf_orb[i] = np.NaN
+                med_act_mass_prf_orb[i] = np.NaN
+            if np.where(calc_mass_prf_inf[:,i] > 0)[0].shape[0] < min_disp_halos:
+                calc_mass_prf_inf[:,i] = np.NaN
+                act_mass_prf_inf[:,i] = np.NaN
+                med_calc_mass_prf_inf[i] = np.NaN
+                med_act_mass_prf_inf[i] = np.NaN
+            if np.where(calc_mass_prf_all[:,i] > 0)[0].shape[0] < min_disp_halos:
+                calc_mass_prf_all[:,i] = np.NaN
+                act_mass_prf_all[:,i] = np.NaN
+                med_calc_mass_prf_all[i] = np.NaN
+                med_act_mass_prf_all[i] = np.NaN
+            if np.where(calc_dens_prf_orb[:,i] > 0)[0].shape[0] < min_disp_halos:
+                calc_dens_prf_orb[:,i] = np.NaN
+                act_dens_prf_orb[:,i] = np.NaN
+                med_calc_dens_prf_orb[i] = np.NaN
+                med_act_dens_prf_orb[i] = np.NaN
+            if np.where(calc_dens_prf_inf[:,i] > 0)[0].shape[0] < min_disp_halos:
+                calc_dens_prf_inf[:,i] = np.NaN
+                act_dens_prf_inf[:,i] = np.NaN
+                med_calc_dens_prf_inf[i] = np.NaN
+                med_act_dens_prf_inf[i] = np.NaN
+            if np.where(calc_dens_prf_all[:,i] > 0)[0].shape[0] < min_disp_halos:
+                calc_dens_prf_all[:,i] = np.NaN
+                act_dens_prf_all[:,i] = np.NaN
+                med_calc_dens_prf_all[i] = np.NaN
+                med_act_dens_prf_all[i] = np.NaN
+        
+        # Get the ratio of the calculated profile with the actual profile
+        with np.errstate(divide='ignore', invalid='ignore'):
+            all_mass_ratio = np.divide(calc_mass_prf_all,act_mass_prf_all) - 1
+            inf_mass_ratio = np.divide(calc_mass_prf_inf,act_mass_prf_inf) - 1
+            orb_mass_ratio = np.divide(calc_mass_prf_orb,act_mass_prf_orb) - 1
+            all_dens_ratio = np.divide(calc_dens_prf_all,act_dens_prf_all) - 1
+            inf_dens_ratio = np.divide(calc_dens_prf_inf,act_dens_prf_inf) - 1
+            orb_dens_ratio = np.divide(calc_dens_prf_orb,act_dens_prf_orb) - 1
 
-    # Take the median value of the ratios
-    med_all_ratio = np.median(all_dens_ratio, axis=0)
-    med_inf_ratio = np.median(inf_dens_ratio, axis=0)
-    med_orb_ratio = np.median(orb_dens_ratio, axis=0)
+        
+        # Find the upper and lower bound for scatter for calculated profiles
+        # Want shape to be (1,80)
+        upper_calc_mass_prf_orb = np.percentile(calc_mass_prf_orb, q=84.1, axis=0)
+        lower_calc_mass_prf_orb = np.percentile(calc_mass_prf_orb, q=15.9, axis=0)
+        upper_calc_mass_prf_inf = np.percentile(calc_mass_prf_inf, q=84.1, axis=0)
+        lower_calc_mass_prf_inf = np.percentile(calc_mass_prf_inf, q=15.9, axis=0)
+        upper_calc_mass_prf_all = np.percentile(calc_mass_prf_all, q=84.1, axis=0)
+        lower_calc_mass_prf_all = np.percentile(calc_mass_prf_all, q=15.9, axis=0)
+        upper_calc_dens_prf_orb = np.percentile(calc_dens_prf_orb, q=84.1, axis=0)
+        lower_calc_dens_prf_orb = np.percentile(calc_dens_prf_orb, q=15.9, axis=0)
+        upper_calc_dens_prf_inf = np.percentile(calc_dens_prf_inf, q=84.1, axis=0)
+        lower_calc_dens_prf_inf = np.percentile(calc_dens_prf_inf, q=15.9, axis=0)
+        upper_calc_dens_prf_all = np.percentile(calc_dens_prf_all, q=84.1, axis=0)
+        lower_calc_dens_prf_all = np.percentile(calc_dens_prf_all, q=15.9, axis=0)
+        
+        # Same for actual profiles    
+        upper_orb_dens_ratio = np.percentile(orb_dens_ratio, q=84.1, axis=0)
+        lower_orb_dens_ratio = np.percentile(orb_dens_ratio, q=15.9, axis=0)
+        upper_inf_dens_ratio = np.percentile(inf_dens_ratio, q=84.1, axis=0)
+        lower_inf_dens_ratio = np.percentile(inf_dens_ratio, q=15.9, axis=0)
+        upper_all_dens_ratio = np.percentile(all_dens_ratio, q=84.1, axis=0)
+        lower_all_dens_ratio = np.percentile(all_dens_ratio, q=15.9, axis=0)
 
-    middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
+        # Take the median value of the ratios
+        med_all_ratio = np.median(all_dens_ratio, axis=0)
+        med_inf_ratio = np.median(inf_dens_ratio, axis=0)
+        med_orb_ratio = np.median(orb_dens_ratio, axis=0)
 
-    fig, ax = plt.subplots(1,3, figsize=(15,30))
-    titlefntsize=26
-    axisfntsize=20
-    tickfntsize=16
-    legendfntsize=18
-    fill_alpha = 0.2
-    
-    # Get rid of the jump from 0 to the first occupied bin by setting them to nan
-    med_calc_mass_prf_all[med_calc_mass_prf_all == 0] = np.NaN
-    med_calc_mass_prf_orb[med_calc_mass_prf_orb == 0] = np.NaN
-    med_calc_mass_prf_inf[med_calc_mass_prf_inf == 0] = np.NaN
-    med_calc_dens_prf_all[med_calc_dens_prf_all == 0] = np.NaN
-    med_calc_dens_prf_orb[med_calc_dens_prf_orb == 0] = np.NaN
-    med_calc_dens_prf_inf[med_calc_dens_prf_inf == 0] = np.NaN
-    med_act_mass_prf_all[med_act_mass_prf_all == 0] = np.NaN
-    med_act_mass_prf_orb[med_act_mass_prf_orb == 0] = np.NaN
-    med_act_mass_prf_inf[med_act_mass_prf_inf == 0] = np.NaN
-    med_act_dens_prf_all[med_act_dens_prf_all == 0] = np.NaN
-    med_act_dens_prf_orb[med_act_dens_prf_orb == 0] = np.NaN
-    med_act_dens_prf_inf[med_act_dens_prf_inf == 0] = np.NaN
-    
-    ax[0].plot(middle_bins, med_calc_mass_prf_all, 'r-', label = "ML mass profile all ptls")
-    ax[0].plot(middle_bins, med_calc_mass_prf_orb, 'b-', label = "ML mass profile orb ptls")
-    ax[0].plot(middle_bins, med_calc_mass_prf_inf, 'g-', label = "ML mass profile inf ptls")
-    ax[0].plot(middle_bins, med_act_mass_prf_all, 'r--', label = "SPARTA mass profile all ptls")
-    ax[0].plot(middle_bins, med_act_mass_prf_orb, 'b--', label = "SPARTA mass profile orb ptls")
-    ax[0].plot(middle_bins, med_act_mass_prf_inf, 'g--', label = "SPARTA mass profile inf ptls")
-    
-    # ax[0].fill_between(middle_bins, lower_calc_mass_prf_all, upper_calc_mass_prf_all, color='r', alpha=fill_alpha)
-    # ax[0].fill_between(middle_bins, lower_calc_mass_prf_inf, upper_calc_mass_prf_inf, color='g', alpha=fill_alpha)
-    # ax[0].fill_between(middle_bins, lower_calc_mass_prf_orb, upper_calc_mass_prf_orb, color='b', alpha=fill_alpha)
-    
-    ax[0].set_title("ML Predicted vs Actual Mass Profile",fontsize=titlefntsize)
-    ax[0].set_xlabel("Radius $r/R_{200m}$", fontsize=axisfntsize)
-    ax[0].set_ylabel("Mass $M_\odot$", fontsize=axisfntsize)
-    ax[0].set_xscale("log")
-    ax[0].set_yscale("log")
-    ax[0].set_box_aspect(1)
-    ax[0].tick_params(axis='both',which='both',labelsize=tickfntsize)
-    ax[0].legend(fontsize=legendfntsize)
-    
-    ax[1].plot(middle_bins, med_calc_dens_prf_all, 'r-', label = "ML density profile all ptls")
-    ax[1].plot(middle_bins, med_calc_dens_prf_orb, 'b-', label = "ML density profile orb ptls")
-    ax[1].plot(middle_bins, med_calc_dens_prf_inf, 'g-', label = "ML density profile inf ptls")
-    ax[1].plot(middle_bins, med_act_dens_prf_all, 'r--', label = "SPARTA density profile all ptls")
-    ax[1].plot(middle_bins, med_act_dens_prf_orb, 'b--', label = "SPARTA density profile orb ptls")
-    ax[1].plot(middle_bins, med_act_dens_prf_inf, 'g--', label = "SPARTA density profile inf ptls")
-    
-    # ax[1].fill_between(middle_bins, lower_calc_dens_prf_all, upper_calc_dens_prf_all, color='r', alpha=fill_alpha)
-    # ax[1].fill_between(middle_bins, lower_calc_dens_prf_inf, upper_calc_dens_prf_inf, color='g', alpha=fill_alpha)
-    # ax[1].fill_between(middle_bins, lower_calc_dens_prf_orb, upper_calc_dens_prf_orb, color='b', alpha=fill_alpha)
-    
-    ax[1].set_title("ML Predicted vs Actual Density Profile",fontsize=titlefntsize)
-    ax[1].set_xlabel("Radius $r/R_{200m}$", fontsize=axisfntsize)
-    ax[1].set_ylabel("Density $M_\odot/kpc^3$", fontsize=axisfntsize)
-    ax[1].set_xscale("log")
-    ax[1].set_yscale("log")
-    ax[1].set_box_aspect(1)
-    ax[1].tick_params(axis='both',which='both',labelsize=tickfntsize)
-    ax[1].tick_params(axis='both',which='both',labelsize=tickfntsize)
-    ax[1].legend(fontsize=legendfntsize)
-    
-    ax[2].plot(middle_bins, med_all_ratio, 'r', label = "(ML density profile / SPARTA density profile all) - 1")
-    ax[2].plot(middle_bins, med_orb_ratio, 'b', label = "(ML density profile / SPARTA density profile orb) - 1")
-    ax[2].plot(middle_bins, med_inf_ratio, 'g', label = "(ML density profile / SPARTA density profile inf) - 1")
-    
-    ax[2].fill_between(middle_bins, lower_all_dens_ratio, upper_all_dens_ratio, color='r', alpha=fill_alpha)
-    ax[2].fill_between(middle_bins, lower_inf_dens_ratio, upper_inf_dens_ratio, color='g', alpha=fill_alpha)
-    ax[2].fill_between(middle_bins, lower_orb_dens_ratio, upper_orb_dens_ratio, color='b', alpha=fill_alpha)    
-    
-    ax[2].set_title("(ML Predicted / Actual Density Profile) - 1",fontsize=titlefntsize)
-    ax[2].set_xlabel("Radius $r/R_{200m}$", fontsize=axisfntsize)
-    ax[2].set_ylabel("(ML Dens Prf / Act Dens Prf) - 1", fontsize=axisfntsize)
-    #ax[2].set_ylim(0,8)
-    top_orb_tick = np.round(np.nanmax(upper_orb_dens_ratio),2)
-    bot_orb_tick = np.round(np.nanmin(lower_orb_dens_ratio),2)
-    top_inf_tick = np.round(np.nanmax(upper_inf_dens_ratio),2)
-    bot_inf_tick = np.round(np.nanmin(lower_inf_dens_ratio),2)
+        middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
 
-    ax[2].set_xscale("log")
-    ax[2].set_yscale("symlog")
-    ax[2].set_box_aspect(1)
-    ax[2].tick_params(axis='both',which='both',labelsize=tickfntsize)
-    ax[2].set_yticks([bot_inf_tick, bot_orb_tick, 0, top_inf_tick, top_orb_tick])
-    ax[2].legend(fontsize=legendfntsize)    
-    
-    if save_graph:
-        fig.set_size_inches(50, 25)
-        fig.savefig(save_location + title + "dens_prfl_rat.png", bbox_inches='tight')
-    if show_graph:
-        plt.show()
-    plt.close()
+        fig, ax = plt.subplots(1,3, figsize=(15,30))
+        titlefntsize=26
+        axisfntsize=20
+        tickfntsize=16
+        legendfntsize=18
+        fill_alpha = 0.2
+        
+        # Get rid of the jump from 0 to the first occupied bin by setting them to nan
+        med_calc_mass_prf_all[med_calc_mass_prf_all == 0] = np.NaN
+        med_calc_mass_prf_orb[med_calc_mass_prf_orb == 0] = np.NaN
+        med_calc_mass_prf_inf[med_calc_mass_prf_inf == 0] = np.NaN
+        med_calc_dens_prf_all[med_calc_dens_prf_all == 0] = np.NaN
+        med_calc_dens_prf_orb[med_calc_dens_prf_orb == 0] = np.NaN
+        med_calc_dens_prf_inf[med_calc_dens_prf_inf == 0] = np.NaN
+        med_act_mass_prf_all[med_act_mass_prf_all == 0] = np.NaN
+        med_act_mass_prf_orb[med_act_mass_prf_orb == 0] = np.NaN
+        med_act_mass_prf_inf[med_act_mass_prf_inf == 0] = np.NaN
+        med_act_dens_prf_all[med_act_dens_prf_all == 0] = np.NaN
+        med_act_dens_prf_orb[med_act_dens_prf_orb == 0] = np.NaN
+        med_act_dens_prf_inf[med_act_dens_prf_inf == 0] = np.NaN
+        
+        ax[0].plot(middle_bins, med_calc_mass_prf_all, 'r-', label = "ML mass profile all ptls")
+        ax[0].plot(middle_bins, med_calc_mass_prf_orb, 'b-', label = "ML mass profile orb ptls")
+        ax[0].plot(middle_bins, med_calc_mass_prf_inf, 'g-', label = "ML mass profile inf ptls")
+        ax[0].plot(middle_bins, med_act_mass_prf_all, 'r--', label = "SPARTA mass profile all ptls")
+        ax[0].plot(middle_bins, med_act_mass_prf_orb, 'b--', label = "SPARTA mass profile orb ptls")
+        ax[0].plot(middle_bins, med_act_mass_prf_inf, 'g--', label = "SPARTA mass profile inf ptls")
+        
+        # ax[0].fill_between(middle_bins, lower_calc_mass_prf_all, upper_calc_mass_prf_all, color='r', alpha=fill_alpha)
+        # ax[0].fill_between(middle_bins, lower_calc_mass_prf_inf, upper_calc_mass_prf_inf, color='g', alpha=fill_alpha)
+        # ax[0].fill_between(middle_bins, lower_calc_mass_prf_orb, upper_calc_mass_prf_orb, color='b', alpha=fill_alpha)
+        
+        ax[0].set_title("ML Predicted vs Actual Mass Profile",fontsize=titlefntsize)
+        ax[0].set_xlabel("Radius $r/R_{200m}$", fontsize=axisfntsize)
+        ax[0].set_ylabel("Mass $M_\odot$", fontsize=axisfntsize)
+        ax[0].set_xscale("log")
+        ax[0].set_yscale("log")
+        ax[0].set_box_aspect(1)
+        ax[0].tick_params(axis='both',which='both',labelsize=tickfntsize)
+        ax[0].legend(fontsize=legendfntsize)
+        
+        ax[1].plot(middle_bins, med_calc_dens_prf_all, 'r-', label = "ML density profile all ptls")
+        ax[1].plot(middle_bins, med_calc_dens_prf_orb, 'b-', label = "ML density profile orb ptls")
+        ax[1].plot(middle_bins, med_calc_dens_prf_inf, 'g-', label = "ML density profile inf ptls")
+        ax[1].plot(middle_bins, med_act_dens_prf_all, 'r--', label = "SPARTA density profile all ptls")
+        ax[1].plot(middle_bins, med_act_dens_prf_orb, 'b--', label = "SPARTA density profile orb ptls")
+        ax[1].plot(middle_bins, med_act_dens_prf_inf, 'g--', label = "SPARTA density profile inf ptls")
+        
+        # ax[1].fill_between(middle_bins, lower_calc_dens_prf_all, upper_calc_dens_prf_all, color='r', alpha=fill_alpha)
+        # ax[1].fill_between(middle_bins, lower_calc_dens_prf_inf, upper_calc_dens_prf_inf, color='g', alpha=fill_alpha)
+        # ax[1].fill_between(middle_bins, lower_calc_dens_prf_orb, upper_calc_dens_prf_orb, color='b', alpha=fill_alpha)
+        
+        ax[1].set_title("ML Predicted vs Actual Density Profile",fontsize=titlefntsize)
+        ax[1].set_xlabel("Radius $r/R_{200m}$", fontsize=axisfntsize)
+        ax[1].set_ylabel("Density $M_\odot/kpc^3$", fontsize=axisfntsize)
+        ax[1].set_xscale("log")
+        ax[1].set_yscale("log")
+        ax[1].set_box_aspect(1)
+        ax[1].tick_params(axis='both',which='both',labelsize=tickfntsize)
+        ax[1].tick_params(axis='both',which='both',labelsize=tickfntsize)
+        ax[1].legend(fontsize=legendfntsize)
+        
+        ax[2].plot(middle_bins, med_all_ratio, 'r', label = "(ML density profile / SPARTA density profile all) - 1")
+        ax[2].plot(middle_bins, med_orb_ratio, 'b', label = "(ML density profile / SPARTA density profile orb) - 1")
+        ax[2].plot(middle_bins, med_inf_ratio, 'g', label = "(ML density profile / SPARTA density profile inf) - 1")
+        
+        ax[2].fill_between(middle_bins, lower_all_dens_ratio, upper_all_dens_ratio, color='r', alpha=fill_alpha)
+        ax[2].fill_between(middle_bins, lower_inf_dens_ratio, upper_inf_dens_ratio, color='g', alpha=fill_alpha)
+        ax[2].fill_between(middle_bins, lower_orb_dens_ratio, upper_orb_dens_ratio, color='b', alpha=fill_alpha)    
+        
+        ax[2].set_title("(ML Predicted / Actual Density Profile) - 1",fontsize=titlefntsize)
+        ax[2].set_xlabel("Radius $r/R_{200m}$", fontsize=axisfntsize)
+        ax[2].set_ylabel("(ML Dens Prf / Act Dens Prf) - 1", fontsize=axisfntsize)
+        #ax[2].set_ylim(0,8)
+        top_orb_tick = np.round(np.nanmax(upper_orb_dens_ratio),2)
+        bot_orb_tick = np.round(np.nanmin(lower_orb_dens_ratio),2)
+        top_inf_tick = np.round(np.nanmax(upper_inf_dens_ratio),2)
+        bot_inf_tick = np.round(np.nanmin(lower_inf_dens_ratio),2)
 
-    t2 = time.time()
-    print("Finished Density Profile Plot in: ", np.round((t2-t1),2), "seconds", np.round(((t2-t1)/60),2), "minutes")
+        ax[2].set_xscale("log")
+        ax[2].set_yscale("symlog")
+        ax[2].set_box_aspect(1)
+        ax[2].tick_params(axis='both',which='both',labelsize=tickfntsize)
+        ax[2].set_yticks([bot_inf_tick, bot_orb_tick, 0, top_inf_tick, top_orb_tick])
+        ax[2].legend(fontsize=legendfntsize)    
+        
+        if save_graph:
+            fig.set_size_inches(50, 25)
+            fig.savefig(save_location + title + "dens_prfl_rat.png", bbox_inches='tight')
+        if show_graph:
+            plt.show()
+        plt.close()
+
     return diff_n_inf_ptls, diff_n_orb_ptls, diff_n_all_ptls, middle_bins
 
 def rv_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = None):
@@ -590,247 +580,241 @@ def plot_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, c
     if "Results" not in model_info:
         model_info["Results"] = {}
     
-    t1 = time.time()
-    print("Starting Misclassified Particle Plot")
+    with timed("Finished Misclassified Particle Plot"):
+        print("Starting Misclassified Particle Plot")
 
-    max_r = np.max(p_r)
-    max_rv = np.max(p_rv)
-    min_rv = np.min(p_rv)
-    max_tv = np.max(p_tv)
-    min_tv = np.min(p_tv)
-    
-    c_max_r = np.nanmax(c_r)
-    c_max_rv = np.nanmax(c_rv)
-    c_min_rv = np.nanmin(c_rv)
-    c_max_tv = np.nanmax(c_tv)
-    c_min_tv = np.nanmin(c_tv)
-    
-    r_range = [0, max_r]
-    rv_range = [min_rv, max_rv]
-    tv_range = [min_tv, max_tv]
+        max_r = np.max(p_r)
+        max_rv = np.max(p_rv)
+        min_rv = np.min(p_rv)
+        max_tv = np.max(p_tv)
+        min_tv = np.min(p_tv)
+        
+        c_max_r = np.nanmax(c_r)
+        c_max_rv = np.nanmax(c_rv)
+        c_min_rv = np.nanmin(c_rv)
+        c_max_tv = np.nanmax(c_tv)
+        c_min_tv = np.nanmin(c_tv)
+        
+        r_range = [0, max_r]
+        rv_range = [min_rv, max_rv]
+        tv_range = [min_tv, max_tv]
 
-    c_corr_labels = np.copy(p_corr_labels)
-    c_ml_labels = np.copy(p_ml_labels)
+        c_corr_labels = np.copy(p_corr_labels)
+        c_ml_labels = np.copy(p_ml_labels)
 
-    c_corr_labels[np.argwhere(np.isnan(c_r)).flatten()] = -99
-    c_ml_labels[np.argwhere(np.isnan(c_r)).flatten()] = -99
-    
-    print("Primary Snap Misclassification")
-    p_misclass_dict, p_min_ptl, p_max_diff, p_max_all_ptl, p_all_inc_r_rv, p_all_inc_r_tv, p_all_inc_rv_tv, p_scaled_inf_r_rv, p_scaled_inf_r_tv, p_scaled_inf_rv_tv, p_scaled_orb_r_rv, p_scaled_orb_r_tv, p_scaled_orb_rv_tv, p_scaled_all_r_rv, p_scaled_all_r_tv, p_scaled_all_rv_tv,p_all_inc_inf_r_rv,p_all_inc_inf_r_tv,p_all_inc_inf_rv_tv,p_all_inc_orb_r_rv,p_all_inc_orb_r_tv,p_all_inc_orb_rv_tv = calc_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, r_range, rv_range, tv_range, num_bins=num_bins, model_info=model_info,dataset_name=dataset_name)
-    print("Secondary Snap Misclassification")
-    c_misclass_dict, c_min_ptl, c_max_diff, c_max_all_ptl, c_all_inc_r_rv, c_all_inc_r_tv, c_all_inc_rv_tv, c_scaled_inf_r_rv, c_scaled_inf_r_tv, c_scaled_inf_rv_tv, c_scaled_orb_r_rv, c_scaled_orb_r_tv, c_scaled_orb_rv_tv, c_scaled_all_r_rv, c_scaled_all_r_tv, c_scaled_all_rv_tv,c_all_inc_inf_r_rv,c_all_inc_inf_r_tv,c_all_inc_inf_rv_tv,c_all_inc_orb_r_rv,c_all_inc_orb_r_tv,c_all_inc_orb_rv_tv = calc_misclassified(c_corr_labels, c_ml_labels, c_r, c_rv, c_tv, r_range, rv_range, tv_range, num_bins=num_bins, model_info=model_info,dataset_name=dataset_name)
-    
-    if dataset_name not in model_info["Results"]:
-        model_info["Results"][dataset_name]={}
-    model_info["Results"][dataset_name]["Primary Snap"] = p_misclass_dict
-    model_info["Results"][dataset_name]["Secondary Snap"] = c_misclass_dict
-    
-    cividis_cmap = plt.get_cmap("cividis_r")
-    cividis_cmap.set_under(color='white')   
-    magma_cmap = plt.get_cmap("magma_r")
-    magma_cmap.set_under(color='white') 
-    cmap = plt.get_cmap("magma")
-    test_cmap = plt.get_cmap("viridis")
-    
-    scale_miss_class_args = {
-        "vmin":p_min_ptl,
-        "vmax":p_max_diff,
-        "norm":"log",
-        "origin":"lower",
-        "aspect":"auto",
-        "cmap":magma_cmap,
-    }
+        c_corr_labels[np.argwhere(np.isnan(c_r)).flatten()] = -99
+        c_ml_labels[np.argwhere(np.isnan(c_r)).flatten()] = -99
+        
+        print("Primary Snap Misclassification")
+        p_misclass_dict, p_min_ptl, p_max_diff, p_max_all_ptl, p_all_inc_r_rv, p_all_inc_r_tv, p_all_inc_rv_tv, p_scaled_inf_r_rv, p_scaled_inf_r_tv, p_scaled_inf_rv_tv, p_scaled_orb_r_rv, p_scaled_orb_r_tv, p_scaled_orb_rv_tv, p_scaled_all_r_rv, p_scaled_all_r_tv, p_scaled_all_rv_tv,p_all_inc_inf_r_rv,p_all_inc_inf_r_tv,p_all_inc_inf_rv_tv,p_all_inc_orb_r_rv,p_all_inc_orb_r_tv,p_all_inc_orb_rv_tv = calc_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, r_range, rv_range, tv_range, num_bins=num_bins, model_info=model_info,dataset_name=dataset_name)
+        print("Secondary Snap Misclassification")
+        c_misclass_dict, c_min_ptl, c_max_diff, c_max_all_ptl, c_all_inc_r_rv, c_all_inc_r_tv, c_all_inc_rv_tv, c_scaled_inf_r_rv, c_scaled_inf_r_tv, c_scaled_inf_rv_tv, c_scaled_orb_r_rv, c_scaled_orb_r_tv, c_scaled_orb_rv_tv, c_scaled_all_r_rv, c_scaled_all_r_tv, c_scaled_all_rv_tv,c_all_inc_inf_r_rv,c_all_inc_inf_r_tv,c_all_inc_inf_rv_tv,c_all_inc_orb_r_rv,c_all_inc_orb_r_tv,c_all_inc_orb_rv_tv = calc_misclassified(c_corr_labels, c_ml_labels, c_r, c_rv, c_tv, r_range, rv_range, tv_range, num_bins=num_bins, model_info=model_info,dataset_name=dataset_name)
+        
+        if dataset_name not in model_info["Results"]:
+            model_info["Results"][dataset_name]={}
+        model_info["Results"][dataset_name]["Primary Snap"] = p_misclass_dict
+        model_info["Results"][dataset_name]["Secondary Snap"] = c_misclass_dict
+        
+        cividis_cmap = plt.get_cmap("cividis_r")
+        cividis_cmap.set_under(color='white')   
+        magma_cmap = plt.get_cmap("magma_r")
+        magma_cmap.set_under(color='white') 
+        cmap = plt.get_cmap("magma")
+        test_cmap = plt.get_cmap("viridis")
+        
+        scale_miss_class_args = {
+            "vmin":p_min_ptl,
+            "vmax":p_max_diff,
+            "norm":"log",
+            "origin":"lower",
+            "aspect":"auto",
+            "cmap":magma_cmap,
+        }
 
-    all_miss_class_args = {
-        "vmin":1,
-        "vmax":p_max_all_ptl,
-        "norm":"log",
-        "origin":"lower",
-        "aspect":"auto",
-        "cmap":cividis_cmap,
-    }
+        all_miss_class_args = {
+            "vmin":1,
+            "vmax":p_max_all_ptl,
+            "norm":"log",
+            "origin":"lower",
+            "aspect":"auto",
+            "cmap":cividis_cmap,
+        }
 
-    widths = [4,4,4,4,.5]
-    heights = [4,4,4,4,4,4,4]
-    
-    scal_miss_class_fig = plt.figure(constrained_layout=True, figsize=(15,25))
-    #scal_miss_class_fig.suptitle("Misclassified Particles/Num Targets " + title)
-    gs = scal_miss_class_fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
-    
-    plt.rcParams.update({'font.size': 12})
-    
-    phase_plot(scal_miss_class_fig.add_subplot(gs[0,0]), c_r, c_rv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,y_label="$v_r/v_{200m}$", hide_xticks=True, text="Actual\nDistribution", title="Secondary Snap")
-    phase_plot(scal_miss_class_fig.add_subplot(gs[0,1]), p_r, p_rv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap, hide_xticks=True, hide_yticks=False,y_label="$v_r/v_{200m}$",text="Actual\nDistribution")
-    phase_plot(scal_miss_class_fig.add_subplot(gs[0,2]), p_r, p_tv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,tv_range],num_bins=num_bins,cmap=cividis_cmap,y_label="$v_t/v_{200m}$",hide_xticks=True)
-    phase_plot(scal_miss_class_fig.add_subplot(gs[0,3]), p_rv, p_tv, min_ptl=10, max_ptl=p_max_all_ptl, range=[rv_range,tv_range],num_bins=num_bins,cmap=cividis_cmap, hide_xticks=True, hide_yticks=True)
-    
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[1,0]), c_all_inc_r_rv.T, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified",kwargs=all_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[1,1]), p_all_inc_r_rv.T, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="All Misclassified",kwargs=all_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[1,2]), p_all_inc_r_tv.T, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=all_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[1,3]), p_all_inc_rv_tv.T, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=all_miss_class_args)
-    
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[2,0]), c_all_inc_inf_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",hide_xticks=True,kwargs=all_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[2,1]), p_all_inc_inf_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",kwargs=all_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[2,2]), p_all_inc_inf_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=all_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[2,3]), p_all_inc_inf_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=all_miss_class_args)
-    
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[3,0]), c_all_inc_orb_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",hide_xticks=True,kwargs=all_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[3,1]), p_all_inc_orb_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",kwargs=all_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[3,2]), p_all_inc_orb_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=all_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[3,3]), p_all_inc_orb_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=all_miss_class_args)
-    
-    phase_plt_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=1, vmax=p_max_all_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[0:4,-1]))
-    phase_plt_color_bar.set_label("Number of Particles")
+        widths = [4,4,4,4,.5]
+        heights = [4,4,4,4,4,4,4]
+        
+        scal_miss_class_fig = plt.figure(constrained_layout=True, figsize=(15,25))
+        #scal_miss_class_fig.suptitle("Misclassified Particles/Num Targets " + title)
+        gs = scal_miss_class_fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
+        
+        plt.rcParams.update({'font.size': 12})
+        
+        phase_plot(scal_miss_class_fig.add_subplot(gs[0,0]), c_r, c_rv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,y_label="$v_r/v_{200m}$", hide_xticks=True, text="Actual\nDistribution", title="Secondary Snap")
+        phase_plot(scal_miss_class_fig.add_subplot(gs[0,1]), p_r, p_rv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap, hide_xticks=True, hide_yticks=False,y_label="$v_r/v_{200m}$",text="Actual\nDistribution")
+        phase_plot(scal_miss_class_fig.add_subplot(gs[0,2]), p_r, p_tv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,tv_range],num_bins=num_bins,cmap=cividis_cmap,y_label="$v_t/v_{200m}$",hide_xticks=True)
+        phase_plot(scal_miss_class_fig.add_subplot(gs[0,3]), p_rv, p_tv, min_ptl=10, max_ptl=p_max_all_ptl, range=[rv_range,tv_range],num_bins=num_bins,cmap=cividis_cmap, hide_xticks=True, hide_yticks=True)
+        
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[1,0]), c_all_inc_r_rv.T, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified",kwargs=all_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[1,1]), p_all_inc_r_rv.T, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="All Misclassified",kwargs=all_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[1,2]), p_all_inc_r_tv.T, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=all_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[1,3]), p_all_inc_rv_tv.T, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=all_miss_class_args)
+        
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[2,0]), c_all_inc_inf_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",hide_xticks=True,kwargs=all_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[2,1]), p_all_inc_inf_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",kwargs=all_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[2,2]), p_all_inc_inf_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=all_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[2,3]), p_all_inc_inf_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=all_miss_class_args)
+        
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[3,0]), c_all_inc_orb_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",hide_xticks=True,kwargs=all_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[3,1]), p_all_inc_orb_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",kwargs=all_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[3,2]), p_all_inc_orb_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=all_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[3,3]), p_all_inc_orb_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=all_miss_class_args)
+        
+        phase_plt_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=1, vmax=p_max_all_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[0:4,-1]))
+        phase_plt_color_bar.set_label("Number of Particles")
 
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[4,0]), c_scaled_inf_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",hide_xticks=True,kwargs=scale_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[4,1]), p_scaled_inf_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",kwargs=scale_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[4,2]), p_scaled_inf_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=scale_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[4,3]), p_scaled_inf_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
-    
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[5,0]), c_scaled_orb_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",hide_xticks=True,kwargs=scale_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[5,1]), p_scaled_orb_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",kwargs=scale_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[5,2]), p_scaled_orb_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=scale_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[5,3]), p_scaled_orb_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
-    
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[6,0]), c_scaled_all_r_rv, extent=[0,max_r,min_rv,max_rv],x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="All Misclassified\nScaled",kwargs=scale_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[6,1]), p_scaled_all_r_rv, extent=[0,max_r,min_rv,max_rv],x_label="$r/R_{200m}$",hide_yticks=False,y_label="$v_r/v_{200m}$",text="All Misclassified\nScaled",kwargs=scale_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[6,2]), p_scaled_all_r_tv, extent=[0,max_r,min_tv,max_tv],x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",kwargs=scale_miss_class_args)
-    imshow_plot(scal_miss_class_fig.add_subplot(gs[6,3]), p_scaled_all_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],x_label="$v_r/v_{200m}$",hide_yticks=True,kwargs=scale_miss_class_args)
-    
-    scal_misclas_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=p_min_ptl, vmax=p_max_diff),cmap=magma_cmap), cax=plt.subplot(gs[4:,-1]))
-    scal_misclas_color_bar.set_label("Num Incorrect Particles (inf/orb) / Total Particles (inf/orb)")
-    
-    scal_miss_class_fig.savefig(save_location + title + "scaled_miss_class.png")
-
-    t2 = time.time()
-    print("Finished Misclassified Particle Plot in: ", np.round((t2-t1),2), "seconds", np.round(((t2-t1)/60),2), "minutes")
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[4,0]), c_scaled_inf_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",hide_xticks=True,kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[4,1]), p_scaled_inf_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[4,2]), p_scaled_inf_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[4,3]), p_scaled_inf_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
+        
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[5,0]), c_scaled_orb_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",hide_xticks=True,kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[5,1]), p_scaled_orb_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[5,2]), p_scaled_orb_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[5,3]), p_scaled_orb_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
+        
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[6,0]), c_scaled_all_r_rv, extent=[0,max_r,min_rv,max_rv],x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="All Misclassified\nScaled",kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[6,1]), p_scaled_all_r_rv, extent=[0,max_r,min_rv,max_rv],x_label="$r/R_{200m}$",hide_yticks=False,y_label="$v_r/v_{200m}$",text="All Misclassified\nScaled",kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[6,2]), p_scaled_all_r_tv, extent=[0,max_r,min_tv,max_tv],x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[6,3]), p_scaled_all_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],x_label="$v_r/v_{200m}$",hide_yticks=True,kwargs=scale_miss_class_args)
+        
+        scal_misclas_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=p_min_ptl, vmax=p_max_diff),cmap=magma_cmap), cax=plt.subplot(gs[4:,-1]))
+        scal_misclas_color_bar.set_label("Num Incorrect Particles (inf/orb) / Total Particles (inf/orb)")
+        
+        scal_miss_class_fig.savefig(save_location + title + "scaled_miss_class.png")
 
 def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, save_location):
-    t1 = time.time()
-    print("Starting r vs rv vs tv Plot")
-    mpl.rcParams.update({'font.size': 8})
-    plt.rcParams['figure.constrained_layout.use'] = True
+    with timed("Finished particle phase space plots"):
+        print("Starting particle phase space plots")
+        
+        plt.rcParams['figure.constrained_layout.use'] = True
 
-    min_ptl = 1e-3
+        min_ptl = 1e-3
 
-    max_r = np.max(r)
-    max_rv = np.max(rv)
-    min_rv = np.min(rv)
-    max_tv = np.max(tv)
-    min_tv = np.min(tv)
-    
-    r_range = [0, max_r]
-    rv_range = [min_rv, max_rv]
-    tv_range = [min_tv, max_tv]
-    
-    ml_inf_r, ml_orb_r = split_orb_inf(r, orb_inf)
-    ml_inf_rv, ml_orb_rv = split_orb_inf(rv, orb_inf)
-    ml_inf_tv, ml_orb_tv = split_orb_inf(tv, orb_inf)
-    
-    act_inf_r, act_orb_r = split_orb_inf(r, correct_orb_inf)
-    act_inf_rv, act_orb_rv = split_orb_inf(rv, correct_orb_inf)
-    act_inf_tv, act_orb_tv = split_orb_inf(tv, correct_orb_inf)
+        max_r = np.max(r)
+        max_rv = np.max(rv)
+        min_rv = np.min(rv)
+        max_tv = np.max(tv)
+        min_tv = np.min(tv)
+        
+        r_range = [0, max_r]
+        rv_range = [min_rv, max_rv]
+        tv_range = [min_tv, max_tv]
+        
+        ml_inf_r, ml_orb_r = split_orb_inf(r, orb_inf)
+        ml_inf_rv, ml_orb_rv = split_orb_inf(rv, orb_inf)
+        ml_inf_tv, ml_orb_tv = split_orb_inf(tv, orb_inf)
+        
+        act_inf_r, act_orb_r = split_orb_inf(r, correct_orb_inf)
+        act_inf_rv, act_orb_rv = split_orb_inf(rv, correct_orb_inf)
+        act_inf_tv, act_orb_tv = split_orb_inf(tv, correct_orb_inf)
 
-    ml_max_ptl, ml_orb_r_rv, ml_orb_r_tv, ml_orb_rv_tv, ml_inf_r_rv, ml_inf_r_tv, ml_inf_rv_tv = create_hist_max_ptl(min_ptl,min_ptl, ml_inf_r, ml_orb_r, ml_inf_rv, ml_orb_rv, ml_inf_tv, ml_orb_tv, num_bins, r_range, rv_range, tv_range)
-    act_max_ptl, act_orb_r_rv, act_orb_r_tv, act_orb_rv_tv, act_inf_r_rv, act_inf_r_tv, act_inf_rv_tv = create_hist_max_ptl(min_ptl,min_ptl, act_inf_r, act_orb_r, act_inf_rv, act_orb_rv, act_inf_tv, act_orb_tv, num_bins, r_range, rv_range, tv_range, bin_r_rv=ml_orb_r_rv[1:], bin_r_tv=ml_orb_r_tv[1:],bin_rv_tv=ml_orb_rv_tv[1:])    
-    
-    floor = 200
-    per_err_1 = percent_error(ml_orb_r_rv[0], act_orb_r_rv[0]).T
-    per_err_2 = percent_error(ml_orb_r_tv[0], act_orb_r_tv[0]).T
-    per_err_3 = percent_error(ml_orb_rv_tv[0], act_orb_rv_tv[0]).T
-    per_err_4 = percent_error(ml_inf_r_rv[0], act_inf_r_rv[0]).T
-    per_err_5 = percent_error(ml_inf_r_tv[0], act_inf_r_tv[0]).T
-    per_err_6 = percent_error(ml_inf_rv_tv[0], act_inf_rv_tv[0]).T
+        ml_max_ptl, ml_orb_r_rv, ml_orb_r_tv, ml_orb_rv_tv, ml_inf_r_rv, ml_inf_r_tv, ml_inf_rv_tv = create_hist_max_ptl(min_ptl,min_ptl, ml_inf_r, ml_orb_r, ml_inf_rv, ml_orb_rv, ml_inf_tv, ml_orb_tv, num_bins, r_range, rv_range, tv_range)
+        act_max_ptl, act_orb_r_rv, act_orb_r_tv, act_orb_rv_tv, act_inf_r_rv, act_inf_r_tv, act_inf_rv_tv = create_hist_max_ptl(min_ptl,min_ptl, act_inf_r, act_orb_r, act_inf_rv, act_orb_rv, act_inf_tv, act_orb_tv, num_bins, r_range, rv_range, tv_range, bin_r_rv=ml_orb_r_rv[1:], bin_r_tv=ml_orb_r_tv[1:],bin_rv_tv=ml_orb_rv_tv[1:])    
+        
+        floor = 200
+        per_err_1 = percent_error(ml_orb_r_rv[0], act_orb_r_rv[0]).T
+        per_err_2 = percent_error(ml_orb_r_tv[0], act_orb_r_tv[0]).T
+        per_err_3 = percent_error(ml_orb_rv_tv[0], act_orb_rv_tv[0]).T
+        per_err_4 = percent_error(ml_inf_r_rv[0], act_inf_r_rv[0]).T
+        per_err_5 = percent_error(ml_inf_r_tv[0], act_inf_r_tv[0]).T
+        per_err_6 = percent_error(ml_inf_rv_tv[0], act_inf_rv_tv[0]).T
 
-    max_err = np.max(np.array([np.max(per_err_1),np.max(per_err_2),np.max(per_err_3),np.max(per_err_4),np.max(per_err_5),np.max(per_err_6)]))
-    min_err = np.min(np.array([np.min(per_err_1),np.min(per_err_2),np.min(per_err_3),np.min(per_err_4),np.min(per_err_5),np.min(per_err_6)]))
+        max_err = np.max(np.array([np.max(per_err_1),np.max(per_err_2),np.max(per_err_3),np.max(per_err_4),np.max(per_err_5),np.max(per_err_6)]))
+        min_err = np.min(np.array([np.min(per_err_1),np.min(per_err_2),np.min(per_err_3),np.min(per_err_4),np.min(per_err_5),np.min(per_err_6)]))
 
-    if ml_max_ptl > act_max_ptl:
-        max_ptl = ml_max_ptl
-    else:
-        max_ptl = act_max_ptl
-  
-    cmap = plt.get_cmap("magma")
-    per_err_cmap = plt.get_cmap("cividis")
+        if ml_max_ptl > act_max_ptl:
+            max_ptl = ml_max_ptl
+        else:
+            max_ptl = act_max_ptl
+    
+        cmap = plt.get_cmap("magma")
+        per_err_cmap = plt.get_cmap("cividis")
 
-    widths = [4,4,4,.5]
-    heights = [4,4]
-    
-    inf_fig = plt.figure()
-    inf_fig.suptitle("Infalling Particles: " + title)
-    gs = inf_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
-    
-    phase_plot(inf_fig.add_subplot(gs[0,0]), ml_inf_r, ml_inf_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$",axisfontsize=12)
-    phase_plot(inf_fig.add_subplot(gs[0,1]), ml_inf_r, ml_inf_tv, min_ptl, max_ptl, range=[r_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="ML Predictions",axisfontsize=12)
-    phase_plot(inf_fig.add_subplot(gs[0,2]), ml_inf_rv, ml_inf_tv, min_ptl, max_ptl, range=[rv_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$",axisfontsize=12)
-    phase_plot(inf_fig.add_subplot(gs[1,0]), act_inf_r, act_inf_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$",axisfontsize=12)
-    phase_plot(inf_fig.add_subplot(gs[1,1]), act_inf_r, act_inf_tv, min_ptl, max_ptl, range=[r_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="Actual Distribution",axisfontsize=12)
-    phase_plot(inf_fig.add_subplot(gs[1,2]), act_inf_rv, act_inf_tv, min_ptl, max_ptl, range=[rv_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$",axisfontsize=12)
-    
-    inf_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]))
-    
-    inf_fig.savefig(save_location + title + "ptls_inf.png")
-    
-#########################################################################################################################################################
-    
-    orb_fig = plt.figure()
-    orb_fig.suptitle("Orbiting Particles: " + title)
-    gs = orb_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
-    
-    phase_plot(orb_fig.add_subplot(gs[0,0]), ml_orb_r, ml_orb_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$")
-    phase_plot(orb_fig.add_subplot(gs[0,1]), ml_orb_r, ml_orb_tv, min_ptl, max_ptl, range=[r_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="ML Predictions")
-    phase_plot(orb_fig.add_subplot(gs[0,2]), ml_orb_rv, ml_orb_tv, min_ptl, max_ptl, range=[rv_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$")
-    phase_plot(orb_fig.add_subplot(gs[1,0]), act_orb_r, act_orb_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$")
-    phase_plot(orb_fig.add_subplot(gs[1,1]), act_orb_r, act_orb_tv, min_ptl, max_ptl, range=[r_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="Actual Distribution")
-    phase_plot(orb_fig.add_subplot(gs[1,2]), act_orb_rv, act_orb_tv, min_ptl, max_ptl, range=[rv_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$")
-    
-    orb_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]), pad = 0.1)
-    
-    orb_fig.savefig(save_location + title + "ptls_orb.png")    
-    
-#########################################################################################################################################################
-    
-    only_r_rv_widths = [4,4,.5]
-    only_r_rv_heights = [4,4]
-    only_r_rv_fig = plt.figure()
-    only_r_rv_fig.suptitle("Radial Velocity Versus Radius: " + title)
-    gs = only_r_rv_fig.add_gridspec(2,3,width_ratios = only_r_rv_widths, height_ratios = only_r_rv_heights)
-    
-    phase_plot(only_r_rv_fig.add_subplot(gs[0,0]), ml_orb_r, ml_orb_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", title="ML Predicted Orbiting Particles")
-    phase_plot(only_r_rv_fig.add_subplot(gs[0,1]), ml_inf_r, ml_inf_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", title="ML Predicted Infalling Particles")
-    phase_plot(only_r_rv_fig.add_subplot(gs[1,0]), act_orb_r, act_orb_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", title="Actual Orbiting Particles")
-    phase_plot(only_r_rv_fig.add_subplot(gs[1,1]), act_inf_r, act_inf_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", title="Actual Infalling Particles")
+        widths = [4,4,4,.5]
+        heights = [4,4]
+        
+        inf_fig = plt.figure()
+        inf_fig.suptitle("Infalling Particles: " + title)
+        gs = inf_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
+        
+        phase_plot(inf_fig.add_subplot(gs[0,0]), ml_inf_r, ml_inf_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$",axisfontsize=12)
+        phase_plot(inf_fig.add_subplot(gs[0,1]), ml_inf_r, ml_inf_tv, min_ptl, max_ptl, range=[r_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="ML Predictions",axisfontsize=12)
+        phase_plot(inf_fig.add_subplot(gs[0,2]), ml_inf_rv, ml_inf_tv, min_ptl, max_ptl, range=[rv_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$",axisfontsize=12)
+        phase_plot(inf_fig.add_subplot(gs[1,0]), act_inf_r, act_inf_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$",axisfontsize=12)
+        phase_plot(inf_fig.add_subplot(gs[1,1]), act_inf_r, act_inf_tv, min_ptl, max_ptl, range=[r_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="Actual Distribution",axisfontsize=12)
+        phase_plot(inf_fig.add_subplot(gs[1,2]), act_inf_rv, act_inf_tv, min_ptl, max_ptl, range=[rv_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$",axisfontsize=12)
+        
+        inf_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]))
+        
+        inf_fig.savefig(save_location + title + "ptls_inf.png")
+        
+    #########################################################################################################################################################
+        
+        orb_fig = plt.figure()
+        orb_fig.suptitle("Orbiting Particles: " + title)
+        gs = orb_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
+        
+        phase_plot(orb_fig.add_subplot(gs[0,0]), ml_orb_r, ml_orb_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$")
+        phase_plot(orb_fig.add_subplot(gs[0,1]), ml_orb_r, ml_orb_tv, min_ptl, max_ptl, range=[r_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="ML Predictions")
+        phase_plot(orb_fig.add_subplot(gs[0,2]), ml_orb_rv, ml_orb_tv, min_ptl, max_ptl, range=[rv_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$")
+        phase_plot(orb_fig.add_subplot(gs[1,0]), act_orb_r, act_orb_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$")
+        phase_plot(orb_fig.add_subplot(gs[1,1]), act_orb_r, act_orb_tv, min_ptl, max_ptl, range=[r_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="Actual Distribution")
+        phase_plot(orb_fig.add_subplot(gs[1,2]), act_orb_rv, act_orb_tv, min_ptl, max_ptl, range=[rv_range,tv_range], num_bins=num_bins, cmap=cmap, x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$")
+        
+        orb_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]), pad = 0.1)
+        
+        orb_fig.savefig(save_location + title + "ptls_orb.png")    
+        
+    #########################################################################################################################################################
+        
+        only_r_rv_widths = [4,4,.5]
+        only_r_rv_heights = [4,4]
+        only_r_rv_fig = plt.figure()
+        only_r_rv_fig.suptitle("Radial Velocity Versus Radius: " + title)
+        gs = only_r_rv_fig.add_gridspec(2,3,width_ratios = only_r_rv_widths, height_ratios = only_r_rv_heights)
+        
+        phase_plot(only_r_rv_fig.add_subplot(gs[0,0]), ml_orb_r, ml_orb_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", title="ML Predicted Orbiting Particles")
+        phase_plot(only_r_rv_fig.add_subplot(gs[0,1]), ml_inf_r, ml_inf_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", title="ML Predicted Infalling Particles")
+        phase_plot(only_r_rv_fig.add_subplot(gs[1,0]), act_orb_r, act_orb_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", title="Actual Orbiting Particles")
+        phase_plot(only_r_rv_fig.add_subplot(gs[1,1]), act_inf_r, act_inf_rv, min_ptl, max_ptl, range=[r_range,rv_range], num_bins=num_bins, cmap=cmap, x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$", title="Actual Infalling Particles")
 
-    
-    only_r_rv_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]))
-    only_r_rv_fig.savefig(save_location + title + "only_r_rv.png")
-    
-#########################################################################################################################################################
+        
+        only_r_rv_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=cmap), cax=plt.subplot(gs[:2,-1]))
+        only_r_rv_fig.savefig(save_location + title + "only_r_rv.png")
+        
+    #########################################################################################################################################################
 
-    err_fig = plt.figure()
-    err_fig.suptitle("Percent Error " + title)
-    gs = err_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
-    
-    err_fig_kwargs = {
-        "norm":colors.CenteredNorm(),
-        "origin":"lower",
-        "aspect":"auto",
-        "cmap":per_err_cmap,
-    }
-    
-    imshow_plot(err_fig.add_subplot(gs[0,0]), per_err_1, extent=[0,max_r,min_rv,max_rv], x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$",kwargs=err_fig_kwargs)
-    imshow_plot(err_fig.add_subplot(gs[0,1]), per_err_2, extent=[0,max_r,min_tv,max_tv], x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="Orbiting Ptls",kwargs=err_fig_kwargs)
-    imshow_plot(err_fig.add_subplot(gs[0,2]), per_err_3, extent=[min_rv,max_rv,min_tv,max_tv], x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$",kwargs=err_fig_kwargs)
-    imshow_plot(err_fig.add_subplot(gs[1,0]), per_err_4, extent=[0,max_r,min_rv,max_rv], x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$",kwargs=err_fig_kwargs)
-    imshow_plot(err_fig.add_subplot(gs[1,1]), per_err_5, extent=[0,max_r,min_tv,max_tv], x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="Infalling Ptls",kwargs=err_fig_kwargs)
-    perr_imshow_img=imshow_plot(err_fig.add_subplot(gs[1,2]), per_err_6, extent=[min_rv,max_rv,min_tv,max_tv], x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$", return_img=True,kwargs=err_fig_kwargs)
-    
-    perr_color_bar = plt.colorbar(perr_imshow_img, cax=plt.subplot(gs[:,-1]), pad = 0.1)
-    
-    err_fig.savefig(save_location + title + "percent_error.png") 
-
-    t2 = time.time()
-    print("Finished r vs rv vs tv Plot in: ", np.round((t2-t1),2), "seconds", np.round(((t2-t1)/60),2), "minutes")
+        err_fig = plt.figure()
+        err_fig.suptitle("Percent Error " + title)
+        gs = err_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
+        
+        err_fig_kwargs = {
+            "norm":colors.CenteredNorm(),
+            "origin":"lower",
+            "aspect":"auto",
+            "cmap":per_err_cmap,
+        }
+        
+        imshow_plot(err_fig.add_subplot(gs[0,0]), per_err_1, extent=[0,max_r,min_rv,max_rv], x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$",kwargs=err_fig_kwargs)
+        imshow_plot(err_fig.add_subplot(gs[0,1]), per_err_2, extent=[0,max_r,min_tv,max_tv], x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="Orbiting Ptls",kwargs=err_fig_kwargs)
+        imshow_plot(err_fig.add_subplot(gs[0,2]), per_err_3, extent=[min_rv,max_rv,min_tv,max_tv], x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$",kwargs=err_fig_kwargs)
+        imshow_plot(err_fig.add_subplot(gs[1,0]), per_err_4, extent=[0,max_r,min_rv,max_rv], x_label="$r/R_{200m}$", y_label="$v_r/v_{200m}$",kwargs=err_fig_kwargs)
+        imshow_plot(err_fig.add_subplot(gs[1,1]), per_err_5, extent=[0,max_r,min_tv,max_tv], x_label="$r/R_{200m}$", y_label="$v_t/v_{200m}$", title="Infalling Ptls",kwargs=err_fig_kwargs)
+        perr_imshow_img=imshow_plot(err_fig.add_subplot(gs[1,2]), per_err_6, extent=[min_rv,max_rv,min_tv,max_tv], x_label="$v_r/v_{200m}$", y_label="$v_t/v_{200m}$", return_img=True,kwargs=err_fig_kwargs)
+        
+        perr_color_bar = plt.colorbar(perr_imshow_img, cax=plt.subplot(gs[:,-1]), pad = 0.1)
+        
+        err_fig.savefig(save_location + title + "percent_error.png") 
     
 def graph_feature_importance(feature_names, feature_importance, title, plot, save, save_location):
     mpl.rcParams.update({'font.size': 8})
