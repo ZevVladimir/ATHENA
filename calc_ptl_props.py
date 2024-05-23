@@ -342,14 +342,14 @@ def halo_loop(indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos,
         if os.path.isfile(save_location + "all_particle_properties.hdf5") and i == 0:
             os.remove(save_location + "all_particle_properties.hdf5")
         with h5py.File((save_location + "all_particle_properties.hdf5"), 'a') as all_particle_properties:
-            save_to_hdf5(all_particle_properties, "Halo_first", dataset = p_start_num_ptls, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(all_particle_properties, "Halo_n", dataset = p_use_num_ptls, chunk = True, max_shape = (total_num_halos,), curr_idx = hdf5_halo_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(all_particle_properties, "HIPIDS", dataset = p_all_HIPIDs, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(all_particle_properties, "Orbit_Infall", dataset = p_all_orb_assn, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(all_particle_properties, "Scaled_radii_", dataset = save_scale_radii, chunk = True, max_shape = use_max_shape, curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(all_particle_properties, "Radial_vel_", dataset = save_rad_vel, chunk = True, max_shape = use_max_shape, curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            save_to_hdf5(all_particle_properties, "Tangential_vel_", dataset = save_tang_vel, chunk = True, max_shape = use_max_shape, curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
-            #save_to_hdf5(all_particle_properties, "scal_sqr_phys_vel", dataset = p_scal_sqr_phys_vel, chunk = True, max_shape = (tot_num_ptls,), curr_idx = hdf5_ptl_idx, max_num_keys = num_save_ptl_params)
+            save_to_hdf5(all_particle_properties, "Halo_first", dataset = p_start_num_ptls, chunk = True, max_shape = (total_num_halos,))
+            save_to_hdf5(all_particle_properties, "Halo_n", dataset = p_use_num_ptls, chunk = True, max_shape = (total_num_halos,))
+            save_to_hdf5(all_particle_properties, "HIPIDS", dataset = p_all_HIPIDs, chunk = True, max_shape = (tot_num_ptls,))
+            save_to_hdf5(all_particle_properties, "Orbit_Infall", dataset = p_all_orb_assn, chunk = True, max_shape = (tot_num_ptls,))
+            save_to_hdf5(all_particle_properties, "Scaled_radii_", dataset = save_scale_radii, chunk = True, max_shape = use_max_shape)
+            save_to_hdf5(all_particle_properties, "Radial_vel_", dataset = save_rad_vel, chunk = True, max_shape = use_max_shape)
+            save_to_hdf5(all_particle_properties, "Tangential_vel_", dataset = save_tang_vel, chunk = True, max_shape = use_max_shape)
+            #save_to_hdf5(all_particle_properties, "scal_sqr_phys_vel", dataset = p_scal_sqr_phys_vel, chunk = True, max_shape = (tot_num_ptls,))
 
         hdf5_ptl_idx += p_tot_num_use_ptls
         hdf5_halo_idx += p_start_num_ptls.shape[0]

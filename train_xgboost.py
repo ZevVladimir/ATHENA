@@ -50,7 +50,6 @@ model_type = config["XGBOOST"]["model_type"]
 radii_splits = config.get("XGBOOST","rad_splits").split(',')
 search_rad = config.getfloat("SEARCH","search_rad")
 total_num_snaps = config.getint("SEARCH","total_num_snaps")
-per_n_halo_per_split = config.getfloat("SEARCH","per_n_halo_per_split")
 test_halos_ratio = config.getfloat("DATASET","test_halos_ratio")
 curr_chunk_size = config.getint("SEARCH","chunk_size")
 global num_save_ptl_params
@@ -163,8 +162,6 @@ if __name__ == "__main__":
 
         if match:
             curr_snap_list = [match.group(1), match.group(2)] 
-            print(f"First number: {match.group(1)}")
-            print(f"Second number: {match.group(2)}")
         else:
             print("Pattern not found in the string.")
         parts = sim.split("_")
@@ -347,11 +344,6 @@ if __name__ == "__main__":
     ax.set_yticks(pos, keys)
     fig.savefig(gen_plot_save_loc + "feature_importance.png")
 
-    # tree_num = 2
-    # xgb.plot_tree(bst, num_trees=tree_num)
-    # fig = plt.gcf()
-    # fig.set_size_inches(110, 25)
-    # fig.savefig('/home/zvladimi/MLOIS/Random_figures/' + model_name + 'tree' + str(tree_num) + '.png')
 
     with open(model_save_loc + "model_info.pickle", "wb") as pickle_file:
         pickle.dump(model_info, pickle_file) 

@@ -13,11 +13,9 @@ import time
 import os
 import sys
 import numpy as np
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-from pairing import depair
-from colossus.cosmology import cosmology
+import json
+import re
+from utils.ML_support import *
 from utils.data_and_loading_functions import create_directory, load_or_pickle_SPARTA_data, conv_halo_id_spid
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -39,24 +37,21 @@ snap_format = config["MISC"]["snap_format"]
 global prim_only
 prim_only = config.getboolean("SEARCH","prim_only")
 t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
-global p_snap
-p_snap = config.getint("SEARCH","p_snap")
-c_snap = config.getint("XGBOOST","c_snap")
-model_name = config["XGBOOST"]["model_name"]
+p_red_shift = config.getfloat("SEARCH","p_red_shift")
 radii_splits = config.get("XGBOOST","rad_splits").split(',')
-snapshot_list = [p_snap, c_snap]
-global search_rad
 search_rad = config.getfloat("SEARCH","search_rad")
 total_num_snaps = config.getint("SEARCH","total_num_snaps")
-per_n_halo_per_split = config.getfloat("SEARCH","per_n_halo_per_split")
-test_halos_ratio = config.getfloat("SEARCH","test_halos_ratio")
+test_halos_ratio = config.getfloat("DATASET","test_halos_ratio")
 curr_chunk_size = config.getint("SEARCH","chunk_size")
-global num_save_ptl_params
 num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 do_hpo = config.getboolean("XGBOOST","hpo")
 # size float32 is 4 bytes
 chunk_size = int(np.floor(1e9 / (num_save_ptl_params * 4)))
 frac_training_data = 1
+model_sims = json.loads(config.get("DATASET","model_sims"))
+model_type = config["XGBOOST"]["model_type"]
+test_sims = json.loads(config.get("XGBOOST","test_sims"))
+eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
 
 import subprocess
 
@@ -66,11 +61,7 @@ try:
 except Exception: # this command not being found can raise quite a few different errors depending on the configuration
     gpu_use = False
 ###############################################################################################################
-sys.path.insert(1, path_to_pygadgetreader)
-sys.path.insert(1, path_to_sparta)
-from utils.visualization_functions import *
-from pygadgetreader import readsnap, readheader
-from sparta_dev import sparta
+
 @contextmanager
 def timed(txt):
     t0 = time.time()
@@ -88,28 +79,60 @@ def get_cluster():
 if __name__ == "__main__":
     client = get_cluster()
     
+    combined_model_name = ""
+    for i,sim in enumerate(model_sims):
+        pattern = r"(\d+)to(\d+)"
+        match = re.search(pattern, sim)
 
-    save_location = path_to_xgboost + specific_save
-    model_save_location = save_location + model_name + "/"  
-    plot_save_location = model_save_location + "plots/"
-    create_directory(model_save_location)
-    create_directory(plot_save_location)
-    train_dataset_loc = save_location + "datasets/" + "train_dataset.pickle"
-    train_labels_loc = save_location + "datasets/" + "train_labels.pickle"
-    test_dataset_loc = save_location + "datasets/" + "test_dataset.pickle"
-    test_labels_loc = save_location + "datasets/" + "test_labels.pickle"
-    
-    with open(save_location + "datasets/" + "test_dataset_all_keys.pickle", "rb") as file:
-        test_all_keys = pickle.load(file)
+        if match:
+            curr_snap_list = [match.group(1), match.group(2)] 
+        else:
+            print("Pattern not found in the string.")
+        parts = sim.split("_")
+        combined_model_name += parts[1] + parts[2] + "s" + parts[4] 
+        if i != len(model_sims)-1:
+            combined_model_name += "_"
+            
+    combined_test_name = ""
+    for i,sim in enumerate(test_sims):
+        pattern = r"(\d+)to(\d+)"
+        match = re.search(pattern, sim)
 
-    if os.path.isfile(model_save_location + model_name + ".json"):
+        if match:
+            curr_snap_list = [match.group(1), match.group(2)] 
+            print(f"First number: {match.group(1)}")
+            print(f"Second number: {match.group(2)}")
+        else:
+            print("Pattern not found in the string.")
+        parts = sim.split("_")
+        combined_test_name += parts[1] + parts[2] + "s" + parts[4] 
+        if i != len(test_sims)-1:
+            combined_test_name += "_"
+        
+    model_name = model_type + "_" + combined_model_name
+
+    test_dataset_loc = path_to_xgboost + combined_test_name + "/datasets/"
+    model_save_loc = path_to_xgboost + combined_model_name + "/" + model_name + "/"
+
+    try:
         bst = xgb.Booster()
-        bst.load_model(model_save_location + model_name + ".json")
-    
-        print(bst.get_score())
-        fig, ax = plt.subplots(figsize=(400, 10))
-        xgb.plot_tree(bst, num_trees=4, ax=ax)
-        plt.savefig("/home/zvladimi/MLOIS/Random_figures/temp.png")
+        bst.load_model(model_save_loc + model_name + ".json")
         print("Loaded Booster")
-    else:
-        print("Couldn't load Booster Located at: " + model_save_location + model_name + ".json")
+    except:
+        print("Couldn't load Booster Located at: " + model_save_loc + model_name + ".json")
+        
+    try:
+        with open(model_save_loc + "model_info.pickle", "rb") as pickle_file:
+            model_info = pickle.load(pickle_file)
+    except FileNotFoundError:
+        print("Model info could not be loaded please ensure the path is correct or rerun train_xgboost.py")
+        
+    for dst_type in eval_datasets:
+        with timed(dst_type + " Plots"):
+            plot_loc = model_save_loc + dst_type + "_" + combined_test_name + "/plots/"
+            create_directory(model_save_loc + dst_type + "_" + combined_test_name)
+            create_directory(plot_loc)
+            eval_model(model_info, client, bst, use_sims=model_sims, dst_type=dst_type, dst_loc=test_dataset_loc, combined_name=combined_test_name, plot_save_loc=plot_loc, p_red_shift=p_red_shift, dens_prf = True, r_rv_tv = True, misclass=True)
+    
+    with open(model_save_loc + "model_info.pickle", "wb") as pickle_file:
+        pickle.dump(model_info, pickle_file) 
