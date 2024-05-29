@@ -3,6 +3,7 @@ import os
 import sys
 import pickle
 from dask import array as da
+import dask.dataframe as dd
 import xgboost as xgb
 from xgboost import dask as dxgb
 import json
@@ -40,8 +41,8 @@ num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 # size float32 is 4 bytes
 chunk_size = int(np.floor(1e9 / (num_save_ptl_params * 4)))
 
-def make_preds(client, bst, X_np, y_np, report_name="Classification Report", print_report=False):
-    X = da.from_array(X_np,chunks=(chunk_size,X_np.shape[1]))
+def make_preds(client, bst, X, y_np, report_name="Classification Report", print_report=False):
+    #X = da.from_array(X_np,chunks=(chunk_size,X_np.shape[1]))
     
     preds = dxgb.inplace_predict(client, bst, X).compute()
     preds = np.round(preds)
@@ -86,28 +87,16 @@ def create_dmatrix(client, X_cpu, y_cpu, features, chunk_size, frac_use_data = 1
     return dqmatrix, X, y_cpu
 
 
-def eval_model(model_info, client, model, use_sims, dst_type, dst_loc, combined_name, plot_save_loc, dens_prf = False, r_rv_tv = False, misclass=False): 
-    with timed(dst_type + " Predictions"):
-        with h5py.File(dst_loc + dst_type.lower() + "_dset.hdf5", "r") as file:
-            X = file["Dataset"][:]
-            y = file["Labels"][:]
-        preds = make_preds(client, model, X, y, report_name=dst_type + " Report", print_report=False)
+def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, combined_name, plot_save_loc, dens_prf = False, r_rv_tv = False, misclass=False): 
+    with timed("Predictions"):
+        preds = make_preds(client, model, X, y, report_name="Report", print_report=False)
         
     num_bins = 30
-    with open(dst_loc + "keys.pickle", "rb") as file:
-        all_keys = pickle.load(file)
-    p_r_loc = np.where(all_keys == "p_Scaled_radii_")[0][0]
-    c_r_loc = np.where(all_keys == "c_Scaled_radii_")[0][0]
-    p_rv_loc = np.where(all_keys == "p_Radial_vel_")[0][0]
-    c_rv_loc = np.where(all_keys == "c_Radial_vel_")[0][0]
-    p_tv_loc = np.where(all_keys == "p_Tangential_vel_")[0][0]
-    c_tv_loc = np.where(all_keys == "c_Tangential_vel_")[0][0]
     
     if dens_prf:
-        with h5py.File(dst_loc + dst_type.lower() + "_dset.hdf5", "r") as file:
-            halo_first = file["Halo_first"][:]
-            halo_n = file["Halo_n"][:]
-            all_idxs = file["Halo_Indices"][:]
+        halo_first = halo_ddf["Halo_first"].values
+        halo_n = halo_ddf["Halo_n"].values
+        all_idxs = halo_ddf["Halo_indices"].values
         
         # Know where each simulation's data starts in the stacekd dataset based on when the indexing starts from 0 again
         sim_splits = np.where(halo_first == 0)[0]
@@ -133,14 +122,19 @@ def eval_model(model_info, client, model, use_sims, dst_type, dst_loc, combined_
             if match:
                 sparta_search_name = match.group(0)
             
+            with open(path_to_calc_info + sim + "/config.pickle", "rb") as file:
+                config_dict = pickle.load(file)
+                
+                curr_z = config_dict["p_snap_info"]["red_shift"][()]
+                new_p_snap, curr_z = find_closest_z(curr_z)
+                p_scale_factor = 1/(1+curr_z)
+                
             with h5py.File(path_to_SPARTA_data + sparta_name + "/" + sparta_search_name + ".hdf5","r") as f:
                 dic_sim = {}
                 grp_sim = f['simulation']
-                for f in grp_sim.attrs:
-                    dic_sim[f] = grp_sim.attrs[f]
-                curr_z = f["config"]["p_snap_info"]["red_shift"][()]
-                new_p_snap, curr_z = find_closest_z(curr_z)
-                p_scale_factor = 1/(1+curr_z)
+
+                for attr in grp_sim.attrs:
+                    dic_sim[attr] = grp_sim.attrs[attr]
             
             all_red_shifts = dic_sim['snap_z']
             p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
@@ -166,13 +160,15 @@ def eval_model(model_info, client, model, use_sims, dst_type, dst_loc, combined_
                 else:
                     use_halo_first[sim_splits[i]:] += use_halo_first[sim_splits[i]-1]
                 
-        compare_density_prf(radii=X[:,p_r_loc], halo_first=use_halo_first, halo_n=halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=ptl_mass, orbit_assn=preds, prf_bins=bins, title="", save_location=plot_save_loc, use_mp=True, save_graph=True)
+        compare_density_prf(radii=X["p_Scaled_radii"].values.compute(), halo_first=use_halo_first, halo_n=halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=ptl_mass, orbit_assn=preds, prf_bins=bins, title="", save_location=plot_save_loc, use_mp=True, save_graph=True)
     
     if r_rv_tv:
-        plot_r_rv_tv_graph(preds, X[:,p_r_loc], X[:,p_rv_loc], X[:,p_tv_loc], y, title="", num_bins=num_bins, save_location=plot_save_loc)
+        plot_r_rv_tv_graph(preds, X["p_Scaled_radii"].values.compute(), X["p_Radial_vel"].values.compute(), X["p_Tangential_vel"].values.compute(), y, title="", num_bins=num_bins, save_location=plot_save_loc)
     
     if misclass:
-        plot_misclassified(p_corr_labels=y, p_ml_labels=preds, p_r=X[:,p_r_loc], p_rv=X[:,p_rv_loc], p_tv=X[:,p_tv_loc], c_r=X[:,c_r_loc], c_rv=X[:,c_rv_loc], c_tv=X[:,c_tv_loc],title="",num_bins=num_bins,save_location=plot_save_loc,model_info=model_info,dataset_name=dst_type + "_" + combined_name)
+        preds = preds.values
+        y = y.compute().values.flatten()
+        plot_misclassified(p_corr_labels=y, p_ml_labels=preds, p_r=X["p_Scaled_radii"].values.compute(), p_rv=X["p_Radial_vel"].values.compute(), p_tv=X["p_Tangential_vel"].values.compute(), c_r=X["c_Scaled_radii"].values.compute(), c_rv=X["c_Radial_vel"].values.compute(), c_tv=X["c_Tangential_vel"].values.compute(),title="",num_bins=num_bins,save_location=plot_save_loc,model_info=model_info,dataset_name=dst_type + "_" + combined_name)
     
 
 def print_tree(bst,tree_num):

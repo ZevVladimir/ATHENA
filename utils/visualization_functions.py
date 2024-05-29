@@ -426,8 +426,8 @@ def histogram(x,y,bins,range,min_ptl,set_ptl):
     return hist
   
 def split_orb_inf(data, labels):
-    infall = data[np.where(labels == 0)]
-    orbit = data[np.where(labels == 1)]
+    infall = data[np.where(labels == 0)[0]]
+    orbit = data[np.where(labels == 1)[0]]
     return infall, orbit
  
 def phase_plot(ax, x, y, min_ptl, max_ptl, range, num_bins, cmap, x_label="", y_label="", norm = "log", xrange=None, yrange=None, hide_xticks=False, hide_yticks=False,text="", axisfontsize=18, title=""):
@@ -501,7 +501,7 @@ def percent_error(pred, act):
 def calc_misclassified(correct_labels, ml_labels, r, rv, tv, r_range, rv_range, tv_range, num_bins, model_info,dataset_name): 
     min_ptl = 1e-4
     act_min_ptl = 10
-       
+
     inc_inf = np.where((ml_labels == 1) & (correct_labels == 0))[0]
     num_orb = np.where(correct_labels == 1)[0].shape[0]
     inc_orb = np.where((ml_labels == 0) & (correct_labels == 1))[0]

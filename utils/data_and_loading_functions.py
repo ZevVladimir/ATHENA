@@ -10,8 +10,7 @@ import time
 import re
 
 def create_directory(path):
-    if os.path.exists(path) != True:
-        os.makedirs(path)
+    os.makedirs(path,exist_ok=True)
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser

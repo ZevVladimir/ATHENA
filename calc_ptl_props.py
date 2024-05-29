@@ -11,6 +11,7 @@ import multiprocessing as mp
 from itertools import repeat
 import sys
 import re
+import pandas as pd
 
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed
 from utils.calculation_functions import *
@@ -20,6 +21,7 @@ import configparser
 config = configparser.ConfigParser()
 config.read(os.environ.get('PWD') + "/config.ini")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
+rand_seed = config.getint("MISC","random_seed")
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
 path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
@@ -47,6 +49,7 @@ per_n_halo_per_split = config.getfloat("SEARCH","per_n_halo_per_split")
 # num_processes = int(os.environ['SLURM_CPUS_PER_TASK'])
 num_processes = mp.cpu_count()
 curr_chunk_size = config.getint("SEARCH","chunk_size")
+test_halos_ratio = config.getfloat("DATASET","test_halos_ratio")
 ##################################################################################################################
 sys.path.insert(1, path_to_pygadgetreader)
 sys.path.insert(1, path_to_sparta)
@@ -152,7 +155,7 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     else:
         return fnd_HIPIDs, scaled_rad_vel, scaled_tang_vel, scaled_radii
 
-def halo_loop(indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos, p_ptls_vel, c_dict, c_ptls_pid, c_ptls_pos, c_ptls_vel):
+def halo_loop(indices, dst_name, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos, p_ptls_vel, c_dict, c_ptls_pid, c_ptls_pos, c_ptls_vel):
     num_iter = int(np.ceil(indices.shape[0] / num_halo_per_split))
     print("Num halo per", num_iter, "splits:", num_halo_per_split)
     hdf5_ptl_idx = 0
@@ -319,16 +322,27 @@ def halo_loop(indices, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos,
                 save_rad_vel = p_all_rad_vel
                 save_tang_vel = p_all_tang_vel
             
-
-            with h5py.File((save_location + "all_particle_properties.hdf5"), 'a') as all_ptl_props:
-                save_to_hdf5(all_ptl_props, "Halo_first", dataset = p_start_num_ptls, chunk = True, max_shape = (total_num_halos,))
-                save_to_hdf5(all_ptl_props, "Halo_n", dataset = p_use_num_ptls, chunk = True, max_shape = (total_num_halos,))
-                save_to_hdf5(all_ptl_props, "HIPIDS", dataset = p_all_HIPIDs, chunk = True, max_shape = (tot_num_ptls,))
-                save_to_hdf5(all_ptl_props, "Orbit_Infall", dataset = p_all_orb_assn, chunk = True, max_shape = (tot_num_ptls,))
-                save_to_hdf5(all_ptl_props, "Scaled_radii_", dataset = save_scale_radii, chunk = True, max_shape = use_max_shape)
-                save_to_hdf5(all_ptl_props, "Radial_vel_", dataset = save_rad_vel, chunk = True, max_shape = use_max_shape)
-                save_to_hdf5(all_ptl_props, "Tangential_vel_", dataset = save_tang_vel, chunk = True, max_shape = use_max_shape)
-                #save_to_hdf5(all_particle_properties, "scal_sqr_phys_vel", dataset = p_scal_sqr_phys_vel, chunk = True, max_shape = (tot_num_ptls,))
+            halo_df = pd.DataFrame({
+                "Halo_first":p_start_num_ptls,
+                "Halo_n":p_use_num_ptls,
+                "Halo_indices":use_indices,
+            })
+            
+            ptl_df = pd.DataFrame({
+                "HIPIDS":p_all_HIPIDs,
+                "Orbit_infall":p_all_orb_assn,
+                "p_Scaled_radii":save_scale_radii[:,0],
+                "p_Radial_vel":save_rad_vel[:,0],
+                "p_Tangential_vel":save_tang_vel[:,0],
+                "c_Scaled_radii":save_scale_radii[:,1],
+                "c_Radial_vel":save_rad_vel[:,1],
+                "c_Tangential_vel":save_tang_vel[:,1],
+                })
+            
+            create_directory(save_location + dst_name + "/halo_info/")
+            create_directory(save_location + dst_name + "/ptl_info/")
+            halo_df.to_hdf(save_location + dst_name + "/halo_info/halo_" + str(i) + ".h5", key='data', mode='w',format='table')  
+            ptl_df.to_hdf(save_location +  dst_name + "/ptl_info/ptl_" + str(i) + ".h5", key='data', mode='w',format='table')  
 
             hdf5_ptl_idx += p_tot_num_use_ptls
             hdf5_halo_idx += p_start_num_ptls.shape[0]
@@ -349,8 +363,7 @@ with timed("Startup"):
         all_red_shifts = dic_sim['snap_z']
         p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
         print("corresponding SPARTA snap num:", p_sparta_snap)
-        print("check sparta redshift:",all_red_shifts[p_sparta_snap])
-        
+        print("check sparta redshift:",all_red_shifts[p_sparta_snap])   
 
         # Set constants
         p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
@@ -368,7 +381,6 @@ with timed("Startup"):
             "hubble_const": p_hubble_constant,
             "box_size": p_box_size,
         }
-
 
     # load all information needed for the primary snap
     with timed("p_snap ptl load"):
@@ -422,11 +434,6 @@ with timed("Startup"):
     else:
         match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap) & (c_halos_status > 0) & (c_halos_last_snap >= c_sparta_snap))[0]
         
-    total_num_halos = match_halo_idxs.shape[0]
-    num_halo_per_split = int(np.ceil(per_n_halo_per_split * total_num_halos))
-
-    with open(save_location + "all_indices.pickle", "wb") as pickle_file:
-        pickle.dump(match_halo_idxs, pickle_file)
 
     if os.path.isfile(save_location + "tot_num_ptls.pickle"):
         with open(save_location + "tot_num_ptls.pickle", "rb") as pickle_file:
@@ -435,12 +442,35 @@ with timed("Startup"):
         with mp.Pool(processes=num_processes) as p:
             # halo position, halo r200m, if comparison snap, want mass?, want indices?
             num_ptls = p.starmap(initial_search, zip(p_halos_pos[match_halo_idxs], p_halos_r200m[match_halo_idxs], repeat(False), repeat(False), repeat(False)), chunksize=curr_chunk_size)
+            # We want to remove any halos that have less than 200 particles as they are too noisy
+      
+            res_mask = np.where(np.array(num_ptls) <= 200)[0]
+            
+            if res_mask.size > 0:
+                num_ptls = num_ptls[res_mask]
+                match_halo_idxs = match_halo_idxs[res_mask]
             tot_num_ptls = np.sum(num_ptls)
             with open(save_location + "tot_num_ptls.pickle", "wb") as pickle_file:
                 pickle.dump(tot_num_ptls, pickle_file)
         p.close()
         p.join() 
 
+    total_num_halos = match_halo_idxs.shape[0]
+    num_halo_per_split = int(np.ceil(per_n_halo_per_split * total_num_halos))
+    rng = np.random.default_rng(rand_seed)    
+    total_num_halos = match_halo_idxs.shape[0]
+    rng.shuffle(match_halo_idxs)
+    # split all indices into train and test groups
+    train_idxs, test_idxs = np.split(match_halo_idxs, [int((1-test_halos_ratio) * total_num_halos)])
+    # need to sort indices otherwise sparta.load breaks...
+    train_idxs = np.sort(train_idxs)
+    test_idxs = np.sort(test_idxs)
+
+    with open(save_location + "train_indices.pickle", "wb") as pickle_file:
+        pickle.dump(train_idxs, pickle_file)
+    with open(save_location + "test_indices.pickle", "wb") as pickle_file:
+        pickle.dump(test_idxs, pickle_file)
+        
     print(f"Total num halos: {total_num_halos:,}")
     print(f"Total num ptls: {tot_num_ptls:,}")
 
@@ -456,10 +486,10 @@ with timed("Startup"):
         "p_snap_info": p_snap_dict,
         "c_snap_info": c_snap_dict,
     }
-    if os.path.isfile(save_location + "all_particle_properties.hdf5"):
-        os.remove(save_location + "all_particle_properties.hdf5")
-    with h5py.File((save_location + "all_particle_properties.hdf5"), 'a') as all_ptl_props:
-        save_to_hdf5(all_ptl_props, "config", config_params, chunk=False, max_shape=1)
-
+    
+    with open((save_location + "config.pickle"), 'wb') as f:
+        pickle.dump(config_params,f)
+        
 with timed("Finished Calc"):   
-    halo_loop(indices=match_halo_idxs, tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
+    halo_loop(indices=train_idxs, dst_name="Train", tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
+    halo_loop(indices=test_idxs, dst_name="Test", tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
