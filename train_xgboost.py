@@ -56,6 +56,7 @@ frac_training_data = config.getfloat("XGBOOST","frac_train_data")
 # size float32 is 4 bytes
 chunk_size = int(np.floor(1e9 / (num_save_ptl_params * 4)))
 eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
+train_rad = config.getint("XGBOOST","training_rad")
 
 from utils.visualization_functions import *
 from utils.ML_support import *
@@ -137,7 +138,7 @@ def print_acc(model, X_train, y_train, X_test, y_test, mode_str="Default"):
     score = accuracy_score(y_pred, y_test.astype('float32'), convert_dtype=True)
     print("{} model accuracy: {}".format(mode_str, score))
 
-def reform_df(folder_path):
+def reform_df(folder_path,rad_cut=0):
     hdf5_files = []
     for f in os.listdir(folder_path):
         if f.endswith('.h5'):
@@ -147,6 +148,9 @@ def reform_df(folder_path):
     for file in hdf5_files:
         file_path = os.path.join(folder_path, file)
         df = pd.read_hdf(file_path)  
+        
+        if rad_cut != 0:
+            df = df[df['p_Scaled_radii'] <= rad_cut]
         dfs.append(df) 
     return pd.concat(dfs, ignore_index=True)
 
@@ -157,13 +161,13 @@ def calc_scal_pos_weight(df):
     scale_pos_weight = count_negatives / count_positives
     return scale_pos_weight
 
-def load_data(client, file_paths, ret_ddf = True, ret_df=False):
+def load_data(client, file_paths, rad_cut=0, ret_ddf = True, ret_df=False):
     dask_dfs = []
     dfs = []
     all_scal_pos_weight = []
     
     for file_path in file_paths:
-        df = reform_df(file_path)   
+        df = reform_df(file_path,rad_cut)   
         all_scal_pos_weight.append(calc_scal_pos_weight(df))
         scatter_df = client.scatter(df, broadcast=True)
         dask_df = dd.from_delayed(scatter_df)
@@ -257,7 +261,7 @@ if __name__ == "__main__":
             train_files.append(path_to_calc_info + sim + "/Train/ptl_info/")
             test_files.append(path_to_calc_info + sim + "/Test/ptl_info/")
 
-        train_data,scale_pos_weight = load_data(client,train_files,ret_ddf=True,ret_df=False)
+        train_data,scale_pos_weight = load_data(client,train_files,rad_cut=train_rad,ret_ddf=True,ret_df=False)
         test_data,test_scale_pos_weight = load_data(client,test_files,ret_ddf=True,ret_df=False)
         
         X_train = train_data[feature_columns]
