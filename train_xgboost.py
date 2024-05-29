@@ -1,5 +1,7 @@
 from dask import array as da
 from dask.distributed import Client
+import dask.dataframe as dd
+from dask_ml.model_selection import train_test_split
 
 import xgboost as xgb
 from xgboost import dask as dxgb
@@ -13,6 +15,7 @@ import matplotlib.pyplot as plt
 import h5py
 import json
 import re
+import pandas as pd
 
 from utils.data_and_loading_functions import create_directory, timed
 ##################################################################################################################
@@ -58,6 +61,17 @@ from utils.visualization_functions import *
 from utils.ML_support import *
 
 import subprocess
+
+def get_size(path):
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            # skip if it is symbolic link
+            if not os.path.islink(fp):
+                total_size += os.path.getsize(fp)
+
+    return total_size
 
 try:
     subprocess.check_output('nvidia-smi')
@@ -123,7 +137,55 @@ def print_acc(model, X_train, y_train, X_test, y_test, mode_str="Default"):
     score = accuracy_score(y_pred, y_test.astype('float32'), convert_dtype=True)
     print("{} model accuracy: {}".format(mode_str, score))
 
+def reform_df(folder_path):
+    hdf5_files = []
+    for f in os.listdir(folder_path):
+        if f.endswith('.h5'):
+            hdf5_files.append(f)
+
+    dfs = []
+    for file in hdf5_files:
+        file_path = os.path.join(folder_path, file)
+        df = pd.read_hdf(file_path)  
+        dfs.append(df) 
+    return pd.concat(dfs, ignore_index=True)
+
+def calc_scal_pos_weight(df):
+    count_negatives = (df['Orbit_infall'] == 0).sum()
+    count_positives = (df['Orbit_infall'] == 1).sum()
+
+    scale_pos_weight = count_negatives / count_positives
+    return scale_pos_weight
+
+def load_data(client, file_paths, ret_ddf = True, ret_df=False):
+    dask_dfs = []
+    dfs = []
+    all_scal_pos_weight = []
+    
+    for file_path in file_paths:
+        df = reform_df(file_path)   
+        all_scal_pos_weight.append(calc_scal_pos_weight(df))
+        scatter_df = client.scatter(df, broadcast=True)
+        dask_df = dd.from_delayed(scatter_df)
+        
+        dask_dfs.append(dask_df)
+        dfs.append(df)
+    
+    act_scale_pos_weight = np.average(np.array(all_scal_pos_weight))
+    if ret_ddf and not ret_df:
+        return dd.concat(dask_dfs),act_scale_pos_weight
+    elif not ret_ddf and ret_df:
+        return pd.concat(dfs),act_scale_pos_weight
+    else:
+        return dd.concat(dask_dfs), pd.concat(dfs),act_scale_pos_weight 
+
+def count_occurrences(partition, value):
+    return (partition == value).sum()
+
 if __name__ == "__main__":
+    feature_columns = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
+    target_column = ["Orbit_infall"]
+    
     if on_zaratan:
         if 'SLURM_CPUS_PER_TASK' in os.environ:
             cpus_per_task = int(os.environ['SLURM_CPUS_PER_TASK'])
@@ -142,8 +204,7 @@ if __name__ == "__main__":
         logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}")
     else:
         client = get_CUDA_cluster()
-        
-        
+             
     combined_name = ""
     for i,sim in enumerate(model_sims):
         pattern = r"(\d+)to(\d+)"
@@ -160,17 +221,10 @@ if __name__ == "__main__":
         
     model_name = model_type + "_" + combined_name
 
-    dataset_loc = path_to_xgboost + combined_name + "/datasets/"
     model_save_loc = path_to_xgboost + combined_name + "/" + model_name + "/"
-    
     gen_plot_save_loc = model_save_loc + "plots/"
     create_directory(model_save_loc)
     create_directory(gen_plot_save_loc)
-    
-    train_dataset_loc = dataset_loc + "train_dset.hdf5"
-    test_dataset_loc = dataset_loc + "test_dset.hdf5"
-    
-    keys_loc = dataset_loc + "keys.pickle"
      
     if os.path.isfile(model_save_loc + "model_info.pickle"):
         with open(model_save_loc + "model_info.pickle", "rb") as pickle_file:
@@ -188,36 +242,32 @@ if __name__ == "__main__":
                 'Max Radius': search_rad,
                 }}
     
-
+    # Load previously trained booster or start the training process
     if os.path.isfile(model_save_loc + model_name + ".json"):
         bst = xgb.Booster()
         bst.load_model(model_save_loc + model_name + ".json")
         params = model_info.get('Training Info',{}).get('Training Params')
         print("Loaded Booster")
     else:
-        print("Training Set:")
-        with h5py.File(train_dataset_loc, "r") as file:
-            train_X = file["Dataset"][:] 
-            train_y = file["Labels"][:]
-        with open(keys_loc, "rb") as file:
-            features = pickle.load(file)
-        features = features.tolist()
+        print("Making Datasets")
+        train_files = []
+        test_files = []
+        
+        for sim in model_sims:
+            train_files.append(path_to_calc_info + sim + "/Train/ptl_info/")
+            test_files.append(path_to_calc_info + sim + "/Test/ptl_info/")
 
-        dtrain,X_train,y_train,scale_pos_weight = create_dmatrix(client, train_X, train_y, features, chunk_size=chunk_size, frac_use_data=frac_training_data, calc_scale_pos_weight=True)
-        del train_X
-        del train_y
+        train_data,scale_pos_weight = load_data(client,train_files,ret_ddf=True,ret_df=False)
+        test_data,test_scale_pos_weight = load_data(client,test_files,ret_ddf=True,ret_df=False)
         
-        print("Testing set:")
-        with h5py.File(test_dataset_loc, "r") as file:
-            test_X = file["Dataset"][:] 
-            test_y = file["Labels"][:]
-        
-        dtest,X_test,y_test = create_dmatrix(client, test_X, test_y, features, chunk_size=chunk_size, frac_use_data=1, calc_scale_pos_weight=False)
-        del test_X
-        del test_y
-        
-        print("scale_pos_weight:", scale_pos_weight)
-        
+        X_train = train_data[feature_columns]
+        y_train = train_data[target_column]
+        X_test = test_data[feature_columns]
+        y_test = test_data[target_column]
+
+        dtrain = xgb.dask.DaskDMatrix(client, X_train, y_train)
+        dtest = xgb.dask.DaskDMatrix(client, X_test, y_test)
+
         if on_zaratan == False and do_hpo == True and os.path.isfile(model_save_loc + "used_params.pickle") == False:  
             params = {
             # Parameters that we are going to tune.
@@ -279,7 +329,6 @@ if __name__ == "__main__":
             params = {
                 "verbosity": 1,
                 "tree_method": "hist",
-                # Golden line for GPU training
                 "scale_pos_weight":scale_pos_weight,
                 "device": "cuda",
                 "subsample": 0.5,
@@ -313,12 +362,26 @@ if __name__ == "__main__":
         del dtrain
         del dtest
 
-    for dst_type in eval_datasets:
-        with timed(dst_type + " Plots"):
-            plot_loc = model_save_loc + dst_type + "_" + combined_name + "/plots/"
-            create_directory(model_save_loc + dst_type + "_" + combined_name)
-            create_directory(plot_loc)
-            eval_model(model_info, client, bst, use_sims=model_sims, dst_type=dst_type, dst_loc=dataset_loc, combined_name=combined_name, plot_save_loc=plot_loc, dens_prf = True, r_rv_tv = True, misclass=True)
+    
+    with timed("Model Evaluation"):
+        plot_loc = model_save_loc + "Test_" + combined_name + "/plots/"
+        create_directory(plot_loc)
+        
+        halo_files = []
+        test_files = []
+        halo_dfs = []
+        for sim in model_sims:
+            halo_files.append(path_to_calc_info + sim + "/Test/halo_info/")
+            test_files.append(path_to_calc_info + sim + "/Test/ptl_info/")
+        for file_path in halo_files:
+            halo_dfs.append(reform_df(file_path))
+        halo_df = pd.concat(halo_dfs)
+        
+        test_data,test_scale_pos_weight = load_data(client,test_files,ret_ddf=True,ret_df=False)
+        X_test = test_data[feature_columns]
+        y_test = test_data[target_column]
+
+        eval_model(model_info, client, bst, use_sims=model_sims, dst_type="Test", X=X_test, y=y_test, halo_ddf=halo_df, combined_name=combined_name, plot_save_loc=plot_loc, dens_prf = True, r_rv_tv = True, misclass=True)
    
     bst.save_model(model_save_loc + model_name + ".json")
 
