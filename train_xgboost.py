@@ -31,6 +31,8 @@ def parse_ranges(ranges_str):
         start, end = map(int, part.split('-'))
         ranges.append((start, end))
     return ranges
+def create_nu_string(nu_list):
+    return '_'.join('-'.join(map(str, tup)) for tup in nu_list)
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -72,6 +74,7 @@ eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
 train_rad = config.getint("XGBOOST","training_rad")
 nu_splits = config["XGBOOST"]["nu_splits"]
 nu_splits = parse_ranges(nu_splits)
+nu_string = create_nu_string(nu_splits)
 
 try:
     subprocess.check_output('nvidia-smi')
@@ -204,7 +207,7 @@ def split_by_nu(df,nus,halo_first,halo_n):
 
     return df.iloc[use_idxs]
 
-def load_data(client, dset_name, rad_cut=search_rad, ret_ddf = True, ret_df=False):
+def load_data(client, dset_name, rad_cut=search_rad, filter_nu = False, ret_ddf = True, ret_df=False):
     dask_dfs = []
     dfs = []
     all_scal_pos_weight = []
@@ -231,7 +234,8 @@ def load_data(client, dset_name, rad_cut=search_rad, ret_ddf = True, ret_df=Fals
         nus = np.array(peaks.peakHeight((curr_halo_df["Halo_n"][:]*ptl_mass), use_z))
         
         df = reform_df(ptl_files_loc)   
-        df = split_by_nu(df,nus,curr_halo_df["Halo_first"],curr_halo_df["Halo_n"])
+        if filter_nu:
+            df = split_by_nu(df,nus,curr_halo_df["Halo_first"],curr_halo_df["Halo_n"])
         df = cut_by_rad(df, rad_cut=rad_cut)
 
         all_scal_pos_weight.append(calc_scal_pos_weight(df))
@@ -287,7 +291,7 @@ if __name__ == "__main__":
         if i != len(model_sims)-1:
             combined_name += "_"
         
-    model_name = model_type + "_" + combined_name
+    model_name = model_type + "_" + combined_name + "nu" + nu_string
 
     model_save_loc = path_to_xgboost + combined_name + "/" + model_name + "/"
     gen_plot_save_loc = model_save_loc + "plots/"
@@ -308,6 +312,7 @@ if __name__ == "__main__":
             'Misc Info':{
                 'Model trained on': train_sims,
                 'Max Radius': search_rad,
+                'Nus Used': nu_string,
                 }}
     
     # Load previously trained booster or start the training process
@@ -323,7 +328,7 @@ if __name__ == "__main__":
         halo_train_files = []
         train_nus = []
  
-        train_data,scale_pos_weight = load_data(client,"Train",rad_cut=train_rad,ret_ddf=True,ret_df=False)
+        train_data,scale_pos_weight = load_data(client,"Train",rad_cut=train_rad,filter_nu=True,ret_ddf=True,ret_df=False)
         test_data,test_scale_pos_weight = load_data(client,"Test",ret_ddf=True,ret_df=False)
         
         X_train = train_data[feature_columns]
