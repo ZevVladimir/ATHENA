@@ -201,13 +201,13 @@ def halo_loop(indices, dst_name, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p
         
             # We need to correct for having previous halos being searched so the final halo_first quantity is for all halos
             # First obtain the halo_first values for this batch and then adjust to where the hdf5 file currently is
-            p_start_num_ptls = [np.sum(p_use_num_ptls[0:i+1]) for i in range(p_use_num_ptls.shape[0])]
+            p_start_num_ptls = np.cumsum(p_use_num_ptls)
             p_start_num_ptls = np.insert(p_start_num_ptls, 0, 0)
             p_start_num_ptls = np.delete(p_start_num_ptls, -1)
             p_start_num_ptls += hdf5_ptl_idx # scale to where we are in the hdf5 file
             
             p_tot_num_use_ptls = int(np.sum(p_use_num_ptls))
-
+    
             halo_first = sparta_output['halos']['ptl_oct_first'][:]
             halo_n = sparta_output['halos']['ptl_oct_n'][:]
             
@@ -443,8 +443,8 @@ with timed("Startup"):
             # halo position, halo r200m, if comparison snap, want mass?, want indices?
             num_ptls = p.starmap(initial_search, zip(p_halos_pos[match_halo_idxs], p_halos_r200m[match_halo_idxs], repeat(False), repeat(False), repeat(False)), chunksize=curr_chunk_size)
             # We want to remove any halos that have less than 200 particles as they are too noisy
-      
-            res_mask = np.where(np.array(num_ptls) <= 200)[0]
+            num_ptls = np.array(num_ptls)
+            res_mask = np.where(num_ptls >= 200)[0]
             
             if res_mask.size > 0:
                 num_ptls = num_ptls[res_mask]

@@ -1,7 +1,6 @@
 from dask import array as da
 from dask.distributed import Client
 import dask.dataframe as dd
-from dask_ml.model_selection import train_test_split
 
 import xgboost as xgb
 from xgboost import dask as dxgb
@@ -16,8 +15,23 @@ import h5py
 import json
 import re
 import pandas as pd
+from colossus.lss import peaks
+from colossus.cosmology import cosmology
+cosmol = cosmology.setCosmology("bolshoi")
+
+import subprocess
 
 from utils.data_and_loading_functions import create_directory, timed
+from utils.visualization_functions import *
+from utils.ML_support import *
+
+def parse_ranges(ranges_str):
+    ranges = []
+    for part in ranges_str.split(','):
+        start, end = map(int, part.split('-'))
+        ranges.append((start, end))
+    return ranges
+
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
@@ -49,7 +63,6 @@ search_rad = config.getfloat("SEARCH","search_rad")
 total_num_snaps = config.getint("SEARCH","total_num_snaps")
 test_halos_ratio = config.getfloat("DATASET","test_halos_ratio")
 curr_chunk_size = config.getint("SEARCH","chunk_size")
-global num_save_ptl_params
 num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 do_hpo = config.getboolean("XGBOOST","hpo")
 frac_training_data = config.getfloat("XGBOOST","frac_train_data")
@@ -57,22 +70,8 @@ frac_training_data = config.getfloat("XGBOOST","frac_train_data")
 chunk_size = int(np.floor(1e9 / (num_save_ptl_params * 4)))
 eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
 train_rad = config.getint("XGBOOST","training_rad")
-
-from utils.visualization_functions import *
-from utils.ML_support import *
-
-import subprocess
-
-def get_size(path):
-    total_size = 0
-    for dirpath, dirnames, filenames in os.walk(path):
-        for f in filenames:
-            fp = os.path.join(dirpath, f)
-            # skip if it is symbolic link
-            if not os.path.islink(fp):
-                total_size += os.path.getsize(fp)
-
-    return total_size
+nu_splits = config["XGBOOST"]["nu_splits"]
+nu_splits = parse_ranges(nu_splits)
 
 try:
     subprocess.check_output('nvidia-smi')
@@ -97,6 +96,36 @@ sys.path.insert(0, path_to_sparta)
 from pygadgetreader import readsnap, readheader # type: ignore
 from sparta_tools import sparta # type: ignore
 
+def split_calc_name(sim):
+    sim_pat = r"cbol_l(\d+)_n(\d+)"
+    match = re.search(sim_pat, sim)
+    if match:
+        sparta_name = match.group(0)
+    sim_search_pat = sim_pat + r"_(\d+)r200m"
+    match = re.search(sim_search_pat, sim)
+    if match:
+        search_name = match.group(0)
+    
+    return sparta_name, search_name
+
+def transform_string(input_str):
+    # Define the regex pattern to match the string parts
+    pattern = r"_([\d]+)to([\d]+)"
+    
+    # Search for the pattern in the input string
+    match = re.search(pattern, input_str)
+    
+    if not match:
+        raise ValueError("Input string:",input_str, "does not match the expected format.")
+
+    # Extract the parts of the string
+    prefix = input_str[:match.start()]
+    first_number = match.group(1)
+    
+    # Construct the new string
+    new_string = f"{first_number}_{prefix}"
+    
+    return new_string
 
 def get_CUDA_cluster():
     cluster = LocalCUDACluster(
@@ -138,19 +167,20 @@ def print_acc(model, X_train, y_train, X_test, y_test, mode_str="Default"):
     score = accuracy_score(y_pred, y_test.astype('float32'), convert_dtype=True)
     print("{} model accuracy: {}".format(mode_str, score))
 
-def reform_df(folder_path,rad_cut=0):
+def cut_by_rad(df, rad_cut):
+    return df[df['p_Scaled_radii'] <= rad_cut]
+
+def reform_df(folder_path):
     hdf5_files = []
     for f in os.listdir(folder_path):
         if f.endswith('.h5'):
             hdf5_files.append(f)
+    hdf5_files.sort()
 
     dfs = []
     for file in hdf5_files:
         file_path = os.path.join(folder_path, file)
         df = pd.read_hdf(file_path)  
-        
-        if rad_cut != 0:
-            df = df[df['p_Scaled_radii'] <= rad_cut]
         dfs.append(df) 
     return pd.concat(dfs, ignore_index=True)
 
@@ -161,14 +191,51 @@ def calc_scal_pos_weight(df):
     scale_pos_weight = count_negatives / count_positives
     return scale_pos_weight
 
-def load_data(client, file_paths, rad_cut=0, ret_ddf = True, ret_df=False):
+def split_by_nu(df,nus,halo_first,halo_n):    
+    mask = pd.Series([False] * nus.shape[0])
+    for start, end in nu_splits:
+        mask[np.where((nus >= start) & (nus <= end))[0]] = True
+    
+    halo_n = halo_n[mask]
+    halo_first = halo_first[mask]
+    halo_last = halo_first + halo_n
+
+    use_idxs = np.concatenate([np.arange(start, end) for start, end in zip(halo_first, halo_last)])
+
+    return df.iloc[use_idxs]
+
+def load_data(client, dset_name, rad_cut=search_rad, ret_ddf = True, ret_df=False):
     dask_dfs = []
     dfs = []
     all_scal_pos_weight = []
     
-    for file_path in file_paths:
-        df = reform_df(file_path,rad_cut)   
+    for sim in model_sims:
+        ptl_files_loc = path_to_calc_info + sim + "/" + dset_name + "/ptl_info/"
+        curr_halo_df = reform_df(path_to_calc_info + sim + "/" + dset_name + "/halo_info/") 
+
+        sparta_name, sparta_search_name = split_calc_name(sim)
+            
+        with h5py.File(path_to_SPARTA_data + sparta_name + "/" +  sparta_search_name + ".hdf5","r") as f:
+            dic_sim = {}
+            grp_sim = f['simulation']
+            for f in grp_sim.attrs:
+                dic_sim[f] = grp_sim.attrs[f]
+        
+        all_red_shifts = dic_sim['snap_z']
+        p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
+        use_z = all_red_shifts[p_sparta_snap]
+        p_snap_loc = transform_string(sim)
+        with open(path_to_pickle + p_snap_loc + "/ptl_mass.pickle", "rb") as pickle_file:
+            ptl_mass = pickle.load(pickle_file)
+        
+        nus = np.array(peaks.peakHeight((curr_halo_df["Halo_n"][:]*ptl_mass), use_z))
+        
+        df = reform_df(ptl_files_loc)   
+        df = split_by_nu(df,nus,curr_halo_df["Halo_first"],curr_halo_df["Halo_n"])
+        df = cut_by_rad(df, rad_cut=rad_cut)
+
         all_scal_pos_weight.append(calc_scal_pos_weight(df))
+        
         scatter_df = client.scatter(df, broadcast=True)
         dask_df = dd.from_delayed(scatter_df)
         
@@ -181,10 +248,7 @@ def load_data(client, file_paths, rad_cut=0, ret_ddf = True, ret_df=False):
     elif not ret_ddf and ret_df:
         return pd.concat(dfs),act_scale_pos_weight
     else:
-        return dd.concat(dask_dfs), pd.concat(dfs),act_scale_pos_weight 
-
-def count_occurrences(partition, value):
-    return (partition == value).sum()
+        return dd.concat(dask_dfs), pd.concat(dfs), act_scale_pos_weight 
 
 if __name__ == "__main__":
     feature_columns = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
@@ -256,13 +320,11 @@ if __name__ == "__main__":
         print("Making Datasets")
         train_files = []
         test_files = []
-        
-        for sim in model_sims:
-            train_files.append(path_to_calc_info + sim + "/Train/ptl_info/")
-            test_files.append(path_to_calc_info + sim + "/Test/ptl_info/")
-
-        train_data,scale_pos_weight = load_data(client,train_files,rad_cut=train_rad,ret_ddf=True,ret_df=False)
-        test_data,test_scale_pos_weight = load_data(client,test_files,ret_ddf=True,ret_df=False)
+        halo_train_files = []
+        train_nus = []
+ 
+        train_data,scale_pos_weight = load_data(client,"Train",rad_cut=train_rad,ret_ddf=True,ret_df=False)
+        test_data,test_scale_pos_weight = load_data(client,"Test",ret_ddf=True,ret_df=False)
         
         X_train = train_data[feature_columns]
         y_train = train_data[target_column]
@@ -365,26 +427,23 @@ if __name__ == "__main__":
     
         del dtrain
         del dtest
-
     
     with timed("Model Evaluation"):
         plot_loc = model_save_loc + "Test_" + combined_name + "/plots/"
         create_directory(plot_loc)
         
         halo_files = []
-        test_files = []
+
         halo_dfs = []
         for sim in model_sims:
-            halo_files.append(path_to_calc_info + sim + "/Test/halo_info/")
-            test_files.append(path_to_calc_info + sim + "/Test/ptl_info/")
-        for file_path in halo_files:
-            halo_dfs.append(reform_df(file_path))
+            halo_dfs.append(reform_df(path_to_calc_info + sim + "/Test/halo_info/"))
+
         halo_df = pd.concat(halo_dfs)
         
-        test_data,test_scale_pos_weight = load_data(client,test_files,ret_ddf=True,ret_df=False)
+        test_data,test_scale_pos_weight = load_data(client,"Test",ret_ddf=True,ret_df=False)
         X_test = test_data[feature_columns]
         y_test = test_data[target_column]
-
+        
         eval_model(model_info, client, bst, use_sims=model_sims, dst_type="Test", X=X_test, y=y_test, halo_ddf=halo_df, combined_name=combined_name, plot_save_loc=plot_loc, dens_prf = True, r_rv_tv = True, misclass=True)
    
     bst.save_model(model_save_loc + model_name + ".json")
@@ -398,7 +457,6 @@ if __name__ == "__main__":
     ax.barh(pos,values)
     ax.set_yticks(pos, keys)
     fig.savefig(gen_plot_save_loc + "feature_importance.png")
-
 
     with open(model_save_loc + "model_info.pickle", "wb") as pickle_file:
         pickle.dump(model_info, pickle_file) 
