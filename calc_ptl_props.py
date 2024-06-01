@@ -12,6 +12,7 @@ from itertools import repeat
 import sys
 import re
 import pandas as pd
+import shutil
 
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed
 from utils.calculation_functions import *
@@ -50,6 +51,7 @@ per_n_halo_per_split = config.getfloat("SEARCH","per_n_halo_per_split")
 num_processes = mp.cpu_count()
 curr_chunk_size = config.getint("SEARCH","chunk_size")
 test_halos_ratio = config.getfloat("DATASET","test_halos_ratio")
+mem_size = config.getfloat("SEARCH","hdf5_mem_size")
 ##################################################################################################################
 sys.path.insert(1, path_to_pygadgetreader)
 sys.path.insert(1, path_to_sparta)
@@ -57,6 +59,36 @@ from pygadgetreader import readsnap, readheader # type: ignore
 from sparta_tools import sparta # type: ignore
 ##################################################################################################################
 
+def calc_halo_mem(n_ptl):
+    # rad, rad_vel, tang_vel each 4bytes and two snaps
+    # orbit/infall is one byte
+    # HIPIDS is 8 bytes
+    n_bytes = (6 * 4 + 1 + 8) * n_ptl
+    
+    return n_bytes
+
+def det_halo_splits(mem_arr, mem_lim):
+    split_idxs = []
+    split_idxs.append(0)
+    curr_size = 0 
+    
+    for i,mem in enumerate(mem_arr):
+        curr_size += mem
+        if curr_size > mem_lim:
+            split_idxs.append(i) 
+            curr_size = mem
+    return split_idxs
+            
+def clean_dir(path):
+    try:
+        files = os.listdir(path)
+        for file in files:
+            file_path = os.path.join(path, file)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+    except OSError:
+        print("Error occurred while deleting files.")
+            
 def initial_search(halo_positions, halo_r200m, comp_snap, find_mass = False, find_ptl_indices = False):
     global search_rad
     if comp_snap:
@@ -155,9 +187,11 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     else:
         return fnd_HIPIDs, scaled_rad_vel, scaled_tang_vel, scaled_radii
 
-def halo_loop(indices, dst_name, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos, p_ptls_vel, c_dict, c_ptls_pid, c_ptls_pos, c_ptls_vel):
-    num_iter = int(np.ceil(indices.shape[0] / num_halo_per_split))
-    print("Num halo per", num_iter, "splits:", num_halo_per_split)
+def halo_loop(indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos, p_ptls_vel, c_dict, c_ptls_pid, c_ptls_pos, c_ptls_vel):
+    num_iter = len(halo_splits)
+    prnt_halo_splits = halo_splits
+    prnt_halo_splits.append(indices.size)
+    print("Num halos in each split:", ", ".join(map(str, np.diff(prnt_halo_splits))) + ".", num_iter, "splits")
     hdf5_ptl_idx = 0
     hdf5_halo_idx = 0
     
@@ -165,9 +199,9 @@ def halo_loop(indices, dst_name, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p
         with timed("Split "+str(i+1)+"/"+str(num_iter)):
             # Get the indices corresponding to where we are in the number of iterations (0:num_halo_persplit) -> (num_halo_persplit:2*num_halo_persplit) etc
             if i < (num_iter - 1):
-                use_indices = indices[i * num_halo_per_split: (i+1) * num_halo_per_split]
+                use_indices = indices[halo_splits[i]:halo_splits[i+1]]
             else:
-                use_indices = indices[i * num_halo_per_split:]
+                use_indices = indices[halo_splits[i]:]
             
             curr_num_halos = use_indices.shape[0]
             use_halo_ids = p_halo_ids[use_indices]
@@ -341,6 +375,9 @@ def halo_loop(indices, dst_name, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p
             
             create_directory(save_location + dst_name + "/halo_info/")
             create_directory(save_location + dst_name + "/ptl_info/")
+            if i == 0:
+                clean_dir(save_location + dst_name + "/halo_info/")
+                clean_dir(save_location + dst_name + "/ptl_info/")
             halo_df.to_hdf(save_location + dst_name + "/halo_info/halo_" + str(i) + ".h5", key='data', mode='w',format='table')  
             ptl_df.to_hdf(save_location +  dst_name + "/ptl_info/ptl_" + str(i) + ".h5", key='data', mode='w',format='table')  
 
@@ -435,9 +472,9 @@ with timed("Startup"):
         match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap) & (c_halos_status > 0) & (c_halos_last_snap >= c_sparta_snap))[0]
         
 
-    if os.path.isfile(save_location + "tot_num_ptls.pickle"):
-        with open(save_location + "tot_num_ptls.pickle", "rb") as pickle_file:
-            tot_num_ptls = pickle.load(pickle_file)
+    if os.path.isfile(save_location + "num_ptls.pickle"):
+        with open(save_location + "num_ptls.pickle", "rb") as pickle_file:
+            num_ptls = pickle.load(pickle_file)
     else:
         with mp.Pool(processes=num_processes) as p:
             # halo position, halo r200m, if comparison snap, want mass?, want indices?
@@ -449,23 +486,29 @@ with timed("Startup"):
             if res_mask.size > 0:
                 num_ptls = num_ptls[res_mask]
                 match_halo_idxs = match_halo_idxs[res_mask]
-            tot_num_ptls = np.sum(num_ptls)
-            with open(save_location + "tot_num_ptls.pickle", "wb") as pickle_file:
-                pickle.dump(tot_num_ptls, pickle_file)
+            
+            with open(save_location + "num_ptls.pickle", "wb") as pickle_file:
+                pickle.dump(num_ptls, pickle_file)
         p.close()
         p.join() 
-
+    tot_num_ptls = np.sum(num_ptls)
+    halo_mem = calc_halo_mem(num_ptls)
+    
     total_num_halos = match_halo_idxs.shape[0]
-    num_halo_per_split = int(np.ceil(per_n_halo_per_split * total_num_halos))
+    
     rng = np.random.default_rng(rand_seed)    
     total_num_halos = match_halo_idxs.shape[0]
     rng.shuffle(match_halo_idxs)
     # split all indices into train and test groups
     train_idxs, test_idxs = np.split(match_halo_idxs, [int((1-test_halos_ratio) * total_num_halos)])
+    train_halo_mem, test_halo_mem = np.split(halo_mem, [int((1-test_halos_ratio) * total_num_halos)])
     # need to sort indices otherwise sparta.load breaks...
     train_idxs = np.sort(train_idxs)
     test_idxs = np.sort(test_idxs)
 
+    train_halo_splits = det_halo_splits(train_halo_mem, mem_size)
+    test_halo_splits = det_halo_splits(test_halo_mem, mem_size)
+    
     with open(save_location + "train_indices.pickle", "wb") as pickle_file:
         pickle.dump(train_idxs, pickle_file)
     with open(save_location + "test_indices.pickle", "wb") as pickle_file:
@@ -491,5 +534,5 @@ with timed("Startup"):
         pickle.dump(config_params,f)
         
 with timed("Finished Calc"):   
-    halo_loop(indices=train_idxs, dst_name="Train", tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
-    halo_loop(indices=test_idxs, dst_name="Test", tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
+    halo_loop(indices=train_idxs, halo_splits=train_halo_splits, dst_name="Train", tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
+    halo_loop(indices=test_idxs, halo_splits=test_halo_splits, dst_name="Test", tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
