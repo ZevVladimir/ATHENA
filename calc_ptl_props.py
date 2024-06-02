@@ -38,6 +38,7 @@ path_to_sparta = config["PATHS"]["path_to_sparta"]
 create_directory(path_to_pickle)
 create_directory(path_to_calc_info)
 snap_format = config["MISC"]["snap_format"]
+reset_lvl = config.getint("SEARCH","reset")
 global prim_only
 prim_only = config.getboolean("SEARCH","prim_only")
 t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
@@ -58,6 +59,19 @@ sys.path.insert(1, path_to_sparta)
 from pygadgetreader import readsnap, readheader # type: ignore
 from sparta_tools import sparta # type: ignore
 ##################################################################################################################
+
+def find_start_pnt(directory):
+    max_number = 0
+    number_pattern = re.compile(r'(\d+)')
+    
+    for filename in os.listdir(directory):
+        match = number_pattern.search(filename)
+        if match:
+            number = int(match.group(1)) + 1
+            if number > max_number:
+                max_number = number
+                
+    return max_number
 
 def calc_halo_mem(n_ptl):
     # rad, rad_vel, tang_vel each 4bytes and two snaps
@@ -187,7 +201,7 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     else:
         return fnd_HIPIDs, scaled_rad_vel, scaled_tang_vel, scaled_radii
 
-def halo_loop(indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos, p_ptls_vel, c_dict, c_ptls_pid, c_ptls_pos, c_ptls_vel):
+def halo_loop(rst_pnt, indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos, p_ptls_vel, c_dict, c_ptls_pid, c_ptls_pos, c_ptls_vel):
     num_iter = len(halo_splits)
     prnt_halo_splits = halo_splits
     prnt_halo_splits.append(indices.size)
@@ -373,13 +387,8 @@ def halo_loop(indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids, p_dict, 
                 "c_Tangential_vel":save_tang_vel[:,1],
                 })
             
-            create_directory(save_location + dst_name + "/halo_info/")
-            create_directory(save_location + dst_name + "/ptl_info/")
-            if i == 0:
-                clean_dir(save_location + dst_name + "/halo_info/")
-                clean_dir(save_location + dst_name + "/ptl_info/")
-            halo_df.to_hdf(save_location + dst_name + "/halo_info/halo_" + str(i) + ".h5", key='data', mode='w',format='table')  
-            ptl_df.to_hdf(save_location +  dst_name + "/ptl_info/ptl_" + str(i) + ".h5", key='data', mode='w',format='table')  
+            halo_df.to_hdf(save_location + dst_name + "/halo_info/halo_" + str(i+rst_pnt) + ".h5", key='data', mode='w',format='table')  
+            ptl_df.to_hdf(save_location +  dst_name + "/ptl_info/ptl_" + str(i+rst_pnt) + ".h5", key='data', mode='w',format='table')  
 
             hdf5_ptl_idx += p_tot_num_use_ptls
             hdf5_halo_idx += p_start_num_ptls.shape[0]
@@ -517,6 +526,7 @@ with timed("Startup"):
     print(f"Total num halos: {total_num_halos:,}")
     print(f"Total num ptls: {tot_num_ptls:,}")
 
+    #TODO add functionality to check if all the params are the same and then restart (and throw warning)
     config_params = {
         "sparta_file": curr_sparta_file,
         "snap_format": snap_format,
@@ -526,6 +536,7 @@ with timed("Startup"):
         "total_num_snaps": total_num_snaps,
         "per_n_halo_per_split": per_n_halo_per_split,
         "chunk_size": curr_chunk_size,
+        "HDF5 Mem Size": mem_size,
         "p_snap_info": p_snap_dict,
         "c_snap_info": c_snap_dict,
     }
@@ -533,6 +544,21 @@ with timed("Startup"):
     with open((save_location + "config.pickle"), 'wb') as f:
         pickle.dump(config_params,f)
         
+    create_directory(save_location + "Train/halo_info/")
+    create_directory(save_location + "Train/ptl_info/")
+    create_directory(save_location + "Test/halo_info/")
+    create_directory(save_location + "Test/ptl_info/")
+    if reset_lvl > 0: # At any level of reset we delete the calculated info for particles
+        clean_dir(save_location + "Train/halo_info/")
+        clean_dir(save_location + "Train/ptl_info/")
+        clean_dir(save_location + "Test/halo_info/")
+        clean_dir(save_location + "Test/ptl_info/")
+    else: #Otherwise check to see where we were and then continue teh calculations from there.
+        train_start_pnt = find_start_pnt(save_location + "Train/ptl_info/")
+        test_start_pnt = find_start_pnt(save_location + "Test/ptl_info/")
+        train_halo_splits = train_halo_splits[train_start_pnt:]
+        test_halo_splits = test_halo_splits[test_start_pnt:]
+        
 with timed("Finished Calc"):   
-    halo_loop(indices=train_idxs, halo_splits=train_halo_splits, dst_name="Train", tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
-    halo_loop(indices=test_idxs, halo_splits=test_halo_splits, dst_name="Test", tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
+    halo_loop(rst_pnt=train_start_pnt,indices=train_idxs, halo_splits=train_halo_splits, dst_name="Train", tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
+    halo_loop(rst_pnt=test_start_pnt,indices=test_idxs, halo_splits=test_halo_splits, dst_name="Test", tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
