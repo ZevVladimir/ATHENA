@@ -173,27 +173,6 @@ def print_acc(model, X_train, y_train, X_test, y_test, mode_str="Default"):
 def cut_by_rad(df, rad_cut):
     return df[df['p_Scaled_radii'] <= rad_cut]
 
-def reform_df(folder_path):
-    hdf5_files = []
-    for f in os.listdir(folder_path):
-        if f.endswith('.h5'):
-            hdf5_files.append(f)
-    hdf5_files.sort()
-
-    dfs = []
-    for file in hdf5_files:
-        file_path = os.path.join(folder_path, file)
-        df = pd.read_hdf(file_path)  
-        dfs.append(df) 
-    return pd.concat(dfs, ignore_index=True)
-
-def calc_scal_pos_weight(df):
-    count_negatives = (df['Orbit_infall'] == 0).sum()
-    count_positives = (df['Orbit_infall'] == 1).sum()
-
-    scale_pos_weight = count_negatives / count_positives
-    return scale_pos_weight
-
 def split_by_nu(df,nus,halo_first,halo_n):    
     mask = pd.Series([False] * nus.shape[0])
     for start, end in nu_splits:
@@ -207,53 +186,99 @@ def split_by_nu(df,nus,halo_first,halo_n):
 
     return df.iloc[use_idxs]
 
-def load_data(client, dset_name, rad_cut=search_rad, filter_nu = False, ret_ddf = True, ret_df=False):
-    dask_dfs = []
+def reform_df(folder_path):
+    hdf5_files = []
+    for f in os.listdir(folder_path):
+        if f.endswith('.h5'):
+            hdf5_files.append(f)
+    hdf5_files.sort()
+
     dfs = []
+    for file in hdf5_files:
+        file_path = os.path.join(folder_path, file)
+        df = pd.read_hdf(file_path) 
+        dfs.append(df) 
+    return pd.concat(dfs, ignore_index=True)
+
+def sort_files(folder_path):
+    hdf5_files = []
+    for f in os.listdir(folder_path):
+        if f.endswith('.h5'):
+            hdf5_files.append(f)
+    hdf5_files.sort()
+    return hdf5_files
+    
+def sim_info_for_nus(sim):
+    sparta_name, sparta_search_name = split_calc_name(sim)
+            
+    with h5py.File(path_to_SPARTA_data + sparta_name + "/" +  sparta_search_name + ".hdf5","r") as f:
+        dic_sim = {}
+        grp_sim = f['simulation']
+        for f in grp_sim.attrs:
+            dic_sim[f] = grp_sim.attrs[f]
+    
+    all_red_shifts = dic_sim['snap_z']
+    p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
+    use_z = all_red_shifts[p_sparta_snap]
+    p_snap_loc = transform_string(sim)
+    with open(path_to_pickle + p_snap_loc + "/ptl_mass.pickle", "rb") as pickle_file:
+        ptl_mass = pickle.load(pickle_file)
+    
+    return ptl_mass, use_z
+
+
+def reform_datasets(client,sim,folder_path,rad_cut=None,filter_nu=None):
+    ptl_files = sort_files(folder_path+"/ptl_info/")
+
+    ddfs = []
+    halo_dfs = []
+    sim_scal_pos_weight = []
+    for i in range(len(ptl_files)):
+        ptl_path = folder_path + "/ptl_info/ptl_"+str(i)+".h5"
+        halo_path = folder_path + "/halo_info/halo_"+str(i)+".h5"
+        
+        ptl_df = pd.read_hdf(ptl_path)  
+        halo_df = pd.read_hdf(halo_path)
+        
+        ptl_mass, use_z = sim_info_for_nus(sim)
+        nus = np.array(peaks.peakHeight((halo_df["Halo_n"][:]*ptl_mass), use_z))    
+        
+        if filter_nu:
+            ptl_df = split_by_nu(ptl_df,nus,halo_df["Halo_first"],halo_df["Halo_n"])
+        ptl_df = cut_by_rad(ptl_df, rad_cut=rad_cut)
+            
+        sim_scal_pos_weight.append(calc_scal_pos_weight(ptl_df))
+        scatter_df = client.scatter(ptl_df, broadcast=True)
+        dask_df = dd.from_delayed(scatter_df)
+        ddfs.append(dask_df)
+        halo_dfs.append(halo_df)
+         
+    return dd.concat(ddfs, axis=0), pd.concat(halo_dfs, ignore_index=True), sim_scal_pos_weight
+
+def calc_scal_pos_weight(df):
+    count_negatives = (df['Orbit_infall'] == 0).sum()
+    count_positives = (df['Orbit_infall'] == 1).sum()
+
+    scale_pos_weight = count_negatives / count_positives
+    return scale_pos_weight
+
+def load_data(client, dset_name, rad_cut=search_rad, filter_nu=False):
+    dask_dfs = []
     all_scal_pos_weight = []
     
     for sim in model_sims:
-        ptl_files_loc = path_to_calc_info + sim + "/" + dset_name + "/ptl_info/"
-        curr_halo_df = reform_df(path_to_calc_info + sim + "/" + dset_name + "/halo_info/") 
+        files_loc = path_to_calc_info + sim + "/" + dset_name
 
-        sparta_name, sparta_search_name = split_calc_name(sim)
-            
-        with h5py.File(path_to_SPARTA_data + sparta_name + "/" +  sparta_search_name + ".hdf5","r") as f:
-            dic_sim = {}
-            grp_sim = f['simulation']
-            for f in grp_sim.attrs:
-                dic_sim[f] = grp_sim.attrs[f]
-        
-        all_red_shifts = dic_sim['snap_z']
-        p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
-        use_z = all_red_shifts[p_sparta_snap]
-        p_snap_loc = transform_string(sim)
-        with open(path_to_pickle + p_snap_loc + "/ptl_mass.pickle", "rb") as pickle_file:
-            ptl_mass = pickle.load(pickle_file)
-        
-        nus = np.array(peaks.peakHeight((curr_halo_df["Halo_n"][:]*ptl_mass), use_z))
-        
-        df = reform_df(ptl_files_loc)   
-        if filter_nu:
-            df = split_by_nu(df,nus,curr_halo_df["Halo_first"],curr_halo_df["Halo_n"])
-        df = cut_by_rad(df, rad_cut=rad_cut)
+        ptl_ddf,halo_df,sim_scal_pos_weight = reform_datasets(client,sim,files_loc,rad_cut=rad_cut,filter_nu=filter_nu)   
 
-        all_scal_pos_weight.append(calc_scal_pos_weight(df))
+        all_scal_pos_weight.append(sim_scal_pos_weight)
         
-        scatter_df = client.scatter(df, broadcast=True)
-        dask_df = dd.from_delayed(scatter_df)
-        
-        dask_dfs.append(dask_df)
-        dfs.append(df)
+        dask_dfs.append(ptl_ddf)
     
     act_scale_pos_weight = np.average(np.array(all_scal_pos_weight))
-    if ret_ddf and not ret_df:
-        return dd.concat(dask_dfs),act_scale_pos_weight
-    elif not ret_ddf and ret_df:
-        return pd.concat(dfs),act_scale_pos_weight
-    else:
-        return dd.concat(dask_dfs), pd.concat(dfs), act_scale_pos_weight 
-
+    
+    return dd.concat(dask_dfs),act_scale_pos_weight
+    
 if __name__ == "__main__":
     feature_columns = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
     target_column = ["Orbit_infall"]
@@ -328,8 +353,8 @@ if __name__ == "__main__":
         halo_train_files = []
         train_nus = []
  
-        train_data,scale_pos_weight = load_data(client,"Train",rad_cut=train_rad,filter_nu=True,ret_ddf=True,ret_df=False)
-        test_data,test_scale_pos_weight = load_data(client,"Test",ret_ddf=True,ret_df=False)
+        train_data,scale_pos_weight = load_data(client,"Train",rad_cut=train_rad,filter_nu=True)
+        test_data,test_scale_pos_weight = load_data(client,"Test")
         
         X_train = train_data[feature_columns]
         y_train = train_data[target_column]
@@ -445,7 +470,7 @@ if __name__ == "__main__":
 
         halo_df = pd.concat(halo_dfs)
         
-        test_data,test_scale_pos_weight = load_data(client,"Test",ret_ddf=True,ret_df=False)
+        test_data,test_scale_pos_weight = load_data(client,"Test")
         X_test = test_data[feature_columns]
         y_test = test_data[target_column]
         

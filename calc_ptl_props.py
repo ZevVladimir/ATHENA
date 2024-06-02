@@ -526,7 +526,7 @@ with timed("Startup"):
     print(f"Total num halos: {total_num_halos:,}")
     print(f"Total num ptls: {tot_num_ptls:,}")
 
-    #TODO add functionality to check if all the params are the same and then restart (and throw warning)
+    #TODO add functionality to check if all the params are the same and then restart (and throw warning) or maybe just reload them if restart=0
     config_params = {
         "sparta_file": curr_sparta_file,
         "snap_format": snap_format,
@@ -540,7 +540,7 @@ with timed("Startup"):
         "p_snap_info": p_snap_dict,
         "c_snap_info": c_snap_dict,
     }
-    
+
     with open((save_location + "config.pickle"), 'wb') as f:
         pickle.dump(config_params,f)
         
