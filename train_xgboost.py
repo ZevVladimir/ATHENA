@@ -1,6 +1,7 @@
 from dask import array as da
 from dask.distributed import Client
 import dask.dataframe as dd
+from dask import delayed
 
 import xgboost as xgb
 from xgboost import dask as dxgb
@@ -228,32 +229,49 @@ def sim_info_for_nus(sim):
 
 
 def reform_datasets(client,sim,folder_path,rad_cut=None,filter_nu=None):
-    ptl_files = sort_files(folder_path+"/ptl_info/")
-
-    ddfs = []
-    halo_dfs = []
-    sim_scal_pos_weight = []
-    for i in range(len(ptl_files)):
-        ptl_path = folder_path + "/ptl_info/ptl_"+str(i)+".h5"
-        halo_path = folder_path + "/halo_info/halo_"+str(i)+".h5"
+    ptl_files = sort_files(folder_path + "/ptl_info/")
+    
+    # Function to process each file
+    @delayed
+    def process_file(ptl_index):
+        ptl_path = folder_path + f"/ptl_info/ptl_{ptl_index}.h5"
+        halo_path = folder_path + f"/halo_info/halo_{ptl_index}.h5"
         
-        ptl_df = pd.read_hdf(ptl_path)  
+        ptl_df = pd.read_hdf(ptl_path)
         halo_df = pd.read_hdf(halo_path)
         
-        ptl_mass, use_z = sim_info_for_nus(sim)
-        nus = np.array(peaks.peakHeight((halo_df["Halo_n"][:]*ptl_mass), use_z))    
+        # Operations on halo_df
+        halo_df["Halo_first"] = halo_df["Halo_first"] - halo_df["Halo_first"][0]
         
+        # Compute necessary values
+        ptl_mass, use_z = sim_info_for_nus(sim)
+        nus = np.array(peaks.peakHeight((halo_df["Halo_n"][:] * ptl_mass), use_z))
+        
+        # Apply filters
         if filter_nu:
-            ptl_df = split_by_nu(ptl_df,nus,halo_df["Halo_first"],halo_df["Halo_n"])
+            ptl_df = split_by_nu(ptl_df, nus, halo_df["Halo_first"], halo_df["Halo_n"])
         ptl_df = cut_by_rad(ptl_df, rad_cut=rad_cut)
-            
-        sim_scal_pos_weight.append(calc_scal_pos_weight(ptl_df))
-        scatter_df = client.scatter(ptl_df, broadcast=True)
+        
+        # Calculate scalar position weight
+        scal_pos_weight = calc_scal_pos_weight(ptl_df)
+        
+        return ptl_df, scal_pos_weight
+
+    # Create delayed tasks for each file
+    delayed_results = [process_file(i) for i in range(len(ptl_files))]
+
+    # Compute the results in parallel
+    results = client.compute(delayed_results, sync=True)
+
+    # Unpack the results
+    ddfs, sim_scal_pos_weight = [], []
+    for ptl_df, scal_pos_weight in results:
+        scatter_df = client.scatter(ptl_df)
         dask_df = dd.from_delayed(scatter_df)
         ddfs.append(dask_df)
-        halo_dfs.append(halo_df)
-         
-    return dd.concat(ddfs, axis=0), pd.concat(halo_dfs, ignore_index=True), sim_scal_pos_weight
+    sim_scal_pos_weight.append(scal_pos_weight)
+    
+    return dd.concat(ddfs),sim_scal_pos_weight
 
 def calc_scal_pos_weight(df):
     count_negatives = (df['Orbit_infall'] == 0).sum()
@@ -269,7 +287,8 @@ def load_data(client, dset_name, rad_cut=search_rad, filter_nu=False):
     for sim in model_sims:
         files_loc = path_to_calc_info + sim + "/" + dset_name
 
-        ptl_ddf,halo_df,sim_scal_pos_weight = reform_datasets(client,sim,files_loc,rad_cut=rad_cut,filter_nu=filter_nu)   
+        with timed("Reformed " + dset_name + " Dataset: " + sim):
+            ptl_ddf,sim_scal_pos_weight = reform_datasets(client,sim,files_loc,rad_cut=rad_cut,filter_nu=filter_nu)   
 
         all_scal_pos_weight.append(sim_scal_pos_weight)
         
