@@ -75,9 +75,10 @@ def find_start_pnt(directory):
 
 def calc_halo_mem(n_ptl):
     # rad, rad_vel, tang_vel each 4bytes and two snaps
+    # HIPIDS is 4 bytes as well
     # orbit/infall is one byte
-    # HIPIDS is 8 bytes
-    n_bytes = (6 * 4 + 1 + 8) * n_ptl
+    n_bytes = (7 * 4 + 1) * n_ptl
+    n_bytes += 128 # account for indexing
     
     return n_bytes
 
@@ -89,7 +90,7 @@ def det_halo_splits(mem_arr, mem_lim):
     for i,mem in enumerate(mem_arr):
         curr_size += mem
         if curr_size > mem_lim:
-            split_idxs.append(i) 
+            split_idxs.append(i)
             curr_size = mem
     return split_idxs
             
@@ -203,7 +204,7 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
 
 def halo_loop(rst_pnt, indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos, p_ptls_vel, c_dict, c_ptls_pid, c_ptls_pos, c_ptls_vel):
     num_iter = len(halo_splits)
-    prnt_halo_splits = halo_splits
+    prnt_halo_splits = halo_splits.copy()
     prnt_halo_splits.append(indices.size)
     print("Num halos in each split:", ", ".join(map(str, np.diff(prnt_halo_splits))) + ".", num_iter, "splits")
     hdf5_ptl_idx = 0
@@ -288,7 +289,7 @@ def halo_loop(rst_pnt, indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids,
             p_all_scal_rad = np.concatenate(p_all_scal_rad, axis = 0)
             #p_scal_sqr_phys_vel = np.concatenate(p_scal_sqr_phys_vel, axis=0)
             
-            p_all_HIPIDs = p_all_HIPIDs.astype(np.float64)
+            p_all_HIPIDs = p_all_HIPIDs.astype(np.float32)
             p_all_orb_assn = p_all_orb_assn.astype(np.int8)
             p_all_rad_vel = p_all_rad_vel.astype(np.float32)
             p_all_tang_vel = p_all_tang_vel.astype(np.float32)
@@ -386,6 +387,9 @@ def halo_loop(rst_pnt, indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids,
                 "c_Radial_vel":save_rad_vel[:,1],
                 "c_Tangential_vel":save_tang_vel[:,1],
                 })
+            
+            print("ptl df memory:",ptl_df.memory_usage(index=True).sum())
+            print("calc ptl df memory:",calc_halo_mem(ptl_df.shape[0]))
             
             halo_df.to_hdf(save_location + dst_name + "/halo_info/halo_" + str(i+rst_pnt) + ".h5", key='data', mode='w',format='table')  
             ptl_df.to_hdf(save_location +  dst_name + "/ptl_info/ptl_" + str(i+rst_pnt) + ".h5", key='data', mode='w',format='table')  
@@ -517,7 +521,7 @@ with timed("Startup"):
 
     train_halo_splits = det_halo_splits(train_halo_mem, mem_size)
     test_halo_splits = det_halo_splits(test_halo_mem, mem_size)
-    
+
     with open(save_location + "train_indices.pickle", "wb") as pickle_file:
         pickle.dump(train_idxs, pickle_file)
     with open(save_location + "test_indices.pickle", "wb") as pickle_file:
@@ -553,11 +557,25 @@ with timed("Startup"):
         clean_dir(save_location + "Train/ptl_info/")
         clean_dir(save_location + "Test/halo_info/")
         clean_dir(save_location + "Test/ptl_info/")
+        train_start_pnt=0
+        test_start_pnt=0
+
     else: #Otherwise check to see where we were and then continue teh calculations from there.
         train_start_pnt = find_start_pnt(save_location + "Train/ptl_info/")
         test_start_pnt = find_start_pnt(save_location + "Test/ptl_info/")
         train_halo_splits = train_halo_splits[train_start_pnt:]
         test_halo_splits = test_halo_splits[test_start_pnt:]
+        
+    prnt_halo_splits = train_halo_splits.copy()
+    prnt_halo_splits.append(len(train_idxs))        
+    
+    for i in range(len(prnt_halo_splits)):
+        if i < len(prnt_halo_splits) - 1:
+            print((np.sum(train_halo_mem[prnt_halo_splits[i]:prnt_halo_splits[i+1]]))*1e-9,"GB")
+        else:
+            print(train_halo_mem.shape,prnt_halo_splits[i])
+            print((np.sum(train_halo_mem[prnt_halo_splits[i]:]))*1e-9,"GB")
+        
         
 with timed("Finished Calc"):   
     halo_loop(rst_pnt=train_start_pnt,indices=train_idxs, halo_splits=train_halo_splits, dst_name="Train", tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)

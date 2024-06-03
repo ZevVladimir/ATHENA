@@ -37,6 +37,7 @@ def create_nu_string(nu_list):
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
+#TODO load these parameters (at least for MISC/SEARCH from config.pickle)
 import configparser
 config = configparser.ConfigParser()
 config.read(os.environ.get('PWD') + "/config.ini")
@@ -58,6 +59,7 @@ global prim_only
 prim_only = config.getboolean("SEARCH","prim_only")
 t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
 p_red_shift = config.getfloat("SEARCH","p_red_shift")
+mem_size = config.getfloat("SEARCH","hdf5_mem_size")
 model_sims = json.loads(config.get("DATASET","model_sims"))
 
 model_type = config["XGBOOST"]["model_type"]
@@ -76,6 +78,7 @@ train_rad = config.getint("XGBOOST","training_rad")
 nu_splits = config["XGBOOST"]["nu_splits"]
 nu_splits = parse_ranges(nu_splits)
 nu_string = create_nu_string(nu_splits)
+
 
 try:
     subprocess.check_output('nvidia-smi')
@@ -227,6 +230,17 @@ def sim_info_for_nus(sim):
     
     return ptl_mass, use_z
 
+def split_dataframe(df, max_size):
+    # Split a dataframe so that each one is below a maximum memory size
+    total_size = df.memory_usage(index=True).sum()
+    num_splits = int(np.ceil(total_size / max_size))
+    chunk_size = int(np.ceil(len(df) / num_splits))
+    
+    split_dfs = []
+    for i in range(0, len(df), chunk_size):
+        split_dfs.append(df.iloc[i:i + chunk_size])
+    
+    return split_dfs
 
 def reform_datasets(client,sim,folder_path,rad_cut=None,filter_nu=None):
     ptl_files = sort_files(folder_path + "/ptl_info/")
@@ -236,26 +250,32 @@ def reform_datasets(client,sim,folder_path,rad_cut=None,filter_nu=None):
     def process_file(ptl_index):
         ptl_path = folder_path + f"/ptl_info/ptl_{ptl_index}.h5"
         halo_path = folder_path + f"/halo_info/halo_{ptl_index}.h5"
-        
+
         ptl_df = pd.read_hdf(ptl_path)
         halo_df = pd.read_hdf(halo_path)
         
-        # Operations on halo_df
+        # reset indices for halo_first halo_n indexing
         halo_df["Halo_first"] = halo_df["Halo_first"] - halo_df["Halo_first"][0]
         
-        # Compute necessary values
+        # find nu values for halos in this chunk
         ptl_mass, use_z = sim_info_for_nus(sim)
         nus = np.array(peaks.peakHeight((halo_df["Halo_n"][:] * ptl_mass), use_z))
         
-        # Apply filters
+        # Filter by nu and by radius
         if filter_nu:
             ptl_df = split_by_nu(ptl_df, nus, halo_df["Halo_first"], halo_df["Halo_n"])
         ptl_df = cut_by_rad(ptl_df, rad_cut=rad_cut)
         
-        # Calculate scalar position weight
+        # Calculate scale position weight
         scal_pos_weight = calc_scal_pos_weight(ptl_df)
+
+        # If the dataframe is too large split it up
+        if ptl_df.memory_usage(index=True).sum() > mem_size:
+            ptl_dfs = split_dataframe(ptl_df, mem_size)
+        else:
+            ptl_dfs = [ptl_df]
         
-        return ptl_df, scal_pos_weight
+        return ptl_dfs,scal_pos_weight
 
     # Create delayed tasks for each file
     delayed_results = [process_file(i) for i in range(len(ptl_files))]
@@ -289,7 +309,7 @@ def load_data(client, dset_name, rad_cut=search_rad, filter_nu=False):
 
         with timed("Reformed " + dset_name + " Dataset: " + sim):
             ptl_ddf,sim_scal_pos_weight = reform_datasets(client,sim,files_loc,rad_cut=rad_cut,filter_nu=filter_nu)   
-
+        print(ptl_ddf.npartitions)
         all_scal_pos_weight.append(sim_scal_pos_weight)
         
         dask_dfs.append(ptl_ddf)
