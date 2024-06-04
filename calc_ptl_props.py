@@ -78,7 +78,6 @@ def calc_halo_mem(n_ptl):
     # HIPIDS is 4 bytes as well
     # orbit/infall is one byte
     n_bytes = (7 * 4 + 1) * n_ptl
-    n_bytes += 128 # account for indexing
     
     return n_bytes
 
@@ -89,9 +88,10 @@ def det_halo_splits(mem_arr, mem_lim):
     
     for i,mem in enumerate(mem_arr):
         curr_size += mem
-        if curr_size > mem_lim:
+        # Take into 128bytes for index in pandas dataframe
+        if (curr_size + 128) > mem_lim:
             split_idxs.append(i)
-            curr_size = mem
+            curr_size = 0
     return split_idxs
             
 def clean_dir(path):
@@ -110,7 +110,7 @@ def initial_search(halo_positions, halo_r200m, comp_snap, find_mass = False, fin
         tree = c_ptl_tree
     else:
         tree = p_ptl_tree
-    
+
     if halo_r200m > 0:
         #find how many particles we are finding
         indices = tree.query_ball_point(halo_positions, r = search_rad * halo_r200m)
@@ -239,7 +239,7 @@ def halo_loop(rst_pnt, indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids,
                 p_use_num_ptls, p_curr_ptl_indices = zip(*p.starmap(initial_search, zip(p_use_halos_pos, p_use_halos_r200m, repeat(False), repeat(False), repeat(True)), chunksize=curr_chunk_size))
             p.close()
             p.join() 
-
+            
             # Remove halos with 0 ptls around them
             p_use_num_ptls = np.array(p_use_num_ptls)
             p_curr_ptl_indices = np.array(p_curr_ptl_indices, dtype=object)
@@ -247,7 +247,7 @@ def halo_loop(rst_pnt, indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids,
             p_use_num_ptls = p_use_num_ptls[has_ptls]
             p_curr_ptl_indices = p_curr_ptl_indices[has_ptls]
             p_use_halo_idxs = use_halo_idxs[has_ptls]
-        
+
             # We need to correct for having previous halos being searched so the final halo_first quantity is for all halos
             # First obtain the halo_first values for this batch and then adjust to where the hdf5 file currently is
             p_start_num_ptls = np.cumsum(p_use_num_ptls)
@@ -256,7 +256,7 @@ def halo_loop(rst_pnt, indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids,
             p_start_num_ptls += hdf5_ptl_idx # scale to where we are in the hdf5 file
             
             p_tot_num_use_ptls = int(np.sum(p_use_num_ptls))
-    
+
             halo_first = sparta_output['halos']['ptl_oct_first'][:]
             halo_n = sparta_output['halos']['ptl_oct_n'][:]
             
@@ -388,8 +388,8 @@ def halo_loop(rst_pnt, indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids,
                 "c_Tangential_vel":save_tang_vel[:,1],
                 })
             
-            print("ptl df memory:",ptl_df.memory_usage(index=True).sum())
-            print("calc ptl df memory:",calc_halo_mem(ptl_df.shape[0]))
+            print("ptl df memory:",ptl_df.memory_usage(index=True).sum()*1e-9)
+            
             
             halo_df.to_hdf(save_location + dst_name + "/halo_info/halo_" + str(i+rst_pnt) + ".h5", key='data', mode='w',format='table')  
             ptl_df.to_hdf(save_location +  dst_name + "/ptl_info/ptl_" + str(i+rst_pnt) + ".h5", key='data', mode='w',format='table')  
@@ -489,13 +489,14 @@ with timed("Startup"):
         with open(save_location + "num_ptls.pickle", "rb") as pickle_file:
             num_ptls = pickle.load(pickle_file)
     else:
-        with mp.Pool(processes=num_processes) as p:
+        with mp.Pool(processes=num_processes) as p:           
             # halo position, halo r200m, if comparison snap, want mass?, want indices?
             num_ptls = p.starmap(initial_search, zip(p_halos_pos[match_halo_idxs], p_halos_r200m[match_halo_idxs], repeat(False), repeat(False), repeat(False)), chunksize=curr_chunk_size)
+            
             # We want to remove any halos that have less than 200 particles as they are too noisy
             num_ptls = np.array(num_ptls)
             res_mask = np.where(num_ptls >= 200)[0]
-            
+
             if res_mask.size > 0:
                 num_ptls = num_ptls[res_mask]
                 match_halo_idxs = match_halo_idxs[res_mask]
@@ -505,19 +506,27 @@ with timed("Startup"):
         p.close()
         p.join() 
     tot_num_ptls = np.sum(num_ptls)
-    halo_mem = calc_halo_mem(num_ptls)
     
     total_num_halos = match_halo_idxs.shape[0]
     
-    rng = np.random.default_rng(rand_seed)    
-    total_num_halos = match_halo_idxs.shape[0]
-    rng.shuffle(match_halo_idxs)
+    # rng = np.random.default_rng(rand_seed)    
+    # total_num_halos = match_halo_idxs.shape[0]
+    # rng.shuffle(match_halo_idxs)
     # split all indices into train and test groups
     train_idxs, test_idxs = np.split(match_halo_idxs, [int((1-test_halos_ratio) * total_num_halos)])
-    train_halo_mem, test_halo_mem = np.split(halo_mem, [int((1-test_halos_ratio) * total_num_halos)])
+    train_num_ptls, test_num_ptls = np.split(num_ptls, [int((1-test_halos_ratio) * total_num_halos)])
+
     # need to sort indices otherwise sparta.load breaks...
-    train_idxs = np.sort(train_idxs)
-    test_idxs = np.sort(test_idxs)
+    train_idxs_inds = train_idxs.argsort()
+    train_idxs = train_idxs[train_idxs_inds]
+    train_num_ptls = train_num_ptls[train_idxs_inds]
+    
+    test_idxs_inds = test_idxs.argsort()
+    test_idxs = test_idxs[test_idxs_inds]
+    test_num_ptls = test_num_ptls[test_idxs_inds]
+    
+    train_halo_mem = calc_halo_mem(train_num_ptls)
+    test_halo_mem = calc_halo_mem(test_num_ptls)
 
     train_halo_splits = det_halo_splits(train_halo_mem, mem_size)
     test_halo_splits = det_halo_splits(test_halo_mem, mem_size)
@@ -560,7 +569,7 @@ with timed("Startup"):
         train_start_pnt=0
         test_start_pnt=0
 
-    else: #Otherwise check to see where we were and then continue teh calculations from there.
+    else: #Otherwise check to see where we were and then continue the calculations from there.
         train_start_pnt = find_start_pnt(save_location + "Train/ptl_info/")
         test_start_pnt = find_start_pnt(save_location + "Test/ptl_info/")
         train_halo_splits = train_halo_splits[train_start_pnt:]
@@ -571,7 +580,7 @@ with timed("Startup"):
     
     for i in range(len(prnt_halo_splits)):
         if i < len(prnt_halo_splits) - 1:
-            print((np.sum(train_halo_mem[prnt_halo_splits[i]:prnt_halo_splits[i+1]]))*1e-9,"GB")
+            print(((np.sum(train_halo_mem[prnt_halo_splits[i]:prnt_halo_splits[i+1]])) + 128 )*1e-9,"GB")
         else:
             print(train_halo_mem.shape,prnt_halo_splits[i])
             print((np.sum(train_halo_mem[prnt_halo_splits[i]:]))*1e-9,"GB")
