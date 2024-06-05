@@ -388,6 +388,10 @@ def halo_loop(rst_pnt, indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids,
                 "c_Tangential_vel":save_tang_vel[:,1],
                 })
             
+            memory_usage_bytes = ptl_df.memory_usage(deep=True)
+            memory_usage_gb = memory_usage_bytes * 1e-9
+            print(memory_usage_gb)
+
             print("ptl df memory:",ptl_df.memory_usage(index=True).sum()*1e-9)
             
             
@@ -455,9 +459,9 @@ with timed("Startup"):
     snapshot_list = [p_snap, c_snap]
 
     if prim_only:
-        save_location =  path_to_MLOIS +  "calculated_info/" + curr_sparta_file + "_" + str(snapshot_list[0]) + "/"
+        save_location =  path_to_calc_info + curr_sparta_file + "_" + str(snapshot_list[0]) + "/"
     else:
-        save_location =  path_to_MLOIS + "calculated_info/" + curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[1]) + "/"
+        save_location =  path_to_calc_info + curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[1]) + "/"
 
     if os.path.exists(save_location) != True:
         os.makedirs(save_location)
@@ -513,8 +517,15 @@ with timed("Startup"):
     # total_num_halos = match_halo_idxs.shape[0]
     # rng.shuffle(match_halo_idxs)
     # split all indices into train and test groups
-    train_idxs, test_idxs = np.split(match_halo_idxs, [int((1-test_halos_ratio) * total_num_halos)])
-    train_num_ptls, test_num_ptls = np.split(num_ptls, [int((1-test_halos_ratio) * total_num_halos)])
+    split_pnt = int((1-test_halos_ratio) * total_num_halos)
+    train_idxs = match_halo_idxs[:split_pnt]
+    test_idxs = match_halo_idxs[split_pnt:]
+    train_num_ptls = num_ptls[:split_pnt]
+    test_num_ptls = num_ptls[split_pnt:]
+    
+    print(train_idxs.shape,train_num_ptls.shape)
+    print(test_idxs.shape,test_num_ptls.shape)
+    print(match_halo_idxs.shape,num_ptls.shape)
 
     # need to sort indices otherwise sparta.load breaks...
     train_idxs_inds = train_idxs.argsort()
@@ -545,6 +556,7 @@ with timed("Startup"):
         "snap_format": snap_format,
         "prim_only": prim_only,
         "t_dyn_step": t_dyn_step,
+        "p_red_shift":p_red_shift,
         "search_rad": search_rad,
         "total_num_snaps": total_num_snaps,
         "per_n_halo_per_split": per_n_halo_per_split,

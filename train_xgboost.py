@@ -44,6 +44,7 @@ config.read(os.environ.get('PWD') + "/config.ini")
 rand_seed = config.getint("MISC","random_seed")
 on_zaratan = config.getboolean("MISC","on_zaratan")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
+
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
 path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
@@ -54,31 +55,17 @@ path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
 path_to_sparta = config["PATHS"]["path_to_sparta"]
 path_to_xgboost = config["PATHS"]["path_to_xgboost"]
 
-snap_format = config["MISC"]["snap_format"]
-global prim_only
-prim_only = config.getboolean("SEARCH","prim_only")
-t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
-p_red_shift = config.getfloat("SEARCH","p_red_shift")
-mem_size = config.getfloat("SEARCH","hdf5_mem_size")
 model_sims = json.loads(config.get("DATASET","model_sims"))
 
 model_type = config["XGBOOST"]["model_type"]
-radii_splits = config.get("XGBOOST","rad_splits").split(',')
-search_rad = config.getfloat("SEARCH","search_rad")
-total_num_snaps = config.getint("SEARCH","total_num_snaps")
-test_halos_ratio = config.getfloat("DATASET","test_halos_ratio")
-curr_chunk_size = config.getint("SEARCH","chunk_size")
-num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 do_hpo = config.getboolean("XGBOOST","hpo")
 frac_training_data = config.getfloat("XGBOOST","frac_train_data")
-# size float32 is 4 bytes
-chunk_size = int(np.floor(1e9 / (num_save_ptl_params * 4)))
 eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
 train_rad = config.getint("XGBOOST","training_rad")
 nu_splits = config["XGBOOST"]["nu_splits"]
+
 nu_splits = parse_ranges(nu_splits)
 nu_string = create_nu_string(nu_splits)
-
 
 try:
     subprocess.check_output('nvidia-smi')
@@ -212,7 +199,7 @@ def sort_files(folder_path):
     hdf5_files.sort()
     return hdf5_files
     
-def sim_info_for_nus(sim):
+def sim_info_for_nus(sim,config_params):
     sparta_name, sparta_search_name = split_calc_name(sim)
             
     with h5py.File(path_to_SPARTA_data + sparta_name + "/" +  sparta_search_name + ".hdf5","r") as f:
@@ -220,6 +207,8 @@ def sim_info_for_nus(sim):
         grp_sim = f['simulation']
         for f in grp_sim.attrs:
             dic_sim[f] = grp_sim.attrs[f]
+    
+    p_red_shift = config_params["p_red_shift"]
     
     all_red_shifts = dic_sim['snap_z']
     p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
@@ -235,6 +224,7 @@ def split_dataframe(df, max_size):
     total_size = df.memory_usage(index=True).sum()
     num_splits = int(np.ceil(total_size / max_size))
     chunk_size = int(np.ceil(len(df) / num_splits))
+    print("splitting Dataframe into:",num_splits,"dataframes")
     
     split_dfs = []
     for i in range(0, len(df), chunk_size):
@@ -242,7 +232,7 @@ def split_dataframe(df, max_size):
     
     return split_dfs
 
-def reform_datasets(client,sim,folder_path,rad_cut=None,filter_nu=None):
+def reform_datasets(client,config_params,sim,folder_path,rad_cut=None,filter_nu=None):
     ptl_files = sort_files(folder_path + "/ptl_info/")
     
     # Function to process each file
@@ -258,7 +248,7 @@ def reform_datasets(client,sim,folder_path,rad_cut=None,filter_nu=None):
         halo_df["Halo_first"] = halo_df["Halo_first"] - halo_df["Halo_first"][0]
         
         # find nu values for halos in this chunk
-        ptl_mass, use_z = sim_info_for_nus(sim)
+        ptl_mass, use_z = sim_info_for_nus(sim,config_params)
         nus = np.array(peaks.peakHeight((halo_df["Halo_n"][:] * ptl_mass), use_z))
         
         # Filter by nu and by radius
@@ -270,8 +260,9 @@ def reform_datasets(client,sim,folder_path,rad_cut=None,filter_nu=None):
         scal_pos_weight = calc_scal_pos_weight(ptl_df)
 
         # If the dataframe is too large split it up
-        if ptl_df.memory_usage(index=True).sum() > mem_size:
-            ptl_dfs = split_dataframe(ptl_df, mem_size)
+        max_mem = config_params["HDF5 Mem Size"]
+        if ptl_df.memory_usage(index=True).sum() > max_mem:
+            ptl_dfs = split_dataframe(ptl_df, max_mem)
         else:
             ptl_dfs = [ptl_df]
         
@@ -300,15 +291,22 @@ def calc_scal_pos_weight(df):
     scale_pos_weight = count_negatives / count_positives
     return scale_pos_weight
 
-def load_data(client, dset_name, rad_cut=search_rad, filter_nu=False):
+def load_data(client, dset_name, filter_nu=False):
     dask_dfs = []
     all_scal_pos_weight = []
     
     for sim in model_sims:
         files_loc = path_to_calc_info + sim + "/" + dset_name
+        with open(path_to_calc_info + sim + "/config.pickle","rb") as f:
+            config_params = pickle.load(f)
 
         with timed("Reformed " + dset_name + " Dataset: " + sim):
-            ptl_ddf,sim_scal_pos_weight = reform_datasets(client,sim,files_loc,rad_cut=rad_cut,filter_nu=filter_nu)   
+            if dset_name.lower() == "train":
+                rad_cut = train_rad
+            else:
+                rad_cut = config_params["search_rad"]
+                
+            ptl_ddf,sim_scal_pos_weight = reform_datasets(client,config_params,sim,files_loc,rad_cut=rad_cut,filter_nu=filter_nu)   
         print(ptl_ddf.npartitions)
         all_scal_pos_weight.append(sim_scal_pos_weight)
         
@@ -375,7 +373,7 @@ if __name__ == "__main__":
         model_info = {
             'Misc Info':{
                 'Model trained on': train_sims,
-                'Max Radius': search_rad,
+                'Max Train Radius': train_rad,
                 'Nus Used': nu_string,
                 }}
     
@@ -392,7 +390,7 @@ if __name__ == "__main__":
         halo_train_files = []
         train_nus = []
  
-        train_data,scale_pos_weight = load_data(client,"Train",rad_cut=train_rad,filter_nu=True)
+        train_data,scale_pos_weight = load_data(client,"Train",filter_nu=True)
         test_data,test_scale_pos_weight = load_data(client,"Test")
         
         X_train = train_data[feature_columns]
