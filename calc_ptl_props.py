@@ -51,7 +51,7 @@ per_n_halo_per_split = config.getfloat("SEARCH","per_n_halo_per_split")
 # num_processes = int(os.environ['SLURM_CPUS_PER_TASK'])
 num_processes = mp.cpu_count()
 curr_chunk_size = config.getint("SEARCH","chunk_size")
-test_halos_ratio = config.getfloat("DATASET","test_halos_ratio")
+test_halos_ratio = config.getfloat("XGBOOST","test_halos_ratio")
 mem_size = config.getfloat("SEARCH","hdf5_mem_size")
 ##################################################################################################################
 sys.path.insert(1, path_to_pygadgetreader)

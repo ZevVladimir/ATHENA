@@ -41,7 +41,7 @@ global search_rad
 search_rad = config.getfloat("SEARCH","search_rad")
 total_num_snaps = config.getint("SEARCH","total_num_snaps")
 per_n_halo_per_split = config.getfloat("SEARCH","per_n_halo_per_split")
-test_halos_ratio = config.getfloat("DATASET","test_halos_ratio")
+test_halos_ratio = config.getfloat("XGBOOST","test_halos_ratio")
 global num_save_ptl_params
 num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 num_processes = mp.cpu_count()
