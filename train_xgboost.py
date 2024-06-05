@@ -37,7 +37,6 @@ def create_nu_string(nu_list):
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
-#TODO load these parameters (at least for MISC/SEARCH from config.pickle)
 import configparser
 config = configparser.ConfigParser()
 config.read(os.environ.get('PWD') + "/config.ini")
@@ -307,7 +306,7 @@ def load_data(client, dset_name, filter_nu=False):
                 rad_cut = config_params["search_rad"]
                 
             ptl_ddf,sim_scal_pos_weight = reform_datasets(client,config_params,sim,files_loc,rad_cut=rad_cut,filter_nu=filter_nu)   
-        print(ptl_ddf.npartitions)
+        print("num of partitions:",ptl_ddf.npartitions)
         all_scal_pos_weight.append(sim_scal_pos_weight)
         
         dask_dfs.append(ptl_ddf)

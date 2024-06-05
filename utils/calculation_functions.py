@@ -88,11 +88,11 @@ def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200m, red_shift, 
     
     # Hubble velocity is the hubble constant times the distance the particle is from the halo
     v_hubble = hubble_constant * particle_dist   
-    
     v_hubble = rhat * v_hubble[:, np.newaxis] 
     
     phys_vel_comp = peculiar_vel + v_hubble    
 
+    # dot phys_vel with rhat
     radial_vel_comp = phys_vel_comp * rhat
     radial_vel = np.sum(radial_vel_comp, axis = 1)
     phys_vel = np.linalg.norm(phys_vel_comp, axis = 1)
@@ -106,15 +106,15 @@ def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200m, red_shift, 
     # scale all the radial velocities by v200m of the halo
     return radial_vel, curr_v200m, phys_vel, phys_vel_comp, rhat
 
-def calc_tang_vel(radial_vel, physical_vel, rhat):
-    component_rad_vel = rhat * radial_vel[:, np.newaxis] 
-    tangential_vel = physical_vel - component_rad_vel
-    
-    return tangential_vel
+def calc_tang_vel(rv, phys_v_comp, rhat):
+    rv_comp = rhat * rv[:, np.newaxis] 
+    tv_comp = phys_v_comp - rv_comp
+    tv = np.linalg.norm(tv_comp, axis=1)
+    return tv
 
 def calc_t_dyn(halo_r200m, red_shift):
-    corresponding_hubble_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200c")
-    curr_v200m = calc_v200m(corresponding_hubble_m200m, halo_r200m)
+    halo_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200c")
+    curr_v200m = calc_v200m(halo_m200m, halo_r200m)
     t_dyn = (2*halo_r200m)/curr_v200m
 
     return t_dyn

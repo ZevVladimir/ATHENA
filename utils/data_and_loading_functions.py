@@ -32,6 +32,8 @@ path_to_sparta = config["PATHS"]["path_to_sparta"]
 path_to_xgboost = config["PATHS"]["path_to_xgboost"]
 
 snap_format = config["MISC"]["snap_format"]
+
+reset_lvl = config.getint("SEARCH","reset")
 global prim_only
 prim_only = config.getboolean("SEARCH","prim_only")
 t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
@@ -59,6 +61,16 @@ def timed(txt):
     time_min = time_s / 60
     
     print("%s time: %.5fs, %.2f min" % (txt, time_s, time_min))
+
+def clean_dir(path):
+    try:
+        files = os.listdir(path)
+        for file in files:
+            file_path = os.path.join(path, file)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+    except OSError:
+        print("Error occurred while deleting files at location:",path)
 
 def check_pickle_exist_gadget(sparta_name, ptl_property, snapshot, snapshot_path, scale_factor):
     # save to folder containing pickled data to be accessed easily later
@@ -263,6 +275,8 @@ def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red
     # c_box_size = c_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
     # c_box_size = c_box_size + 0.001 # NEED TO MAKE WORK FOR PARTICLES ON THE VERY EDGE
     
+    if reset_lvl == 3:
+        clean_dir(path_to_pickle + str(c_snap) + "_" + str(sparta_name) +  "_" + str(int(search_rad)) + "r200m/")
     # load particle data and SPARTA data for the comparison snap
     with timed("c_snap ptl load"):
         c_particles_pid, c_particles_vel, c_particles_pos = load_or_pickle_ptl_data(curr_sparta_file, str(c_snap), snapshot_path, c_scale_factor)
