@@ -123,7 +123,7 @@ if __name__ == "__main__":
         
         
     for dset_name in eval_datasets:
-        with timed("Model Evaluation on " + dset_name):             
+        with timed("Model Evaluation on " + dset_name + " dataset"):             
             plot_loc = model_save_loc + dset_name + "_" + combined_test_name + "/plots/"
             create_directory(plot_loc)
             

@@ -164,6 +164,8 @@ def med_prf(prf, num_halo, dtype):
 def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_prf_orb, mass, orbit_assn, prf_bins, title, save_location, use_mp = False, show_graph = False, save_graph = False):
     # Shape of profiles should be (num halo,num bins)
     # EX: 10 halos, 80 bins (10,80)
+    print(radii.shape[0])
+    print(np.sum(halo_n))
     with timed("Finished Density Profile Plot"):
         print("Starting Density Profile Plot")
         act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb

@@ -225,7 +225,7 @@ def reform_datasets(client,config_params,sim,folder_path,rad_cut=None,filter_nu=
         if filter_nu:
             ptl_df = split_by_nu(ptl_df, nus, halo_df["Halo_first"], halo_df["Halo_n"])
         ptl_df = cut_by_rad(ptl_df, rad_cut=rad_cut)
-        
+        print(ptl_df.shape[0])
         # Calculate scale position weight
         scal_pos_weight = calc_scal_pos_weight(ptl_df)
 
