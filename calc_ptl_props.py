@@ -14,7 +14,7 @@ import re
 import pandas as pd
 import shutil
 
-from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed
+from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir
 from utils.calculation_functions import *
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -51,7 +51,7 @@ per_n_halo_per_split = config.getfloat("SEARCH","per_n_halo_per_split")
 # num_processes = int(os.environ['SLURM_CPUS_PER_TASK'])
 num_processes = mp.cpu_count()
 curr_chunk_size = config.getint("SEARCH","chunk_size")
-test_halos_ratio = config.getfloat("DATASET","test_halos_ratio")
+test_halos_ratio = config.getfloat("XGBOOST","test_halos_ratio")
 mem_size = config.getfloat("SEARCH","hdf5_mem_size")
 ##################################################################################################################
 sys.path.insert(1, path_to_pygadgetreader)
@@ -93,16 +93,6 @@ def det_halo_splits(mem_arr, mem_lim):
             split_idxs.append(i)
             curr_size = 0
     return split_idxs
-            
-def clean_dir(path):
-    try:
-        files = os.listdir(path)
-        for file in files:
-            file_path = os.path.join(path, file)
-            if os.path.isfile(file_path):
-                os.remove(file_path)
-    except OSError:
-        print("Error occurred while deleting files.")
             
 def initial_search(halo_positions, halo_r200m, comp_snap, find_mass = False, find_ptl_indices = False):
     global search_rad
@@ -176,8 +166,7 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_
     # calculate peculiar, radial, and tangential velocity
     pec_vel = calc_pec_vel(curr_ptl_vel, halo_vel)
     fnd_rad_vel, curr_v200m, phys_vel, phys_vel_comp, rhat = calc_rad_vel(pec_vel, ptl_rad, coord_dist, halo_r200m, red_shift, hubble_const)
-    fnd_tang_vel_comp = calc_tang_vel(fnd_rad_vel, phys_vel_comp, rhat)
-    fnd_tang_vel = np.linalg.norm(fnd_tang_vel_comp, axis = 1)
+    fnd_tang_vel = calc_tang_vel(fnd_rad_vel, phys_vel_comp, rhat)
     
     scaled_rad_vel = fnd_rad_vel / curr_v200m
     scaled_tang_vel = fnd_tang_vel / curr_v200m
@@ -388,6 +377,10 @@ def halo_loop(rst_pnt, indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids,
                 "c_Tangential_vel":save_tang_vel[:,1],
                 })
             
+            memory_usage_bytes = ptl_df.memory_usage(deep=True)
+            memory_usage_gb = memory_usage_bytes * 1e-9
+            print(memory_usage_gb)
+
             print("ptl df memory:",ptl_df.memory_usage(index=True).sum()*1e-9)
             
             
@@ -431,6 +424,9 @@ with timed("Startup"):
             "hubble_const": p_hubble_constant,
             "box_size": p_box_size,
         }
+        
+    if reset_lvl == 3:
+        clean_dir(path_to_pickle + str(p_snap) + "_" + str(sparta_name) + "_" + str(int(search_rad)) + "r200m/")
 
     # load all information needed for the primary snap
     with timed("p_snap ptl load"):
@@ -455,14 +451,14 @@ with timed("Startup"):
     snapshot_list = [p_snap, c_snap]
 
     if prim_only:
-        save_location =  path_to_MLOIS +  "calculated_info/" + curr_sparta_file + "_" + str(snapshot_list[0]) + "/"
+        save_location =  path_to_calc_info + curr_sparta_file + "_" + str(snapshot_list[0]) + "/"
     else:
-        save_location =  path_to_MLOIS + "calculated_info/" + curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[1]) + "/"
+        save_location =  path_to_calc_info + curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[1]) + "/"
 
     if os.path.exists(save_location) != True:
         os.makedirs(save_location)
 
-    if os.path.isfile(save_location + "p_ptl_tree.pickle"):
+    if os.path.isfile(save_location + "p_ptl_tree.pickle") and reset_lvl < 2:
             with open(save_location + "p_ptl_tree.pickle", "rb") as pickle_file:
                 p_ptl_tree = pickle.load(pickle_file)
     else:
@@ -470,7 +466,7 @@ with timed("Startup"):
         with open(save_location + "p_ptl_tree.pickle", "wb") as pickle_file:
             pickle.dump(p_ptl_tree, pickle_file)
             
-    if os.path.isfile(save_location + "c_ptl_tree.pickle"):
+    if os.path.isfile(save_location + "c_ptl_tree.pickle") and reset_lvl < 2:
             with open(save_location + "c_ptl_tree.pickle", "rb") as pickle_file:
                 c_ptl_tree = pickle.load(pickle_file)
     else:
@@ -485,7 +481,7 @@ with timed("Startup"):
         match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap) & (c_halos_status > 0) & (c_halos_last_snap >= c_sparta_snap))[0]
         
 
-    if os.path.isfile(save_location + "num_ptls.pickle"):
+    if os.path.isfile(save_location + "num_ptls.pickle") and reset_lvl < 2:
         with open(save_location + "num_ptls.pickle", "rb") as pickle_file:
             num_ptls = pickle.load(pickle_file)
     else:
@@ -513,8 +509,15 @@ with timed("Startup"):
     # total_num_halos = match_halo_idxs.shape[0]
     # rng.shuffle(match_halo_idxs)
     # split all indices into train and test groups
-    train_idxs, test_idxs = np.split(match_halo_idxs, [int((1-test_halos_ratio) * total_num_halos)])
-    train_num_ptls, test_num_ptls = np.split(num_ptls, [int((1-test_halos_ratio) * total_num_halos)])
+    split_pnt = int((1-test_halos_ratio) * total_num_halos)
+    train_idxs = match_halo_idxs[:split_pnt]
+    test_idxs = match_halo_idxs[split_pnt:]
+    train_num_ptls = num_ptls[:split_pnt]
+    test_num_ptls = num_ptls[split_pnt:]
+    
+    print(train_idxs.shape,train_num_ptls.shape)
+    print(test_idxs.shape,test_num_ptls.shape)
+    print(match_halo_idxs.shape,num_ptls.shape)
 
     # need to sort indices otherwise sparta.load breaks...
     train_idxs_inds = train_idxs.argsort()
@@ -530,11 +533,6 @@ with timed("Startup"):
 
     train_halo_splits = det_halo_splits(train_halo_mem, mem_size)
     test_halo_splits = det_halo_splits(test_halo_mem, mem_size)
-
-    with open(save_location + "train_indices.pickle", "wb") as pickle_file:
-        pickle.dump(train_idxs, pickle_file)
-    with open(save_location + "test_indices.pickle", "wb") as pickle_file:
-        pickle.dump(test_idxs, pickle_file)
         
     print(f"Total num halos: {total_num_halos:,}")
     print(f"Total num ptls: {tot_num_ptls:,}")
@@ -545,6 +543,7 @@ with timed("Startup"):
         "snap_format": snap_format,
         "prim_only": prim_only,
         "t_dyn_step": t_dyn_step,
+        "p_red_shift":p_red_shift,
         "search_rad": search_rad,
         "total_num_snaps": total_num_snaps,
         "per_n_halo_per_split": per_n_halo_per_split,

@@ -164,12 +164,14 @@ def med_prf(prf, num_halo, dtype):
 def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_prf_orb, mass, orbit_assn, prf_bins, title, save_location, use_mp = False, show_graph = False, save_graph = False):
     # Shape of profiles should be (num halo,num bins)
     # EX: 10 halos, 80 bins (10,80)
-    
+    print(radii.shape[0])
+    print(np.sum(halo_n))
     with timed("Finished Density Profile Plot"):
         print("Starting Density Profile Plot")
         act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
         curr_num_halos = halo_first.shape[0]
-        min_disp_halos = int(np.ceil(0.3 * curr_num_halos))
+        min_disp_halos = int(np.ceil(0.1 * curr_num_halos))
+        
         num_bins = prf_bins.size
         
         # for each halo get the corresponding mass and density profile that the model predicts for it
@@ -218,7 +220,7 @@ def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_pr
         calc_dens_prf_orb, med_calc_dens_prf_orb = med_prf(calc_dens_prf_orb, curr_num_halos, np.float32)
         calc_dens_prf_inf, med_calc_dens_prf_inf = med_prf(calc_dens_prf_inf, curr_num_halos, np.float32)
         calc_dens_prf_all, med_calc_dens_prf_all = med_prf(calc_dens_prf_all, curr_num_halos, np.float32)
-    
+  
         # Get density profiles by dividing the mass profiles by the volume of each bin
         act_dens_prf_all = calculate_density(act_mass_prf_all, prf_bins[1:])
         act_dens_prf_orb = calculate_density(act_mass_prf_orb, prf_bins[1:])
@@ -515,11 +517,6 @@ def calc_misclassified(correct_labels, ml_labels, r, rv, tv, r_range, rv_range, 
         "Num Incorrect Orbiting Particles": str(inc_orb.shape[0])+", "+str(np.round(((inc_orb.shape[0]/num_orb)*100),2))+"% of orbiting ptls",
         "Num Incorrect All Particles": str(tot_num_inc)+", "+str(np.round(((tot_num_inc/tot_num_ptl)*100),2))+"% of all ptls",
     }
-
-    # print("tot num ptl:",tot_num_ptl)
-    # print("num incorrect inf", inc_inf.shape[0], ",", np.round(((inc_inf.shape[0]/num_inf)*100),2), "% of infalling ptls")
-    # print("num incorrect orb", inc_orb.shape[0], ",", np.round(((inc_orb.shape[0]/num_orb)*100),2), "% of orbiting ptls")
-    # print("num incorrect tot", tot_num_inc, ",", np.round(((tot_num_inc/tot_num_ptl) * 100),2), "% of all ptls")
     
     inc_orb_r = r[inc_orb]
     inc_inf_r = r[inc_inf]
@@ -838,7 +835,6 @@ def graph_correlation_matrix(data, labels, save_location, show, save):
     mpl.rcParams.update({'font.size': 12})
     masked_data = np.ma.masked_invalid(data)
     corr_mtrx = np.ma.corrcoef(masked_data, rowvar=False)
-    print(corr_mtrx)
     heatmap = sns.heatmap(corr_mtrx, annot = True, cbar = True, xticklabels=labels, yticklabels=labels)
     heatmap.set_title("Feature Correlation Heatmap")
 

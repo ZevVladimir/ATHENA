@@ -1,7 +1,7 @@
 from dask import array as da
 from dask.distributed import Client
 import dask.dataframe as dd
-from dask import delayed
+
 
 import xgboost as xgb
 from xgboost import dask as dxgb
@@ -16,11 +16,9 @@ import h5py
 import json
 import re
 import pandas as pd
-from colossus.lss import peaks
+import subprocess
 from colossus.cosmology import cosmology
 cosmol = cosmology.setCosmology("bolshoi")
-
-import subprocess
 
 from utils.data_and_loading_functions import create_directory, timed
 from utils.visualization_functions import *
@@ -37,13 +35,13 @@ def create_nu_string(nu_list):
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
-#TODO load these parameters (at least for MISC/SEARCH from config.pickle)
 import configparser
 config = configparser.ConfigParser()
 config.read(os.environ.get('PWD') + "/config.ini")
 rand_seed = config.getint("MISC","random_seed")
 on_zaratan = config.getboolean("MISC","on_zaratan")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
+
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
 path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
@@ -54,31 +52,17 @@ path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
 path_to_sparta = config["PATHS"]["path_to_sparta"]
 path_to_xgboost = config["PATHS"]["path_to_xgboost"]
 
-snap_format = config["MISC"]["snap_format"]
-global prim_only
-prim_only = config.getboolean("SEARCH","prim_only")
-t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
-p_red_shift = config.getfloat("SEARCH","p_red_shift")
-mem_size = config.getfloat("SEARCH","hdf5_mem_size")
-model_sims = json.loads(config.get("DATASET","model_sims"))
+model_sims = json.loads(config.get("XGBOOST","model_sims"))
 
 model_type = config["XGBOOST"]["model_type"]
-radii_splits = config.get("XGBOOST","rad_splits").split(',')
-search_rad = config.getfloat("SEARCH","search_rad")
-total_num_snaps = config.getint("SEARCH","total_num_snaps")
-test_halos_ratio = config.getfloat("DATASET","test_halos_ratio")
-curr_chunk_size = config.getint("SEARCH","chunk_size")
-num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 do_hpo = config.getboolean("XGBOOST","hpo")
 frac_training_data = config.getfloat("XGBOOST","frac_train_data")
-# size float32 is 4 bytes
-chunk_size = int(np.floor(1e9 / (num_save_ptl_params * 4)))
 eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
 train_rad = config.getint("XGBOOST","training_rad")
 nu_splits = config["XGBOOST"]["nu_splits"]
+
 nu_splits = parse_ranges(nu_splits)
 nu_string = create_nu_string(nu_splits)
-
 
 try:
     subprocess.check_output('nvidia-smi')
@@ -102,37 +86,6 @@ sys.path.insert(0, path_to_pygadgetreader)
 sys.path.insert(0, path_to_sparta)
 from pygadgetreader import readsnap, readheader # type: ignore
 from sparta_tools import sparta # type: ignore
-
-def split_calc_name(sim):
-    sim_pat = r"cbol_l(\d+)_n(\d+)"
-    match = re.search(sim_pat, sim)
-    if match:
-        sparta_name = match.group(0)
-    sim_search_pat = sim_pat + r"_(\d+)r200m"
-    match = re.search(sim_search_pat, sim)
-    if match:
-        search_name = match.group(0)
-    
-    return sparta_name, search_name
-
-def transform_string(input_str):
-    # Define the regex pattern to match the string parts
-    pattern = r"_([\d]+)to([\d]+)"
-    
-    # Search for the pattern in the input string
-    match = re.search(pattern, input_str)
-    
-    if not match:
-        raise ValueError("Input string:",input_str, "does not match the expected format.")
-
-    # Extract the parts of the string
-    prefix = input_str[:match.start()]
-    first_number = match.group(1)
-    
-    # Construct the new string
-    new_string = f"{first_number}_{prefix}"
-    
-    return new_string
 
 def get_CUDA_cluster():
     cluster = LocalCUDACluster(
@@ -174,150 +127,7 @@ def print_acc(model, X_train, y_train, X_test, y_test, mode_str="Default"):
     score = accuracy_score(y_pred, y_test.astype('float32'), convert_dtype=True)
     print("{} model accuracy: {}".format(mode_str, score))
 
-def cut_by_rad(df, rad_cut):
-    return df[df['p_Scaled_radii'] <= rad_cut]
 
-def split_by_nu(df,nus,halo_first,halo_n):    
-    mask = pd.Series([False] * nus.shape[0])
-    for start, end in nu_splits:
-        mask[np.where((nus >= start) & (nus <= end))[0]] = True
-    
-    halo_n = halo_n[mask]
-    halo_first = halo_first[mask]
-    halo_last = halo_first + halo_n
-
-    use_idxs = np.concatenate([np.arange(start, end) for start, end in zip(halo_first, halo_last)])
-
-    return df.iloc[use_idxs]
-
-def reform_df(folder_path):
-    hdf5_files = []
-    for f in os.listdir(folder_path):
-        if f.endswith('.h5'):
-            hdf5_files.append(f)
-    hdf5_files.sort()
-
-    dfs = []
-    for file in hdf5_files:
-        file_path = os.path.join(folder_path, file)
-        df = pd.read_hdf(file_path) 
-        dfs.append(df) 
-    return pd.concat(dfs, ignore_index=True)
-
-def sort_files(folder_path):
-    hdf5_files = []
-    for f in os.listdir(folder_path):
-        if f.endswith('.h5'):
-            hdf5_files.append(f)
-    hdf5_files.sort()
-    return hdf5_files
-    
-def sim_info_for_nus(sim):
-    sparta_name, sparta_search_name = split_calc_name(sim)
-            
-    with h5py.File(path_to_SPARTA_data + sparta_name + "/" +  sparta_search_name + ".hdf5","r") as f:
-        dic_sim = {}
-        grp_sim = f['simulation']
-        for f in grp_sim.attrs:
-            dic_sim[f] = grp_sim.attrs[f]
-    
-    all_red_shifts = dic_sim['snap_z']
-    p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
-    use_z = all_red_shifts[p_sparta_snap]
-    p_snap_loc = transform_string(sim)
-    with open(path_to_pickle + p_snap_loc + "/ptl_mass.pickle", "rb") as pickle_file:
-        ptl_mass = pickle.load(pickle_file)
-    
-    return ptl_mass, use_z
-
-def split_dataframe(df, max_size):
-    # Split a dataframe so that each one is below a maximum memory size
-    total_size = df.memory_usage(index=True).sum()
-    num_splits = int(np.ceil(total_size / max_size))
-    chunk_size = int(np.ceil(len(df) / num_splits))
-    
-    split_dfs = []
-    for i in range(0, len(df), chunk_size):
-        split_dfs.append(df.iloc[i:i + chunk_size])
-    
-    return split_dfs
-
-def reform_datasets(client,sim,folder_path,rad_cut=None,filter_nu=None):
-    ptl_files = sort_files(folder_path + "/ptl_info/")
-    
-    # Function to process each file
-    @delayed
-    def process_file(ptl_index):
-        ptl_path = folder_path + f"/ptl_info/ptl_{ptl_index}.h5"
-        halo_path = folder_path + f"/halo_info/halo_{ptl_index}.h5"
-
-        ptl_df = pd.read_hdf(ptl_path)
-        halo_df = pd.read_hdf(halo_path)
-        
-        # reset indices for halo_first halo_n indexing
-        halo_df["Halo_first"] = halo_df["Halo_first"] - halo_df["Halo_first"][0]
-        
-        # find nu values for halos in this chunk
-        ptl_mass, use_z = sim_info_for_nus(sim)
-        nus = np.array(peaks.peakHeight((halo_df["Halo_n"][:] * ptl_mass), use_z))
-        
-        # Filter by nu and by radius
-        if filter_nu:
-            ptl_df = split_by_nu(ptl_df, nus, halo_df["Halo_first"], halo_df["Halo_n"])
-        ptl_df = cut_by_rad(ptl_df, rad_cut=rad_cut)
-        
-        # Calculate scale position weight
-        scal_pos_weight = calc_scal_pos_weight(ptl_df)
-
-        # If the dataframe is too large split it up
-        if ptl_df.memory_usage(index=True).sum() > mem_size:
-            ptl_dfs = split_dataframe(ptl_df, mem_size)
-        else:
-            ptl_dfs = [ptl_df]
-        
-        return ptl_dfs,scal_pos_weight
-
-    # Create delayed tasks for each file
-    delayed_results = [process_file(i) for i in range(len(ptl_files))]
-
-    # Compute the results in parallel
-    results = client.compute(delayed_results, sync=True)
-
-    # Unpack the results
-    ddfs, sim_scal_pos_weight = [], []
-    for ptl_df, scal_pos_weight in results:
-        scatter_df = client.scatter(ptl_df)
-        dask_df = dd.from_delayed(scatter_df)
-        ddfs.append(dask_df)
-    sim_scal_pos_weight.append(scal_pos_weight)
-    
-    return dd.concat(ddfs),sim_scal_pos_weight
-
-def calc_scal_pos_weight(df):
-    count_negatives = (df['Orbit_infall'] == 0).sum()
-    count_positives = (df['Orbit_infall'] == 1).sum()
-
-    scale_pos_weight = count_negatives / count_positives
-    return scale_pos_weight
-
-def load_data(client, dset_name, rad_cut=search_rad, filter_nu=False):
-    dask_dfs = []
-    all_scal_pos_weight = []
-    
-    for sim in model_sims:
-        files_loc = path_to_calc_info + sim + "/" + dset_name
-
-        with timed("Reformed " + dset_name + " Dataset: " + sim):
-            ptl_ddf,sim_scal_pos_weight = reform_datasets(client,sim,files_loc,rad_cut=rad_cut,filter_nu=filter_nu)   
-        print(ptl_ddf.npartitions)
-        all_scal_pos_weight.append(sim_scal_pos_weight)
-        
-        dask_dfs.append(ptl_ddf)
-    
-    act_scale_pos_weight = np.average(np.array(all_scal_pos_weight))
-    
-    return dd.concat(dask_dfs),act_scale_pos_weight
-    
 if __name__ == "__main__":
     feature_columns = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
     target_column = ["Orbit_infall"]
@@ -375,7 +185,7 @@ if __name__ == "__main__":
         model_info = {
             'Misc Info':{
                 'Model trained on': train_sims,
-                'Max Radius': search_rad,
+                'Max Train Radius': train_rad,
                 'Nus Used': nu_string,
                 }}
     
