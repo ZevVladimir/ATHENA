@@ -225,7 +225,7 @@ def reform_datasets(client,config_params,sim,folder_path,rad_cut=None,filter_nu=
         if filter_nu:
             ptl_df = split_by_nu(ptl_df, nus, halo_df["Halo_first"], halo_df["Halo_n"])
         ptl_df = cut_by_rad(ptl_df, rad_cut=rad_cut)
-        print(ptl_df.shape[0])
+
         # Calculate scale position weight
         scal_pos_weight = calc_scal_pos_weight(ptl_df)
 
@@ -261,12 +261,12 @@ def calc_scal_pos_weight(df):
     scale_pos_weight = count_negatives / count_positives
     return scale_pos_weight
 
-def load_data(client, dset_name, rad_cut=None, filter_nu=False):
+def load_data(client, sims, dset_name, rad_cut=None, filter_nu=False):
     #rad_cut set to None so that the full dataset is used (determined by the search radius initially used) 
     dask_dfs = []
     all_scal_pos_weight = []
     
-    for sim in model_sims:
+    for sim in sims:
         files_loc = path_to_calc_info + sim + "/" + dset_name
         with open(path_to_calc_info + sim + "/config.pickle","rb") as f:
             config_params = pickle.load(f)
@@ -309,18 +309,31 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
         halo_first = halo_ddf["Halo_first"].values
         halo_n = halo_ddf["Halo_n"].values
         all_idxs = halo_ddf["Halo_indices"].values
-        
+
         # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
         sim_splits = np.where(halo_first == 0)[0]
 
+        # if there are multiple simulations, to correctly index the dataset we need to update the starting values for the 
+        # stacked simulations such that they correspond to the larger dataset and not one specific simulation
+        if len(use_sims) != 1:
+            for i in range(1,len(use_sims)):
+                if i < len(use_sims) - 1:
+                    halo_first[sim_splits[i]:sim_splits[i+1]] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
+                else:
+                    halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
+                    
+        dens_prf_all_list = []
+        dens_prf_1halo_list = []
+        all_masses = []
+        
         for i,sim in enumerate(use_sims):
             # Get the halo indices corresponding to this simulation
             if i < len(use_sims) - 1:
                 use_idxs = all_idxs[sim_splits[i]:sim_splits[i+1]]
             else:
                 use_idxs = all_idxs[sim_splits[i]:]
-        
-             # find the snapshots for this simulation
+            
+            # find the snapshots for this simulation
             snap_pat = r"(\d+)to(\d+)"
             match = re.search(snap_pat, sim)
             if match:
@@ -350,29 +363,25 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
             
             all_red_shifts = dic_sim['snap_z']
             p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
-            halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_or_pickle_SPARTA_data(sparta_name, p_scale_factor, curr_snap_list[0], p_sparta_snap)
+            
+            halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_or_pickle_SPARTA_data(sparta_search_name, p_scale_factor, curr_snap_list[0], p_sparta_snap)
 
             use_halo_ids = halos_id[use_idxs]
+            
             sparta_output = sparta.load(filename=path_to_SPARTA_data + sparta_name + "/" + sparta_search_name + ".hdf5", halo_ids=use_halo_ids, log_level=0)
-        
             new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta resort the indices
-            dens_prf_all = sparta_output['anl_prf']['M_all'][new_idxs,p_sparta_snap,:]
-            dens_prf_1halo = sparta_output['anl_prf']['M_1halo'][new_idxs,p_sparta_snap,:]
+            
+            dens_prf_all_list.append(sparta_output['anl_prf']['M_all'][new_idxs,p_sparta_snap,:])
+            dens_prf_1halo_list.append(sparta_output['anl_prf']['M_1halo'][new_idxs,p_sparta_snap,:])
+            all_masses.append(ptl_mass)
+
+        dens_prf_all = np.vstack(dens_prf_all_list)
+        dens_prf_1halo = np.vstack(dens_prf_1halo_list)
         
         bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
         bins = np.insert(bins, 0, 0)
-         
-        use_halo_first = halo_first
-        # if there are multiple simulations, to correctly index the dataset we need to update the starting values for the 
-        # stacked simulations such that they correspond to the larger dataset and not one specific simulation
-        if sim_splits.size != 1:
-            for i in range(sim_splits.size):
-                if i < sim_splits.size - 1:
-                    use_halo_first[sim_splits[i]:sim_splits[i+1]] += use_halo_first[sim_splits[i]-1]
-                else:
-                    use_halo_first[sim_splits[i]:] += use_halo_first[sim_splits[i]-1]
-                
-        compare_density_prf(radii=X["p_Scaled_radii"].values.compute(), halo_first=use_halo_first, halo_n=halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=ptl_mass, orbit_assn=preds, prf_bins=bins, title="", save_location=plot_save_loc, use_mp=True, save_graph=True)
+        
+        compare_density_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=all_masses, orbit_assn=preds, prf_bins=bins, title="", save_location=plot_save_loc, use_mp=True, save_graph=True)
     
     if r_rv_tv:
         plot_r_rv_tv_graph(preds, X["p_Scaled_radii"].values.compute(), X["p_Radial_vel"].values.compute(), X["p_Tangential_vel"].values.compute(), y, title="", num_bins=num_bins, save_location=plot_save_loc)

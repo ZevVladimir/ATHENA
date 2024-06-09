@@ -202,8 +202,8 @@ if __name__ == "__main__":
         halo_train_files = []
         train_nus = []
  
-        train_data,scale_pos_weight = load_data(client,"Train",rad_cut=train_rad,filter_nu=True)
-        test_data,test_scale_pos_weight = load_data(client,"Test")
+        train_data,scale_pos_weight = load_data(client,model_sims,"Train",rad_cut=train_rad,filter_nu=True)
+        test_data,test_scale_pos_weight = load_data(client,model_sims,"Test")
         
         X_train = train_data[feature_columns]
         y_train = train_data[target_column]
@@ -319,7 +319,7 @@ if __name__ == "__main__":
 
         halo_df = pd.concat(halo_dfs)
         
-        test_data,test_scale_pos_weight = load_data(client,"Test")
+        test_data,test_scale_pos_weight = load_data(client,model_sims,"Test")
         X_test = test_data[feature_columns]
         y_test = test_data[target_column]
         
