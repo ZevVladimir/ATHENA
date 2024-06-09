@@ -87,12 +87,7 @@ sys.path.insert(0, path_to_sparta)
 from pygadgetreader import readsnap, readheader # type: ignore
 from sparta_tools import sparta # type: ignore
 
-def get_CUDA_cluster():
-    cluster = LocalCUDACluster(
-                               device_memory_limit='10GB',
-                               jit_unspill=True)
-    client = Client(cluster)
-    return client
+
 
 def accuracy_score_wrapper(y, y_hat): 
     y = y.astype("float32") 

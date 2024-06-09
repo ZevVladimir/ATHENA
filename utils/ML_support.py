@@ -55,6 +55,13 @@ nu_splits = config["XGBOOST"]["nu_splits"]
 nu_splits = parse_ranges(nu_splits)
 nu_string = create_nu_string(nu_splits)
 
+def get_CUDA_cluster():
+    cluster = LocalCUDACluster(
+                               device_memory_limit='10GB',
+                               jit_unspill=True)
+    client = Client(cluster)
+    return client
+
 def make_preds(client, bst, X, y_np, report_name="Classification Report", print_report=False):
     #X = da.from_array(X_np,chunks=(chunk_size,X_np.shape[1]))
     
