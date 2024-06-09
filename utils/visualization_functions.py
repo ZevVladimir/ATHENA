@@ -194,7 +194,7 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         act_dens_prf_all = calculate_density(act_mass_prf_all, prf_bins[1:])
         act_dens_prf_orb = calculate_density(act_mass_prf_orb, prf_bins[1:])
         act_dens_prf_inf = calculate_density(act_mass_prf_inf, prf_bins[1:])
-        
+        print(mass,splits.size)
         for i in range(splits.size):
             if i < splits.size - 1:
                 curr_num_halos = act_mass_prf_all[splits[i]:splits[i+1]].shape[0]

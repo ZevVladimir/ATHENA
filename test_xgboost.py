@@ -17,6 +17,18 @@ import re
 from colossus.cosmology import cosmology
 cosmol = cosmology.setCosmology("bolshoi")
 
+if on_zaratan:
+    from dask_mpi import initialize
+    from mpi4py import MPI
+    from distributed.scheduler import logger
+    import socket
+    #from dask_jobqueue import SLURMCluster
+else:
+    from dask_cuda import LocalCUDACluster
+    from cuml.metrics.accuracy import accuracy_score #TODO fix cupy installation??
+    from sklearn.metrics import make_scorer
+    import dask_ml.model_selection as dcv
+
 from utils.ML_support import *
 from utils.data_and_loading_functions import create_directory, timed
 ##################################################################################################################
@@ -64,17 +76,28 @@ except Exception: # this command not being found can raise quite a few different
     gpu_use = False
 ###############################################################################################################
 
-def get_cluster():
-    cluster = LocalCUDACluster(
-                               device_memory_limit='10GB',
-                               jit_unspill=True)
-    client = Client(cluster)
-    return client
-
 if __name__ == "__main__":
     feature_columns = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
     target_column = ["Orbit_infall"]
-    client = get_cluster()
+    
+    if on_zaratan:
+        if 'SLURM_CPUS_PER_TASK' in os.environ:
+            cpus_per_task = int(os.environ['SLURM_CPUS_PER_TASK'])
+        else:
+            print("SLURM_CPUS_PER_TASK is not defined.")
+        if gpu_use:
+            initialize(local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
+        else:
+            initialize(nthreads = cpus_per_task, local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
+        print("Initialized")
+        client = Client()
+        host = client.run_on_scheduler(socket.gethostname)
+        port = client.scheduler_info()['services']['dashboard']
+        login_node_address = "zvladimi@login.zaratan.umd.edu" # Change this to the address/domain of your login node
+
+        logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}")
+    else:
+        client = get_CUDA_cluster()
     
     combined_model_name = ""
     for i,sim in enumerate(model_sims):
