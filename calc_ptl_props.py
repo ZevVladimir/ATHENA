@@ -377,13 +377,6 @@ def halo_loop(rst_pnt, indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids,
                 "c_Tangential_vel":save_tang_vel[:,1],
                 })
             
-            memory_usage_bytes = ptl_df.memory_usage(deep=True)
-            memory_usage_gb = memory_usage_bytes * 1e-9
-            print(memory_usage_gb)
-
-            print("ptl df memory:",ptl_df.memory_usage(index=True).sum()*1e-9)
-            
-            
             halo_df.to_hdf(save_location + dst_name + "/halo_info/halo_" + str(i+rst_pnt) + ".h5", key='data', mode='w',format='table')  
             ptl_df.to_hdf(save_location +  dst_name + "/ptl_info/ptl_" + str(i+rst_pnt) + ".h5", key='data', mode='w',format='table')  
 
@@ -514,10 +507,6 @@ with timed("Startup"):
     test_idxs = match_halo_idxs[split_pnt:]
     train_num_ptls = num_ptls[:split_pnt]
     test_num_ptls = num_ptls[split_pnt:]
-    
-    print(train_idxs.shape,train_num_ptls.shape)
-    print(test_idxs.shape,test_num_ptls.shape)
-    print(match_halo_idxs.shape,num_ptls.shape)
 
     # need to sort indices otherwise sparta.load breaks...
     train_idxs_inds = train_idxs.argsort()
@@ -583,7 +572,6 @@ with timed("Startup"):
         else:
             print(train_halo_mem.shape,prnt_halo_splits[i])
             print((np.sum(train_halo_mem[prnt_halo_splits[i]:]))*1e-9,"GB")
-        
         
 with timed("Finished Calc"):   
     halo_loop(rst_pnt=train_start_pnt,indices=train_idxs, halo_splits=train_halo_splits, dst_name="Train", tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)

@@ -121,7 +121,7 @@ if __name__ == "__main__":
     except FileNotFoundError:
         print("Model info could not be loaded please ensure the path is correct or rerun train_xgboost.py")
         
-        
+    #TODO check that the right sims and datasets are chosen
     for dset_name in eval_datasets:
         with timed("Model Evaluation on " + dset_name + " dataset"):             
             plot_loc = model_save_loc + dset_name + "_" + combined_test_name + "/plots/"
@@ -130,20 +130,20 @@ if __name__ == "__main__":
             halo_files = []
             halo_dfs = []
             if dset_name == "Full":    
-                for sim in model_sims:
+                for sim in test_sims:
                     halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + "Train" + "/halo_info/"))
                     halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + "Test" + "/halo_info/"))
             else:
-                for sim in model_sims:
+                for sim in test_sims:
                     halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + dset_name + "/halo_info/"))
 
             halo_df = pd.concat(halo_dfs)
             
-            data,scale_pos_weight = load_data(client,dset_name)
+            data,scale_pos_weight = load_data(client,test_sims,dset_name)
             X = data[feature_columns]
             y = data[target_column]
 
-            eval_model(model_info, client, bst, use_sims=model_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, combined_name=combined_test_name, plot_save_loc=plot_loc, dens_prf = True, r_rv_tv = True, misclass=True)
+            eval_model(model_info, client, bst, use_sims=test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, combined_name=combined_test_name, plot_save_loc=plot_loc, dens_prf = True, r_rv_tv = True, misclass=True)
 
     with open(model_save_loc + "model_info.pickle", "wb") as pickle_file:
         pickle.dump(model_info, pickle_file) 

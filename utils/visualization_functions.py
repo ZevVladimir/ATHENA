@@ -147,7 +147,7 @@ def create_dens_prf(radii, orbit_assn, act_mass_prf_all, act_mass_prf_1halo, prf
     
     return calc_mass_prf_orb, calc_mass_prf_inf, calc_mass_prf_all, calc_dens_prf_orb, calc_dens_prf_inf, calc_dens_prf_all, diff_n_orb_ptls, diff_n_inf_ptls, diff_n_all_ptls 
 
-def med_prf(prf, num_halo, dtype):
+def comb_prf(prf, num_halo, dtype):
     if num_halo > 1:
         prf = np.stack(prf, axis=0)
     else:
@@ -156,85 +156,127 @@ def med_prf(prf, num_halo, dtype):
     
     prf = prf.astype(dtype)
 
-    # For median want to have one value for each bin (1,80)
-    med_prf = np.median(prf,axis=0)
-
-    return prf, med_prf
+    return prf
     
-def compare_density_prf(radii, halo_first, halo_n, act_mass_prf_all, act_mass_prf_orb, mass, orbit_assn, prf_bins, title, save_location, use_mp = False, show_graph = False, save_graph = False):
+def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act_mass_prf_orb, mass, orbit_assn, prf_bins, title, save_location, use_mp = False, show_graph = False, save_graph = False):
     # Shape of profiles should be (num halo,num bins)
     # EX: 10 halos, 80 bins (10,80)
-    print(radii.shape[0])
-    print(np.sum(halo_n))
+
     with timed("Finished Density Profile Plot"):
         print("Starting Density Profile Plot")
         act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
-        curr_num_halos = halo_first.shape[0]
-        min_disp_halos = int(np.ceil(0.1 * curr_num_halos))
-        
+        tot_num_halos = halo_first.shape[0]
+        min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
         num_bins = prf_bins.size
         
-        # for each halo get the corresponding mass and density profile that the model predicts for it
-        # Can do this using either multiprocessing or a for loop
-        if use_mp:
-            num_processes = mp.cpu_count()
-            with mp.Pool(processes=num_processes) as p:
-                calc_mass_prf_orb, calc_mass_prf_inf, calc_mass_prf_all, calc_dens_prf_orb, calc_dens_prf_inf, calc_dens_prf_all, diff_n_orb_ptls, diff_n_inf_ptls, diff_n_all_ptls = zip(*p.starmap(create_dens_prf, 
-                                            zip((radii[halo_first[i]:halo_first[i]+halo_n[i]] for i in range(curr_num_halos)),
-                                                (orbit_assn[halo_first[i]:halo_first[i]+halo_n[i]] for i in range(curr_num_halos)),
-                                                (act_mass_prf_all[j] for j in range(curr_num_halos)),
-                                                (act_mass_prf_orb[j] for j in range(curr_num_halos)),
-                                                repeat(prf_bins),repeat(mass)),
-                                            chunksize=100))
-            p.close()
-            p.join()        
+        med_act_mass_prf_all = 0
+        med_act_mass_prf_orb = 0
+        med_act_mass_prf_inf = 0
+        med_act_dens_prf_all = 0
+        med_act_dens_prf_orb = 0
+        med_act_dens_prf_inf = 0
+        
+        med_calc_mass_prf_all = 0
+        med_calc_mass_prf_orb = 0
+        med_calc_mass_prf_inf = 0
+        med_calc_dens_prf_all = 0
+        med_calc_dens_prf_orb = 0
+        med_calc_dens_prf_inf = 0
+        
+        calc_mass_prf_orb_lst = []
+        calc_mass_prf_inf_lst = []   
+        calc_mass_prf_all_lst = []   
+        calc_dens_prf_orb_lst = []   
+        calc_dens_prf_inf_lst = []   
+        calc_dens_prf_all_lst = []   
 
-        else:
-            calc_mass_prf_orb = []
-            calc_mass_prf_inf = []
-            calc_mass_prf_all = []
-            calc_dens_prf_orb = []
-            calc_dens_prf_inf = []
-            calc_dens_prf_all = []
-            diff_n_orb_ptls = []
-            diff_n_inf_ptls = []
-            diff_n_all_ptls = []
-            
-            for i in range(curr_num_halos):
-                halo_mass_prf_orb, halo_mass_prf_inf, halo_mass_prf_all, halo_dens_prf_orb, halo_dens_prf_inf, halo_dens_prf_all, halo_diff_n_orb_ptls, halo_diff_n_inf_ptls, halo_diff_n_all_ptls = create_dens_prf(radii[halo_first[i]:halo_first[i]+halo_n[i]], orbit_assn[halo_first[i]:halo_first[i]+halo_n[i]], act_mass_prf_all[i], act_mass_prf_orb[i],prf_bins,mass)
-                calc_mass_prf_orb.append(np.array(halo_mass_prf_orb))
-                calc_mass_prf_inf.append(np.array(halo_mass_prf_inf))
-                calc_mass_prf_all.append(np.array(halo_mass_prf_all))
-                calc_dens_prf_orb.append(np.array(halo_dens_prf_orb))
-                calc_dens_prf_inf.append(np.array(halo_dens_prf_inf))
-                calc_dens_prf_all.append(np.array(halo_dens_prf_all))
-                diff_n_orb_ptls.append(np.array(halo_diff_n_orb_ptls))
-                diff_n_inf_ptls.append(np.array(halo_diff_n_inf_ptls))
-                diff_n_all_ptls.append(np.array(halo_diff_n_all_ptls))
-
-        # For each profile combine all halos and obtain their median values for each bin
-        # calc_mass_prf_xxx has shape (num_halo, num_bins)
-        calc_mass_prf_orb, med_calc_mass_prf_orb = med_prf(calc_mass_prf_orb, curr_num_halos, np.float32)
-        calc_mass_prf_inf, med_calc_mass_prf_inf = med_prf(calc_mass_prf_inf, curr_num_halos, np.float32)
-        calc_mass_prf_all, med_calc_mass_prf_all = med_prf(calc_mass_prf_all, curr_num_halos, np.float32)
-        calc_dens_prf_orb, med_calc_dens_prf_orb = med_prf(calc_dens_prf_orb, curr_num_halos, np.float32)
-        calc_dens_prf_inf, med_calc_dens_prf_inf = med_prf(calc_dens_prf_inf, curr_num_halos, np.float32)
-        calc_dens_prf_all, med_calc_dens_prf_all = med_prf(calc_dens_prf_all, curr_num_halos, np.float32)
-  
         # Get density profiles by dividing the mass profiles by the volume of each bin
         act_dens_prf_all = calculate_density(act_mass_prf_all, prf_bins[1:])
         act_dens_prf_orb = calculate_density(act_mass_prf_orb, prf_bins[1:])
         act_dens_prf_inf = calculate_density(act_mass_prf_inf, prf_bins[1:])
         
-        # Get the median value of the actual mass and density profiles
-        med_act_mass_prf_all = np.median(act_mass_prf_all, axis=0)
-        med_act_mass_prf_orb = np.median(act_mass_prf_orb, axis=0)
-        med_act_mass_prf_inf = np.median(act_mass_prf_inf, axis=0)
+        for i in range(splits.size):
+            if i < splits.size - 1:
+                curr_num_halos = act_mass_prf_all[splits[i]:splits[i+1]].shape[0]
+            else:
+                curr_num_halos = act_mass_prf_all[splits[i]:].shape[0]
 
-        med_act_dens_prf_all = np.median(act_dens_prf_all, axis=0)
-        med_act_dens_prf_orb = np.median(act_dens_prf_orb, axis=0)
-        med_act_dens_prf_inf = np.median(act_dens_prf_inf, axis=0)
-        
+            # for each halo get the corresponding mass and density profile that the model predicts for it
+            # Can do this using either multiprocessing or a for loop
+            if use_mp:
+                num_processes = mp.cpu_count()
+                with mp.Pool(processes=num_processes) as p:
+                    calc_mass_prf_orb, calc_mass_prf_inf, calc_mass_prf_all, calc_dens_prf_orb, calc_dens_prf_inf, calc_dens_prf_all, diff_n_orb_ptls, diff_n_inf_ptls, diff_n_all_ptls = zip(*p.starmap(create_dens_prf, 
+                                                zip((radii[halo_first[n]:halo_first[n]+halo_n[n]] for n in range(splits[i],splits[i]+curr_num_halos)),
+                                                    (orbit_assn[halo_first[n]:halo_first[n]+halo_n[n]] for n in range(splits[i],splits[i]+curr_num_halos)),
+                                                    (act_mass_prf_all[n] for n in range(splits[i],splits[i]+curr_num_halos)),
+                                                    (act_mass_prf_orb[n] for n in range(splits[i],splits[i]+curr_num_halos)),
+                                                    repeat(prf_bins),repeat(mass[i])),
+                                                chunksize=100))
+                p.close()
+                p.join()        
+
+            else:
+                calc_mass_prf_orb = []
+                calc_mass_prf_inf = []
+                calc_mass_prf_all = []
+                calc_dens_prf_orb = []
+                calc_dens_prf_inf = []
+                calc_dens_prf_all = []
+                diff_n_orb_ptls = []
+                diff_n_inf_ptls = []
+                diff_n_all_ptls = []
+                
+                for j in range(curr_num_halos):
+                    halo_mass_prf_orb, halo_mass_prf_inf, halo_mass_prf_all, halo_dens_prf_orb, halo_dens_prf_inf, halo_dens_prf_all, halo_diff_n_orb_ptls, halo_diff_n_inf_ptls, halo_diff_n_all_ptls = create_dens_prf(radii[halo_first[splits[i]+j]:halo_first[splits[i]+j]+halo_n[splits[i]+j]], orbit_assn[halo_first[splits[i]+j]:halo_first[splits[i]+j]+halo_n[splits[i]+j]], act_mass_prf_all[splits[i]+j], act_mass_prf_orb[splits[i]+j],prf_bins,mass[i])
+                    calc_mass_prf_orb.append(np.array(halo_mass_prf_orb))
+                    calc_mass_prf_inf.append(np.array(halo_mass_prf_inf))
+                    calc_mass_prf_all.append(np.array(halo_mass_prf_all))
+                    calc_dens_prf_orb.append(np.array(halo_dens_prf_orb))
+                    calc_dens_prf_inf.append(np.array(halo_dens_prf_inf))
+                    calc_dens_prf_all.append(np.array(halo_dens_prf_all))
+                    diff_n_orb_ptls.append(np.array(halo_diff_n_orb_ptls))
+                    diff_n_inf_ptls.append(np.array(halo_diff_n_inf_ptls))
+                    diff_n_all_ptls.append(np.array(halo_diff_n_all_ptls))
+            
+            # For each profile combine all halos for each bin
+            # calc_mass_prf_xxx has shape (num_halo, num_bins)
+            curr_calc_mass_prf_orb = comb_prf(calc_mass_prf_orb, curr_num_halos, np.float32)
+            curr_calc_mass_prf_inf = comb_prf(calc_mass_prf_inf, curr_num_halos, np.float32)
+            curr_calc_mass_prf_all = comb_prf(calc_mass_prf_all, curr_num_halos, np.float32)
+            curr_calc_dens_prf_orb = comb_prf(calc_dens_prf_orb, curr_num_halos, np.float32)
+            curr_calc_dens_prf_inf = comb_prf(calc_dens_prf_inf, curr_num_halos, np.float32)
+            curr_calc_dens_prf_all = comb_prf(calc_dens_prf_all, curr_num_halos, np.float32)
+
+            med_calc_mass_prf_all += np.median(curr_calc_mass_prf_all,axis=0) 
+            med_calc_mass_prf_orb += np.median(curr_calc_mass_prf_orb,axis=0) 
+            med_calc_mass_prf_inf += np.median(curr_calc_mass_prf_inf,axis=0) 
+            med_calc_dens_prf_all += np.median(curr_calc_dens_prf_all,axis=0) 
+            med_calc_dens_prf_orb += np.median(curr_calc_dens_prf_orb,axis=0) 
+            med_calc_dens_prf_inf += np.median(curr_calc_dens_prf_inf,axis=0)
+            
+            med_act_mass_prf_all += np.median(act_mass_prf_all[splits[i]:splits[i]+curr_num_halos], axis=0)
+            med_act_mass_prf_orb += np.median(act_mass_prf_orb[splits[i]:splits[i]+curr_num_halos], axis=0)
+            med_act_mass_prf_inf += np.median(act_mass_prf_inf[splits[i]:splits[i]+curr_num_halos], axis=0)
+            med_act_dens_prf_all += np.median(act_dens_prf_all[splits[i]:splits[i]+curr_num_halos], axis=0)
+            med_act_dens_prf_orb += np.median(act_dens_prf_orb[splits[i]:splits[i]+curr_num_halos], axis=0)
+            med_act_dens_prf_inf += np.median(act_dens_prf_inf[splits[i]:splits[i]+curr_num_halos], axis=0)
+            
+            
+            calc_mass_prf_orb_lst.append(curr_calc_mass_prf_orb)
+            calc_mass_prf_inf_lst.append(curr_calc_mass_prf_inf)
+            calc_mass_prf_all_lst.append(curr_calc_mass_prf_all)
+            calc_dens_prf_orb_lst.append(curr_calc_dens_prf_orb)
+            calc_dens_prf_inf_lst.append(curr_calc_dens_prf_inf)
+            calc_dens_prf_all_lst.append(curr_calc_dens_prf_all)
+            
+        calc_mass_prf_orb = np.vstack(calc_mass_prf_orb_lst)
+        calc_mass_prf_inf = np.vstack(calc_mass_prf_inf_lst)
+        calc_mass_prf_all = np.vstack(calc_mass_prf_all_lst)
+        calc_dens_prf_orb = np.vstack(calc_dens_prf_orb_lst)
+        calc_dens_prf_inf = np.vstack(calc_dens_prf_inf_lst)
+        calc_dens_prf_all = np.vstack(calc_dens_prf_all_lst)
+            
         # for each bin checking how many halos have particles there
         # if there are less than half the total number of halos then just treat that bin as having 0
         for i in range(calc_mass_prf_orb.shape[1]):

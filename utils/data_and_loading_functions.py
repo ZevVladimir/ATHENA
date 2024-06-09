@@ -100,6 +100,7 @@ def load_or_pickle_ptl_data(sparta_name, snapshot, snapshot_path, scale_factor):
 def load_or_pickle_SPARTA_data(sparta_name, scale_factor, snap, sparta_snap):
     create_directory(path_to_pickle + str(snap) +  "_" + str(sparta_name) + "/")
     reload_sparta = False
+    
 
     if os.path.isfile(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/halos_pos.pickle"):
         with open(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/halos_pos.pickle", "rb") as pickle_file:
