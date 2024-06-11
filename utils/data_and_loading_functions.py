@@ -232,8 +232,8 @@ def find_closest_z(value,snap_path,snap_form):
     all_z = np.ones(total_num_snaps) * -1000
     for i in range(total_num_snaps):
         # Sometimes not all snaps exist
-        if os.path.isdir(snap_path + "snapdir_" + snap_format.format(i)):
-            all_z[i] = readheader(snap_path + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift')
+        if os.path.isdir(snap_path + "snapdir_" + snap_form.format(i)):
+            all_z[i] = readheader(snap_path + "snapdir_" + snap_form.format(i) + "/snapshot_" + snap_form.format(i), 'redshift')
 
     idx = (np.abs(all_z - value)).argmin()
     return idx, all_z[idx]
