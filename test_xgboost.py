@@ -17,18 +17,6 @@ import re
 from colossus.cosmology import cosmology
 cosmol = cosmology.setCosmology("bolshoi")
 
-if on_zaratan:
-    from dask_mpi import initialize
-    from mpi4py import MPI
-    from distributed.scheduler import logger
-    import socket
-    #from dask_jobqueue import SLURMCluster
-else:
-    from dask_cuda import LocalCUDACluster
-    from cuml.metrics.accuracy import accuracy_score #TODO fix cupy installation??
-    from sklearn.metrics import make_scorer
-    import dask_ml.model_selection as dcv
-
 from utils.ML_support import *
 from utils.data_and_loading_functions import create_directory, timed
 ##################################################################################################################
@@ -36,6 +24,7 @@ from utils.data_and_loading_functions import create_directory, timed
 import configparser
 config = configparser.ConfigParser()
 config.read(os.environ.get('PWD') + "/config.ini")
+on_zaratan = config.getboolean("MISC","on_zaratan")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
@@ -66,6 +55,18 @@ model_sims = json.loads(config.get("XGBOOST","model_sims"))
 model_type = config["XGBOOST"]["model_type"]
 test_sims = json.loads(config.get("XGBOOST","test_sims"))
 eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
+
+if on_zaratan:
+    from dask_mpi import initialize
+    from mpi4py import MPI
+    from distributed.scheduler import logger
+    import socket
+    #from dask_jobqueue import SLURMCluster
+else:
+    from dask_cuda import LocalCUDACluster
+    from cuml.metrics.accuracy import accuracy_score #TODO fix cupy installation??
+    from sklearn.metrics import make_scorer
+    import dask_ml.model_selection as dcv
 
 import subprocess
 
@@ -163,10 +164,15 @@ if __name__ == "__main__":
             halo_df = pd.concat(halo_dfs)
             
             data,scale_pos_weight = load_data(client,test_sims,dset_name)
+
             X = data[feature_columns]
             y = data[target_column]
 
             eval_model(model_info, client, bst, use_sims=test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, combined_name=combined_test_name, plot_save_loc=plot_loc, dens_prf = True, r_rv_tv = True, misclass=True)
-
+            del data #otherwise garbage collection doesn't work
+            del X
+            del y
+            
     with open(model_save_loc + "model_info.pickle", "wb") as pickle_file:
         pickle.dump(model_info, pickle_file) 
+    client.close()

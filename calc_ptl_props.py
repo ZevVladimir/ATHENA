@@ -30,6 +30,7 @@ sim_pat = r"cbol_l(\d+)_n(\d+)"
 match = re.search(sim_pat, curr_sparta_file)
 if match:
     sparta_name = match.group(0)
+    path_to_snaps = path_to_snaps + sparta_name + "/"
 path_to_hdf5_file = path_to_SPARTA_data + sparta_name + "/" + curr_sparta_file + ".hdf5"
 path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
@@ -75,9 +76,9 @@ def find_start_pnt(directory):
 
 def calc_halo_mem(n_ptl):
     # rad, rad_vel, tang_vel each 4bytes and two snaps
-    # HIPIDS is 4 bytes as well
+    # HIPIDS is 8 bytes 
     # orbit/infall is one byte
-    n_bytes = (7 * 4 + 1) * n_ptl
+    n_bytes = (6 * 4 + 1 + 8) * n_ptl
     
     return n_bytes
 
@@ -125,7 +126,7 @@ def initial_search(halo_positions, halo_r200m, comp_snap, find_mass = False, fin
     else:
         return num_new_particles, halo_mass, all_ptl_indices
     
-def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_pids, curr_ptl_pos, curr_ptl_vel, 
+def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_pos, curr_ptl_vel, 
                  halo_pos, halo_vel, halo_r200m, sparta_last_pericenter_snap=None, sparta_n_pericenter=None, sparta_tracer_ids=None,
                  sparta_n_is_lower_limit=None, dens_prf_all=None, dens_prf_1halo=None, bins=None, create_dens_prf=False):
     # Doing this this way as otherwise will have to generate super large arrays for input from multiprocessing
@@ -236,6 +237,7 @@ def halo_loop(rst_pnt, indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids,
             p_use_num_ptls = p_use_num_ptls[has_ptls]
             p_curr_ptl_indices = p_curr_ptl_indices[has_ptls]
             p_use_halo_idxs = use_halo_idxs[has_ptls]
+            p_curr_num_halos = p_curr_ptl_indices.shape[0]
 
             # We need to correct for having previous halos being searched so the final halo_first quantity is for all halos
             # First obtain the halo_first values for this batch and then adjust to where the hdf5 file currently is
@@ -252,19 +254,19 @@ def halo_loop(rst_pnt, indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids,
             # Use multiprocessing to search multiple halos at the same time and add information to shared arrays
             with mp.Pool(processes=num_processes) as p:
                 p_all_HIPIDs, p_all_orb_assn, p_all_rad_vel, p_all_tang_vel, p_all_scal_rad = zip(*p.starmap(search_halos, 
-                                            zip(repeat(False), repeat(p_dict), p_use_halo_idxs, np.arange(curr_num_halos),
-                                            (p_ptls_pid[p_curr_ptl_indices[i]] for i in range(curr_num_halos)), 
-                                            (p_ptls_pos[p_curr_ptl_indices[j]] for j in range(curr_num_halos)),
-                                            (p_ptls_vel[p_curr_ptl_indices[k]] for k in range(curr_num_halos)),
-                                            (sparta_output['halos']['position'][l,p_sparta_snap,:] for l in range(curr_num_halos)),
-                                            (sparta_output['halos']['velocity'][l,p_sparta_snap,:] for l in range(curr_num_halos)),
-                                            (sparta_output['halos']['R200m'][l,p_sparta_snap] for l in range(curr_num_halos)),
-                                            (sparta_output['tcr_ptl']['res_oct']['last_pericenter_snap'][halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
-                                            (sparta_output['tcr_ptl']['res_oct']['n_pericenter'][halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
-                                            (sparta_output['tcr_ptl']['res_oct']['tracer_id'][halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
-                                            (sparta_output['tcr_ptl']['res_oct']['n_is_lower_limit'][halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
-                                            (sparta_output['anl_prf']['M_all'][l,p_sparta_snap,:] for l in range(curr_num_halos)),
-                                            (sparta_output['anl_prf']['M_1halo'][l,p_sparta_snap,:] for l in range(curr_num_halos)),
+                                            zip(repeat(False), repeat(p_dict), p_use_halo_idxs,
+                                            (p_ptls_pid[p_curr_ptl_indices[i]] for i in range(p_curr_num_halos)), 
+                                            (p_ptls_pos[p_curr_ptl_indices[j]] for j in range(p_curr_num_halos)),
+                                            (p_ptls_vel[p_curr_ptl_indices[k]] for k in range(p_curr_num_halos)),
+                                            (sparta_output['halos']['position'][l,p_sparta_snap,:] for l in range(p_curr_num_halos)),
+                                            (sparta_output['halos']['velocity'][l,p_sparta_snap,:] for l in range(p_curr_num_halos)),
+                                            (sparta_output['halos']['R200m'][l,p_sparta_snap] for l in range(p_curr_num_halos)),
+                                            (sparta_output['tcr_ptl']['res_oct']['last_pericenter_snap'][halo_first[m]:halo_first[m]+halo_n[m]] for m in range(p_curr_num_halos)),
+                                            (sparta_output['tcr_ptl']['res_oct']['n_pericenter'][halo_first[m]:halo_first[m]+halo_n[m]] for m in range(p_curr_num_halos)),
+                                            (sparta_output['tcr_ptl']['res_oct']['tracer_id'][halo_first[m]:halo_first[m]+halo_n[m]] for m in range(p_curr_num_halos)),
+                                            (sparta_output['tcr_ptl']['res_oct']['n_is_lower_limit'][halo_first[m]:halo_first[m]+halo_n[m]] for m in range(p_curr_num_halos)),
+                                            (sparta_output['anl_prf']['M_all'][l,p_sparta_snap,:] for l in range(p_curr_num_halos)),
+                                            (sparta_output['anl_prf']['M_1halo'][l,p_sparta_snap,:] for l in range(p_curr_num_halos)),
                                             # Uncomment below to create dens profiles
                                             #repeat(sparta_output["config"]['anl_prf']["r_bins_lin"]),repeat(True) 
                                             ),chunksize=curr_chunk_size))
@@ -278,7 +280,7 @@ def halo_loop(rst_pnt, indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids,
             p_all_scal_rad = np.concatenate(p_all_scal_rad, axis = 0)
             #p_scal_sqr_phys_vel = np.concatenate(p_scal_sqr_phys_vel, axis=0)
             
-            p_all_HIPIDs = p_all_HIPIDs.astype(np.float32)
+            p_all_HIPIDs = p_all_HIPIDs.astype(np.float64)
             p_all_orb_assn = p_all_orb_assn.astype(np.int8)
             p_all_rad_vel = p_all_rad_vel.astype(np.float32)
             p_all_tang_vel = p_all_tang_vel.astype(np.float32)
@@ -300,31 +302,32 @@ def halo_loop(rst_pnt, indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids,
 
                 c_use_num_ptls = np.array(c_use_num_ptls)
                 c_curr_ptl_indices = np.array(c_curr_ptl_indices, dtype=object)
-                has_ptls = np.where(c_use_num_ptls > 0)
+                has_ptls = np.where(c_use_num_ptls > 0)[0]
                 c_use_num_ptls = c_use_num_ptls[has_ptls]
                 c_curr_ptl_indices = c_curr_ptl_indices[has_ptls]
                 c_use_halo_idxs = use_halo_idxs[has_ptls]
-
                 c_tot_num_use_ptls = int(np.sum(c_use_num_ptls))
+                c_curr_num_halos = c_curr_ptl_indices.shape[0]
                 
                 
                 with mp.Pool(processes=num_processes) as p:
                     c_all_HIPIDs, c_all_rad_vel, c_all_tang_vel, c_all_scal_rad = zip(*p.starmap(search_halos, 
-                                                zip(repeat(True), repeat(c_dict),c_use_halo_idxs, np.arange(curr_num_halos),
-                                                    (c_ptls_pid[c_curr_ptl_indices[i]] for i in range(curr_num_halos)), 
-                                                    (c_ptls_pos[c_curr_ptl_indices[j]] for j in range(curr_num_halos)),
-                                                    (c_ptls_vel[c_curr_ptl_indices[k]] for k in range(curr_num_halos)),
-                                                    (sparta_output['halos']['position'][l,c_sparta_snap,:] for l in range(curr_num_halos)),
-                                                    (sparta_output['halos']['velocity'][l,c_sparta_snap,:] for l in range(curr_num_halos)),
-                                                    (sparta_output['halos']['R200m'][l,c_sparta_snap] for l in range(curr_num_halos)),
+                                                zip(repeat(True), repeat(c_dict),c_use_halo_idxs,
+                                                    (c_ptls_pid[c_curr_ptl_indices[i]] for i in range(c_curr_num_halos)), 
+                                                    (c_ptls_pos[c_curr_ptl_indices[j]] for j in range(c_curr_num_halos)),
+                                                    (c_ptls_vel[c_curr_ptl_indices[k]] for k in range(c_curr_num_halos)),
+                                                    (sparta_output['halos']['position'][l,c_sparta_snap,:] for l in range(c_curr_num_halos)),
+                                                    (sparta_output['halos']['velocity'][l,c_sparta_snap,:] for l in range(c_curr_num_halos)),
+                                                    (sparta_output['halos']['R200m'][l,c_sparta_snap] for l in range(c_curr_num_halos)),
                                                     ),chunksize=curr_chunk_size))
                 p.close()
                 p.join()
-
+                
                 c_all_HIPIDs = np.concatenate(c_all_HIPIDs, axis = 0)
                 c_all_rad_vel = np.concatenate(c_all_rad_vel, axis = 0)
                 c_all_tang_vel = np.concatenate(c_all_tang_vel, axis = 0)
                 c_all_scal_rad = np.concatenate(c_all_scal_rad, axis = 0)
+                
                 
                 c_all_HIPIDs = c_all_HIPIDs.astype(np.float64)
                 c_all_rad_vel = c_all_rad_vel.astype(np.float32)
@@ -467,17 +470,18 @@ with timed("Startup"):
         with open(save_location + "c_ptl_tree.pickle", "wb") as pickle_file:
             pickle.dump(c_ptl_tree, pickle_file)
 
-    # only take halos that are hosts in primary snap and exist past the p_snap and exist in some form at the comparison snap
-    if prim_only:
-        match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap))[0]
-    else:
-        match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap) & (c_halos_status > 0) & (c_halos_last_snap >= c_sparta_snap))[0]
-        
 
-    if os.path.isfile(save_location + "num_ptls.pickle") and reset_lvl < 2:
+    if os.path.isfile(save_location + "num_ptls.pickle") and os.path.isfile(save_location + "match_halo_idxs.pickle") and reset_lvl < 2:
         with open(save_location + "num_ptls.pickle", "rb") as pickle_file:
             num_ptls = pickle.load(pickle_file)
+        with open(save_location + "match_halo_idxs.pickle", "rb") as pickle_file:
+            match_halo_idxs = pickle.load(pickle_file)
     else:
+        # only take halos that are hosts in primary snap and exist past the p_snap and exist in some form at the comparison snap
+        if prim_only:
+            match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap))[0]
+        else:
+            match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap) & (c_halos_status > 0) & (c_halos_last_snap >= c_sparta_snap))[0]
         with mp.Pool(processes=num_processes) as p:           
             # halo position, halo r200m, if comparison snap, want mass?, want indices?
             num_ptls = p.starmap(initial_search, zip(p_halos_pos[match_halo_idxs], p_halos_r200m[match_halo_idxs], repeat(False), repeat(False), repeat(False)), chunksize=curr_chunk_size)
@@ -492,6 +496,8 @@ with timed("Startup"):
             
             with open(save_location + "num_ptls.pickle", "wb") as pickle_file:
                 pickle.dump(num_ptls, pickle_file)
+            with open(save_location + "match_halo_idxs.pickle", "wb") as pickle_file:
+                pickle.dump(match_halo_idxs, pickle_file)
         p.close()
         p.join() 
     tot_num_ptls = np.sum(num_ptls)

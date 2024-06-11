@@ -13,6 +13,7 @@ import re
 import matplotlib.pyplot as plt
 import pandas as pd
 from colossus.lss import peaks
+from dask.distributed import Client
 
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, find_closest_z, conv_halo_id_spid, timed
 from utils.visualization_functions import compare_density_prf, plot_r_rv_tv_graph, plot_misclassified
@@ -54,6 +55,18 @@ nu_splits = config["XGBOOST"]["nu_splits"]
 
 nu_splits = parse_ranges(nu_splits)
 nu_string = create_nu_string(nu_splits)
+
+if on_zaratan:
+    from dask_mpi import initialize
+    from mpi4py import MPI
+    from distributed.scheduler import logger
+    import socket
+    #from dask_jobqueue import SLURMCluster
+else:
+    from dask_cuda import LocalCUDACluster
+    from cuml.metrics.accuracy import accuracy_score #TODO fix cupy installation??
+    from sklearn.metrics import make_scorer
+    import dask_ml.model_selection as dcv
 
 def get_CUDA_cluster():
     cluster = LocalCUDACluster(
@@ -358,7 +371,8 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
                 config_dict = pickle.load(file)
                 
                 curr_z = config_dict["p_snap_info"]["red_shift"][()]
-                new_p_snap, curr_z = find_closest_z(curr_z)
+                curr_snap_format = config_dict["snap_format"]
+                new_p_snap, curr_z = find_closest_z(curr_z,path_to_snaps + sparta_name + "/",curr_snap_format)
                 p_scale_factor = 1/(1+curr_z)
                 
             with h5py.File(path_to_SPARTA_data + sparta_name + "/" + sparta_search_name + ".hdf5","r") as f:
@@ -370,12 +384,15 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
             
             all_red_shifts = dic_sim['snap_z']
             p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
-            
+            print(all_red_shifts.shape)
+            print(curr_z,p_sparta_snap)
             halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_or_pickle_SPARTA_data(sparta_search_name, p_scale_factor, curr_snap_list[0], p_sparta_snap)
 
             use_halo_ids = halos_id[use_idxs]
             
-            sparta_output = sparta.load(filename=path_to_SPARTA_data + sparta_name + "/" + sparta_search_name + ".hdf5", halo_ids=use_halo_ids, log_level=0)
+            sparta_output = sparta.load(filename=path_to_SPARTA_data + sparta_name + "/" + sparta_search_name + ".hdf5", halo_ids=use_halo_ids, log_level=1)
+            print(path_to_SPARTA_data + sparta_name + "/" + sparta_search_name + ".hdf5")
+            print(use_halo_ids.shape)
             new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta resort the indices
             
             dens_prf_all_list.append(sparta_output['anl_prf']['M_all'][new_idxs,p_sparta_snap,:])
@@ -396,6 +413,11 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
     if misclass:
         preds = preds.values
         y = y.compute().values.flatten()
+        c_rad = X["c_Scaled_radii"].values.compute()
+        print(c_rad.shape)
+        not_nan_mask = ~np.isnan(c_rad)
+        print(np.where(not_nan_mask)[0].shape)
+        
         plot_misclassified(p_corr_labels=y, p_ml_labels=preds, p_r=X["p_Scaled_radii"].values.compute(), p_rv=X["p_Radial_vel"].values.compute(), p_tv=X["p_Tangential_vel"].values.compute(), c_r=X["c_Scaled_radii"].values.compute(), c_rv=X["c_Radial_vel"].values.compute(), c_tv=X["c_Tangential_vel"].values.compute(),title="",num_bins=num_bins,save_location=plot_save_loc,model_info=model_info,dataset_name=dst_type + "_" + combined_name)
     
 

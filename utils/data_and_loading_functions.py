@@ -228,12 +228,12 @@ def choose_halo_split(indices, snap, halo_props, particle_props, num_features):
 
     return dataset
 
-def find_closest_z(value):
+def find_closest_z(value,snap_path,snap_form):
     all_z = np.ones(total_num_snaps) * -1000
     for i in range(total_num_snaps):
         # Sometimes not all snaps exist
-        if os.path.isdir(path_to_snaps + "snapdir_" + snap_format.format(i)):
-            all_z[i] = readheader(path_to_snaps + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift')
+        if os.path.isdir(snap_path + "snapdir_" + snap_format.format(i)):
+            all_z[i] = readheader(snap_path + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift')
 
     idx = (np.abs(all_z - value)).argmin()
     return idx, all_z[idx]
