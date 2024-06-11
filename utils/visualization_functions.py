@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import re
 import pickle
 mpl.use('agg')
 from utils.calculation_functions import calculate_distance
@@ -35,7 +36,12 @@ rand_seed = config.getint("MISC","random_seed")
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
 path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
-path_to_hdf5_file = path_to_SPARTA_data + curr_sparta_file + ".hdf5"
+sim_pat = r"cbol_l(\d+)_n(\d+)"
+match = re.search(sim_pat, curr_sparta_file)
+if match:
+    sparta_name = match.group(0)
+path_to_snaps = path_to_snaps + sparta_name + "/"
+path_to_hdf5_file = path_to_SPARTA_data + sparta_name + "/" + curr_sparta_file + ".hdf5"
 path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
 path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
