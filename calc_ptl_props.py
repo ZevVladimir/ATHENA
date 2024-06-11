@@ -30,7 +30,7 @@ sim_pat = r"cbol_l(\d+)_n(\d+)"
 match = re.search(sim_pat, curr_sparta_file)
 if match:
     sparta_name = match.group(0)
-    path_to_snaps = path_to_snaps + sparta_name + "/"
+path_to_snaps = path_to_snaps + sparta_name + "/"
 path_to_hdf5_file = path_to_SPARTA_data + sparta_name + "/" + curr_sparta_file + ".hdf5"
 path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
@@ -391,7 +391,7 @@ with timed("Startup"):
     cosmol = cosmology.setCosmology("bolshoi") 
 
     with timed("p_snap information load"):
-        p_snap, p_red_shift = find_closest_z(p_red_shift)
+        p_snap, p_red_shift = find_closest_z(p_red_shift,path_to_snaps,snap_format)
         print("Snapshot number found:", p_snap, "Closest redshift found:", p_red_shift)
         with h5py.File(path_to_hdf5_file,"r") as f:
             dic_sim = {}
