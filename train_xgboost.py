@@ -87,8 +87,6 @@ sys.path.insert(0, path_to_sparta)
 from pygadgetreader import readsnap, readheader # type: ignore
 from sparta_tools import sparta # type: ignore
 
-
-
 def accuracy_score_wrapper(y, y_hat): 
     y = y.astype("float32") 
     return accuracy_score(y, y_hat, convert_dtype=True)
@@ -276,14 +274,14 @@ if __name__ == "__main__":
             model_info['Training Info']={
                 'Fraction of Training Data Used': frac_training_data,
                 'Training Params': params}
-            
         print("Starting train using params:", params)
         output = dxgb.train(
             client,
             params,
             dtrain,
             num_boost_round=100,
-            evals=[(dtrain, "train"), (dtest,"test")],
+            # evals=[(dtrain, "train"),(dtest, "test")],
+            evals=[(dtrain, "train")],
             early_stopping_rounds=10,            
             )
         bst = output["booster"]
@@ -292,7 +290,7 @@ if __name__ == "__main__":
 
         plt.figure(figsize=(10,7))
         plt.plot(history["train"]["rmse"], label="Training loss")
-        plt.plot(history["test"]["rmse"], label="Validation loss")
+        #plt.plot(history["test"]["rmse"], label="Validation loss")
         plt.axvline(21, color="gray", label="Optimal tree number")
         plt.xlabel("Number of trees")
         plt.ylabel("Loss")
@@ -331,7 +329,7 @@ if __name__ == "__main__":
     ax.barh(pos,values)
     ax.set_yticks(pos, keys)
     fig.savefig(gen_plot_save_loc + "feature_importance.png")
-
+    
     with open(model_save_loc + "model_info.pickle", "wb") as pickle_file:
         pickle.dump(model_info, pickle_file) 
     client.close()
