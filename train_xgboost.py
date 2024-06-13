@@ -49,7 +49,6 @@ sim_pat = r"cbol_l(\d+)_n(\d+)"
 match = re.search(sim_pat, curr_sparta_file)
 if match:
     sparta_name = match.group(0)
-path_to_snaps = path_to_snaps + sparta_name + "/"
 path_to_hdf5_file = path_to_SPARTA_data + sparta_name + "/" + curr_sparta_file + ".hdf5"
 path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
@@ -65,6 +64,7 @@ frac_training_data = config.getfloat("XGBOOST","frac_train_data")
 eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
 train_rad = config.getint("XGBOOST","training_rad")
 nu_splits = config["XGBOOST"]["nu_splits"]
+retrain = config.getint("XGBOOST","retrain")
 
 nu_splits = parse_ranges(nu_splits)
 nu_string = create_nu_string(nu_splits)
@@ -170,7 +170,7 @@ if __name__ == "__main__":
     create_directory(model_save_loc)
     create_directory(gen_plot_save_loc)
      
-    if os.path.isfile(model_save_loc + "model_info.pickle"):
+    if os.path.isfile(model_save_loc + "model_info.pickle") and retrain < 2:
         with open(model_save_loc + "model_info.pickle", "rb") as pickle_file:
             model_info = pickle.load(pickle_file)
     else:
@@ -188,28 +188,26 @@ if __name__ == "__main__":
                 }}
     
     # Load previously trained booster or start the training process
-    if os.path.isfile(model_save_loc + model_name + ".json"):
+    if os.path.isfile(model_save_loc + model_name + ".json") and retrain < 1:
         bst = xgb.Booster()
         bst.load_model(model_save_loc + model_name + ".json")
         params = model_info.get('Training Info',{}).get('Training Params')
         print("Loaded Booster")
     else:
-        print("Making Datasets")
-        train_files = []
-        test_files = []
-        halo_train_files = []
-        train_nus = []
- 
-        train_data,scale_pos_weight = load_data(client,model_sims,"Train",rad_cut=train_rad,filter_nu=True)
-        test_data,test_scale_pos_weight = load_data(client,model_sims,"Test")
+        print("Making Datasets") 
+        train_data,scale_pos_weight,train_weights, bin_edges = load_data(client,model_sims,"Train",scale_rad=True,filter_nu=False)
+        # test_data,test_scale_pos_weight,test_weights = load_data(client,model_sims,"Test")
         
+        # plot_rad_dist(bin_edges,train_data["p_Scaled_radii"].values.compute(),gen_plot_save_loc)
+        plot_orb_inf_dist(50, train_data["p_Scaled_radii"].values.compute(), train_data["Orbit_infall"].values.compute(), gen_plot_save_loc)
+        print("scale_pos_weight:",scale_pos_weight)
         X_train = train_data[feature_columns]
         y_train = train_data[target_column]
-        X_test = test_data[feature_columns]
-        y_test = test_data[target_column]
+        # X_test = test_data[feature_columns]
+        # y_test = test_data[target_column]
 
         dtrain = xgb.dask.DaskDMatrix(client, X_train, y_train)
-        dtest = xgb.dask.DaskDMatrix(client, X_test, y_test)
+        # dtest = xgb.dask.DaskDMatrix(client, X_test, y_test)
 
         if on_zaratan == False and do_hpo == True and os.path.isfile(model_save_loc + "used_params.pickle") == False:  
             params = {
@@ -254,7 +252,7 @@ if __name__ == "__main__":
                     pickle.dump(results, pickle_file)
                     
                 print("Searched over {} parameters".format(len(results.cv_results_['mean_test_score'])))
-                print_acc(res, X_train, y_train, X_test, y_test, mode_str=mode)
+                # print_acc(res, X_train, y_train, X_test, y_test, mode_str=mode)
                 print("Best params", results.best_params_)
                 
                 params = results.best_params_
@@ -273,8 +271,10 @@ if __name__ == "__main__":
                 "verbosity": 1,
                 "tree_method": "hist",
                 "scale_pos_weight":scale_pos_weight,
+                "max_depth":6,
                 "device": "cuda",
                 "subsample": 0.5,
+                'objective': 'binary:logistic',
                 }
             model_info['Training Info']={
                 'Fraction of Training Data Used': frac_training_data,
@@ -287,24 +287,28 @@ if __name__ == "__main__":
             num_boost_round=100,
             # evals=[(dtrain, "train"),(dtest, "test")],
             evals=[(dtrain, "train")],
-            early_stopping_rounds=10,            
+            early_stopping_rounds=10,      
             )
         bst = output["booster"]
         history = output["history"]
         bst.save_model(model_save_loc + model_name + ".json")
 
         plt.figure(figsize=(10,7))
-        plt.plot(history["train"]["rmse"], label="Training loss")
-        #plt.plot(history["test"]["rmse"], label="Validation loss")
-        plt.axvline(21, color="gray", label="Optimal tree number")
+        plt.plot(history["train"]["logloss"], label="Training loss")
         plt.xlabel("Number of trees")
         plt.ylabel("Loss")
         plt.legend()
-        plt.savefig(gen_plot_save_loc + "training_loss_graph.png")
+        plt.savefig(gen_plot_save_loc + "training_loss_graph.png") 
     
         del dtrain
-        del dtest
+        # del dtest
     
+    xgb.plot_tree(bst, num_trees=10, rankdir='LR')
+    fig = plt.gcf()
+    fig.set_size_inches(150, 100)
+
+    fig.savefig(gen_plot_save_loc + "ex_tree.png",bbox_inches="tight")
+        
     with timed("Model Evaluation"):
         plot_loc = model_save_loc + "Test_" + combined_name + "/plots/"
         create_directory(plot_loc)
@@ -317,7 +321,7 @@ if __name__ == "__main__":
 
         halo_df = pd.concat(halo_dfs)
         
-        test_data,test_scale_pos_weight = load_data(client,model_sims,"Test")
+        test_data,test_scale_pos_weight, test_weights = load_data(client,model_sims,"Test")
         X_test = test_data[feature_columns]
         y_test = test_data[target_column]
         

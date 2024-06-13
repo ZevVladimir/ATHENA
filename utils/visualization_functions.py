@@ -200,7 +200,7 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         act_dens_prf_all = calculate_density(act_mass_prf_all, prf_bins[1:])
         act_dens_prf_orb = calculate_density(act_mass_prf_orb, prf_bins[1:])
         act_dens_prf_inf = calculate_density(act_mass_prf_inf, prf_bins[1:])
-        print(mass,splits.size)
+
         for i in range(splits.size):
             if i < splits.size - 1:
                 curr_num_halos = act_mass_prf_all[splits[i]:splits[i+1]].shape[0]
@@ -435,12 +435,16 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         bot_orb_tick = np.round(np.nanmin(lower_orb_dens_ratio),2)
         top_inf_tick = np.round(np.nanmax(upper_inf_dens_ratio),2)
         bot_inf_tick = np.round(np.nanmin(lower_inf_dens_ratio),2)
+        max_orb_tick = np.round(np.nanmax(med_orb_ratio),2)
+        min_orb_tick = np.round(np.nanmin(med_orb_ratio),2)
+        max_inf_tick = np.round(np.nanmax(med_inf_ratio),2)
+        min_inf_tick = np.round(np.nanmin(med_inf_ratio),2)
 
         ax[2].set_xscale("log")
         ax[2].set_yscale("symlog")
         ax[2].set_box_aspect(1)
         ax[2].tick_params(axis='both',which='both',labelsize=tickfntsize)
-        ax[2].set_yticks([bot_inf_tick, bot_orb_tick, 0, top_inf_tick, top_orb_tick])
+        ax[2].set_yticks([bot_inf_tick, bot_orb_tick,min_orb_tick, min_inf_tick, 0, top_inf_tick, top_orb_tick, max_orb_tick, max_inf_tick])
         ax[2].legend(fontsize=legendfntsize)    
         
         if save_graph:
@@ -1375,4 +1379,57 @@ def halo_plot_3d(ptl_pos, halo_pos, real_labels, preds):
     
     fig.savefig("/home/zvladimi/MLOIS/Random_figures/one_halo.png")
     
+def plot_rad_dist(bin_edges,filter_radii,save_path):
+    fig,ax = plt.subplots(1,2,figsize=(25,10))
+    ax[0].hist(filter_radii)
+    ax[0].set_xlabel("Radius $r/R_{200m}$")
+    ax[0].set_ylabel("counts")
+    ax[1].hist(filter_radii,bins=bin_edges)
+    ax[1].set_xlabel("Radius $r/R_{200m}$")
+    ax[1].set_xscale("log")
+    print("num ptl within 2 R200m", np.where(filter_radii < 2)[0].shape)
+    print("num ptl outside 2 R200m", np.where(filter_radii > 2)[0].shape)
+    print("ratio in/out", np.where(filter_radii < 2)[0].shape[0] / np.where(filter_radii > 2)[0].shape[0])
+    fig.savefig(save_path + "radii_dist.png",bbox_inches="tight")
+
+def plot_orb_inf_dist(num_bins, radii, orb_inf, save_path):
+    lin_orb_cnt = np.zeros(num_bins)
+    lin_inf_cnt = np.zeros(num_bins)
+    log_orb_cnt = np.zeros(num_bins)
+    log_inf_cnt = np.zeros(num_bins)
+
+    lin_bins = np.linspace(0, np.max(radii), num_bins + 1)
+    log_bins = np.logspace(np.log10(0.1),np.log10(np.max(radii)),num_bins+1)
+
+    # Count particles in each bin
+    for i in range(num_bins):
+        lin_bin_mask = (radii >= lin_bins[i]) & (radii < lin_bins[i + 1])
+        lin_orb_cnt[i] = np.sum((orb_inf == 1) & lin_bin_mask)
+        lin_inf_cnt[i] = np.sum((orb_inf == 0) & lin_bin_mask)
+
+        log_bin_mask = (radii >= log_bins[i]) & (radii < log_bins[i + 1])
+        log_orb_cnt[i] = np.sum((orb_inf == 1) & log_bin_mask)
+        log_inf_cnt[i] = np.sum((orb_inf == 0) & log_bin_mask)
+    # Plotting
+    bar_width = 0.35  # width of the bars
+    index = np.arange(num_bins)  # the label locations
+
+    fig, ax = plt.subplots(1,2,figsize=(35,10))
+    ax[0].bar(index, lin_orb_cnt, bar_width, label='Orbiting')
+    ax[0].bar(index + bar_width, lin_inf_cnt, bar_width, label='Infalling')
+    ax[0].set_xlabel('Radius Bins')
+    ax[0].set_ylabel('Number of Particles')
+    ax[0].set_title('Number of Orbiting and Infalling Particles by Radius Bin')
+    ax[0].set_xticks(index + bar_width / 2)
+    ax[0].set_xticklabels([f'{lin_bins[i]:.1f}-{lin_bins[i + 1]:.1f}' for i in range(num_bins)],rotation=90)
+    ax[0].legend()
     
+    ax[1].bar(index, log_orb_cnt, bar_width, label='Orbiting',log=True)
+    ax[1].bar(index + bar_width, log_inf_cnt, bar_width, label='Infalling',log=True)
+    ax[1].set_xlabel('Radius Bins')
+    ax[1].set_title('Number of Orbiting and Infalling Particles by Radius Bin')
+    ax[1].set_xticks(index + bar_width / 2)
+    ax[1].set_xticklabels([f'{log_bins[i]:.2f}-{log_bins[i + 1]:.2f}' for i in range(num_bins)],rotation=90)
+    ax[1].legend()
+    
+    fig.savefig(save_path + "orb_inf_dist.png",bbox_inches="tight")
