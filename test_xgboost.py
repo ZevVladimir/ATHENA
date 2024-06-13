@@ -33,7 +33,6 @@ sim_pat = r"cbol_l(\d+)_n(\d+)"
 match = re.search(sim_pat, curr_sparta_file)
 if match:
     sparta_name = match.group(0)
-path_to_snaps = path_to_snaps + sparta_name + "/"
 path_to_hdf5_file = path_to_SPARTA_data + sparta_name + "/" + curr_sparta_file + ".hdf5"
 path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
@@ -168,7 +167,7 @@ if __name__ == "__main__":
 
             halo_df = pd.concat(halo_dfs)
             
-            data,scale_pos_weight = load_data(client,test_sims,dset_name)
+            data,scale_pos_weight,weights = load_data(client,test_sims,dset_name)
 
             X = data[feature_columns]
             y = data[target_column]
