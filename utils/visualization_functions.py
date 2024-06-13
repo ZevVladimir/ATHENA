@@ -40,7 +40,7 @@ sim_pat = r"cbol_l(\d+)_n(\d+)"
 match = re.search(sim_pat, curr_sparta_file)
 if match:
     sparta_name = match.group(0)
-path_to_snaps = path_to_snaps + sparta_name + "/"
+snap_loc = path_to_snaps + sparta_name + "/"
 path_to_hdf5_file = path_to_SPARTA_data + sparta_name + "/" + curr_sparta_file + ".hdf5"
 path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
@@ -1080,10 +1080,10 @@ def plot_halo_ptls(pos, act_labels, save_path, pred_labels = None):
     ax.legend()
     fig.savefig(save_path + "plot_of_halo_label_dist.png")
 
-def get_ptl_halo_pos(p_snap, num_plt_snaps, i, sparta_z, low_tjy_loc, high_tjy_loc, low_idxs, high_idxs, halos_pos, halos_vel, halos_r200m):
+def get_ptl_halo_pos(snap_loc, p_snap, num_plt_snaps, i, sparta_z, low_tjy_loc, high_tjy_loc, low_idxs, high_idxs, halos_pos, halos_vel, halos_r200m):
     curr_snap = (p_snap-num_plt_snaps) + i + 1
-    snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(curr_snap) + "/snapshot_" + snap_format.format(curr_snap)
-    if os.path.isdir(path_to_snaps + "snapdir_" + snap_format.format(curr_snap)):
+    snapshot_path = snap_loc + "snapdir_" + snap_format.format(curr_snap) + "/snapshot_" + snap_format.format(curr_snap)
+    if os.path.isdir(snap_loc + "snapdir_" + snap_format.format(curr_snap)):
         curr_red_shift = readheader(snapshot_path, 'redshift')
         curr_scale_factor = 1/(1+curr_red_shift)
         curr_sparta_snap = np.abs(sparta_z - curr_red_shift).argmin()
@@ -1154,7 +1154,7 @@ def update_anim(curr_frame, ax, q, halo_pos, halo_vel, ptl_pos, ptl_vel, radius,
         
     return q,
 
-def anim_ptl_path(red_shift,cosmol,num_halo_search,num_plt_snaps,ptl_props_path,save_path):
+def anim_ptl_path(snap_loc,red_shift,cosmol,num_halo_search,num_plt_snaps,ptl_props_path,save_path):
     with timed("sparta info load time"):
         with h5py.File(path_to_hdf5_file,"r") as file:      
             p_snap, p_red_shift = find_closest_z(red_shift)
@@ -1171,7 +1171,7 @@ def anim_ptl_path(red_shift,cosmol,num_halo_search,num_plt_snaps,ptl_props_path,
             print("check sparta redshift:",all_red_shifts[p_sparta_snap])
             
             # Set constants
-            p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
+            p_snapshot_path = snap_loc + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
 
             p_scale_factor = 1/(1+p_red_shift)
             p_hubble_constant = cosmol.Hz(p_red_shift) * 0.001 # convert to units km/s/kpc
@@ -1241,7 +1241,7 @@ def anim_ptl_path(red_shift,cosmol,num_halo_search,num_plt_snaps,ptl_props_path,
     with mp.Pool(processes=num_processes) as p:
         # halo position, halo r200m, if comparison snap, want mass?, want indices?
         low_use_ptl_pos,low_use_ptl_vel,high_use_ptl_pos,high_use_ptl_vel,low_use_halo_pos,low_use_halo_vel,low_use_halo_r200m,high_use_halo_pos,high_use_halo_vel,high_use_halo_r200m = zip(*p.starmap(get_ptl_halo_pos, 
-                                                zip(repeat(p_snap), repeat(num_plt_snaps), np.arange(0,num_plt_snaps), repeat(sparta_z), repeat(low_tjy_loc),
+                                                zip(repeat(snap_loc),repeat(p_snap),repeat(num_plt_snaps),np.arange(0,num_plt_snaps),repeat(sparta_z),repeat(low_tjy_loc),
                                                     repeat(high_tjy_loc), repeat(low_idxs), repeat(high_idxs), repeat(halos_pos), repeat(halos_vel), repeat(halos_r200m)),
                                                     chunksize=curr_chunk_size))
     p.close()

@@ -30,7 +30,7 @@ sim_pat = r"cbol_l(\d+)_n(\d+)"
 match = re.search(sim_pat, curr_sparta_file)
 if match:
     sparta_name = match.group(0)
-path_to_snaps = path_to_snaps + sparta_name + "/"
+snap_loc = path_to_snaps + sparta_name + "/"
 path_to_hdf5_file = path_to_SPARTA_data + sparta_name + "/" + curr_sparta_file + ".hdf5"
 path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
@@ -391,7 +391,7 @@ with timed("Startup"):
     cosmol = cosmology.setCosmology("bolshoi") 
 
     with timed("p_snap information load"):
-        p_snap, p_red_shift = find_closest_z(p_red_shift,path_to_snaps,snap_format)
+        p_snap, p_red_shift = find_closest_z(p_red_shift,snap_loc,snap_format)
         print("Snapshot number found:", p_snap, "Closest redshift found:", p_red_shift)
         with h5py.File(path_to_hdf5_file,"r") as f:
             dic_sim = {}
@@ -405,7 +405,7 @@ with timed("Startup"):
         print("check sparta redshift:",all_red_shifts[p_sparta_snap])   
 
         # Set constants
-        p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
+        p_snapshot_path = snap_loc + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
 
         p_scale_factor = 1/(1+p_red_shift)
         p_rho_m = cosmol.rho_m(p_red_shift)
@@ -433,7 +433,7 @@ with timed("Startup"):
 
     with timed("c_snap load"):
         t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], p_red_shift)
-        c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_ptls_pid, c_ptls_vel, c_ptls_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts, snap_format=snap_format)
+        c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_ptls_pid, c_ptls_vel, c_ptls_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts, snap_format=snap_format,snap_loc=snap_loc)
         c_box_size = sim_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
 
     c_snap_dict = {

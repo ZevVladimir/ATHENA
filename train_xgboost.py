@@ -302,12 +302,12 @@ if __name__ == "__main__":
     
         del dtrain
         # del dtest
-    
-    xgb.plot_tree(bst, num_trees=10, rankdir='LR')
-    fig = plt.gcf()
-    fig.set_size_inches(150, 100)
+    if not on_zaratan:
+        xgb.plot_tree(bst, num_trees=10, rankdir='LR')
+        fig = plt.gcf()
+        fig.set_size_inches(150, 100)
 
-    fig.savefig(gen_plot_save_loc + "ex_tree.png",bbox_inches="tight")
+        fig.savefig(gen_plot_save_loc + "ex_tree.png",bbox_inches="tight")
         
     with timed("Model Evaluation"):
         plot_loc = model_save_loc + "Test_" + combined_name + "/plots/"
