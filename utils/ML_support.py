@@ -57,6 +57,12 @@ model_type = config["XGBOOST"]["model_type"]
 train_rad = config.getint("XGBOOST","training_rad")
 nu_splits = config["XGBOOST"]["nu_splits"]
 
+reduce_rad = config.getfloat("XGBOOST","reduce_rad")
+reduce_perc = config.getfloat("XGBOOST", "reduce_perc")
+
+weight_rad = config.getfloat("XGBOOST","weight_rad")
+min_weight = config.getfloat("XGBOOST","min_weight")
+
 nu_splits = parse_ranges(nu_splits)
 nu_string = create_nu_string(nu_splits)
 
@@ -159,10 +165,9 @@ def transform_string(input_str):
 def weight_by_rad(data):
     radii = data["p_Scaled_radii"].values
     orb_inf = data["Orbit_infall"].values
-    rad_cut = 3
     weights = np.ones(radii.shape[0])
-    mask = (radii > rad_cut) & (orb_inf == 1)
-    weights[mask] = np.exp((np.log(0.01)/(10-rad_cut)) * (radii[mask]-rad_cut))
+    mask = (radii > weight_rad) & (orb_inf == 1)
+    weights[mask] = np.exp((np.log(min_weight)/(np.max(radii)-weight_rad)) * (radii[mask]-weight_rad))
     # sigma = 5
     # weights[mask] = np.exp((-1* radii[mask]**2)/(2*sigma**2))
     
@@ -170,7 +175,7 @@ def weight_by_rad(data):
 
 def scale_by_rad(data,bin_edges):
     radii = data["p_Scaled_radii"].values
-    max_ptl = int(np.floor(np.where(radii<1)[0].shape[0] * 0.1))
+    max_ptl = int(np.floor(np.where(radii<reduce_rad)[0].shape[0] * reduce_perc))
     filter_data = []
     
     for i in range(len(bin_edges) - 1):
@@ -255,7 +260,7 @@ def split_dataframe(df, max_size):
     
     return split_dfs
 
-def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,filter_nu=None):
+def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,use_weights=False,filter_nu=None):
     ptl_files = sort_files(folder_path + "/ptl_info/")
     
     # Function to process each file
@@ -281,8 +286,8 @@ def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,filter_
             num_bins=100
             bin_edges = np.logspace(np.log10(0.001),np.log10(10),num_bins)
             ptl_df = scale_by_rad(ptl_df,bin_edges)
-            # ptl_df = cut_by_rad(ptl_df,5)
-        weights = weight_by_rad(ptl_df)
+        if use_weights:
+            weights = weight_by_rad(ptl_df)
         
         # Calculate scale position weight
         scal_pos_weight = calc_scal_pos_weight(ptl_df)
@@ -294,10 +299,14 @@ def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,filter_
         else:
             ptl_dfs = [ptl_df]
         
-        if scale_rad:
+        if scale_rad and use_weights:
             return ptl_dfs,scal_pos_weight,weights,bin_edges
-        else:
+        elif scale_rad and not use_weights:
+            return ptl_dfs,scal_pos_weight
+        elif not scale_rad and use_weights:
             return ptl_dfs,scal_pos_weight,weights
+        else:
+            return ptl_dfs,scal_pos_weight
 
     # Create delayed tasks for each file
     delayed_results = [process_file(i) for i in range(len(ptl_files))]
@@ -306,8 +315,9 @@ def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,filter_
     results = client.compute(delayed_results, sync=True)
 
     # Unpack the results
+    
     ddfs,sim_scal_pos_weight,dask_weights = [], [], []
-    if scale_rad:    
+    if scale_rad and use_weights:    
         for ptl_df, scal_pos_weight, weight, bin_edge in results:
             scatter_df = client.scatter(ptl_df)
             dask_df = dd.from_delayed(scatter_df)
@@ -317,20 +327,36 @@ def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,filter_
             dask_weight = dd.from_delayed(scatter_weight) 
             dask_weights.append(dask_weight)
             bin_edges = bin_edge
-    else:
+    elif scale_rad and not use_weights:
+        for ptl_df, scal_pos_weight, bin_edge in results:
+            scatter_df = client.scatter(ptl_df)
+            dask_df = dd.from_delayed(scatter_df)
+            ddfs.append(dask_df)
+            sim_scal_pos_weight.append(scal_pos_weight)
+            bin_edges = bin_edge
+    elif not scale_rad and use_weights:
         for ptl_df, scal_pos_weight, weight in results:
+            scatter_df = client.scatter(ptl_df)
+            dask_df = dd.from_delayed(scatter_df)
+            ddfs.append(dask_df)
+            sim_scal_pos_weight.append(scal_pos_weight)
+            scatter_weight = client.scatter(weight)
+            dask_weight = dd.from_delayed(scatter_weight) 
+    else:
+        for ptl_df, scal_pos_weight in results:
             scatter_df = client.scatter(ptl_df)
             dask_df = dd.from_delayed(scatter_df)
             ddfs.append(dask_df)    
             sim_scal_pos_weight.append(scal_pos_weight)
-            scatter_weight = client.scatter(weight)
-            dask_weight = dd.from_delayed(scatter_weight) 
-            dask_weights.append(dask_weight)
 
-    if scale_rad:
+    if scale_rad and use_weights:
         return dd.concat(ddfs),sim_scal_pos_weight,dd.concat(dask_weights),bin_edges
-    else:
+    elif scale_rad and not use_weights:
+        return dd.concat(ddfs),sim_scal_pos_weight,bin_edges
+    elif not scale_rad and use_weights:
         return dd.concat(ddfs),sim_scal_pos_weight,dd.concat(dask_weights)
+    else:
+        return dd.concat(ddfs),sim_scal_pos_weight
 
 def calc_scal_pos_weight(df):
     count_negatives = (df['Orbit_infall'] == 0).sum()
@@ -339,7 +365,7 @@ def calc_scal_pos_weight(df):
     scale_pos_weight = count_negatives / count_positives
     return scale_pos_weight
 
-def load_data(client, sims, dset_name, scale_rad=False, filter_nu=False):
+def load_data(client, sims, dset_name, scale_rad=False, use_weights=False, filter_nu=False):
     dask_dfs = []
     all_scal_pos_weight = []
     all_weights = []
@@ -352,51 +378,71 @@ def load_data(client, sims, dset_name, scale_rad=False, filter_nu=False):
         if dset_name == "Full":
             with timed("Reformed " + "Train" + " Dataset: " + sim):    
                 files_loc = path_to_calc_info + sim + "/" + "Train"
-                if scale_rad:
-                    ptl_ddf,sim_scal_pos_weight, weights, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,filter_nu=filter_nu)  
+                if scale_rad and use_weights:
+                    ptl_ddf,sim_scal_pos_weight, weights, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu)  
+                elif scale_rad and not use_weights:
+                    ptl_ddf,sim_scal_pos_weight, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu)
+                elif not scale_rad and use_weights:
+                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu) 
                 else:
-                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,filter_nu=filter_nu)  
+                    ptl_ddf,sim_scal_pos_weight = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu)  
             print("num of partitions:",ptl_ddf.npartitions)
             all_scal_pos_weight.append(sim_scal_pos_weight)
             dask_dfs.append(ptl_ddf)
-            all_weights.append(weights)
+            if use_weights:
+                all_weights.append(weights)
             with timed("Reformed " + "Test" + " Dataset: " + sim):
                 files_loc = path_to_calc_info + sim + "/" + "Test"
-                if scale_rad:
-                    ptl_ddf,sim_scal_pos_weight, weights, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,filter_nu=filter_nu)
+                if scale_rad and use_weights:
+                    ptl_ddf,sim_scal_pos_weight, weights, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu)  
+                elif scale_rad and not use_weights:
+                    ptl_ddf,sim_scal_pos_weight, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu)
+                elif not scale_rad and use_weights:
+                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu) 
                 else:
-                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,filter_nu=filter_nu)   
+                    ptl_ddf,sim_scal_pos_weight = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu) 
             print("num of partitions:",ptl_ddf.npartitions)
             all_scal_pos_weight.append(sim_scal_pos_weight)
             dask_dfs.append(ptl_ddf)
-            all_weights.append(weights)
+            if use_weights:
+                all_weights.append(weights)
         else:
             with timed("Reformed " + dset_name + " Dataset: " + sim):  
-                if scale_rad:
-                    ptl_ddf,sim_scal_pos_weight, weights, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,filter_nu=filter_nu)                  
+                if scale_rad and use_weights:
+                    ptl_ddf,sim_scal_pos_weight, weights, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu)  
+                elif scale_rad and not use_weights:
+                    ptl_ddf,sim_scal_pos_weight, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu)
+                elif not scale_rad and use_weights:
+                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu) 
                 else:
-                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,filter_nu=filter_nu)   
+                    ptl_ddf,sim_scal_pos_weight = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu)   
             print("num of partitions:",ptl_ddf.npartitions)
             all_scal_pos_weight.append(sim_scal_pos_weight)
             dask_dfs.append(ptl_ddf)
-            all_weights.append(weights)
+            if use_weights:
+                all_weights.append(weights)
 
     all_scal_pos_weight = np.average(np.concatenate([np.array(sublist).flatten() for sublist in all_scal_pos_weight]))
     act_scale_pos_weight = np.average(all_scal_pos_weight)
     
-    if scale_rad:
+    if scale_rad and use_weights:
         return dd.concat(dask_dfs),act_scale_pos_weight, dd.concat(all_weights), bin_edges
-    else:
+    elif scale_rad and not use_weights:
+        return dd.concat(dask_dfs),act_scale_pos_weight, bin_edges
+    elif not scale_rad and use_weights:
         return dd.concat(dask_dfs),act_scale_pos_weight, dd.concat(all_weights)
-    
+    else:
+        return dd.concat(dask_dfs),act_scale_pos_weight
 
 def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, combined_name, plot_save_loc, dens_prf = False, r_rv_tv = False, misclass=False): 
     with timed("Predictions"):
+        print(f"Starting predictions for {y.size.compute():.3e} particles")
         preds = make_preds(client, model, X, y, report_name="Report", print_report=False)
     
     num_bins = 30
     
     if dens_prf:
+        
         halo_first = halo_ddf["Halo_first"].values
         halo_n = halo_ddf["Halo_n"].values
         all_idxs = halo_ddf["Halo_indices"].values
