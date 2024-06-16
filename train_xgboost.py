@@ -66,6 +66,12 @@ train_rad = config.getint("XGBOOST","training_rad")
 nu_splits = config["XGBOOST"]["nu_splits"]
 retrain = config.getint("XGBOOST","retrain")
 
+reduce_rad = config.getfloat("XGBOOST","reduce_rad")
+reduce_perc = config.getfloat("XGBOOST", "reduce_perc")
+
+weight_rad = config.getfloat("XGBOOST","weight_rad")
+min_weight = config.getfloat("XGBOOST","min_weight")
+
 nu_splits = parse_ranges(nu_splits)
 nu_string = create_nu_string(nu_splits)
 
@@ -183,7 +189,6 @@ if __name__ == "__main__":
         model_info = {
             'Misc Info':{
                 'Model trained on': train_sims,
-                'Max Train Radius': train_rad,
                 'Nus Used': nu_string,
                 }}
     
@@ -195,7 +200,31 @@ if __name__ == "__main__":
         print("Loaded Booster")
     else:
         print("Making Datasets") 
-        train_data,scale_pos_weight,train_weights, bin_edges = load_data(client,model_sims,"Train",scale_rad=True,filter_nu=False)
+        scale_rad=False
+        use_weights=False
+        if reduce_rad > 0 and reduce_perc > 0:
+            scale_rad = True
+        if weight_rad > 0 and min_weight > 0:
+            use_weights=True
+            
+        scale_rad_info = {
+            "Used scale_rad": scale_rad,
+            "Reducing radius start": reduce_rad,
+            "Reducing radius percent": reduce_perc,
+        }
+            
+        weight_rad_info = {
+            "Used weighting by radius": use_weights,
+            "Start for weighting": weight_rad,
+            "Minimum weight assing": min_weight
+        }
+            
+        model_info["Training Data Adjustments"] = {
+            "Scaling by Radii": scale_rad_info,
+            "Weighting by Radii": weight_rad_info,
+        }
+
+        train_data,scale_pos_weight,train_weights, bin_edges = load_data(client,model_sims,"Train",scale_rad=scale_rad,use_weights=use_weights,filter_nu=False)
         # test_data,test_scale_pos_weight,test_weights = load_data(client,model_sims,"Test")
         
         # plot_rad_dist(bin_edges,train_data["p_Scaled_radii"].values.compute(),gen_plot_save_loc)
@@ -279,29 +308,32 @@ if __name__ == "__main__":
             model_info['Training Info']={
                 'Fraction of Training Data Used': frac_training_data,
                 'Training Params': params}
-        print("Starting train using params:", params)
-        output = dxgb.train(
-            client,
-            params,
-            dtrain,
-            num_boost_round=100,
-            # evals=[(dtrain, "train"),(dtest, "test")],
-            evals=[(dtrain, "train")],
-            early_stopping_rounds=10,      
-            )
-        bst = output["booster"]
-        history = output["history"]
-        bst.save_model(model_save_loc + model_name + ".json")
+        with timed("Trained Model"):
+            print("Starting train using params:", params)
+            output = dxgb.train(
+                client,
+                params,
+                dtrain,
+                num_boost_round=100,
+                # evals=[(dtrain, "train"),(dtest, "test")],
+                evals=[(dtrain, "train")],
+                early_stopping_rounds=10,      
+                )
+            bst = output["booster"]
+            history = output["history"]
+            bst.save_model(model_save_loc + model_name + ".json")
+            with open(model_save_loc + "model_info.pickle", "wb") as pickle_file:
+                pickle.dump(model_info, pickle_file)
 
-        plt.figure(figsize=(10,7))
-        plt.plot(history["train"]["logloss"], label="Training loss")
-        plt.xlabel("Number of trees")
-        plt.ylabel("Loss")
-        plt.legend()
-        plt.savefig(gen_plot_save_loc + "training_loss_graph.png") 
-    
-        del dtrain
-        # del dtest
+            plt.figure(figsize=(10,7))
+            plt.plot(history["train"]["logloss"], label="Training loss")
+            plt.xlabel("Number of trees")
+            plt.ylabel("Loss")
+            plt.legend()
+            plt.savefig(gen_plot_save_loc + "training_loss_graph.png") 
+        
+            del dtrain
+            # del dtest
     if not on_zaratan:
         xgb.plot_tree(bst, num_trees=10, rankdir='LR')
         fig = plt.gcf()
@@ -321,7 +353,7 @@ if __name__ == "__main__":
 
         halo_df = pd.concat(halo_dfs)
         
-        test_data,test_scale_pos_weight, test_weights = load_data(client,model_sims,"Test")
+        test_data,test_scale_pos_weight = load_data(client,model_sims,"Test")
         X_test = test_data[feature_columns]
         y_test = test_data[target_column]
         

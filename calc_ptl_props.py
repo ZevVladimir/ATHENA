@@ -176,7 +176,7 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
     if comp_snap == False:
         # particles with very high radial velocities at small radii should be considered infalling
         # incorrectly classified
-        curr_orb_assn[np.where((scaled_radii < 1.1) & (np.abs(scaled_rad_vel)>10))] = 0
+        curr_orb_assn[np.where((scaled_radii < 1.1) & (np.abs(phys_vel)>(3*curr_v200m)))] = 0
         
     scaled_radii_inds = scaled_radii.argsort()
     scaled_radii = scaled_radii[scaled_radii_inds]
@@ -529,8 +529,8 @@ with timed("Startup"):
     train_halo_splits = det_halo_splits(train_halo_mem, mem_size)
     test_halo_splits = det_halo_splits(test_halo_mem, mem_size)
         
-    print(f"Total num halos: {total_num_halos:,}")
-    print(f"Total num ptls: {tot_num_ptls:,}")
+    print(f"Total num halos: {total_num_halos:.3e}")
+    print(f"Total num ptls: {tot_num_ptls:.3e}")
 
     #TODO add functionality to check if all the params are the same and then restart (and throw warning) or maybe just reload them if restart=0
     config_params = {
