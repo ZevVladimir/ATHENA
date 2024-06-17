@@ -20,6 +20,7 @@ from scipy.spatial import cKDTree
 import sys
 from matplotlib.animation import FuncAnimation
 import seaborn as sns
+import plotly.graph_objects as go
 
 from utils.data_and_loading_functions import check_pickle_exist_gadget, create_directory, find_closest_z, load_or_pickle_ptl_data, timed
 from utils.calculation_functions import calc_v200m, calculate_density
@@ -1180,37 +1181,85 @@ def halo_plot_3d(ptl_pos, halo_pos, real_labels, preds):
     
     fig.savefig("/home/zvladimi/MLOIS/Random_figures/one_halo.png")
     
-def halo_plot_3d_vec(ptl_pos, ptl_vel, halo_pos, halo_vel, labels, constraint, halo_idx):
+def compute_alpha(num_points, max_alpha=1.0, min_alpha=0.001, scaling_factor=0.5):
+    return max(min_alpha, max_alpha * (scaling_factor / (num_points ** 0.5)))    
+    
+def halo_plot_3d_vec(ptl_pos, ptl_vel, halo_pos, halo_vel, halo_r200m, labels, constraint, halo_idx):
     inf_ptls = np.where(labels == 0)[0]
     orb_ptls = np.where(labels == 1)[0]
     
-    inf_ptl_cnstrn = np.intersect1d(inf_ptls, constraint)
-    orb_ptl_cnstrn = np.intersect1d(orb_ptls, constraint)
-    print(orb_ptl_cnstrn)
+    inf_ptls_cnstrn = np.intersect1d(inf_ptls, constraint)
+    orb_ptls_cnstrn = np.intersect1d(orb_ptls, constraint)
     
+    min_alpha = 0.001
+    max_alpha = 1
+    all_alpha = compute_alpha(inf_ptls.shape[0])
+    cnstrn_alpha = compute_alpha(inf_ptls_cnstrn.shape[0])
+
     axis_fontsize=14
     title_fontsize=24
     
-    fig = plt.figure(figsize=(30,10))
-    ax1 = fig.add_subplot(121,projection='3d')
-    ax1.quiver(ptl_pos[inf_ptls,0],ptl_pos[inf_ptls,1],ptl_pos[inf_ptls,2],ptl_vel[inf_ptls,0],ptl_vel[inf_ptls,1],ptl_vel[inf_ptls,2],color='g',alpha=0.01,label="Infalling Particles")
-    ax1.quiver(ptl_pos[orb_ptls,0],ptl_pos[orb_ptls,1],ptl_pos[orb_ptls,2],ptl_vel[orb_ptls,0],ptl_vel[orb_ptls,1],ptl_vel[orb_ptls,2],color='b',alpha=0.01,label="Orbiting Particles")
-    ax1.quiver(halo_pos[0],halo_pos[1],halo_pos[2],halo_vel[0],halo_vel[1],halo_vel[2],color='r',alpha=1,label="Halo Center")
-    ax1.set_xlabel("X position (kpc/h)",fontsize=axis_fontsize)
-    ax1.set_ylabel("Y position (kpc/h)",fontsize=axis_fontsize)
-    ax1.set_zlabel("Z position (kpc/h)",fontsize=axis_fontsize)
-    ax1.set_title("All Ptls",fontsize=title_fontsize)
+    fig1 = go.Figure()
     
-    ax2 = fig.add_subplot(122,projection='3d')
-    ax2.quiver(ptl_pos[inf_ptl_cnstrn,0],ptl_pos[inf_ptl_cnstrn,1],ptl_pos[inf_ptl_cnstrn,2],ptl_vel[inf_ptl_cnstrn,0],ptl_vel[inf_ptl_cnstrn,1],ptl_vel[inf_ptl_cnstrn,2],color='g',alpha=0.01,label="Infalling Particles")
-    ax2.quiver(ptl_pos[orb_ptl_cnstrn,0],ptl_pos[orb_ptl_cnstrn,1],ptl_pos[orb_ptl_cnstrn,2],ptl_vel[orb_ptl_cnstrn,0],ptl_vel[orb_ptl_cnstrn,1],ptl_vel[orb_ptls,2],color='b',alpha=0.01,label="Orbiting Particles")
-    ax2.quiver(halo_pos[0],halo_pos[1],halo_pos[2],halo_vel[0],halo_vel[1],halo_vel[2],color='r',alpha=1,label="Halo Center")
-    ax2.set_xlabel("X position (kpc/h)",fontsize=axis_fontsize)
-    ax2.set_ylabel("Y position (kpc/h)",fontsize=axis_fontsize)
-    ax2.set_zlabel("Z position (kpc/h)",fontsize=axis_fontsize)
-    ax2.set_title("Within 1.1R200m with high physical velocity",fontsize=title_fontsize)
-        
-    fig.savefig(path_to_MLOIS + "/Random_figs/high_vel_halo_idx_" + str(halo_idx) + ".png")
+    fig1.add_trace(go.Cone(x=ptl_pos[inf_ptls,0], y=ptl_pos[inf_ptls,1], z=ptl_pos[inf_ptls,2],
+                          u=ptl_vel[inf_ptls,0], v=ptl_vel[inf_ptls,1], w=ptl_vel[inf_ptls,2],
+                          colorscale=[[0, 'green'], [1, 'green']],sizemode='raw',sizeref=1,showscale=False,opacity=all_alpha,name='Infalling'))
+
+    fig1.add_trace(go.Cone(x=ptl_pos[orb_ptls,0], y=ptl_pos[orb_ptls,1], z=ptl_pos[orb_ptls,2],
+                          u=ptl_vel[orb_ptls,0], v=ptl_vel[orb_ptls,1], w=ptl_vel[orb_ptls,2],
+                          colorscale=[[0, 'blue'], [1, 'blue']],sizemode='raw',sizeref=1,showscale=False,opacity=all_alpha,name='Orbiting'))
+    
+    print(halo_pos[0],halo_pos[1],halo_pos[2])
+    print(halo_vel[0],halo_vel[1],halo_vel[2])
+    fig1.add_trace(go.Cone(x=[halo_pos[0]], y=[halo_pos[1]], z=[halo_pos[2]],
+                          u=[halo_vel[0]], v=[halo_vel[1]], w=[halo_vel[2]],
+                          colorscale=[[0, 'red'], [1, 'red']],sizemode='raw',sizeref=1,showscale=False,opacity=1,name='Halo Center'))
+    
+    fig1.update_layout(
+    scene=dict(
+        xaxis=dict(title='X position (kpc/h)', range=[halo_pos[0] - 10 * halo_r200m,halo_pos[0] + 10 * halo_r200m]),
+        yaxis=dict(title='Y position (kpc/h)', range=[halo_pos[1] - 10 * halo_r200m,halo_pos[1] + 10 * halo_r200m]),
+        zaxis=dict(title='Z position (kpc/h)', range=[halo_pos[2] - 10 * halo_r200m,halo_pos[2] + 10 * halo_r200m])
+    ),
+    title='All Particles',
+    legend=dict(
+        x=0.8,
+        y=0.9,
+        title="Legend"
+    )
+    )
+    fig1.show()
+    fig1.write_html(path_to_MLOIS + "/Random_figs/all_ptl_high_vel_halo_idx_" + str(halo_idx) + ".html")
+    
+    fig2 = go.Figure()
+    
+    if inf_ptls_cnstrn.shape[0] > 0:
+        fig2.add_trace(go.Cone(x=ptl_pos[inf_ptls_cnstrn,0], y=ptl_pos[inf_ptls_cnstrn,1], z=ptl_pos[inf_ptls_cnstrn,2],
+                          u=ptl_vel[inf_ptls_cnstrn,0], v=ptl_vel[inf_ptls_cnstrn,1], w=ptl_vel[inf_ptls_cnstrn,2],
+                          colorscale=[[0, 'green'], [1, 'green']],sizemode='raw',sizeref=1,showscale=False,opacity=cnstrn_alpha,name='Infalling'))
+    if orb_ptls_cnstrn.shape[0] > 0:
+        fig2.add_trace(go.Cone(x=ptl_pos[orb_ptls_cnstrn,0], y=ptl_pos[orb_ptls_cnstrn,1], z=ptl_pos[orb_ptls_cnstrn,2],
+                          u=ptl_vel[orb_ptls_cnstrn,0], v=ptl_vel[orb_ptls_cnstrn,1], w=ptl_vel[orb_ptls_cnstrn,2],
+                          colorscale=[[0, 'blue'], [1, 'blue']],sizemode='raw',sizeref=1,showscale=False,opacity=cnstrn_alpha,name='Orbiting'))
+    fig2.add_trace(go.Cone(x=[halo_pos[0]], y=[halo_pos[1]], z=[halo_pos[2]],
+                          u=[halo_vel[0]], v=[halo_vel[1]], w=[halo_vel[2]],
+                          colorscale=[[0, 'red'], [1, 'red']],sizemode='raw',sizeref=1,showscale=False,opacity=1,name='Halo Center'))
+    
+    fig2.update_layout(
+    scene=dict(
+        xaxis=dict(title='X position (kpc/h)', range=[halo_pos[0] - 10 * halo_r200m,halo_pos[0] + 10 * halo_r200m]),
+        yaxis=dict(title='Y position (kpc/h)', range=[halo_pos[1] - 10 * halo_r200m,halo_pos[1] + 10 * halo_r200m]),
+        zaxis=dict(title='Z position (kpc/h)', range=[halo_pos[2] - 10 * halo_r200m,halo_pos[2] + 10 * halo_r200m])
+    ),
+    title='Only Ptls within 1.1R200m with High Physical Vel',
+    legend=dict(
+        x=0.8,
+        y=0.9,
+        title="Legend"
+    )
+    )
+    fig2.show()
+    fig2.write_html(path_to_MLOIS + "/Random_figs/cnstrn_high_vel_halo_idx_" + str(halo_idx) + ".html")
     
     
     

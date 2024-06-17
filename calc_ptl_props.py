@@ -174,15 +174,15 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
     scaled_tang_vel = fnd_tang_vel / curr_v200m
     scaled_radii = ptl_rad / halo_r200m
     
-    vel_scal = 3
-    per_of_halo = 0.3
+    vel_scal = 1
+    per_of_halo = 0.05
     if comp_snap == False:
         # particles with very high radial velocities at small radii should be considered infalling
         # incorrectly classified
         curr_orb_assn[np.where((scaled_radii < 1.1) & (phys_vel>(vel_scal*curr_v200m)))] = 0
         if np.where((scaled_radii < 1.1) & (phys_vel>(vel_scal*curr_v200m)))[0].shape[0] > int(np.floor(per_of_halo * ptl_rad.shape[0])):
             constraint = np.where((scaled_radii < 1.1) & (phys_vel>(vel_scal*curr_v200m)))[0]
-            halo_plot_3d_vec(curr_ptl_pos, curr_ptl_vel, halo_pos, halo_vel, curr_orb_assn, constraint, curr_halo_idx)
+            halo_plot_3d_vec(curr_ptl_pos, curr_ptl_vel, halo_pos, halo_vel, halo_r200m, curr_orb_assn, constraint, curr_halo_idx)
         
     scaled_radii_inds = scaled_radii.argsort()
     scaled_radii = scaled_radii[scaled_radii_inds]
