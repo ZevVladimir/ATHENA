@@ -16,6 +16,7 @@ import shutil
 
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir
 from utils.calculation_functions import *
+from utils.visualization_functions import halo_plot_3d_vec
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
@@ -173,10 +174,15 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
     scaled_tang_vel = fnd_tang_vel / curr_v200m
     scaled_radii = ptl_rad / halo_r200m
     
+    vel_scal = 3
+    per_of_halo = 0.3
     if comp_snap == False:
         # particles with very high radial velocities at small radii should be considered infalling
         # incorrectly classified
-        curr_orb_assn[np.where((scaled_radii < 1.1) & (np.abs(phys_vel)>(3*curr_v200m)))] = 0
+        curr_orb_assn[np.where((scaled_radii < 1.1) & (phys_vel>(vel_scal*curr_v200m)))] = 0
+        if np.where((scaled_radii < 1.1) & (phys_vel>(vel_scal*curr_v200m)))[0].shape[0] > int(np.floor(per_of_halo * ptl_rad.shape[0])):
+            constraint = np.where((scaled_radii < 1.1) & (phys_vel>(vel_scal*curr_v200m)))[0]
+            halo_plot_3d_vec(curr_ptl_pos, curr_ptl_vel, halo_pos, halo_vel, curr_orb_assn, constraint, curr_halo_idx)
         
     scaled_radii_inds = scaled_radii.argsort()
     scaled_radii = scaled_radii[scaled_radii_inds]
@@ -186,7 +192,7 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
     #scal_sqr_phys_vel = scal_sqr_phys_vel[scaled_radii_inds]
     if comp_snap == False:
         curr_orb_assn = curr_orb_assn[scaled_radii_inds]
-        
+
     if comp_snap == False:
         return fnd_HIPIDs, curr_orb_assn, scaled_rad_vel, scaled_tang_vel, scaled_radii
     else:
