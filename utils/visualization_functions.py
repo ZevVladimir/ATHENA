@@ -20,6 +20,7 @@ from scipy.spatial import cKDTree
 import sys
 from matplotlib.animation import FuncAnimation
 import seaborn as sns
+import plotly.graph_objects as go
 
 from utils.data_and_loading_functions import check_pickle_exist_gadget, create_directory, find_closest_z, load_or_pickle_ptl_data, timed
 from utils.calculation_functions import calc_v200m, calculate_density
@@ -1079,206 +1080,7 @@ def plot_halo_ptls(pos, act_labels, save_path, pred_labels = None):
     ax.set_ylabel("Y position (kpc)")
     ax.legend()
     fig.savefig(save_path + "plot_of_halo_label_dist.png")
-
-def get_ptl_halo_pos(snap_loc, p_snap, num_plt_snaps, i, sparta_z, low_tjy_loc, high_tjy_loc, low_idxs, high_idxs, halos_pos, halos_vel, halos_r200m):
-    curr_snap = (p_snap-num_plt_snaps) + i + 1
-    snapshot_path = snap_loc + "snapdir_" + snap_format.format(curr_snap) + "/snapshot_" + snap_format.format(curr_snap)
-    if os.path.isdir(snap_loc + "snapdir_" + snap_format.format(curr_snap)):
-        curr_red_shift = readheader(snapshot_path, 'redshift')
-        curr_scale_factor = 1/(1+curr_red_shift)
-        curr_sparta_snap = np.abs(sparta_z - curr_red_shift).argmin()
-
-        ptls_pos = readsnap(snapshot_path, 'pos', 'dm', suppress=1) * 10**3 * curr_scale_factor
-        ptls_vel = readsnap(snapshot_path, 'vel', 'dm', suppress=1)
-        
-        low_use_ptl_pos = ptls_pos[low_tjy_loc,:]
-        low_use_ptl_vel = ptls_vel[low_tjy_loc,:]
-        high_use_ptl_pos = ptls_pos[high_tjy_loc,:]
-        high_use_ptl_vel = ptls_vel[high_tjy_loc,:]
-        
-        low_use_halo_pos = halos_pos[low_idxs,curr_sparta_snap]
-        low_use_halo_vel = halos_vel[low_idxs,curr_sparta_snap]
-        low_use_halo_r200m =  halos_r200m[low_idxs,curr_sparta_snap]
-        
-        high_use_halo_pos = halos_pos[high_idxs,curr_sparta_snap]
-        high_use_halo_vel = halos_vel[high_idxs,curr_sparta_snap]
-        high_use_halo_r200m = halos_r200m[high_idxs,curr_sparta_snap]
-
-        return low_use_ptl_pos,low_use_ptl_vel,high_use_ptl_pos,high_use_ptl_vel,low_use_halo_pos,low_use_halo_vel,low_use_halo_r200m,high_use_halo_pos,high_use_halo_vel,high_use_halo_r200m
-
-def update_anim(curr_frame, ax, q, halo_pos, halo_vel, ptl_pos, ptl_vel, radius, snap_hist, num_halo_search, halo_clrs, alphas, p_snap, p_box_size, num_plt_snaps):
-    with timed("Frame " + str(curr_frame) + " completed"):
-        for i in range(num_halo_search):
-            if curr_frame == 1:
-                ax.scatter(np.array([]),np.array([]),color=halo_clrs[i], label=("Halo " + str(i)))
-            
-            ax.quiver(halo_pos[curr_frame,i,0],halo_pos[curr_frame,i,1],halo_pos[curr_frame,i,2],halo_vel[curr_frame,i,0],halo_vel[curr_frame,i,1],halo_vel[curr_frame,i,2], alpha=alphas[curr_frame], color=halo_clrs[i])
-            # u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
-            # x = halo_pos[i,j,0] + radius[i,j] * np.cos(u)*np.sin(v)
-            # y = halo_pos[i,j,1] + radius[i,j] * np.sin(u)*np.sin(v)
-            # z = halo_pos[i,j,2] + radius[i,j] * np.cos(v)
-
-            # ax.plot_wireframe(x, y, z, color=halo_clrs[j])
-            # ax.set_box_aspect([1,1,1])
-        
-        if curr_frame == 1:
-            ax.scatter(np.array([]),np.array([]), color="blue", label = "Ptl")
-            ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-
-        if (p_snap-num_plt_snaps+curr_frame+1) in snap_hist:
-            ax.quiver(ptl_pos[curr_frame,0],ptl_pos[curr_frame,1],ptl_pos[curr_frame,2],ptl_vel[curr_frame,0],ptl_vel[curr_frame,1],ptl_vel[curr_frame,2], color="red", alpha=1, label="Orbiting Event Snap:"+str(p_snap-num_plt_snaps+curr_frame+1))
-            ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-        else:
-            ax.quiver(ptl_pos[curr_frame,0],ptl_pos[curr_frame,1],ptl_pos[curr_frame,2],ptl_vel[curr_frame,0],ptl_vel[curr_frame,1],ptl_vel[curr_frame,2], color="blue", alpha=alphas[curr_frame])
-
-        if curr_frame == 0:    
-            min_x = np.amin([np.amin(halo_pos[:,:,0]),np.amin(ptl_pos[:,0])])
-            max_x = np.amax([np.amax(halo_pos[:,:,0]),np.amin(ptl_pos[:,0])])
-            min_y = np.amin([np.amin(halo_pos[:,:,1]),np.amin(ptl_pos[:,1])])
-            max_y = np.amax([np.amax(halo_pos[:,:,1]),np.amin(ptl_pos[:,1])])
-            min_z = np.amin([np.amin(halo_pos[:,:,2]),np.amin(ptl_pos[:,2])])
-            max_z = np.amax([np.amax(halo_pos[:,:,2]),np.amin(ptl_pos[:,2])])
-            
-            # x_adj = 0.5*(max_x-min_x)
-            # y_adj = 0.5*(max_y-min_y)
-            # z_adj = 0.5*(max_z-min_z)
-            x_adj=0
-            y_adj=0
-            z_adj=0
-
-            ax.set_xlim(np.max([min_x-x_adj,0]), np.min([(max_x+x_adj),p_box_size]))
-            ax.set_ylim(np.max([min_y-y_adj,0]), np.min([(max_y+y_adj),p_box_size]))
-            ax.set_zlim(np.max([min_z-z_adj,0]), np.min([(max_z+z_adj),p_box_size]))
-
-        ax.text2D(.01,.95, s=str("Snapshot: " + str(p_snap-num_plt_snaps+curr_frame+1)), ha="left", va="top", transform=ax.transAxes, fontsize="x-large", bbox={"facecolor":'white',"alpha":.9,})
-        
-    return q,
-
-def anim_ptl_path(snap_loc,red_shift,cosmol,num_halo_search,num_plt_snaps,ptl_props_path,save_path):
-    with timed("sparta info load time"):
-        with h5py.File(path_to_hdf5_file,"r") as file:      
-            p_snap, p_red_shift = find_closest_z(red_shift)
-            print("Snapshot number found:", p_snap, "Closest redshift found:", p_red_shift)
-            tot_num_halos = file['halos']['id'][:].shape[0]
-            use_halos = np.zeros(tot_num_halos)
-            use_halos[0]=1
-            # num_halos = file
-            with timed("SPARTA load:"):
-                sparta_output = sparta.load(filename=path_to_hdf5_file, load_halo_data=False, halo_mask = use_halos, log_level= 0)
-            all_red_shifts = sparta_output["simulation"]["snap_z"][:]
-            p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
-            print("corresponding SPARTA snap num:", p_sparta_snap)
-            print("check sparta redshift:",all_red_shifts[p_sparta_snap])
-            
-            # Set constants
-            p_snapshot_path = snap_loc + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
-
-            p_scale_factor = 1/(1+p_red_shift)
-            p_hubble_constant = cosmol.Hz(p_red_shift) * 0.001 # convert to units km/s/kpc
-            sim_box_size = sparta_output["simulation"]["box_size"] #units Mpc/h comoving
-            p_box_size = sim_box_size * 10**3 * p_scale_factor #convert to Kpc/h physical
-
-            p_snap_dict = {
-                "snap":p_snap,
-                "red_shift":p_red_shift,
-                "scale_factor": p_scale_factor,
-                "hubble_const": p_hubble_constant,
-                "box_size": p_box_size,
-            }
-            halos_pos = file['halos']['position'][:,:,:] * 10**3 * p_scale_factor
-            halos_vel = file['halos']['velocity'][:,:,:]
-            halos_r200m = file['halos']['R200m'][:]
-            tcr_id = file['tcr_ptl']['res_oct']['tracer_id'][:]
-
-            with timed("ptl info load"):
-                p_ptls_pid, p_ptls_vel, p_ptls_pos = load_or_pickle_ptl_data(curr_sparta_file, str(p_snap), p_snapshot_path, p_scale_factor)
-            
-            snap_hist = file['tcr_ptl']['res_oct']['snap_hist'][:]
-            sparta_z = sparta_output["simulation"]["snap_z"][:]
-
-    with timed("ptl prop load time"):
-        with h5py.File(ptl_props_path, 'a') as all_particle_properties:
-            scaled_rad_vel = all_particle_properties["Radial_vel_"][:,0]
-            scal_rad = all_particle_properties["Scaled_radii_"][:,0]
-            hipids = all_particle_properties["HIPIDS"][:]
-            labels = all_particle_properties["Orbit_Infall"][:]
-
-    # conditions
-    low_mask = np.logical_and.reduce(((scal_rad>=0.9), (scal_rad<1.05), (labels==1)))
-    high_mask = np.logical_and.reduce(((scal_rad>=1.05), (scal_rad<1.2), (labels==1)))
-    # find where in original array the array with the conditions applied is max
-    print(np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[low_mask])))[0].shape)
-    print("radial vel low rad ptl:",scaled_rad_vel[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[low_mask])))[0][0]])
-    print("radial vel high rad ptl:",scaled_rad_vel[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[high_mask])))[0][0]])
-    low_id = depair(hipids[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[low_mask])))[0][0]])
-    high_id = depair(hipids[np.where(scaled_rad_vel==np.max(np.abs(scaled_rad_vel[high_mask])))[0][0]])
-
-    low_tjy_loc = np.where(p_ptls_pid==low_id[0])[0]
-    high_tjy_loc = np.where(p_ptls_pid==high_id[0])[0]
-
-    low_snap_hist = snap_hist[np.where(tcr_id==low_id[0])[0]].ravel()
-    high_snap_hist = snap_hist[np.where(tcr_id==high_id[0])[0]].ravel()
-
-    print(low_snap_hist,high_snap_hist)
-
-    tree = cKDTree(data = halos_pos[:,p_sparta_snap,:], leafsize = 3, balanced_tree = False, boxsize = p_box_size)
-    low_dist, low_idxs = tree.query(p_ptls_pos[low_tjy_loc,:], k=num_halo_search, workers=num_processes)
-    high_dist, high_idxs = tree.query(p_ptls_pos[high_tjy_loc,:], k=num_halo_search, workers=num_processes)
-    low_idxs = low_idxs[0]
-    high_idxs = high_idxs[0]
-
-    all_low_use_ptl_pos = np.zeros((num_plt_snaps,3))
-    all_low_use_ptl_vel = np.zeros((num_plt_snaps,3))
-    all_high_use_ptl_pos = np.zeros((num_plt_snaps,3))
-    all_high_use_ptl_vel = np.zeros((num_plt_snaps,3))
-    all_low_use_halo_pos = np.zeros((num_plt_snaps,num_halo_search,3))
-    all_low_use_halo_vel = np.zeros((num_plt_snaps,num_halo_search,3))
-    all_low_use_halo_r200m = np.zeros((num_plt_snaps,num_halo_search))
-    all_high_use_halo_pos = np.zeros((num_plt_snaps,num_halo_search,3))
-    all_high_use_halo_vel = np.zeros((num_plt_snaps,num_halo_search,3))
-    all_high_use_halo_r200m = np.zeros((num_plt_snaps,num_halo_search))
-
-    with mp.Pool(processes=num_processes) as p:
-        # halo position, halo r200m, if comparison snap, want mass?, want indices?
-        low_use_ptl_pos,low_use_ptl_vel,high_use_ptl_pos,high_use_ptl_vel,low_use_halo_pos,low_use_halo_vel,low_use_halo_r200m,high_use_halo_pos,high_use_halo_vel,high_use_halo_r200m = zip(*p.starmap(get_ptl_halo_pos, 
-                                                zip(repeat(snap_loc),repeat(p_snap),repeat(num_plt_snaps),np.arange(0,num_plt_snaps),repeat(sparta_z),repeat(low_tjy_loc),
-                                                    repeat(high_tjy_loc), repeat(low_idxs), repeat(high_idxs), repeat(halos_pos), repeat(halos_vel), repeat(halos_r200m)),
-                                                    chunksize=curr_chunk_size))
-    p.close()
-    p.join() 
     
-    all_low_use_ptl_pos = np.stack(low_use_ptl_pos, axis=0).squeeze()
-    all_low_use_ptl_vel = np.stack(low_use_ptl_vel, axis=0).squeeze()
-    all_high_use_ptl_pos = np.stack(high_use_ptl_pos, axis=0).squeeze()
-    all_high_use_ptl_vel = np.stack(high_use_ptl_vel, axis=0).squeeze()
-    all_low_use_halo_pos = np.stack(low_use_halo_pos, axis=0)
-    all_low_use_halo_vel = np.stack(low_use_halo_vel, axis=0)
-    all_low_use_halo_r200m = np.stack(low_use_halo_r200m, axis=0)
-    all_high_use_halo_pos = np.stack(high_use_halo_pos, axis=0)
-    all_high_use_halo_vel = np.stack(high_use_halo_vel, axis=0)
-    all_high_use_halo_r200m = np.stack(high_use_halo_r200m, axis=0)
-    print(all_low_use_ptl_pos.shape)
-    print(all_low_use_halo_pos.shape)
-
-    halo_clrs = plt.cm.viridis(np.linspace(0, 1, num_halo_search))
-    alphas = np.logspace(np.log10(0.1),np.log10(1),num_plt_snaps)
-
-    low_fig = plt.figure()
-    low_ax = low_fig.add_subplot(projection='3d')
-    q = low_ax.quiver([], [], [], [], [], [], color='r')
-
-    high_fig = plt.figure()
-    high_ax = high_fig.add_subplot(projection='3d')
-    q = high_ax.quiver([], [], [], [], [], [], color='r')
-
-    fps = 3
-                                                                
-    ani = FuncAnimation(low_fig, update_anim, frames=num_plt_snaps, fargs=(low_ax, q, all_low_use_halo_pos, all_low_use_halo_vel, all_low_use_ptl_pos, all_low_use_ptl_vel, all_low_use_halo_r200m, low_snap_hist, num_halo_search, halo_clrs,alphas,p_snap,p_box_size,num_plt_snaps), interval=200, blit=True)
-    ani.save(save_path+"low_ptl_track.mp4", writer='ffmpeg', fps=fps)
-
-    ani = FuncAnimation(high_fig, update_anim, frames=num_plt_snaps, fargs=(high_ax, q, all_high_use_halo_pos, all_high_use_halo_vel, all_high_use_ptl_pos, all_high_use_ptl_vel, all_high_use_halo_r200m, high_snap_hist, num_halo_search, halo_clrs,alphas,p_snap,p_box_size,num_plt_snaps), interval=200, blit=True)
-    ani.save(save_path+"high_ptl_track.mp4", writer='ffmpeg', fps=fps)
-
 def halo_plot_3d(ptl_pos, halo_pos, real_labels, preds):
     axis_cut = 2
     
@@ -1379,6 +1181,88 @@ def halo_plot_3d(ptl_pos, halo_pos, real_labels, preds):
     
     fig.savefig("/home/zvladimi/MLOIS/Random_figures/one_halo.png")
     
+def compute_alpha(num_points, max_alpha=1.0, min_alpha=0.001, scaling_factor=0.5):
+    return max(min_alpha, max_alpha * (scaling_factor / (num_points ** 0.5)))    
+    
+def halo_plot_3d_vec(ptl_pos, ptl_vel, halo_pos, halo_vel, halo_r200m, labels, constraint, halo_idx):
+    inf_ptls = np.where(labels == 0)[0]
+    orb_ptls = np.where(labels == 1)[0]
+    
+    inf_ptls_cnstrn = np.intersect1d(inf_ptls, constraint)
+    orb_ptls_cnstrn = np.intersect1d(orb_ptls, constraint)
+    
+    min_alpha = 0.001
+    max_alpha = 1
+    all_alpha = compute_alpha(inf_ptls.shape[0])
+    cnstrn_alpha = compute_alpha(inf_ptls_cnstrn.shape[0])
+
+    axis_fontsize=14
+    title_fontsize=24
+    
+    fig1 = go.Figure()
+    
+    fig1.add_trace(go.Cone(x=ptl_pos[inf_ptls,0], y=ptl_pos[inf_ptls,1], z=ptl_pos[inf_ptls,2],
+                          u=ptl_vel[inf_ptls,0], v=ptl_vel[inf_ptls,1], w=ptl_vel[inf_ptls,2],
+                          colorscale=[[0, 'green'], [1, 'green']],sizemode='raw',sizeref=1,showscale=False,opacity=all_alpha,name='Infalling'))
+
+    fig1.add_trace(go.Cone(x=ptl_pos[orb_ptls,0], y=ptl_pos[orb_ptls,1], z=ptl_pos[orb_ptls,2],
+                          u=ptl_vel[orb_ptls,0], v=ptl_vel[orb_ptls,1], w=ptl_vel[orb_ptls,2],
+                          colorscale=[[0, 'blue'], [1, 'blue']],sizemode='raw',sizeref=1,showscale=False,opacity=all_alpha,name='Orbiting'))
+    
+    print(halo_pos[0],halo_pos[1],halo_pos[2])
+    print(halo_vel[0],halo_vel[1],halo_vel[2])
+    fig1.add_trace(go.Cone(x=[halo_pos[0]], y=[halo_pos[1]], z=[halo_pos[2]],
+                          u=[halo_vel[0]], v=[halo_vel[1]], w=[halo_vel[2]],
+                          colorscale=[[0, 'red'], [1, 'red']],sizemode='raw',sizeref=1,showscale=False,opacity=1,name='Halo Center'))
+    
+    fig1.update_layout(
+    scene=dict(
+        xaxis=dict(title='X position (kpc/h)', range=[halo_pos[0] - 10 * halo_r200m,halo_pos[0] + 10 * halo_r200m]),
+        yaxis=dict(title='Y position (kpc/h)', range=[halo_pos[1] - 10 * halo_r200m,halo_pos[1] + 10 * halo_r200m]),
+        zaxis=dict(title='Z position (kpc/h)', range=[halo_pos[2] - 10 * halo_r200m,halo_pos[2] + 10 * halo_r200m])
+    ),
+    title='All Particles',
+    legend=dict(
+        x=0.8,
+        y=0.9,
+        title="Legend"
+    )
+    )
+    fig1.show()
+    fig1.write_html(path_to_MLOIS + "/Random_figs/all_ptl_high_vel_halo_idx_" + str(halo_idx) + ".html")
+    
+    fig2 = go.Figure()
+    
+    if inf_ptls_cnstrn.shape[0] > 0:
+        fig2.add_trace(go.Cone(x=ptl_pos[inf_ptls_cnstrn,0], y=ptl_pos[inf_ptls_cnstrn,1], z=ptl_pos[inf_ptls_cnstrn,2],
+                          u=ptl_vel[inf_ptls_cnstrn,0], v=ptl_vel[inf_ptls_cnstrn,1], w=ptl_vel[inf_ptls_cnstrn,2],
+                          colorscale=[[0, 'green'], [1, 'green']],sizemode='raw',sizeref=1,showscale=False,opacity=cnstrn_alpha,name='Infalling'))
+    if orb_ptls_cnstrn.shape[0] > 0:
+        fig2.add_trace(go.Cone(x=ptl_pos[orb_ptls_cnstrn,0], y=ptl_pos[orb_ptls_cnstrn,1], z=ptl_pos[orb_ptls_cnstrn,2],
+                          u=ptl_vel[orb_ptls_cnstrn,0], v=ptl_vel[orb_ptls_cnstrn,1], w=ptl_vel[orb_ptls_cnstrn,2],
+                          colorscale=[[0, 'blue'], [1, 'blue']],sizemode='raw',sizeref=1,showscale=False,opacity=cnstrn_alpha,name='Orbiting'))
+    fig2.add_trace(go.Cone(x=[halo_pos[0]], y=[halo_pos[1]], z=[halo_pos[2]],
+                          u=[halo_vel[0]], v=[halo_vel[1]], w=[halo_vel[2]],
+                          colorscale=[[0, 'red'], [1, 'red']],sizemode='raw',sizeref=1,showscale=False,opacity=1,name='Halo Center'))
+    
+    fig2.update_layout(
+    scene=dict(
+        xaxis=dict(title='X position (kpc/h)', range=[halo_pos[0] - 10 * halo_r200m,halo_pos[0] + 10 * halo_r200m]),
+        yaxis=dict(title='Y position (kpc/h)', range=[halo_pos[1] - 10 * halo_r200m,halo_pos[1] + 10 * halo_r200m]),
+        zaxis=dict(title='Z position (kpc/h)', range=[halo_pos[2] - 10 * halo_r200m,halo_pos[2] + 10 * halo_r200m])
+    ),
+    title='Only Ptls within 1.1R200m with High Physical Vel',
+    legend=dict(
+        x=0.8,
+        y=0.9,
+        title="Legend"
+    )
+    )
+    fig2.show()
+    fig2.write_html(path_to_MLOIS + "/Random_figs/cnstrn_high_vel_halo_idx_" + str(halo_idx) + ".html")
+    
+    
+    
 def plot_rad_dist(bin_edges,filter_radii,save_path):
     fig,ax = plt.subplots(1,2,figsize=(25,10))
     ax[0].hist(filter_radii)
@@ -1433,3 +1317,5 @@ def plot_orb_inf_dist(num_bins, radii, orb_inf, save_path):
     ax[1].legend()
     
     fig.savefig(save_path + "orb_inf_dist.png",bbox_inches="tight")
+
+
