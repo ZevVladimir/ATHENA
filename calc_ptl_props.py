@@ -182,7 +182,7 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
         curr_orb_assn[np.where((scaled_radii < 1.1) & (phys_vel>(vel_scal*curr_v200m)))] = 0
         if np.where((scaled_radii < 1.1) & (phys_vel>(vel_scal*curr_v200m)))[0].shape[0] > int(np.floor(per_of_halo * ptl_rad.shape[0])):
             constraint = np.where((scaled_radii < 1.1) & (phys_vel>(vel_scal*curr_v200m)))[0]
-            halo_plot_3d_vec(curr_ptl_pos, curr_ptl_vel, halo_pos, halo_vel, halo_r200m, curr_orb_assn, constraint, curr_halo_idx)
+            halo_plot_3d_vec(curr_ptl_pos, curr_ptl_vel, halo_pos, halo_vel, halo_r200m, curr_orb_assn, constraint, curr_halo_idx,vel_scal)
         
     scaled_radii_inds = scaled_radii.argsort()
     scaled_radii = scaled_radii[scaled_radii_inds]

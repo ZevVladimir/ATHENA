@@ -21,6 +21,7 @@ import sys
 from matplotlib.animation import FuncAnimation
 import seaborn as sns
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from utils.data_and_loading_functions import check_pickle_exist_gadget, create_directory, find_closest_z, load_or_pickle_ptl_data, timed
 from utils.calculation_functions import calc_v200m, calculate_density
@@ -1184,7 +1185,7 @@ def halo_plot_3d(ptl_pos, halo_pos, real_labels, preds):
 def compute_alpha(num_points, max_alpha=1.0, min_alpha=0.001, scaling_factor=0.5):
     return max(min_alpha, max_alpha * (scaling_factor / (num_points ** 0.5)))    
     
-def halo_plot_3d_vec(ptl_pos, ptl_vel, halo_pos, halo_vel, halo_r200m, labels, constraint, halo_idx):
+def halo_plot_3d_vec(ptl_pos, ptl_vel, halo_pos, halo_vel, halo_r200m, labels, constraint, halo_idx, v200m_scale):
     inf_ptls = np.where(labels == 0)[0]
     orb_ptls = np.where(labels == 1)[0]
     
@@ -1199,68 +1200,58 @@ def halo_plot_3d_vec(ptl_pos, ptl_vel, halo_pos, halo_vel, halo_r200m, labels, c
     axis_fontsize=14
     title_fontsize=24
     
-    fig1 = go.Figure()
-    
-    fig1.add_trace(go.Cone(x=ptl_pos[inf_ptls,0], y=ptl_pos[inf_ptls,1], z=ptl_pos[inf_ptls,2],
-                          u=ptl_vel[inf_ptls,0], v=ptl_vel[inf_ptls,1], w=ptl_vel[inf_ptls,2],
-                          colorscale=[[0, 'green'], [1, 'green']],sizemode='raw',sizeref=1,showscale=False,opacity=all_alpha,name='Infalling'))
+    fig = make_subplots(rows=1, cols=2, specs=[[{'type': 'scatter3d'}, {'type': 'scatter3d'}]],subplot_titles=["All Particles",'<1.1R200m and >'+str(v200m_scale)+"v200m"])
 
-    fig1.add_trace(go.Cone(x=ptl_pos[orb_ptls,0], y=ptl_pos[orb_ptls,1], z=ptl_pos[orb_ptls,2],
+    
+    fig.add_trace(go.Cone(x=ptl_pos[inf_ptls,0], y=ptl_pos[inf_ptls,1], z=ptl_pos[inf_ptls,2],
+                          u=ptl_vel[inf_ptls,0], v=ptl_vel[inf_ptls,1], w=ptl_vel[inf_ptls,2],
+                          colorscale=[[0, 'green'], [1, 'green']],sizemode='raw',sizeref=1,showscale=False,
+                          opacity=all_alpha,name='Infalling'),row=1,col=1)
+    fig.add_trace(go.Cone(x=[0], y=[0], z=[0],
+                          u=[0], v=[0], w=[0],
+                          colorscale=[[0, 'green'], [1, 'green']],sizemode='raw',sizeref=1,showscale=False,
+                          opacity=1,name='Infalling',showlegend=True),row=1,col=1)
+
+    fig.add_trace(go.Cone(x=ptl_pos[orb_ptls,0], y=ptl_pos[orb_ptls,1], z=ptl_pos[orb_ptls,2],
                           u=ptl_vel[orb_ptls,0], v=ptl_vel[orb_ptls,1], w=ptl_vel[orb_ptls,2],
-                          colorscale=[[0, 'blue'], [1, 'blue']],sizemode='raw',sizeref=1,showscale=False,opacity=all_alpha,name='Orbiting'))
+                          colorscale=[[0, 'blue'], [1, 'blue']],sizemode='raw',sizeref=1,showscale=False,
+                          opacity=all_alpha,name='Orbiting'),row=1,col=1)
+    fig.add_trace(go.Cone(x=[0], y=[0], z=[0],
+                          u=[0], v=[0], w=[0],
+                          colorscale=[[0, 'blue'], [1, 'blue']],sizemode='raw',sizeref=1,showscale=False,
+                          opacity=1,name='Orbiting',showlegend=True),row=1,col=1)
     
-    print(halo_pos[0],halo_pos[1],halo_pos[2])
-    print(halo_vel[0],halo_vel[1],halo_vel[2])
-    fig1.add_trace(go.Cone(x=[halo_pos[0]], y=[halo_pos[1]], z=[halo_pos[2]],
+    fig.add_trace(go.Cone(x=[halo_pos[0]], y=[halo_pos[1]], z=[halo_pos[2]],
                           u=[halo_vel[0]], v=[halo_vel[1]], w=[halo_vel[2]],
-                          colorscale=[[0, 'red'], [1, 'red']],sizemode='raw',sizeref=1,showscale=False,opacity=1,name='Halo Center'))
-    
-    fig1.update_layout(
-    scene=dict(
-        xaxis=dict(title='X position (kpc/h)', range=[halo_pos[0] - 10 * halo_r200m,halo_pos[0] + 10 * halo_r200m]),
-        yaxis=dict(title='Y position (kpc/h)', range=[halo_pos[1] - 10 * halo_r200m,halo_pos[1] + 10 * halo_r200m]),
-        zaxis=dict(title='Z position (kpc/h)', range=[halo_pos[2] - 10 * halo_r200m,halo_pos[2] + 10 * halo_r200m])
-    ),
-    title='All Particles',
-    legend=dict(
-        x=0.8,
-        y=0.9,
-        title="Legend"
-    )
-    )
-    fig1.show()
-    fig1.write_html(path_to_MLOIS + "/Random_figs/all_ptl_high_vel_halo_idx_" + str(halo_idx) + ".html")
-    
-    fig2 = go.Figure()
+                          colorscale=[[0, 'red'], [1, 'red']],sizemode='raw',sizeref=1,showscale=False,
+                          opacity=1,name='Halo Center',showlegend=True),row=1,col=1)
     
     if inf_ptls_cnstrn.shape[0] > 0:
-        fig2.add_trace(go.Cone(x=ptl_pos[inf_ptls_cnstrn,0], y=ptl_pos[inf_ptls_cnstrn,1], z=ptl_pos[inf_ptls_cnstrn,2],
+        fig.add_trace(go.Cone(x=ptl_pos[inf_ptls_cnstrn,0], y=ptl_pos[inf_ptls_cnstrn,1], z=ptl_pos[inf_ptls_cnstrn,2],
                           u=ptl_vel[inf_ptls_cnstrn,0], v=ptl_vel[inf_ptls_cnstrn,1], w=ptl_vel[inf_ptls_cnstrn,2],
-                          colorscale=[[0, 'green'], [1, 'green']],sizemode='raw',sizeref=1,showscale=False,opacity=cnstrn_alpha,name='Infalling'))
+                          colorscale=[[0, 'green'], [1, 'green']],sizemode='raw',sizeref=1,showscale=False,
+                          opacity=cnstrn_alpha,name='Infalling'),row=1,col=2)
     if orb_ptls_cnstrn.shape[0] > 0:
-        fig2.add_trace(go.Cone(x=ptl_pos[orb_ptls_cnstrn,0], y=ptl_pos[orb_ptls_cnstrn,1], z=ptl_pos[orb_ptls_cnstrn,2],
+        fig.add_trace(go.Cone(x=ptl_pos[orb_ptls_cnstrn,0], y=ptl_pos[orb_ptls_cnstrn,1], z=ptl_pos[orb_ptls_cnstrn,2],
                           u=ptl_vel[orb_ptls_cnstrn,0], v=ptl_vel[orb_ptls_cnstrn,1], w=ptl_vel[orb_ptls_cnstrn,2],
-                          colorscale=[[0, 'blue'], [1, 'blue']],sizemode='raw',sizeref=1,showscale=False,opacity=cnstrn_alpha,name='Orbiting'))
-    fig2.add_trace(go.Cone(x=[halo_pos[0]], y=[halo_pos[1]], z=[halo_pos[2]],
+                          colorscale=[[0, 'blue'], [1, 'blue']],sizemode='raw',sizeref=1,showscale=False,
+                          opacity=cnstrn_alpha,name='Orbiting'),row=1,col=2)
+    fig.add_trace(go.Cone(x=[halo_pos[0]], y=[halo_pos[1]], z=[halo_pos[2]],
                           u=[halo_vel[0]], v=[halo_vel[1]], w=[halo_vel[2]],
-                          colorscale=[[0, 'red'], [1, 'red']],sizemode='raw',sizeref=1,showscale=False,opacity=1,name='Halo Center'))
-    
-    fig2.update_layout(
-    scene=dict(
+                          colorscale=[[0, 'red'], [1, 'red']],sizemode='raw',sizeref=1,showscale=False,
+                          opacity=1,name='Halo Center',showlegend=True),row=1,col=2)
+
+    fig.update_scenes(
         xaxis=dict(title='X position (kpc/h)', range=[halo_pos[0] - 10 * halo_r200m,halo_pos[0] + 10 * halo_r200m]),
         yaxis=dict(title='Y position (kpc/h)', range=[halo_pos[1] - 10 * halo_r200m,halo_pos[1] + 10 * halo_r200m]),
-        zaxis=dict(title='Z position (kpc/h)', range=[halo_pos[2] - 10 * halo_r200m,halo_pos[2] + 10 * halo_r200m])
-    ),
-    title='Only Ptls within 1.1R200m with High Physical Vel',
-    legend=dict(
-        x=0.8,
-        y=0.9,
-        title="Legend"
-    )
-    )
-    fig2.show()
-    fig2.write_html(path_to_MLOIS + "/Random_figs/cnstrn_high_vel_halo_idx_" + str(halo_idx) + ".html")
-    
+        zaxis=dict(title='Z position (kpc/h)', range=[halo_pos[2] - 10 * halo_r200m,halo_pos[2] + 10 * halo_r200m]),
+        row=1,col=1)
+    fig.update_scenes(
+        xaxis=dict(title='X position (kpc/h)', range=[halo_pos[0] - 10 * halo_r200m,halo_pos[0] + 10 * halo_r200m]),
+        yaxis=dict(title='Y position (kpc/h)', range=[halo_pos[1] - 10 * halo_r200m,halo_pos[1] + 10 * halo_r200m]),
+        zaxis=dict(title='Z position (kpc/h)', range=[halo_pos[2] - 10 * halo_r200m,halo_pos[2] + 10 * halo_r200m]),
+        row=1,col=2)
+    fig.write_html(path_to_MLOIS + "/Random_figs/high_vel_halo_idx_" + str(halo_idx) + ".html")
     
     
 def plot_rad_dist(bin_edges,filter_radii,save_path):
