@@ -12,7 +12,7 @@ from itertools import repeat
 import sys
 import re
 import pandas as pd
-import shutil
+import psutil
 
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir
 from utils.calculation_functions import *
@@ -62,6 +62,10 @@ from pygadgetreader import readsnap, readheader # type: ignore
 from sparta_tools import sparta # type: ignore
 ##################################################################################################################
 
+def memory_usage():
+    process = psutil.Process(os.getpid())
+    return process.memory_info().rss
+
 def find_start_pnt(directory):
     max_number = 0
     number_pattern = re.compile(r'(\d+)')
@@ -97,7 +101,6 @@ def det_halo_splits(mem_arr, mem_lim):
     return split_idxs
             
 def initial_search(halo_positions, halo_r200m, comp_snap, find_mass = False, find_ptl_indices = False):
-    global search_rad
     if comp_snap:
         tree = c_ptl_tree
     else:
@@ -198,21 +201,14 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
     else:
         return fnd_HIPIDs, scaled_rad_vel, scaled_tang_vel, scaled_radii
 
-def halo_loop(rst_pnt, indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos, p_ptls_vel, c_dict, c_ptls_pid, c_ptls_pos, c_ptls_vel):
-    num_iter = len(halo_splits)
-    prnt_halo_splits = halo_splits.copy()
-    prnt_halo_splits.append(indices.size)
-    print("Num halos in each split:", ", ".join(map(str, np.diff(prnt_halo_splits))) + ".", num_iter, "splits")
-    hdf5_ptl_idx = 0
-    hdf5_halo_idx = 0
-    
-    for i in range(num_iter):
-        with timed("Split "+str(i+1)+"/"+str(num_iter)):
+def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos, p_ptls_vel, c_dict, c_ptls_pid, c_ptls_pos, c_ptls_vel):
+        print(f"Initial memory usage: {memory_usage() / 1024**3:.2f} GB")
+        with timed("Split "+str(curr_iter+1)+"/"+str(num_iter)):
             # Get the indices corresponding to where we are in the number of iterations (0:num_halo_persplit) -> (num_halo_persplit:2*num_halo_persplit) etc
-            if i < (num_iter - 1):
-                use_indices = indices[halo_splits[i]:halo_splits[i+1]]
+            if curr_iter < (num_iter - 1):
+                use_indices = indices[halo_splits[curr_iter]:halo_splits[curr_iter+1]]
             else:
-                use_indices = indices[halo_splits[i]:]
+                use_indices = indices[halo_splits[curr_iter]:]
             
             curr_num_halos = use_indices.shape[0]
             use_halo_ids = p_halo_ids[use_indices]
@@ -230,6 +226,7 @@ def halo_loop(rst_pnt, indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids,
             p_use_halos_pos = sparta_output['halos']['position'][:,p_sparta_snap] * 10**3 * p_scale_factor 
             p_use_halos_r200m = sparta_output['halos']['R200m'][:,p_sparta_snap]
 
+            
             with mp.Pool(processes=num_processes) as p:
                 # halo position, halo r200m, if comparison snap, want mass?, want indices?
                 p_use_num_ptls, p_curr_ptl_indices = zip(*p.starmap(initial_search, zip(p_use_halos_pos, p_use_halos_r200m, repeat(False), repeat(False), repeat(True)), chunksize=curr_chunk_size))
@@ -250,7 +247,7 @@ def halo_loop(rst_pnt, indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids,
             p_start_num_ptls = np.cumsum(p_use_num_ptls)
             p_start_num_ptls = np.insert(p_start_num_ptls, 0, 0)
             p_start_num_ptls = np.delete(p_start_num_ptls, -1)
-            p_start_num_ptls += hdf5_ptl_idx # scale to where we are in the hdf5 file
+            p_start_num_ptls += ptl_idx # scale to where we are in the hdf5 file
             
             p_tot_num_use_ptls = int(np.sum(p_use_num_ptls))
 
@@ -386,12 +383,14 @@ def halo_loop(rst_pnt, indices, halo_splits, dst_name, tot_num_ptls, p_halo_ids,
                 "c_Tangential_vel":save_tang_vel[:,1],
                 })
             
-            halo_df.to_hdf(save_location + dst_name + "/halo_info/halo_" + str(i+rst_pnt) + ".h5", key='data', mode='w',format='table')  
-            ptl_df.to_hdf(save_location +  dst_name + "/ptl_info/ptl_" + str(i+rst_pnt) + ".h5", key='data', mode='w',format='table')  
+            halo_df.to_hdf(save_location + dst_name + "/halo_info/halo_" + str(curr_iter+rst_pnt) + ".h5", key='data', mode='w',format='table')  
+            ptl_df.to_hdf(save_location +  dst_name + "/ptl_info/ptl_" + str(curr_iter+rst_pnt) + ".h5", key='data', mode='w',format='table')  
 
-            hdf5_ptl_idx += p_tot_num_use_ptls
-            hdf5_halo_idx += p_start_num_ptls.shape[0]
-            del sparta_output      
+            ptl_idx += p_tot_num_use_ptls
+            halo_idx += p_start_num_ptls.shape[0]
+            del sparta_output   
+        print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
+        return halo_idx, ptl_idx
                 
 with timed("Startup"):
     cosmol = cosmology.setCosmology("bolshoi") 
@@ -586,5 +585,23 @@ with timed("Startup"):
             print((np.sum(train_halo_mem[prnt_halo_splits[i]:]))*1e-9,"GB")
         
 with timed("Finished Calc"):   
-    halo_loop(rst_pnt=train_start_pnt,indices=train_idxs, halo_splits=train_halo_splits, dst_name="Train", tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
-    halo_loop(rst_pnt=test_start_pnt,indices=test_idxs, halo_splits=test_halo_splits, dst_name="Test", tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
+    train_num_iter = len(train_halo_splits)
+    train_prnt_halo_splits = train_halo_splits.copy()
+    train_prnt_halo_splits.append(train_idxs.size)
+    print("Train Splits")
+    print("Num halos in each split:", ", ".join(map(str, np.diff(prnt_halo_splits))) + ".", train_num_iter, "splits")
+    ptl_idx = 0
+    halo_idx = 0
+    
+    for i in range(train_num_iter):
+        halo_idx, ptl_idx = halo_loop(halo_idx=halo_idx,ptl_idx=ptl_idx,curr_iter=i,num_iter=train_num_iter,rst_pnt=train_start_pnt,indices=train_idxs, halo_splits=train_halo_splits, dst_name="Train", tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
+    
+    test_num_iter = len(test_halo_splits)
+    test_prnt_halo_splits = test_halo_splits.copy()
+    test_prnt_halo_splits.append(test_idxs.size)
+    print("Test Splits")
+    print("Num halos in each split:", ", ".join(map(str, np.diff(prnt_halo_splits))) + ".", test_num_iter, "splits")
+    ptl_idx = 0
+    halo_idx = 0
+    for i in range(test_num_iter):
+        halo_idx, ptl_idx = halo_loop(halo_idx=halo_idx,ptl_idx=ptl_idx,curr_iter=i,num_iter=test_num_iter,rst_pnt=test_start_pnt,indices=test_idxs, halo_splits=test_halo_splits, dst_name="Test", tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
