@@ -71,6 +71,13 @@ reduce_perc = config.getfloat("XGBOOST", "reduce_perc")
 
 weight_rad = config.getfloat("XGBOOST","weight_rad")
 min_weight = config.getfloat("XGBOOST","min_weight")
+opt_wghts = config.getboolean("XGBOOST","opt_wghts")
+opt_scale_rad = config.getboolean("XGBOOST","opt_scale_rad")
+
+dens_prf_plt = config.getboolean("XGBOOST","dens_prf_plt")
+phase_space_plts = config.getboolean("XGBOOST","phase_space_plts")
+misclass_plt = config.getboolean("XGBOOST","misclass_plt")
+per_err_plt = config.getboolean("XGBOOST","per_err_plt")
 
 nu_splits = parse_ranges(nu_splits)
 nu_string = create_nu_string(nu_splits)
@@ -97,40 +104,6 @@ sys.path.insert(0, path_to_pygadgetreader)
 sys.path.insert(0, path_to_sparta)
 from pygadgetreader import readsnap, readheader # type: ignore
 from sparta_tools import sparta # type: ignore
-
-def accuracy_score_wrapper(y, y_hat): 
-    y = y.astype("float32") 
-    return accuracy_score(y, y_hat, convert_dtype=True)
-
-def do_HPO(model, gridsearch_params, scorer, X, y, mode='gpu-Grid', n_iter=10):
-    if mode == 'gpu-grid':
-        clf = dcv.GridSearchCV(model,
-                               gridsearch_params,
-                               cv=N_FOLDS,
-                               scoring=scorer)
-    elif mode == 'gpu-random':
-        clf = dcv.RandomizedSearchCV(model,
-                               gridsearch_params,
-                               cv=N_FOLDS,
-                               scoring=scorer,
-                               n_iter=n_iter)
-
-    else:
-        print("Unknown Option, please choose one of [gpu-grid, gpu-random]")
-        return None, None
-    res = clf.fit(X, y,eval_metric='rmse')
-    print("Best clf and score {} {}\n---\n".format(res.best_estimator_, res.best_score_))
-    return res.best_estimator_, res
-
-def print_acc(model, X_train, y_train, X_test, y_test, mode_str="Default"):
-    """
-        Trains a model on the train data provided, and prints the accuracy of the trained model.
-        mode_str: User specifies what model it is to print the value
-    """
-    y_pred = model.fit(X_train, y_train).predict(X_test)
-    score = accuracy_score(y_pred, y_test.astype('float32'), convert_dtype=True)
-    print("{} model accuracy: {}".format(mode_str, score))
-
 
 if __name__ == "__main__":
     feature_columns = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
@@ -168,13 +141,23 @@ if __name__ == "__main__":
         combined_name += parts[1] + parts[2] + "s" + parts[4] 
         if i != len(model_sims)-1:
             combined_name += "_"
+    
+    scale_rad=False
+    use_weights=False
+    
+    if reduce_rad > 0 and reduce_perc > 0 and not opt_scale_rad:
+        scale_rad = True
+    if weight_rad > 0 and min_weight > 0 and not opt_wghts:
+        use_weights=True
         
-    model_name = model_type + "_" + combined_name + "nu" + nu_string
+    model_name = model_type + "_" + combined_name + "nu" + nu_string 
+    if scale_rad:
+        model_name += "scl_rad" + str(reduce_rad) + "_" + str(reduce_perc)
+    if use_weights:
+        model_name += "wght" + str(weight_rad) + "_" + str(min_weight)
 
     model_save_loc = path_to_xgboost + combined_name + "/" + model_name + "/"
     gen_plot_save_loc = model_save_loc + "plots/"
-    create_directory(model_save_loc)
-    create_directory(gen_plot_save_loc)
      
     if os.path.isfile(model_save_loc + "model_info.pickle") and retrain < 2:
         with open(model_save_loc + "model_info.pickle", "rb") as pickle_file:
@@ -200,12 +183,6 @@ if __name__ == "__main__":
         print("Loaded Booster")
     else:
         print("Making Datasets") 
-        scale_rad=False
-        use_weights=False
-        if reduce_rad > 0 and reduce_perc > 0:
-            scale_rad = True
-        if weight_rad > 0 and min_weight > 0:
-            use_weights=True
             
         scale_rad_info = {
             "Used scale_rad": scale_rad,
@@ -215,92 +192,117 @@ if __name__ == "__main__":
             
         weight_rad_info = {
             "Used weighting by radius": use_weights,
+            "Optimized weights": opt_wghts,
             "Start for weighting": weight_rad,
-            "Minimum weight assing": min_weight
+            "Minimum weight assign": min_weight
         }
             
+        #TODO add if statements for if scale rad or weight rad 
+        if scale_rad and use_weights:
+            train_data,scale_pos_weight,train_weights,bin_edges = load_data(client,model_sims,"Train",scale_rad=scale_rad,use_weights=use_weights,filter_nu=False)
+        elif scale_rad and not use_weights:
+            train_data,scale_pos_weight,bin_edges = load_data(client,model_sims,"Train",scale_rad=scale_rad,use_weights=use_weights,filter_nu=False)
+        elif not scale_rad and use_weights:
+            train_data,scale_pos_weight,train_weights = load_data(client,model_sims,"Train",scale_rad=scale_rad,use_weights=use_weights,filter_nu=False)
+        else:
+            train_data,scale_pos_weight = load_data(client,model_sims,"Train",scale_rad=scale_rad,use_weights=use_weights,filter_nu=False)
+
+        print("scale_pos_weight:",scale_pos_weight)
+        X_train = train_data[feature_columns]
+        y_train = train_data[target_column]
+
+        if opt_wghts or opt_scale_rad:
+            params = {
+                    "verbosity": 0,
+                    "tree_method": "hist",
+                    "scale_pos_weight":scale_pos_weight,
+                    "max_depth":4,
+                    "device": "cuda",
+                    "subsample": 0.5,
+                    'objective': 'binary:logistic',
+                    }
+
+            opt_data = train_data.sample(frac=0.4, random_state=rand_seed)
+            X_opt = opt_data[feature_columns]
+            y_opt = opt_data[target_column] 
+            
+            halo_files = []
+
+            halo_dfs = []
+            for sim in model_sims:
+                halo_dfs.append(reform_df(path_to_calc_info + sim + "/Train/halo_info/"))
+
+            halo_df = pd.concat(halo_dfs)
+
+        if opt_wghts:  
+            use_weights = True          
+            opt_weight_rad, opt_min_weight, opt_weight_exp = optimize_weights(client,params,X_opt,y_opt,halo_df,model_sims)
+            
+            train_weights = weight_by_rad(X_train["p_Scaled_radii"].values.compute(),y_train.compute().values.flatten(), opt_weight_rad, opt_min_weight)
+            dask_weights = []
+            scatter_weight = client.scatter(train_weights)
+            dask_weight = dd.from_delayed(scatter_weight) 
+            dask_weights.append(dask_weight)
+                
+            train_weights = dd.concat(dask_weights)
+            
+            train_weights = train_weights.repartition(npartitions=X_train.npartitions)
+            
+            model_name += "wght" + str(np.round(opt_weight_rad,3)) + "_" + str(np.round(opt_min_weight,3)) + "_" + str(np.round(opt_weight_exp,3))
+            weight_rad_info = {
+                "Used weighting by radius": use_weights,
+                "Optimized weights": opt_wghts,
+                "Start for weighting": opt_weight_rad,
+                "Minimum weight assign": opt_min_weight,
+                "Weight exponent": opt_weight_exp
+            }
+        
+        if opt_scale_rad:
+            scale_rad = True
+            num_bins=100
+            bin_edges = np.logspace(np.log10(0.001),np.log10(10),num_bins)
+            opt_reduce_rad, opt_reduce_perc = optimize_scale_rad(client,params,opt_data,halo_df,model_sims)
+            train_data = scale_by_rad(train_data.compute(),bin_edges,opt_reduce_rad,opt_reduce_perc)
+            train_data = dd.from_pandas(train_data,npartitions=7)
+            X_train = train_data[feature_columns]
+            y_train = train_data[target_column]
+            
+            model_name += "scl_rad" + str(np.round(opt_reduce_rad,3)) + "_" + str(np.round(opt_reduce_perc,3))
+            scale_rad_info = {
+            "Used scale_rad": scale_rad,
+            "Optimized Scale by Radius": opt_scale_rad,
+            "Reducing radius start": opt_reduce_rad,
+            "Reducing radius percent": opt_reduce_perc,
+            }
+        
         model_info["Training Data Adjustments"] = {
             "Scaling by Radii": scale_rad_info,
             "Weighting by Radii": weight_rad_info,
         }
-
-        train_data,scale_pos_weight,train_weights, bin_edges = load_data(client,model_sims,"Train",scale_rad=scale_rad,use_weights=use_weights,filter_nu=False)
-        # test_data,test_scale_pos_weight,test_weights = load_data(client,model_sims,"Test")
         
-        # plot_rad_dist(bin_edges,train_data["p_Scaled_radii"].values.compute(),gen_plot_save_loc)
+        model_save_loc = path_to_xgboost + combined_name + "/" + model_name + "/"
+        gen_plot_save_loc = model_save_loc + "plots/"
+        create_directory(model_save_loc)
+        create_directory(gen_plot_save_loc)
+        
         plot_orb_inf_dist(50, train_data["p_Scaled_radii"].values.compute(), train_data["Orbit_infall"].values.compute(), gen_plot_save_loc)
-        print("scale_pos_weight:",scale_pos_weight)
-        X_train = train_data[feature_columns]
-        y_train = train_data[target_column]
-        # X_test = test_data[feature_columns]
-        # y_test = test_data[target_column]
-
-        dtrain = xgb.dask.DaskDMatrix(client, X_train, y_train)
-        # dtest = xgb.dask.DaskDMatrix(client, X_test, y_test)
-
-        if on_zaratan == False and do_hpo == True and os.path.isfile(model_save_loc + "used_params.pickle") == False:  
-            params = {
-            # Parameters that we are going to tune.
-            'max_depth':np.arange(2,4,1),
-            # 'min_child_weight': 1,
-            'learning_rate':np.arange(0.01,1.01,.1),
-            'scale_pos_weight':np.arange(scale_pos_weight,scale_pos_weight+10,1),
-            'lambda':np.arange(0,3,.5),
-            'alpha':np.arange(0,3,.5),
-            'subsample': 0.5,
-            # 'colsample_bytree': 1,
-            }
         
-            N_FOLDS = 5
-            N_ITER = 25
-            
-            model = dxgb.XGBClassifier(tree_method='hist', device="cuda", eval_metric="logloss", n_estimators=100, use_label_encoder=False, scale_pos_weight=scale_pos_weight)
-            accuracy_wrapper_scorer = make_scorer(accuracy_score_wrapper)
-            cuml_accuracy_scorer = make_scorer(accuracy_score, convert_dtype=True)
-            print_acc(model, X_train, y_train, X_test, y_test)
-            
-            mode = "gpu-random"
-            #TODO fix so it takes from model_info.pickle
-            if os.path.isfile(model_save_loc + "hyper_param_res.pickle") and os.path.isfile(model_save_loc + "hyper_param_results.pickle"):
-                with open(model_save_loc + "hyper_param_res.pickle", "rb") as pickle_file:
-                    res = pickle.load(pickle_file)
-                with open(model_save_loc + "hyper_param_results.pickle", "rb") as pickle_file:
-                    results = pickle.load(pickle_file)
-            else:
-                with timed("XGB-"+mode):
-                    res, results = do_HPO(model,
-                                            params,
-                                            cuml_accuracy_scorer,
-                                            X_train,
-                                            y_train,
-                                            mode=mode,
-                                            n_iter=N_ITER)
-                with open(model_save_loc + "hyper_param_res.pickle", "wb") as pickle_file:
-                    pickle.dump(res, pickle_file)
-                with open(model_save_loc + "hyper_param_results.pickle", "wb") as pickle_file:
-                    pickle.dump(results, pickle_file)
-                    
-                print("Searched over {} parameters".format(len(results.cv_results_['mean_test_score'])))
-                # print_acc(res, X_train, y_train, X_test, y_test, mode_str=mode)
-                print("Best params", results.best_params_)
-                
-                params = results.best_params_
-                
-                model_info['Training Info']={
-                'Fraction of Training Data Used': frac_training_data,
-                'Trained on GPU': gpu_use,
-                'HPO used': do_hpo,
-                'Training Params': params,
-                }            
-                
-        elif 'Training Info' in model_info: 
+        if use_weights:
+            fig,ax = plt.subplots(1)
+            ax.hist(train_weights.values.compute())
+            fig.savefig(path_to_MLOIS + "Random_figs/weight_dist.png")
+            dtrain = xgb.dask.DaskDMatrix(client, X_train, y_train, weight=train_weights)
+        else:
+            dtrain = xgb.dask.DaskDMatrix(client, X_train, y_train)
+        
+        if 'Training Info' in model_info: 
             params = model_info.get('Training Info',{}).get('Training Params')
         else:
             params = {
                 "verbosity": 1,
                 "tree_method": "hist",
                 "scale_pos_weight":scale_pos_weight,
-                "max_depth":6,
+                "max_depth":4,
                 "device": "cuda",
                 "subsample": 0.5,
                 'objective': 'binary:logistic',
@@ -357,7 +359,7 @@ if __name__ == "__main__":
         X_test = test_data[feature_columns]
         y_test = test_data[target_column]
         
-        eval_model(model_info, client, bst, use_sims=model_sims, dst_type="Test", X=X_test, y=y_test, halo_ddf=halo_df, combined_name=combined_name, plot_save_loc=plot_loc, dens_prf = True, r_rv_tv = True, misclass=True)
+        eval_model(model_info, client, bst, use_sims=model_sims, dst_type="Test", X=X_test, y=y_test, halo_ddf=halo_df, combined_name=combined_name, plot_save_loc=plot_loc, dens_prf=dens_prf_plt,r_rv_tv=phase_space_plts,misclass=misclass_plt,per_err=per_err_plt)
    
     bst.save_model(model_save_loc + model_name + ".json")
 

@@ -15,8 +15,14 @@ import pandas as pd
 from colossus.lss import peaks
 from dask.distributed import Client
 
+from skopt import gp_minimize
+from skopt.space import Real
+from sklearn.metrics import accuracy_score
+from functools import partial
+
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, find_closest_z, conv_halo_id_spid, timed
-from utils.visualization_functions import compare_density_prf, plot_r_rv_tv_graph, plot_misclassified, plot_rad_dist
+from utils.visualization_functions import compare_density_prf, plot_r_rv_tv_graph, plot_misclassified, plot_per_err
+from utils.calculation_functions import create_mass_prf
 from sparta_tools import sparta # type: ignore
 
 def parse_ranges(ranges_str):
@@ -62,6 +68,7 @@ reduce_perc = config.getfloat("XGBOOST", "reduce_perc")
 
 weight_rad = config.getfloat("XGBOOST","weight_rad")
 min_weight = config.getfloat("XGBOOST","min_weight")
+weight_exp = config.getfloat("XGBOOST","weight_exp")
 
 nu_splits = parse_ranges(nu_splits)
 nu_string = create_nu_string(nu_splits)
@@ -162,20 +169,25 @@ def transform_string(input_str):
     
     return new_string
 
-def weight_by_rad(data):
-    radii = data["p_Scaled_radii"].values
-    orb_inf = data["Orbit_infall"].values
+def weight_by_rad(radii,orb_inf,use_weight_rad=weight_rad,use_min_weight=min_weight,use_weight_exp=weight_exp,weight_inf=False,weight_orb=True):
     weights = np.ones(radii.shape[0])
-    mask = (radii > weight_rad) & (orb_inf == 1)
-    weights[mask] = np.exp((np.log(min_weight)/(np.max(radii)-weight_rad)) * (radii[mask]-weight_rad))
-    # sigma = 5
-    # weights[mask] = np.exp((-1* radii[mask]**2)/(2*sigma**2))
-    
+
+    if weight_inf and weight_orb:
+        mask = (radii > use_weight_rad)
+    elif weight_orb:
+        mask = (radii > use_weight_rad) & (orb_inf == 1)
+    elif weight_inf:
+        mask = (radii > use_weight_rad) & (orb_inf == 0)
+    else:
+        print("No weights calculated set weight_inf and/or weight_orb = True")
+        return pd.DataFrame(weights)
+    weights[mask] = (np.exp((np.log(use_min_weight)/(np.max(radii)-use_weight_rad)) * (radii[mask]-use_weight_rad)))**weight_exp
+
     return pd.DataFrame(weights)
 
-def scale_by_rad(data,bin_edges):
+def scale_by_rad(data,bin_edges,use_red_rad=reduce_rad,use_red_perc=reduce_perc):
     radii = data["p_Scaled_radii"].values
-    max_ptl = int(np.floor(np.where(radii<reduce_rad)[0].shape[0] * reduce_perc))
+    max_ptl = int(np.floor(np.where(radii<use_red_rad)[0].shape[0] * use_red_perc))
     filter_data = []
     
     for i in range(len(bin_edges) - 1):
@@ -247,7 +259,7 @@ def sim_info_for_nus(sim,config_params):
     
     return ptl_mass, use_z
 
-def split_dataframe(df, max_size):
+def split_dataframe(df, max_size, weights=None, use_weights = False):
     # Split a dataframe so that each one is below a maximum memory size
     total_size = df.memory_usage(index=True).sum()
     num_splits = int(np.ceil(total_size / max_size))
@@ -255,10 +267,16 @@ def split_dataframe(df, max_size):
     print("splitting Dataframe into:",num_splits,"dataframes")
     
     split_dfs = []
+    split_weights = []
     for i in range(0, len(df), chunk_size):
         split_dfs.append(df.iloc[i:i + chunk_size])
+        if use_weights:
+            split_weights.append(weights[i:i+chunk_size])
     
-    return split_dfs
+    if use_weights:
+        return split_dfs, split_weights
+    else:
+        return split_dfs
 
 def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,use_weights=False,filter_nu=None):
     ptl_files = sort_files(folder_path + "/ptl_info/")
@@ -287,22 +305,26 @@ def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,use_wei
             bin_edges = np.logspace(np.log10(0.001),np.log10(10),num_bins)
             ptl_df = scale_by_rad(ptl_df,bin_edges)
         if use_weights:
-            weights = weight_by_rad(ptl_df)
+            weights = weight_by_rad(ptl_df["p_Scaled_radii"].values,ptl_df["Orbit_infall"].values,weight_inf=False,weight_orb=True)
         
         # Calculate scale position weight
         scal_pos_weight = calc_scal_pos_weight(ptl_df)
-
+        print(scal_pos_weight)
         # If the dataframe is too large split it up
-        max_mem = config_params["HDF5 Mem Size"]
+        max_mem = int(np.floor(config_params["HDF5 Mem Size"] / 2))
         if ptl_df.memory_usage(index=True).sum() > max_mem:
             ptl_dfs = split_dataframe(ptl_df, max_mem)
+            if use_weights:
+                ptl_dfs, weights = split_dataframe(ptl_df,max_mem,weights,use_weights=True)
         else:
             ptl_dfs = [ptl_df]
+            if use_weights:
+                weights = [weights]
         
         if scale_rad and use_weights:
             return ptl_dfs,scal_pos_weight,weights,bin_edges
         elif scale_rad and not use_weights:
-            return ptl_dfs,scal_pos_weight
+            return ptl_dfs,scal_pos_weight,bin_edges
         elif not scale_rad and use_weights:
             return ptl_dfs,scal_pos_weight,weights
         else:
@@ -327,6 +349,7 @@ def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,use_wei
             dask_weight = dd.from_delayed(scatter_weight) 
             dask_weights.append(dask_weight)
             bin_edges = bin_edge
+        return dd.concat(ddfs),sim_scal_pos_weight,dd.concat(dask_weights),bin_edges
     elif scale_rad and not use_weights:
         for ptl_df, scal_pos_weight, bin_edge in results:
             scatter_df = client.scatter(ptl_df)
@@ -334,6 +357,7 @@ def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,use_wei
             ddfs.append(dask_df)
             sim_scal_pos_weight.append(scal_pos_weight)
             bin_edges = bin_edge
+        return dd.concat(ddfs),sim_scal_pos_weight,bin_edges
     elif not scale_rad and use_weights:
         for ptl_df, scal_pos_weight, weight in results:
             scatter_df = client.scatter(ptl_df)
@@ -342,22 +366,16 @@ def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,use_wei
             sim_scal_pos_weight.append(scal_pos_weight)
             scatter_weight = client.scatter(weight)
             dask_weight = dd.from_delayed(scatter_weight) 
+            dask_weights.append(dask_weight)
+        return dd.concat(ddfs),sim_scal_pos_weight,dd.concat(dask_weights)
     else:
         for ptl_df, scal_pos_weight in results:
             scatter_df = client.scatter(ptl_df)
             dask_df = dd.from_delayed(scatter_df)
             ddfs.append(dask_df)    
             sim_scal_pos_weight.append(scal_pos_weight)
-
-    if scale_rad and use_weights:
-        return dd.concat(ddfs),sim_scal_pos_weight,dd.concat(dask_weights),bin_edges
-    elif scale_rad and not use_weights:
-        return dd.concat(ddfs),sim_scal_pos_weight,bin_edges
-    elif not scale_rad and use_weights:
-        return dd.concat(ddfs),sim_scal_pos_weight,dd.concat(dask_weights)
-    else:
         return dd.concat(ddfs),sim_scal_pos_weight
-
+        
 def calc_scal_pos_weight(df):
     count_negatives = (df['Orbit_infall'] == 0).sum()
     count_positives = (df['Orbit_infall'] == 1).sum()
@@ -434,7 +452,70 @@ def load_data(client, sims, dset_name, scale_rad=False, use_weights=False, filte
     else:
         return dd.concat(dask_dfs),act_scale_pos_weight
 
-def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, combined_name, plot_save_loc, dens_prf = False, r_rv_tv = False, misclass=False): 
+def load_sprta_mass_prf(sim_splits,all_idxs,use_sims):                
+    mass_prf_all_list = []
+    mass_prf_1halo_list = []
+    all_masses = []
+    
+    for i,sim in enumerate(use_sims):
+        # Get the halo indices corresponding to this simulation
+        if i < len(use_sims) - 1:
+            use_idxs = all_idxs[sim_splits[i]:sim_splits[i+1]]
+        else:
+            use_idxs = all_idxs[sim_splits[i]:]
+        
+        # find the snapshots for this simulation
+        snap_pat = r"(\d+)to(\d+)"
+        match = re.search(snap_pat, sim)
+        if match:
+            curr_snap_list = [match.group(1), match.group(2)] 
+        sim_pat = r"cbol_l(\d+)_n(\d+)"
+        match = re.search(sim_pat, sim)
+        if match:
+            sparta_name = match.group(0)
+        sim_search_pat = sim_pat + r"_(\d+)r200m"
+        match = re.search(sim_search_pat, sim)
+        if match:
+            sparta_search_name = match.group(0)
+        
+        with open(path_to_calc_info + sim + "/config.pickle", "rb") as file:
+            config_dict = pickle.load(file)
+            
+            curr_z = config_dict["p_snap_info"]["red_shift"][()]
+            curr_snap_format = config_dict["snap_format"]
+            new_p_snap, curr_z = find_closest_z(curr_z,path_to_snaps + sparta_name + "/",curr_snap_format)
+            p_scale_factor = 1/(1+curr_z)
+            
+        with h5py.File(path_to_SPARTA_data + sparta_name + "/" + sparta_search_name + ".hdf5","r") as f:
+            dic_sim = {}
+            grp_sim = f['simulation']
+
+            for attr in grp_sim.attrs:
+                dic_sim[attr] = grp_sim.attrs[attr]
+        
+        all_red_shifts = dic_sim['snap_z']
+        p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
+        
+        halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_or_pickle_SPARTA_data(sparta_search_name, p_scale_factor, curr_snap_list[0], p_sparta_snap)
+
+        use_halo_ids = halos_id[use_idxs]
+        
+        sparta_output = sparta.load(filename=path_to_SPARTA_data + sparta_name + "/" + sparta_search_name + ".hdf5", halo_ids=use_halo_ids, log_level=0)
+        new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta resort the indices
+        
+        mass_prf_all_list.append(sparta_output['anl_prf']['M_all'][new_idxs,p_sparta_snap,:])
+        mass_prf_1halo_list.append(sparta_output['anl_prf']['M_1halo'][new_idxs,p_sparta_snap,:])
+        all_masses.append(ptl_mass)
+
+    mass_prf_all = np.vstack(mass_prf_all_list)
+    mass_prf_1halo = np.vstack(mass_prf_1halo_list)
+    
+    bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
+    bins = np.insert(bins, 0, 0)
+
+    return mass_prf_all,mass_prf_1halo,all_masses,bins
+
+def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, combined_name, plot_save_loc, dens_prf = False, r_rv_tv = False, misclass=False,per_err=False): 
     with timed("Predictions"):
         print(f"Starting predictions for {y.size.compute():.3e} particles")
         preds = make_preds(client, model, X, y, report_name="Report", print_report=False)
@@ -442,14 +523,12 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
     num_bins = 30
     
     if dens_prf:
-        
         halo_first = halo_ddf["Halo_first"].values
         halo_n = halo_ddf["Halo_n"].values
         all_idxs = halo_ddf["Halo_indices"].values
 
         # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
         sim_splits = np.where(halo_first == 0)[0]
-
         # if there are multiple simulations, to correctly index the dataset we need to update the starting values for the 
         # stacked simulations such that they correspond to the larger dataset and not one specific simulation
         if len(use_sims) != 1:
@@ -459,81 +538,187 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
                 else:
                     halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
                     
-        dens_prf_all_list = []
-        dens_prf_1halo_list = []
-        all_masses = []
-        
-        for i,sim in enumerate(use_sims):
-            # Get the halo indices corresponding to this simulation
-            if i < len(use_sims) - 1:
-                use_idxs = all_idxs[sim_splits[i]:sim_splits[i+1]]
-            else:
-                use_idxs = all_idxs[sim_splits[i]:]
-            
-            # find the snapshots for this simulation
-            snap_pat = r"(\d+)to(\d+)"
-            match = re.search(snap_pat, sim)
-            if match:
-                curr_snap_list = [match.group(1), match.group(2)] 
-            sim_pat = r"cbol_l(\d+)_n(\d+)"
-            match = re.search(sim_pat, sim)
-            if match:
-                sparta_name = match.group(0)
-            sim_search_pat = sim_pat + r"_(\d+)r200m"
-            match = re.search(sim_search_pat, sim)
-            if match:
-                sparta_search_name = match.group(0)
-            
-            with open(path_to_calc_info + sim + "/config.pickle", "rb") as file:
-                config_dict = pickle.load(file)
-                
-                curr_z = config_dict["p_snap_info"]["red_shift"][()]
-                curr_snap_format = config_dict["snap_format"]
-                new_p_snap, curr_z = find_closest_z(curr_z,path_to_snaps + sparta_name + "/",curr_snap_format)
-                p_scale_factor = 1/(1+curr_z)
-                
-            with h5py.File(path_to_SPARTA_data + sparta_name + "/" + sparta_search_name + ".hdf5","r") as f:
-                dic_sim = {}
-                grp_sim = f['simulation']
+        sparta_mass_prf_all, sparta_mass_prf_1halo,all_masses,bins = load_sprta_mass_prf(sim_splits,all_idxs,use_sims)
 
-                for attr in grp_sim.attrs:
-                    dic_sim[attr] = grp_sim.attrs[attr]
-            
-            all_red_shifts = dic_sim['snap_z']
-            p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
-            
-            halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_or_pickle_SPARTA_data(sparta_search_name, p_scale_factor, curr_snap_list[0], p_sparta_snap)
-
-            use_halo_ids = halos_id[use_idxs]
-            
-            sparta_output = sparta.load(filename=path_to_SPARTA_data + sparta_name + "/" + sparta_search_name + ".hdf5", halo_ids=use_halo_ids, log_level=0)
-            new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta resort the indices
-            
-            dens_prf_all_list.append(sparta_output['anl_prf']['M_all'][new_idxs,p_sparta_snap,:])
-            dens_prf_1halo_list.append(sparta_output['anl_prf']['M_1halo'][new_idxs,p_sparta_snap,:])
-            all_masses.append(ptl_mass)
-
-        dens_prf_all = np.vstack(dens_prf_all_list)
-        dens_prf_1halo = np.vstack(dens_prf_1halo_list)
-        
-        bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
-        bins = np.insert(bins, 0, 0)
-        
-        compare_density_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=all_masses, orbit_assn=preds, prf_bins=bins, title="", save_location=plot_save_loc, use_mp=True, save_graph=True)
+        compare_density_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=sparta_mass_prf_all, act_mass_prf_orb=sparta_mass_prf_1halo, mass=all_masses, orbit_assn=preds, prf_bins=bins, title="", save_location=plot_save_loc, use_mp=True, save_graph=True)
     
     if r_rv_tv:
         plot_r_rv_tv_graph(preds, X["p_Scaled_radii"].values.compute(), X["p_Radial_vel"].values.compute(), X["p_Tangential_vel"].values.compute(), y, title="", num_bins=num_bins, save_location=plot_save_loc)
     
-    if misclass:
-        preds = preds.values
-        y = y.compute().values.flatten()
-        c_rad = X["c_Scaled_radii"].values.compute()
-        not_nan_mask = ~np.isnan(c_rad)
-        
-        plot_misclassified(p_corr_labels=y, p_ml_labels=preds, p_r=X["p_Scaled_radii"].values.compute(), p_rv=X["p_Radial_vel"].values.compute(), p_tv=X["p_Tangential_vel"].values.compute(), c_r=X["c_Scaled_radii"].values.compute(), c_rv=X["c_Radial_vel"].values.compute(), c_tv=X["c_Tangential_vel"].values.compute(),title="",num_bins=num_bins,save_location=plot_save_loc,model_info=model_info,dataset_name=dst_type + "_" + combined_name)
+    if misclass:       
+        plot_misclassified(p_corr_labels=y.compute().values.flatten(), p_ml_labels=preds.values, p_r=X["p_Scaled_radii"].values.compute(), p_rv=X["p_Radial_vel"].values.compute(), p_tv=X["p_Tangential_vel"].values.compute(), c_r=X["c_Scaled_radii"].values.compute(), c_rv=X["c_Radial_vel"].values.compute(), c_tv=X["c_Tangential_vel"].values.compute(),title="",num_bins=num_bins,save_location=plot_save_loc,model_info=model_info,dataset_name=dst_type + "_" + combined_name)
     
+    if per_err:
+        with h5py.File(path_to_hdf5_file,"r") as f:
+            dic_sim = {}
+            grp_sim = f['config']['anl_prf']
+            for f in grp_sim.attrs:
+                dic_sim[f] = grp_sim.attrs[f]
+            bins = dic_sim["r_bins_lin"]
+        plot_per_err(bins,X["p_Scaled_radii"].values.compute(),y.compute().values.flatten(),preds.values,plot_save_loc, "$r/r_{200m}$","rad")
+        # plot_per_err(bins,X["p_Radial_vel"].values.compute(),y.compute().values.flatten(),preds.values,plot_save_loc, "$v_r/v_{200m}$","rad_vel")
+        # plot_per_err(bins,X["p_Tangential_vel"].values.compute(),y.compute().values.flatten(),preds.values,plot_save_loc, "$v_t/v_{200m}$","tang_vel")
 
-def print_tree(bst,tree_num):
+def print_tree(bst,tree_num):# if there are multiple simulations, to correctly index the dataset we need to update the starting values for the 
+    # stacked simulations such that they correspond to the larger dataset and not one specific simulation
+    if len(use_sims) != 1:
+        for i in range(1,len(use_sims)):
+            if i < len(use_sims) - 1:
+                halo_first[sim_splits[i]:sim_splits[i+1]] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
+            else:
+                halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
     fig, ax = plt.subplots(figsize=(400, 10))
     xgb.plot_tree(bst, num_trees=tree_num, ax=ax)
     plt.savefig(path_to_MLOIS + "Random_figs/tree_plot.png")
+    
+    
+def dens_prf_loss(halo_ddf,use_sims,radii,labels):
+    halo_first = halo_ddf["Halo_first"].values
+    halo_n = halo_ddf["Halo_n"].values
+    all_idxs = halo_ddf["Halo_indices"].values
+
+    # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
+    sim_splits = np.where(halo_first == 0)[0]
+    # if there are multiple simulations, to correctly index the dataset we need to update the starting values for the 
+    # stacked simulations such that they correspond to the larger dataset and not one specific simulation
+    if len(use_sims) != 1:
+        for i in range(1,len(use_sims)):
+            if i < len(use_sims) - 1:
+                halo_first[sim_splits[i]:sim_splits[i+1]] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
+            else:
+                halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
+               
+    sparta_mass_prf_all,sparta_mass_prf_orb,all_masses,bins = load_sprta_mass_prf(sim_splits,all_idxs,use_sims)
+    sparta_mass_prf_inf = sparta_mass_prf_all - sparta_mass_prf_orb
+    #TODO make this robust for multiple sims
+    calc_mass_prf_all,calc_mass_prf_orb,calc_mass_prf_inf = create_mass_prf(radii,labels,bins,all_masses[0]) 
+    
+    orb_loss = np.nanmean(((sparta_mass_prf_orb / calc_mass_prf_orb) - 1)**2)
+    inf_loss = np.nanmean(((sparta_mass_prf_inf / calc_mass_prf_inf) - 1)**2)
+    
+    if orb_loss == np.NaN:
+        orb_loss = 50
+    elif orb_loss == np.inf:
+        orb_loss == 50
+    elif inf_loss == np.NaN:
+        inf_loss = 50
+    elif inf_loss == np.inf:
+        inf_loss == 50
+    print(orb_loss,inf_loss,orb_loss+inf_loss)
+    
+    return orb_loss+inf_loss
+    
+def weight_objective(params,client,model_params,X,y,halo_ddf,use_sims):
+    curr_weight_rad, curr_min_weight, curr_weight_exp = params
+
+    radii = X["p_Scaled_radii"].values.compute()
+
+    weights = weight_by_rad(radii,y.compute().values.flatten(), curr_weight_rad, curr_min_weight, curr_weight_exp)
+
+    dask_weights = []
+    scatter_weight = client.scatter(weights)
+    dask_weight = dd.from_delayed(scatter_weight) 
+    dask_weights.append(dask_weight)
+        
+    train_weights = dd.concat(dask_weights)
+    
+    train_weights = train_weights.repartition(npartitions=X.npartitions)
+
+        
+    dtrain = xgb.dask.DaskDMatrix(client, X, y, weight=train_weights)
+    
+    output = dxgb.train(
+                client,
+                model_params,
+                dtrain,
+                num_boost_round=50,
+                # evals=[(dtrain, "train"),(dtest, "test")],
+                evals=[(dtrain, "train")],
+                early_stopping_rounds=5,      
+                )
+    bst = output["booster"]
+
+    y_pred = make_preds(client, bst, X, y, report_name="Report", print_report=False)
+    y = y.compute().values.flatten()
+    only_orb = np.where(y == 1)[0]
+    only_inf = np.where(y == 0)[0]
+    accuracy = accuracy_score(y, y_pred)
+    # accuracy = accuracy_score(y[only_orb], y_pred.iloc[only_orb].values)
+    # accuracy = accuracy_score(y[only_inf], y_pred.iloc[only_inf].values)
+    
+    # accuracy = dens_prf_loss(halo_ddf,use_sims,radii,y_pred)
+    
+    return -accuracy
+
+def scal_rad_objective(params,client,model_params,data,halo_ddf,use_sims):
+    data_pd = data.compute()
+    num_bins=100
+    bin_edges = np.logspace(np.log10(0.001),np.log10(10),num_bins)
+    scld_data = scale_by_rad(data_pd,bin_edges,params[0],params[1])
+    
+    feature_columns = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
+    target_column = ["Orbit_infall"]
+    
+    scld_data_ddf = dd.from_pandas(scld_data,npartitions=7)
+    X = scld_data_ddf[feature_columns]
+    y = scld_data_ddf[target_column]
+    
+    dtrain = xgb.dask.DaskDMatrix(client, X, y)
+    
+    output = dxgb.train(
+                client,
+                model_params,
+                dtrain,
+                num_boost_round=50,
+                # evals=[(dtrain, "train"),(dtest, "test")],
+                evals=[(dtrain, "train")],
+                early_stopping_rounds=5,      
+                )
+    bst = output["booster"]
+
+    y_pred = make_preds(client, bst, X, y, report_name="Report", print_report=False)
+    y = y.compute().values.flatten()
+    only_orb = np.where(y == 1)[0]
+    only_inf = np.where(y == 0)[0]
+    accuracy = accuracy_score(y, y_pred)
+    # accuracy = accuracy_score(y[only_orb], y_pred.iloc[only_orb].values)
+    # accuracy = accuracy_score(y[only_inf], y_pred.iloc[only_inf].values)
+    
+    # radii = X["p_Scaled_radii"].values.compute()
+    # accuracy = dens_prf_loss(halo_ddf,use_sims,radii,y_pred)
+    
+    return -accuracy
+
+def print_iteration(res):
+    iteration = len(res.x_iters)
+    print(f"Iteration {iteration}: Current params: {res.x_iters[-1]}, Current score: {res.func_vals[-1]}")
+
+def optimize_weights(client,model_params,X,y,halo_ddf,use_sims):
+    print("Start Optimization of Weights")
+    space  = [Real(0.1, 5.0, name='weight_rad'),
+            Real(0.001, 0.2, name='min_weight'),
+            Real(0,10,name='weight_exp')]
+
+    objective_with_params = partial(weight_objective,client=client,model_params=model_params,X=X,y=y,halo_ddf=halo_ddf,use_sims=use_sims)
+    res = gp_minimize(objective_with_params, space, n_calls=30, random_state=0, callback=[print_iteration])
+
+    print("Best parameters: ", res.x)
+    print("Best accuracy: ", -res.fun)
+    
+    return res.x[0],res.x[1],res.x[2]
+    
+    
+def optimize_scale_rad(client,model_params,data,halo_ddf,use_sims):    
+    print("Start Optimization of Scaling Radii")
+    space  = [Real(0.1, 5.0, name='reduce_rad'),
+            Real(0.001, 0.25, name='reduce_perc')]
+
+    objective_with_params = partial(scal_rad_objective,client=client,model_params=model_params,data=data,halo_ddf=halo_ddf,use_sims=use_sims)
+    res = gp_minimize(objective_with_params, space, n_calls=20, random_state=0, callback=[print_iteration])
+
+    print("Best parameters: ", res.x)
+    print("Best accuracy: ", -res.fun)
+    
+    return res.x[0],res.x[1]
+    
+    

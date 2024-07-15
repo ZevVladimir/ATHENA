@@ -22,9 +22,10 @@ from matplotlib.animation import FuncAnimation
 import seaborn as sns
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import ipyvolume as ipv
 
 from utils.data_and_loading_functions import check_pickle_exist_gadget, create_directory, find_closest_z, load_or_pickle_ptl_data, timed
-from utils.calculation_functions import calc_v200m, calculate_density
+from utils.calculation_functions import calc_v200m, calculate_density, create_mass_prf
 
 num_processes = mp.cpu_count()
 
@@ -97,76 +98,18 @@ def split_into_bins(num_bins, radial_vel, scaled_radii, particle_radii, halo_r20
     
     return average_val_part, average_val_hubble 
 
-def update_density_prf(calc_prf, diff_n_ptl, radii, idx, start_bin, end_bin, mass, act_prf):
-    radii_within_range = np.where((radii >= start_bin) & (radii < end_bin))[0]
-        
-    # If there are particles in this bin and its not the first bin
-    # Then add the mass of prior bin to the mass of this bin
-    if radii_within_range.size != 0 and idx != 0:
-        calc_prf[idx] = calc_prf[idx - 1] + radii_within_range.size * mass
-        diff_n_ptl[idx] = ((act_prf[idx] - act_prf[idx-1])/mass) - radii_within_range.size
-    # If there are particles in this bin and its  the first bin
-    # Then simply the mass of this bin
-    elif radii_within_range.size != 0 and idx == 0:
-        calc_prf[idx] = radii_within_range.size * mass
-        diff_n_ptl[idx] = act_prf[idx]/mass - radii_within_range.size
-    # If there are  no particles in this bin and its not the first bin
-    # Then use the mass of prior bin 
-    elif radii_within_range.size == 0 and idx != 0:
-        calc_prf[idx] = calc_prf[idx-1]
-        diff_n_ptl[idx] = diff_n_ptl[idx-1]   
-    # If there are  no particles in this bin and its the first bin
-    # Then use the mass of this bin 
-    else:
-        calc_prf[idx] = calc_prf[idx-1]
-        diff_n_ptl[idx] = (act_prf[idx])/mass
-    
-    return calc_prf, diff_n_ptl
-
-def create_dens_prf(radii, orbit_assn, act_mass_prf_all, act_mass_prf_1halo, prf_bins, mass):
-    act_mass_prf_inf = act_mass_prf_all - act_mass_prf_1halo
-    # Create bins for the density profile calculation
-    num_prf_bins = act_mass_prf_all.shape[0]
-
-    calc_mass_prf_orb = np.zeros(num_prf_bins)
-    calc_mass_prf_inf = np.zeros(num_prf_bins)
-    calc_mass_prf_all = np.zeros(num_prf_bins)
-    diff_n_inf_ptls = np.zeros(num_prf_bins)
-    diff_n_orb_ptls = np.zeros(num_prf_bins)
-    diff_n_all_ptls = np.zeros(num_prf_bins)
-    
-    # determine which radii correspond to orbiting and which to infalling
-    orbit_radii = radii[np.where(orbit_assn == 1)[0]]
-    infall_radii = radii[np.where(orbit_assn == 0)[0]]
-
-    # loop through each bin's radii range and get the mass of each type of particle
-    for i in range(num_prf_bins):
-        start_bin = prf_bins[i]
-        end_bin = prf_bins[i+1]  
-        
-        calc_mass_prf_orb, diff_n_orb_ptls = update_density_prf(calc_mass_prf_orb, diff_n_orb_ptls, orbit_radii, i, start_bin, end_bin, mass, act_mass_prf_1halo)      
-        calc_mass_prf_inf, diff_n_inf_ptls = update_density_prf(calc_mass_prf_inf, diff_n_inf_ptls, infall_radii, i, start_bin, end_bin, mass, act_mass_prf_inf)      
-        calc_mass_prf_all, diff_n_all_ptls  = update_density_prf(calc_mass_prf_all, diff_n_all_ptls, radii, i, start_bin, end_bin, mass, act_mass_prf_all)    
- 
-    # Calculate the density by divide the mass of each bin by the volume of that bin's radius
-    calc_dens_prf_orb = calculate_density(calc_mass_prf_orb, prf_bins[1:])
-    calc_dens_prf_inf = calculate_density(calc_mass_prf_inf, prf_bins[1:])
-    calc_dens_prf_all = calculate_density(calc_mass_prf_all, prf_bins[1:])
-    
-    return calc_mass_prf_orb, calc_mass_prf_inf, calc_mass_prf_all, calc_dens_prf_orb, calc_dens_prf_inf, calc_dens_prf_all, diff_n_orb_ptls, diff_n_inf_ptls, diff_n_all_ptls 
-
 def comb_prf(prf, num_halo, dtype):
     if num_halo > 1:
         prf = np.stack(prf, axis=0)
     else:
         prf = np.asarray(prf)
-        prf = np.reshape(prf, (prf.size,1))
+        prf = np.reshape(prf, (1,prf.size))
     
     prf = prf.astype(dtype)
 
     return prf
     
-def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act_mass_prf_orb, mass, orbit_assn, prf_bins, title, save_location, use_mp = False, show_graph = False, save_graph = False):
+def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act_mass_prf_orb, mass, orbit_assn, prf_bins, title, save_location, use_mp = False, show_graph = False, save_graph = True):
     # Shape of profiles should be (num halo,num bins)
     # EX: 10 halos, 80 bins (10,80)
 
@@ -174,7 +117,10 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         print("Starting Density Profile Plot")
         act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
         tot_num_halos = halo_first.shape[0]
-        min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
+        if tot_num_halos > 5:
+            min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
+        else:
+            min_disp_halos = 0
         num_bins = prf_bins.size
         
         med_act_mass_prf_all = 0
@@ -214,11 +160,9 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
             if use_mp:
                 num_processes = mp.cpu_count()
                 with mp.Pool(processes=num_processes) as p:
-                    calc_mass_prf_orb, calc_mass_prf_inf, calc_mass_prf_all, calc_dens_prf_orb, calc_dens_prf_inf, calc_dens_prf_all, diff_n_orb_ptls, diff_n_inf_ptls, diff_n_all_ptls = zip(*p.starmap(create_dens_prf, 
+                    calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf = zip(*p.starmap(create_mass_prf, 
                                                 zip((radii[halo_first[n]:halo_first[n]+halo_n[n]] for n in range(splits[i],splits[i]+curr_num_halos)),
                                                     (orbit_assn[halo_first[n]:halo_first[n]+halo_n[n]] for n in range(splits[i],splits[i]+curr_num_halos)),
-                                                    (act_mass_prf_all[n] for n in range(splits[i],splits[i]+curr_num_halos)),
-                                                    (act_mass_prf_orb[n] for n in range(splits[i],splits[i]+curr_num_halos)),
                                                     repeat(prf_bins),repeat(mass[i])),
                                                 chunksize=100))
                 p.close()
@@ -231,30 +175,26 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
                 calc_dens_prf_orb = []
                 calc_dens_prf_inf = []
                 calc_dens_prf_all = []
-                diff_n_orb_ptls = []
-                diff_n_inf_ptls = []
-                diff_n_all_ptls = []
                 
                 for j in range(curr_num_halos):
-                    halo_mass_prf_orb, halo_mass_prf_inf, halo_mass_prf_all, halo_dens_prf_orb, halo_dens_prf_inf, halo_dens_prf_all, halo_diff_n_orb_ptls, halo_diff_n_inf_ptls, halo_diff_n_all_ptls = create_dens_prf(radii[halo_first[splits[i]+j]:halo_first[splits[i]+j]+halo_n[splits[i]+j]], orbit_assn[halo_first[splits[i]+j]:halo_first[splits[i]+j]+halo_n[splits[i]+j]], act_mass_prf_all[splits[i]+j], act_mass_prf_orb[splits[i]+j],prf_bins,mass[i])
+                    halo_mass_prf_all, halo_mass_prf_orb, halo_mass_prf_inf = create_mass_prf(radii[halo_first[splits[i]+j]:halo_first[splits[i]+j]+halo_n[splits[i]+j]], orbit_assn[halo_first[splits[i]+j]:halo_first[splits[i]+j]+halo_n[splits[i]+j]], prf_bins,mass[i])
                     calc_mass_prf_orb.append(np.array(halo_mass_prf_orb))
                     calc_mass_prf_inf.append(np.array(halo_mass_prf_inf))
                     calc_mass_prf_all.append(np.array(halo_mass_prf_all))
-                    calc_dens_prf_orb.append(np.array(halo_dens_prf_orb))
-                    calc_dens_prf_inf.append(np.array(halo_dens_prf_inf))
-                    calc_dens_prf_all.append(np.array(halo_dens_prf_all))
-                    diff_n_orb_ptls.append(np.array(halo_diff_n_orb_ptls))
-                    diff_n_inf_ptls.append(np.array(halo_diff_n_inf_ptls))
-                    diff_n_all_ptls.append(np.array(halo_diff_n_all_ptls))
+                    calc_dens_prf_orb.append(calculate_density(np.array(calc_mass_prf_orb),prf_bins[1:]))
+                    calc_dens_prf_inf.append(calculate_density(np.array(calc_mass_prf_inf),prf_bins[1:]))
+                    calc_dens_prf_all.append(calculate_density(np.array(calc_mass_prf_all),prf_bins[1:]))
+            
             
             # For each profile combine all halos for each bin
             # calc_mass_prf_xxx has shape (num_halo, num_bins)
             curr_calc_mass_prf_orb = comb_prf(calc_mass_prf_orb, curr_num_halos, np.float32)
             curr_calc_mass_prf_inf = comb_prf(calc_mass_prf_inf, curr_num_halos, np.float32)
             curr_calc_mass_prf_all = comb_prf(calc_mass_prf_all, curr_num_halos, np.float32)
-            curr_calc_dens_prf_orb = comb_prf(calc_dens_prf_orb, curr_num_halos, np.float32)
-            curr_calc_dens_prf_inf = comb_prf(calc_dens_prf_inf, curr_num_halos, np.float32)
-            curr_calc_dens_prf_all = comb_prf(calc_dens_prf_all, curr_num_halos, np.float32)
+            # Calculate the density by divide the mass of each bin by the volume of that bin's radius
+            curr_calc_dens_prf_orb = calculate_density(curr_calc_mass_prf_orb, prf_bins[1:])
+            curr_calc_dens_prf_inf = calculate_density(curr_calc_mass_prf_inf, prf_bins[1:])
+            curr_calc_dens_prf_all = calculate_density(curr_calc_mass_prf_all, prf_bins[1:]) 
 
             med_calc_mass_prf_all += np.median(curr_calc_mass_prf_all,axis=0) 
             med_calc_mass_prf_orb += np.median(curr_calc_mass_prf_orb,axis=0) 
@@ -327,6 +267,8 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
             all_dens_ratio = np.divide(calc_dens_prf_all,act_dens_prf_all) - 1
             inf_dens_ratio = np.divide(calc_dens_prf_inf,act_dens_prf_inf) - 1
             orb_dens_ratio = np.divide(calc_dens_prf_orb,act_dens_prf_orb) - 1
+        
+        inf_dens_ratio[np.isinf(inf_dens_ratio)] = 0
 
         
         # Find the upper and lower bound for scatter for calculated profiles
@@ -358,6 +300,16 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         med_orb_ratio = np.median(orb_dens_ratio, axis=0)
 
         middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
+        
+        # fig, ax = plt.subplots(1,3,figsize=(15,30))
+        # ax[0].scatter(middle_bins,diff_n_inf_ptls,c="g")
+        # ax[1].scatter(middle_bins,diff_n_orb_ptls,c="b")
+        # ax[2].scatter(middle_bins,np.round(diff_n_all_ptls,5),c="r")
+        # ax[0].set_xscale("log")
+        # ax[1].set_xscale("log")
+        # ax[2].set_xscale("log")
+        # fig.set_size_inches(50, 25)
+        # fig.savefig(save_location + title + "num_ptls_wrng.png", bbox_inches='tight')
 
         fig, ax = plt.subplots(1,3, figsize=(15,30))
         titlefntsize=26
@@ -425,28 +377,34 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         ax[2].plot(middle_bins, med_orb_ratio, 'b', label = "(ML density profile / SPARTA density profile orb) - 1")
         ax[2].plot(middle_bins, med_inf_ratio, 'g', label = "(ML density profile / SPARTA density profile inf) - 1")
         
-        ax[2].fill_between(middle_bins, lower_all_dens_ratio, upper_all_dens_ratio, color='r', alpha=fill_alpha)
-        ax[2].fill_between(middle_bins, lower_inf_dens_ratio, upper_inf_dens_ratio, color='g', alpha=fill_alpha)
-        ax[2].fill_between(middle_bins, lower_orb_dens_ratio, upper_orb_dens_ratio, color='b', alpha=fill_alpha)    
-        
+        if tot_num_halos > 5:
+            ax[2].fill_between(middle_bins, lower_all_dens_ratio, upper_all_dens_ratio, color='r', alpha=fill_alpha)
+            ax[2].fill_between(middle_bins, lower_inf_dens_ratio, upper_inf_dens_ratio, color='g', alpha=fill_alpha)
+            ax[2].fill_between(middle_bins, lower_orb_dens_ratio, upper_orb_dens_ratio, color='b', alpha=fill_alpha)    
+            
         ax[2].set_title("(ML Predicted / Actual Density Profile) - 1",fontsize=titlefntsize)
         ax[2].set_xlabel("Radius $r/R_{200m}$", fontsize=axisfntsize)
         ax[2].set_ylabel("(ML Dens Prf / Act Dens Prf) - 1", fontsize=axisfntsize)
         #ax[2].set_ylim(0,8)
-        top_orb_tick = np.round(np.nanmax(upper_orb_dens_ratio),2)
-        bot_orb_tick = np.round(np.nanmin(lower_orb_dens_ratio),2)
-        top_inf_tick = np.round(np.nanmax(upper_inf_dens_ratio),2)
-        bot_inf_tick = np.round(np.nanmin(lower_inf_dens_ratio),2)
-        max_orb_tick = np.round(np.nanmax(med_orb_ratio),2)
-        min_orb_tick = np.round(np.nanmin(med_orb_ratio),2)
-        max_inf_tick = np.round(np.nanmax(med_inf_ratio),2)
-        min_inf_tick = np.round(np.nanmin(med_inf_ratio),2)
+        
+        all_ticks = [0]
+        if tot_num_halos > 5:
+            all_ticks.append(np.round(np.nanmax(upper_orb_dens_ratio),4))
+            all_ticks.append(np.round(np.nanmin(lower_orb_dens_ratio),4))
+            all_ticks.append(np.round(np.nanmax(upper_inf_dens_ratio),4))
+            all_ticks.append(np.round(np.nanmin(lower_inf_dens_ratio),4))
+
+            # ax[2].vlines(middle_bins[np.where(med_orb_ratio > 0)[0][0]],ymin=np.min([all_ticks[2],all_ticks[4]]),ymax=np.max([all_ticks[1],all_ticks[3]]),colors="black",label="orb ratio > 0: " + str(np.round(middle_bins[np.where(med_orb_ratio > 0)[0][0]],3)) + "R200m")
+        all_ticks.append(np.round(np.nanmax(med_orb_ratio),4))
+        all_ticks.append(np.round(np.nanmin(med_orb_ratio),4))
+        all_ticks.append(np.round(np.nanmax(med_inf_ratio),4))
+        all_ticks.append(np.round(np.nanmin(med_inf_ratio),4))
 
         ax[2].set_xscale("log")
         ax[2].set_yscale("symlog")
         ax[2].set_box_aspect(1)
         ax[2].tick_params(axis='both',which='both',labelsize=tickfntsize)
-        ax[2].set_yticks([bot_inf_tick, bot_orb_tick,min_orb_tick, min_inf_tick, 0, top_inf_tick, top_orb_tick, max_orb_tick, max_inf_tick])
+        ax[2].set_yticks(all_ticks)
         ax[2].legend(fontsize=legendfntsize)    
         
         if save_graph:
@@ -456,7 +414,7 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
             plt.show()
         plt.close()
 
-    return diff_n_inf_ptls, diff_n_orb_ptls, diff_n_all_ptls, middle_bins
+    return middle_bins
 
 def rv_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = None):
     if ax == None:
@@ -552,7 +510,7 @@ def create_hist_max_ptl(min_ptl, set_ptl, inf_r, orb_r, inf_rv, orb_rv, inf_tv, 
     return max_ptl, orb_r_rv, orb_r_tv, orb_rv_tv, inf_r_rv, inf_r_tv, inf_rv_tv
 
 def percent_error(pred, act):
-    return (((pred - act))/act) * 100
+    return ((pred - act)/act) * 100
 
 def calc_misclassified(correct_labels, ml_labels, r, rv, tv, r_range, rv_range, tv_range, num_bins, model_info,dataset_name): 
     min_ptl = 1e-4
@@ -593,26 +551,26 @@ def calc_misclassified(correct_labels, ml_labels, r, rv, tv, r_range, rv_range, 
     all_act_r_tv = (act_orb_r_tv[0] + act_inf_r_tv[0])
     all_act_rv_tv = (act_orb_rv_tv[0] + act_inf_rv_tv[0])
 
-    scaled_orb_r_rv = (np.divide(inc_orb_r_rv[0],act_orb_r_rv[0],out=np.zeros_like(inc_orb_r_rv[0]), where=act_orb_r_rv[0]!=0)).T
-    scaled_orb_r_tv = (np.divide(inc_orb_r_tv[0],act_orb_r_tv[0],out=np.zeros_like(inc_orb_r_tv[0]), where=act_orb_r_tv[0]!=0)).T
-    scaled_orb_rv_tv = (np.divide(inc_orb_rv_tv[0],act_orb_rv_tv[0],out=np.zeros_like(inc_orb_rv_tv[0]), where=act_orb_rv_tv[0]!=0)).T
-    scaled_inf_r_rv = (np.divide(inc_inf_r_rv[0],act_inf_r_rv[0],out=np.zeros_like(inc_inf_r_rv[0]), where=act_inf_r_rv[0]!=0)).T
-    scaled_inf_r_tv = (np.divide(inc_inf_r_tv[0],act_inf_r_tv[0],out=np.zeros_like(inc_inf_r_tv[0]), where=act_inf_r_tv[0]!=0)).T
-    scaled_inf_rv_tv = (np.divide(inc_inf_rv_tv[0],act_inf_rv_tv[0],out=np.zeros_like(inc_inf_rv_tv[0]), where=act_inf_rv_tv[0]!=0)).T
-    scaled_all_r_rv = (np.divide(all_inc_r_rv,all_act_r_rv,out=np.zeros_like(all_inc_r_rv), where=all_act_r_rv!=0)).T
-    scaled_all_r_tv = (np.divide(all_inc_r_tv,all_act_r_tv,out=np.zeros_like(all_inc_r_tv), where=all_act_r_tv!=0)).T
-    scaled_all_rv_tv = (np.divide(all_inc_rv_tv,all_act_rv_tv,out=np.zeros_like(all_inc_rv_tv), where=all_act_rv_tv!=0)).T
+    scaled_orb_r_rv = (np.divide(inc_orb_r_rv[0],act_orb_r_rv[0],out=np.zeros_like(inc_orb_r_rv[0]), where=act_orb_r_rv[0]!=0))
+    scaled_orb_r_tv = (np.divide(inc_orb_r_tv[0],act_orb_r_tv[0],out=np.zeros_like(inc_orb_r_tv[0]), where=act_orb_r_tv[0]!=0))
+    scaled_orb_rv_tv = (np.divide(inc_orb_rv_tv[0],act_orb_rv_tv[0],out=np.zeros_like(inc_orb_rv_tv[0]), where=act_orb_rv_tv[0]!=0))
+    scaled_inf_r_rv = (np.divide(inc_inf_r_rv[0],act_inf_r_rv[0],out=np.zeros_like(inc_inf_r_rv[0]), where=act_inf_r_rv[0]!=0))
+    scaled_inf_r_tv = (np.divide(inc_inf_r_tv[0],act_inf_r_tv[0],out=np.zeros_like(inc_inf_r_tv[0]), where=act_inf_r_tv[0]!=0))
+    scaled_inf_rv_tv = (np.divide(inc_inf_rv_tv[0],act_inf_rv_tv[0],out=np.zeros_like(inc_inf_rv_tv[0]), where=act_inf_rv_tv[0]!=0))
+    scaled_all_r_rv = (np.divide(all_inc_r_rv,all_act_r_rv,out=np.zeros_like(all_inc_r_rv), where=all_act_r_rv!=0))
+    scaled_all_r_tv = (np.divide(all_inc_r_tv,all_act_r_tv,out=np.zeros_like(all_inc_r_tv), where=all_act_r_tv!=0))
+    scaled_all_rv_tv = (np.divide(all_inc_rv_tv,all_act_rv_tv,out=np.zeros_like(all_inc_rv_tv), where=all_act_rv_tv!=0))
 
     # For any spots that have no missclassified particles but there are particles there set it to the minimum amount so it still shows up in the plot.
-    scaled_orb_r_rv = update_miss_class(scaled_orb_r_rv.T, inc_orb_r_rv[0], act_orb_r_rv[0], miss_class_min=min_ptl, act_min=act_min_ptl)
-    scaled_orb_r_tv = update_miss_class(scaled_orb_r_tv.T, inc_orb_r_tv[0], act_orb_r_tv[0], miss_class_min=min_ptl, act_min=act_min_ptl)
-    scaled_orb_rv_tv = update_miss_class(scaled_orb_rv_tv.T, inc_orb_rv_tv[0], act_orb_rv_tv[0], miss_class_min=min_ptl, act_min=act_min_ptl)
-    scaled_inf_r_rv = update_miss_class(scaled_inf_r_rv.T, inc_inf_r_rv[0], act_inf_r_rv[0], miss_class_min=min_ptl, act_min=act_min_ptl)
-    scaled_inf_r_tv = update_miss_class(scaled_inf_r_tv.T, inc_inf_r_tv[0], act_inf_r_tv[0], miss_class_min=min_ptl, act_min=act_min_ptl)
-    scaled_inf_rv_tv = update_miss_class(scaled_inf_rv_tv.T, inc_inf_rv_tv[0], act_inf_rv_tv[0], miss_class_min=min_ptl, act_min=act_min_ptl)
-    scaled_all_r_rv = update_miss_class(scaled_all_r_rv.T, all_inc_r_rv, all_act_r_rv, miss_class_min=min_ptl, act_min=act_min_ptl)
-    scaled_all_r_tv = update_miss_class(scaled_all_r_tv.T, all_inc_r_tv, all_act_r_tv, miss_class_min=min_ptl, act_min=act_min_ptl)
-    scaled_all_rv_tv = update_miss_class(scaled_all_rv_tv.T, all_inc_rv_tv, all_act_rv_tv, miss_class_min=min_ptl, act_min=act_min_ptl)
+    scaled_orb_r_rv = update_miss_class(scaled_orb_r_rv, inc_orb_r_rv[0], act_orb_r_rv[0], miss_class_min=min_ptl, act_min=act_min_ptl)
+    scaled_orb_r_tv = update_miss_class(scaled_orb_r_tv, inc_orb_r_tv[0], act_orb_r_tv[0], miss_class_min=min_ptl, act_min=act_min_ptl)
+    scaled_orb_rv_tv = update_miss_class(scaled_orb_rv_tv, inc_orb_rv_tv[0], act_orb_rv_tv[0], miss_class_min=min_ptl, act_min=act_min_ptl)
+    scaled_inf_r_rv = update_miss_class(scaled_inf_r_rv, inc_inf_r_rv[0], act_inf_r_rv[0], miss_class_min=min_ptl, act_min=act_min_ptl)
+    scaled_inf_r_tv = update_miss_class(scaled_inf_r_tv, inc_inf_r_tv[0], act_inf_r_tv[0], miss_class_min=min_ptl, act_min=act_min_ptl)
+    scaled_inf_rv_tv = update_miss_class(scaled_inf_rv_tv, inc_inf_rv_tv[0], act_inf_rv_tv[0], miss_class_min=min_ptl, act_min=act_min_ptl)
+    scaled_all_r_rv = update_miss_class(scaled_all_r_rv, all_inc_r_rv, all_act_r_rv, miss_class_min=min_ptl, act_min=act_min_ptl)
+    scaled_all_r_tv = update_miss_class(scaled_all_r_tv, all_inc_r_tv, all_act_r_tv, miss_class_min=min_ptl, act_min=act_min_ptl)
+    scaled_all_rv_tv = update_miss_class(scaled_all_rv_tv, all_inc_rv_tv, all_act_rv_tv, miss_class_min=min_ptl, act_min=act_min_ptl)
     
     all_inc_inf_r_rv = update_miss_class(inc_inf_r_rv[0], inc_inf_r_rv[0], act_inf_r_rv[0], miss_class_min=min_ptl, act_min=act_min_ptl)
     all_inc_inf_r_tv = update_miss_class(inc_inf_r_tv[0], inc_inf_r_tv[0], act_inf_r_tv[0], miss_class_min=min_ptl, act_min=act_min_ptl)
@@ -845,7 +803,7 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sav
         
     #########################################################################################################################################################
 
-        err_fig = plt.figure()
+        err_fig = plt.figure(figsize=(30,15))
         err_fig.suptitle("Percent Error " + title)
         gs = err_fig.add_gridspec(2,4,width_ratios = widths, height_ratios = heights)
         
@@ -865,7 +823,7 @@ def plot_r_rv_tv_graph(orb_inf, r, rv, tv, correct_orb_inf, title, num_bins, sav
         
         perr_color_bar = plt.colorbar(perr_imshow_img, cax=plt.subplot(gs[:,-1]), pad = 0.1)
         
-        err_fig.savefig(save_location + title + "percent_error.png") 
+        err_fig.savefig(save_location + title + "percent_error.png")  
     
 def graph_feature_importance(feature_names, feature_importance, title, plot, save, save_location):
     mpl.rcParams.update({'font.size': 8})
@@ -925,103 +883,91 @@ def plot_data_dist(data, labels, num_bins, save_location, show, save):
         fig.savefig(save_location + "data_hist.png")
     plt.close()
     
-def graph_acc_by_bin(pred_orb_inf, corr_orb_inf, radius, num_bins, title, plot, save, save_location):
-    bin_width = (np.max(radius) - 0) / num_bins
-    inf_radius = radius[np.where(corr_orb_inf == 0)]
-    orb_radius = radius[np.where(corr_orb_inf == 1)]
+def plot_per_err(bins,parameter,act_labels,pred_labels,save_location,x_label,save_param):
+    all_err_inf = []
+    all_err_orb = []
+    num_wrong_inf = []
+    num_wrong_orb = []
+    scale_wrong_inf = []
+    scale_wrong_orb = []
+    log_num_wrong_inf = []
+    log_num_wrong_orb = []
 
-    all_accuracy = []
-    inf_accuracy = []
-    orb_accuracy = []
-    bins = []
-    start_bin = 0
-    for i in range(num_bins):
-        bins.append(start_bin)
-        finish_bin = start_bin + bin_width
-        idx_in_bin = np.where((radius >= start_bin) & (radius < finish_bin))[0]
-        if idx_in_bin.shape[0] == 0:
-            start_bin = finish_bin
-            all_accuracy.append(np.NaN)
-            continue
-        bin_preds = pred_orb_inf[idx_in_bin]
-        bin_corr = corr_orb_inf[idx_in_bin]
-        classification = classification_report(bin_corr, bin_preds, output_dict=True, zero_division=0)
-        all_accuracy.append(classification["accuracy"])
+    for i in range(bins.size - 1):
+        curr_act_inf = np.where((parameter > bins[i])&(parameter < bins[i+1])&(act_labels==0))[0].size
+        curr_act_orb = np.where((parameter > bins[i])&(parameter < bins[i+1])&(act_labels==1))[0].size
+        curr_pred_inf = np.where((parameter > bins[i])&(parameter < bins[i+1])&(pred_labels==0))[0].size
+        curr_pred_orb = np.where((parameter > bins[i])&(parameter < bins[i+1])&(pred_labels==1))[0].size
         
-        start_bin = finish_bin
-    bins.append(start_bin)    
+        all_err_inf.append(0 if curr_act_inf == 0 else ((curr_pred_inf - curr_act_inf)/curr_act_inf) * 100)
+        all_err_orb.append(0 if curr_act_orb == 0 else ((curr_pred_orb - curr_act_orb)/curr_act_orb) * 100)
+        num_wrong_inf.append(np.where((parameter > bins[i])&(parameter < bins[i+1])&(act_labels==0)&(pred_labels==1))[0].size)
+        num_wrong_orb.append(np.where((parameter > bins[i])&(parameter < bins[i+1])&(act_labels==1)&(pred_labels==0))[0].size)
+        scale_wrong_inf.append(0 if curr_act_inf == 0 else np.where((parameter > bins[i])&(parameter < bins[i+1])&(act_labels==0)&(pred_labels==1))[0].size/curr_act_inf)
+        scale_wrong_orb.append(0 if curr_act_orb == 0 else np.where((parameter > bins[i])&(parameter < bins[i+1])&(act_labels==1)&(pred_labels==0))[0].size/curr_act_orb)
         
-    start_bin = 0
-    for j in range(num_bins):
-        finish_bin = start_bin + bin_width
-        idx_in_bin = np.where((inf_radius >= start_bin) & (inf_radius < finish_bin))[0]
-        if idx_in_bin.shape[0] == 0:
-            start_bin = finish_bin
-            inf_accuracy.append(np.NaN)
-            continue
-        bin_preds = pred_orb_inf[idx_in_bin]
-        bin_corr = corr_orb_inf[idx_in_bin]
-        classification = classification_report(bin_corr, bin_preds, output_dict=True, zero_division=0)
-        inf_accuracy.append(classification["accuracy"])
-        
-
-        start_bin = finish_bin
-
-    start_bin = 0
-    for k in range(num_bins):
-        finish_bin = start_bin + bin_width
-        idx_in_bin = np.where((orb_radius >= start_bin) & (orb_radius < finish_bin))[0]
-        if idx_in_bin.shape[0] == 0:
-            start_bin = finish_bin
-            orb_accuracy.append(np.NaN)
-            continue
-        bin_preds = pred_orb_inf[idx_in_bin]
-        bin_corr = corr_orb_inf[idx_in_bin]
-        classification = classification_report(bin_corr, bin_preds, output_dict=True, zero_division=0)
-        orb_accuracy.append(classification["accuracy"])
-        
-        start_bin = finish_bin
     
+    cmap = plt.get_cmap("viridis")
+    norm = colors.Normalize(vmin=0,vmax=1)
+    inf_colors = cmap(norm(scale_wrong_inf))
+    orb_colors = cmap(norm(scale_wrong_orb))
     
-    fig, ax = plt.subplots(2,2, layout="constrained")
-    fig.suptitle("Accuracy by Radius for: " + title)
-    ax[0,0].stairs(all_accuracy, bins, color = "black", alpha = 0.6, label = "all ptl")    
-    ax[0,0].stairs(inf_accuracy, bins, color = "blue", alpha = 0.4, label = "inf ptl")
-    ax[0,0].stairs(orb_accuracy, bins, color = "red", alpha = 0.4, label = "orb ptl")
-    ax[0,0].set_title("All Density Prfs")
-    ax[0,0].set_xlabel("radius $r/R_{200m}$")
-    ax[0,0].set_ylabel("Accuracy")
-    ax[0,0].set_ylim(-0.1,1.1)
-    ax[0,0].legend()
+    bin_centers = (bins[:-1] + bins[1:]) / 2
     
-    ax[0,1].stairs(all_accuracy, bins, color = "black", label = "all ptl")    
-    ax[0,1].set_title("All Mass Profile")
-    ax[0,1].set_xlabel("radius $r/R_{200m}$")
-    ax[0,1].set_ylabel("Accuracy")
-    ax[0,1].set_ylim(-0.1,1.1)
-    ax[0,1].legend()
-   
-    ax[1,0].stairs(inf_accuracy, bins, color = "blue", label = "inf ptl")
-    ax[1,0].set_title("Infalling Profile")
-    ax[1,0].set_xlabel("radius $r/R_{200m}$")
-    ax[1,0].set_ylabel("Accuracy")
-    ax[1,0].set_ylim(-0.1,1.1)
-    ax[1,0].legend()
+    cumsum_inf = np.cumsum(num_wrong_inf)
+    cumsum_orb = np.cumsum(num_wrong_orb)
 
-    ax[1,1].stairs(orb_accuracy, bins, color = "red", label = "orb ptl")
-    ax[1,1].set_title("Orbiting Profile")
-    ax[1,1].set_xlabel("radius $r/R_{200m}$")
-    ax[1,1].set_ylabel("Accuracy")
-    ax[1,1].set_ylim(-0.1,1.1)
-    ax[1,1].legend()
+    widths = [4,4,.2]
+    heights = [4,4]
+    bar_width = 0.75
+    num_bins = bins.size - 1
+    index = np.arange(0,num_bins)
+    
+    r200m_loc = np.where(bins > 1)[0][0]
+    
+    fig = plt.figure(figsize=(40,20))
+    gs = fig.add_gridspec(2,3,width_ratios = widths, height_ratios = heights)
+    ax1 = fig.add_subplot(gs[0,0])
+    ax2 = fig.add_subplot(gs[0,1])
+    ax3 = fig.add_subplot(gs[1,0])
+    ax4 = fig.add_subplot(gs[1,1])
+    
+    ax1.bar(index,num_wrong_inf,width=bar_width,align='center',color=inf_colors,log=True)
+    ax1.vlines(r200m_loc,ymin=0,ymax=np.max(num_wrong_inf),colors='r')
+    ax1.set_xlabel(x_label)
+    ax1.set_ylabel("Number of Misclassified")
+    ax1.set_title("Infalling Particles")
+    ax1.set_xticks(index)
+    ax1.set_xticklabels([f'{bins[i]:.3f}-{bins[i + 1]:.3f}' for i in range(num_bins)],rotation=90)
+    
+    ax2.bar(index,num_wrong_orb,width=bar_width,align='center',color=orb_colors,log=True)
+    ax2.vlines(r200m_loc,ymin=0,ymax=np.max(num_wrong_orb),colors='r')
+    ax2.set_xlabel(x_label)
+    ax2.set_ylabel("Number of Misclassified")
+    ax2.set_title("Orbiting Particles")
+    ax2.set_xticks(index)
+    ax2.set_xticklabels([f'{bins[i]:.3f}-{bins[i + 1]:.3f}' for i in range(num_bins)],rotation=90)
+    
+    ax3.plot(index,cumsum_inf,color='r',marker='o')
+    ax3.set_xlabel(x_label)
+    ax3.set_ylabel("Number of Misclassified")
+    ax3.set_ylim(np.min([cumsum_inf[0],cumsum_orb[0]])-1000,np.max([cumsum_inf[-1],cumsum_orb[-1]])+1000)
+    ax3.set_xticks(index)
+    ax3.set_xticklabels([f'{bins[i]:.3f}-{bins[i + 1]:.3f}' for i in range(num_bins)],rotation=90)
+    
+    ax4.plot(index,cumsum_orb,color='r',marker='o')
+    ax4.set_xlabel(x_label)
+    ax4.set_ylabel("Number of Misclassified")
+    ax4.set_ylim(np.min([cumsum_inf[0],cumsum_orb[0]])-1000,np.max([cumsum_inf[-1],cumsum_orb[-1]])+1000)
+    ax4.set_xticks(index)
+    ax4.set_xticklabels([f'{bins[i]:.3f}-{bins[i + 1]:.3f}' for i in range(num_bins)],rotation=90)
 
-    if plot:
-        plt.show()
-        plt.close()
-    if save:
-        create_directory(save_location + "error_by_rad_graphs/")
-        fig.savefig(save_location + "error_by_rad_graphs/error_by_rad_" + title + ".png")
-        plt.close()
+    sm = mpl.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cbar = plt.colorbar(sm, cax=plt.subplot(gs[0,-1]))
+    cbar.set_label("Number of Misclassified Particles / Number of Actual Particles")
+
+    fig.savefig(save_location + save_param + "_per_err_by_bin.png",bbox_inches="tight")
         
 def feature_dist(features, labels, save_name, plot, save, save_location):
     tot_plts = features.shape[1]
@@ -1253,7 +1199,6 @@ def halo_plot_3d_vec(ptl_pos, ptl_vel, halo_pos, halo_vel, halo_r200m, labels, c
         row=1,col=2)
     fig.write_html(path_to_MLOIS + "/Random_figs/high_vel_halo_idx_" + str(halo_idx) + ".html")
     
-    
 def plot_rad_dist(bin_edges,filter_radii,save_path):
     fig,ax = plt.subplots(1,2,figsize=(25,10))
     ax[0].hist(filter_radii)
@@ -1308,5 +1253,11 @@ def plot_orb_inf_dist(num_bins, radii, orb_inf, save_path):
     ax[1].legend()
     
     fig.savefig(save_path + "orb_inf_dist.png",bbox_inches="tight")
+    
 
-
+    
+def mov_3d_plt(ptl_pos,ptl_vel,labels):
+    inf_mask = np.where(labels == 0)[0]
+    orb_msk = np.where(labels == 1)[0]
+    inf_ptls = ipv.quiver(ptl_pos[:,0,0],ptl_pos[:,1,0],ptl_pos[:,2,0],ptl_vel[:,0,0],ptl_vel[:,1,0],ptl_vel[:,2,0])
+    

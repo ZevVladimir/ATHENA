@@ -119,3 +119,62 @@ def calc_t_dyn(halo_r200m, red_shift):
 
     return t_dyn
 
+def update_density_prf(calc_prf, radii, idx, start_bin, end_bin, mass):
+    radii_within_range = np.where((radii >= start_bin) & (radii < end_bin))[0]
+    
+    # If there are particles in this bin and its not the first bin
+    # Then add the mass of prior bin to the mass of this bin
+    if radii_within_range.size != 0 and idx != 0:
+        calc_prf[idx] = calc_prf[idx - 1] + radii_within_range.size * mass
+    # If there are particles in this bin and its  the first bin
+    # Then simply the mass of this bin
+    elif radii_within_range.size != 0 and idx == 0:
+        calc_prf[idx] = radii_within_range.size * mass
+    # If there are  no particles in this bin and its not the first bin
+    # Then use the mass of prior bin 
+    elif radii_within_range.size == 0 and idx != 0:
+        calc_prf[idx] = calc_prf[idx-1]
+    # If there are  no particles in this bin and its the first bin
+    # Then use the mass of this bin 
+    else:
+        calc_prf[idx] = calc_prf[idx-1]
+    
+    return calc_prf
+
+def diff_n_prf(diff_n_ptl, radii, idx, start_bin, end_bin, mass, act_prf):
+    radii_within_range = np.where((radii >= start_bin) & (radii < end_bin))[0]
+    
+    if radii_within_range.size != 0 and idx != 0:
+        diff_n_ptl[idx] = np.round((act_prf[idx] - act_prf[idx-1])/mass) - radii_within_range.size
+    elif radii_within_range.size != 0 and idx == 0:
+        diff_n_ptl[idx] = np.round(act_prf[idx]/mass) - radii_within_range.size
+    elif radii_within_range.size == 0 and idx != 0:
+        diff_n_ptl[idx] = np.round((act_prf[idx] - act_prf[idx-1])/mass) - radii_within_range.size
+    else:
+        diff_n_ptl[idx] = np.round((act_prf[idx])/mass)
+        
+    return diff_n_ptl
+
+def create_mass_prf(radii, orbit_assn, prf_bins, mass):
+    # Create bins for the density profile calculation
+    num_prf_bins = prf_bins.shape[0] - 1
+
+    calc_mass_prf_orb = np.zeros(num_prf_bins)
+    calc_mass_prf_inf = np.zeros(num_prf_bins)
+    calc_mass_prf_all = np.zeros(num_prf_bins)
+    
+    # determine which radii correspond to orbiting and which to infalling
+    orbit_radii = radii[np.where(orbit_assn == 1)[0]]
+    infall_radii = radii[np.where(orbit_assn == 0)[0]]
+
+    # loop through each bin's radii range and get the mass of each type of particle
+    for i in range(num_prf_bins):
+        start_bin = prf_bins[i]
+        end_bin = prf_bins[i+1]          
+
+        calc_mass_prf_all  = update_density_prf(calc_mass_prf_all, radii, i, start_bin, end_bin, mass)    
+        calc_mass_prf_orb = update_density_prf(calc_mass_prf_orb, orbit_radii, i, start_bin, end_bin, mass)      
+        calc_mass_prf_inf = update_density_prf(calc_mass_prf_inf, infall_radii, i, start_bin, end_bin, mass)      
+    
+    
+    return calc_mass_prf_all,calc_mass_prf_orb, calc_mass_prf_inf
