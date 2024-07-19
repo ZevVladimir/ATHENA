@@ -128,25 +128,6 @@ if __name__ == "__main__":
     else:
         client = get_CUDA_cluster()
     
-    # create a string for the model that combines all the simulations used 
-    # create a string for the radius and v200m limits used       
-    combined_name = ""
-    combined_lims = ""
-    for i,sim in enumerate(model_sims):
-        pattern = r"(\d+)to(\d+)"
-        match = re.search(pattern, sim)
-
-        if match:
-            curr_snap_list = [match.group(1), match.group(2)] 
-        else:
-            print("Pattern not found in the string.")
-        parts = sim.split("_")
-        combined_name += parts[1] + parts[2] + "s" + parts[5] 
-        combined_lims += parts[3] + parts[4]
-        if i != len(model_sims)-1:
-            combined_name += "_"
-            combined_lims += "_"
-
     scale_rad=False
     use_weights=False
     
@@ -154,6 +135,8 @@ if __name__ == "__main__":
         scale_rad = True
     if weight_rad > 0 and min_weight > 0 and not opt_wghts:
         use_weights=True
+        
+    combined_name, combined_lims = get_combined_name(model_sims) 
         
     model_dir = model_type + "_" + combined_lims + "nu" + nu_string 
 
@@ -353,7 +336,7 @@ if __name__ == "__main__":
         fig.savefig(gen_plot_save_loc + "ex_tree.png",bbox_inches="tight")
         
     with timed("Model Evaluation"):
-        plot_loc = model_save_loc + "Test_" + combined_name + "/plots/"
+        plot_loc = model_save_loc + "Test_" + combined_lims + "_" + combined_name + "/plots/"
         create_directory(plot_loc)
         
         halo_files = []

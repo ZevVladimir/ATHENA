@@ -109,50 +109,27 @@ if __name__ == "__main__":
     else:
         client = get_CUDA_cluster()
     
-    combined_model_name = ""
-    for i,sim in enumerate(model_sims):
-        pattern = r"(\d+)to(\d+)"
-        match = re.search(pattern, sim)
-
-        if match:
-            curr_snap_list = [match.group(1), match.group(2)] 
-        else:
-            print("Pattern not found in the string.")
-        parts = sim.split("_")
-        combined_model_name += parts[1] + parts[2] + "s" + parts[4] 
-        if i != len(model_sims)-1:
-            combined_model_name += "_"
+    model_comb_name, model_comb_lims = get_combined_name(model_sims) 
+    test_comb_name, test_comb_lims = get_combined_name(test_sims) 
             
-    combined_test_name = ""
-    for i,sim in enumerate(test_sims):
-        pattern = r"(\d+)to(\d+)"
-        match = re.search(pattern, sim)
-
-        if match:
-            curr_snap_list = [match.group(1), match.group(2)] 
-        else:
-            print("Pattern not found in the string.")
-        parts = sim.split("_")
-        combined_test_name += parts[1] + parts[2] + "s" + parts[4] 
-        if i != len(test_sims)-1:
-            combined_test_name += "_"
-        
     scale_rad=False
     use_weights=False
     if reduce_rad > 0 and reduce_perc > 0:
         scale_rad = True
     if weight_rad > 0 and min_weight > 0:
         use_weights=True    
-    
-    model_name = model_type + "_" + combined_model_name + "nu" + nu_string
+        
+    model_dir = model_type + "_" + model_comb_lims + "nu" + nu_string 
 
     if scale_rad:
-        model_name += "scl_rad" + str(reduce_rad) + "_" + str(reduce_perc)
+        model_dir += "scl_rad" + str(reduce_rad) + "_" + str(reduce_perc)
     if use_weights:
-        model_name += "wght" + str(weight_rad) + "_" + str(min_weight)
+        model_dir += "wght" + str(weight_rad) + "_" + str(min_weight)
         
-    test_dataset_loc = path_to_xgboost + combined_test_name + "/datasets/"
-    model_save_loc = path_to_xgboost + combined_model_name + "/" + model_name + "/"
+    model_name =  model_dir + model_comb_name
+    
+        
+    model_save_loc = path_to_xgboost + model_comb_name + "/" + model_dir + "/"
     
     try:
         bst = xgb.Booster()
@@ -170,7 +147,7 @@ if __name__ == "__main__":
     #TODO check that the right sims and datasets are chosen
     for dset_name in eval_datasets:
         with timed("Model Evaluation on " + dset_name + " dataset"):             
-            plot_loc = model_save_loc + dset_name + "_" + combined_test_name + "/plots/"
+            plot_loc = model_save_loc + dset_name + "_" + test_comb_lims + "_" + test_comb_name + "/plots/"
             create_directory(plot_loc)
             
             halo_files = []
@@ -191,7 +168,7 @@ if __name__ == "__main__":
             X = data[feature_columns]
             y = data[target_column]
 
-            eval_model(model_info, client, bst, use_sims=test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, combined_name=combined_test_name, plot_save_loc=plot_loc,dens_prf=dens_prf_plt,r_rv_tv=phase_space_plts,misclass=misclass_plt,per_err=per_err_plt)
+            eval_model(model_info, client, bst, use_sims=test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, combined_name=test_comb_name, plot_save_loc=plot_loc,dens_prf=dens_prf_plt,r_rv_tv=phase_space_plts,misclass=misclass_plt,per_err=per_err_plt)
             del data #otherwise garbage collection doesn't work
             del X
             del y
