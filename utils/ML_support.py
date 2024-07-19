@@ -741,7 +741,6 @@ def optimize_weights(client,model_params,ptl_ddf,halo_ddf,use_sims,feat_cols,tar
     
     return res.x[0],res.x[1],res.x[2]
     
-    
 def optimize_scale_rad(client,model_params,ptl_ddf,halo_ddf,use_sims,feat_cols,tar_col):    
     print("Start Optimization of Scaling Radii")
     space  = [Real(0.1, 5.0, name='reduce_rad'),
@@ -754,5 +753,28 @@ def optimize_scale_rad(client,model_params,ptl_ddf,halo_ddf,use_sims,feat_cols,t
     print("Best accuracy: ", -res.fun)
     
     return res.x[0],res.x[1]
+    
+def get_combined_name(model_sims):
+    # create a string for the model that combines all the simulations used 
+    # create a string for the radius and v200m limits used       
+    combined_name = ""
+    combined_lims = ""
+    for i,sim in enumerate(model_sims):
+        pattern = r"(\d+)to(\d+)"
+        match = re.search(pattern, sim)
+
+        if match:
+            curr_snap_list = [match.group(1), match.group(2)] 
+        else:
+            print("Pattern not found in the string.")
+        parts = sim.split("_")
+        #TODO make this work for sims that don't do a v200m cut
+        combined_name += parts[1] + parts[2] + "s" + parts[5] 
+        combined_lims += parts[3] + parts[4]
+        if i != len(model_sims)-1:
+            combined_name += "_"
+            combined_lims += "_"
+    
+    return combined_name,combined_lims
     
     

@@ -140,7 +140,8 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
     red_shift = snap_dict["red_shift"]
     scale_factor = snap_dict["scale_factor"]
     hubble_const = snap_dict["hubble_const"]
-    box_size = snap_dict["box_size"]    
+    box_size = snap_dict["box_size"] 
+    little_h = snap_dict["h"]   
     
     halo_pos = halo_pos * 10**3 * scale_factor
     
@@ -172,7 +173,7 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
 
     # calculate peculiar, radial, and tangential velocity
     pec_vel = calc_pec_vel(curr_ptl_vel, halo_vel)
-    fnd_rad_vel, curr_v200m, phys_vel, phys_vel_comp, rhat = calc_rad_vel(pec_vel, ptl_rad, coord_dist, halo_r200m, red_shift, hubble_const)
+    fnd_rad_vel, curr_v200m, phys_vel, phys_vel_comp, rhat = calc_rad_vel(pec_vel, ptl_rad, coord_dist, halo_r200m, red_shift, hubble_const, little_h)
     fnd_tang_vel = calc_tang_vel(fnd_rad_vel, phys_vel_comp, rhat)
     
     scaled_rad_vel = fnd_rad_vel / curr_v200m
@@ -438,6 +439,7 @@ with timed("Startup"):
         p_hubble_constant = cosmol.Hz(p_red_shift) * 0.001 # convert to units km/s/kpc
         sim_box_size = dic_sim["box_size"] #units Mpc/h comoving
         p_box_size = sim_box_size * 10**3 * p_scale_factor #convert to Kpc/h physical
+        little_h = dic_sim["h"]
 
         p_snap_dict = {
             "snap":p_snap,
@@ -445,6 +447,7 @@ with timed("Startup"):
             "scale_factor": p_scale_factor,
             "hubble_const": p_hubble_constant,
             "box_size": p_box_size,
+            "h":little_h
         }
         
     if reset_lvl == 3:
@@ -468,7 +471,8 @@ with timed("Startup"):
         "red_shift":c_red_shift,
         "scale_factor": c_scale_factor,
         "hubble_const": c_hubble_constant,
-        "box_size": c_box_size
+        "box_size": c_box_size,
+        "h":little_h
     }
 
     snapshot_list = [p_snap, c_snap]

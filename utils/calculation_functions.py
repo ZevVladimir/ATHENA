@@ -2,7 +2,7 @@ import numpy as np
 from colossus.halo import mass_so
 from colossus.utils import constants
 
-G = constants.G
+G = constants.G # kpc km^2 / M_⊙ / s^2
 
 #calculate distance of particle from halo
 def calculate_distance(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_particles, box_size):
@@ -43,7 +43,7 @@ def calculate_distance(halo_x, halo_y, halo_z, particle_x, particle_y, particle_
     distance = np.zeros((new_particles,1))
     distance = np.sqrt(np.square((halo_x - particle_x)) + np.square((halo_y - particle_y)) + np.square((halo_z - particle_z)))
     
-    return distance, coord_diff
+    return distance, coord_diff #kpc/h
 
 #calculates density within sphere of given radius with given mass and calculating volume at each particle's radius
 def calculate_density(masses, radius):
@@ -58,7 +58,7 @@ def calc_pec_vel(particle_vel, halo_vel):
     # Peculiar velocity is particle velocity minus the corresponding halo velocity
     peculiar_velocities = particle_vel - halo_vel   
 
-    return peculiar_velocities
+    return peculiar_velocities # km/s
 
 def calc_rhat(x_comp, y_comp, z_comp):
     rhat = np.zeros((x_comp.size, 3), dtype = np.float32)
@@ -74,9 +74,9 @@ def calc_rhat(x_comp, y_comp, z_comp):
 
 def calc_v200m(mass, radius):
     # calculate the v200m for a halo based on its mass and radius
-    return np.sqrt((G * mass)/radius)
+    return np.sqrt((G * mass)/radius) #km/s
 
-def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200m, red_shift, hubble_constant):
+def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200m, red_shift, hubble_constant, little_h):
     
     # Get the corresponding components, distances, and halo v200m for every particle
     v_hubble = np.zeros(particle_dist.size, dtype = np.float32)
@@ -87,7 +87,7 @@ def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200m, red_shift, 
     rhat = calc_rhat(coord_sep[:,0], coord_sep[:,1], coord_sep[:,2])
     
     # Hubble velocity is the hubble constant times the distance the particle is from the halo
-    v_hubble = hubble_constant * particle_dist   
+    v_hubble = hubble_constant * particle_dist * little_h   #km/s/kpc * kpc/h * h= km/s
     v_hubble = rhat * v_hubble[:, np.newaxis] 
     
     phys_vel_comp = peculiar_vel + v_hubble    

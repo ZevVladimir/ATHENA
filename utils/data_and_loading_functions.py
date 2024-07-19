@@ -92,8 +92,8 @@ def check_pickle_exist_gadget(sparta_name, ptl_property, snapshot, snapshot_path
     return ptl_info
 
 def load_or_pickle_ptl_data(sparta_name, snapshot, snapshot_path, scale_factor):
-    ptl_pid = check_pickle_exist_gadget(sparta_name, "pid", snapshot, snapshot_path, scale_factor=scale_factor)
-    ptl_vel = check_pickle_exist_gadget(sparta_name, "vel", snapshot, snapshot_path, scale_factor=scale_factor)
+    ptl_pid = check_pickle_exist_gadget(sparta_name, "pid", snapshot, snapshot_path, scale_factor=scale_factor) # kpc/h
+    ptl_vel = check_pickle_exist_gadget(sparta_name, "vel", snapshot, snapshot_path, scale_factor=scale_factor) # km/s
     ptl_pos = check_pickle_exist_gadget(sparta_name, "pos", snapshot, snapshot_path, scale_factor=scale_factor)
 
     return ptl_pid, ptl_vel, ptl_pos
@@ -132,9 +132,9 @@ def load_or_pickle_SPARTA_data(sparta_name, scale_factor, snap, sparta_snap):
     else:
         reload_sparta = True
 
-    if os.path.isfile(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/parent_id.pickle"):
-        with open(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/parent_id.pickle", "rb") as pickle_file:
-            parent_id = pickle.load(pickle_file)
+    if os.path.isfile(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/pid.pickle"):
+        with open(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/pid.pickle", "rb") as pickle_file:
+            pid = pickle.load(pickle_file)
     else:
         reload_sparta = True
         
