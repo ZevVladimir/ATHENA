@@ -16,7 +16,7 @@ import psutil
 
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir
 from utils.calculation_functions import *
-from utils.visualization_functions import halo_plot_3d_vec
+from utils.visualization_functions import halo_plot_3d_vec, compare_density_prf
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
@@ -61,6 +61,8 @@ sys.path.insert(1, path_to_sparta)
 from pygadgetreader import readsnap, readheader # type: ignore
 from sparta_tools import sparta # type: ignore
 ##################################################################################################################
+global count
+count = 0
 
 def memory_usage():
     process = psutil.Process(os.getpid())
@@ -160,10 +162,10 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
         adj_sparta_n_is_lower_limit = sparta_n_is_lower_limit
         adj_sparta_n_is_lower_limit[future_peri] = 0
         # If a particle has a pericenter or if the lower limit is 1 then it is orbiting
-        if (total_num_snaps - snap) <= 3:
-            compare_sparta_assn[np.where((adj_sparta_n_pericenter >= 1) | (adj_sparta_n_is_lower_limit == 1))[0]] = 1
-        else: 
-            compare_sparta_assn[np.where(adj_sparta_n_pericenter >= 1)] = 1
+
+        compare_sparta_assn[np.where((adj_sparta_n_pericenter >= 1) | (adj_sparta_n_is_lower_limit == 1))[0]] = 1
+        # compare_sparta_assn[np.where(adj_sparta_n_pericenter >= 1)] = 1
+        
         # Compare the ids between SPARTA and the found prtl ids and match the SPARTA results
         matched_ids = np.intersect1d(curr_ptl_pids, sparta_tracer_ids, return_indices = True)
         curr_orb_assn[matched_ids[1]] = compare_sparta_assn[matched_ids[2]]
@@ -176,28 +178,42 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
     scaled_rad_vel = fnd_rad_vel / curr_v200m
     scaled_tang_vel = fnd_tang_vel / curr_v200m
     scaled_radii = ptl_rad / halo_r200m
+    scaled_phys_vel = phys_vel / curr_v200m
     
-    vel_scal = 1
-    per_of_halo = 0.05
-    if comp_snap == False:
-        # particles with very high radial velocities at small radii should be considered infalling
-        # incorrectly classified
-        curr_orb_assn[np.where((scaled_radii < 1.1) & (phys_vel>(vel_scal*curr_v200m)))] = 0
-        if np.where((scaled_radii < 1.1) & (phys_vel>(vel_scal*curr_v200m)))[0].shape[0] > int(np.floor(per_of_halo * ptl_rad.shape[0])):
-            constraint = np.where((scaled_radii < 1.1) & (phys_vel>(vel_scal*curr_v200m)))[0]
-            halo_plot_3d_vec(curr_ptl_pos, curr_ptl_vel, halo_pos, halo_vel, halo_r200m, curr_orb_assn, constraint, curr_halo_idx,vel_scal)
+    # vel_scal = 1
+    # per_of_halo = 0.05
+    # if comp_snap == False:
+    #     # particles with very high radial velocities at small radii should be considered infalling
+    #     # incorrectly classified
+    #     curr_orb_assn[np.where((scaled_radii < 1.1) & (phys_vel>(vel_scal*curr_v200m)))] = 0
+    #     if np.where((scaled_radii < 1.1) & (phys_vel>(vel_scal*curr_v200m)))[0].shape[0] > int(np.floor(per_of_halo * ptl_rad.shape[0])):
+    #         constraint = np.where((scaled_radii < 1.1) & (phys_vel>(vel_scal*curr_v200m)))[0]
+    #         halo_plot_3d_vec(curr_ptl_pos, curr_ptl_vel, halo_pos, halo_vel, halo_r200m, curr_orb_assn, constraint, curr_halo_idx,vel_scal)
         
     scaled_radii_inds = scaled_radii.argsort()
     scaled_radii = scaled_radii[scaled_radii_inds]
     fnd_HIPIDs = fnd_HIPIDs[scaled_radii_inds]
     scaled_rad_vel = scaled_rad_vel[scaled_radii_inds]
     scaled_tang_vel = scaled_tang_vel[scaled_radii_inds]
-    #scal_sqr_phys_vel = scal_sqr_phys_vel[scaled_radii_inds]
+    scaled_phys_vel = scaled_phys_vel[scaled_radii_inds]
+
     if comp_snap == False:
         curr_orb_assn = curr_orb_assn[scaled_radii_inds]
 
+    global count
+    if create_dens_prf:
+        count += 1
+        with open(path_to_pickle + "190_cbol_l0063_n0256_10r200m/ptl_mass.pickle", "rb") as pickle_file:
+            ptl_mass = pickle.load(pickle_file)
+
+        bins = np.insert(bins, 0, 0)
+        dens_prf_all = np.reshape(dens_prf_all,(1,80))
+        dens_prf_1halo = np.reshape(dens_prf_1halo,(1,80))
+
+        compare_density_prf(np.array([0]),scaled_radii,np.array([0]),np.array([num_new_ptls]),dens_prf_all,dens_prf_1halo,np.array([ptl_mass]),curr_orb_assn,bins,str(curr_halo_idx),"/home/zvladimi/MLOIS/Random_figs/",save_graph=True)
+
     if comp_snap == False:
-        return fnd_HIPIDs, curr_orb_assn, scaled_rad_vel, scaled_tang_vel, scaled_radii
+        return fnd_HIPIDs, curr_orb_assn, scaled_rad_vel, scaled_tang_vel, scaled_radii, scaled_phys_vel
     else:
         return fnd_HIPIDs, scaled_rad_vel, scaled_tang_vel, scaled_radii
 
@@ -212,7 +228,7 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
             
             curr_num_halos = use_indices.shape[0]
             use_halo_ids = p_halo_ids[use_indices]
-
+            # print(use_halo_ids[10])
             # Load the halo information for the ids within this range
             sparta_output = sparta.load(filename = path_to_hdf5_file, halo_ids=use_halo_ids, log_level=0)
 
@@ -256,7 +272,7 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
             
             # Use multiprocessing to search multiple halos at the same time and add information to shared arrays
             with mp.Pool(processes=num_processes) as p:
-                p_all_HIPIDs, p_all_orb_assn, p_all_rad_vel, p_all_tang_vel, p_all_scal_rad = zip(*p.starmap(search_halos, 
+                p_all_HIPIDs, p_all_orb_assn, p_all_rad_vel, p_all_tang_vel, p_all_scal_rad, p_phys_vel = zip(*p.starmap(search_halos, 
                                             zip(repeat(False), repeat(p_dict), p_use_halo_idxs,
                                             (p_ptls_pid[p_curr_ptl_indices[i]] for i in range(p_curr_num_halos)), 
                                             (p_ptls_pos[p_curr_ptl_indices[j]] for j in range(p_curr_num_halos)),
@@ -271,7 +287,7 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
                                             (sparta_output['anl_prf']['M_all'][l,p_sparta_snap,:] for l in range(p_curr_num_halos)),
                                             (sparta_output['anl_prf']['M_1halo'][l,p_sparta_snap,:] for l in range(p_curr_num_halos)),
                                             # Uncomment below to create dens profiles
-                                            #repeat(sparta_output["config"]['anl_prf']["r_bins_lin"]),repeat(True) 
+                                            # repeat(sparta_output["config"]['anl_prf']["r_bins_lin"]),repeat(True) 
                                             ),chunksize=curr_chunk_size))
             p.close()
             p.join()
@@ -281,14 +297,14 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
             p_all_rad_vel = np.concatenate(p_all_rad_vel, axis = 0)
             p_all_tang_vel = np.concatenate(p_all_tang_vel, axis = 0)
             p_all_scal_rad = np.concatenate(p_all_scal_rad, axis = 0)
-            #p_scal_sqr_phys_vel = np.concatenate(p_scal_sqr_phys_vel, axis=0)
+            p_phys_vel = np.concatenate(p_phys_vel, axis=0)
             
             p_all_HIPIDs = p_all_HIPIDs.astype(np.float64)
             p_all_orb_assn = p_all_orb_assn.astype(np.int8)
             p_all_rad_vel = p_all_rad_vel.astype(np.float32)
             p_all_tang_vel = p_all_tang_vel.astype(np.float32)
             p_all_scal_rad = p_all_scal_rad.astype(np.float32)
-            #p_scal_sqr_phys_vel = p_scal_sqr_phys_vel.astype(np.float32)
+            p_phys_vel = p_phys_vel.astype(np.float32)
             
             num_bins = 30
         
@@ -381,7 +397,12 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
                 "c_Scaled_radii":save_scale_radii[:,1],
                 "c_Radial_vel":save_rad_vel[:,1],
                 "c_Tangential_vel":save_tang_vel[:,1],
+                "p_phys_vel":p_phys_vel
                 })
+            
+            print(np.where(p_all_orb_assn == 0)[0].shape[0] / np.where(p_all_orb_assn == 1)[0].shape[0])
+            sim_splits = [0]
+            # compare_density_prf(sim_splits,radii=ptl_df ["p_Scaled_radii"].values, halo_first=halo_df["Halo_first"], halo_n=halo_df["Halo_n"], act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=all_masses, orbit_assn=preds, prf_bins=bins, title="", save_location=plot_save_loc, use_mp=True, save_graph=True)
             
             halo_df.to_hdf(save_location + dst_name + "/halo_info/halo_" + str(curr_iter+rst_pnt) + ".h5", key='data', mode='w',format='table')  
             ptl_df.to_hdf(save_location +  dst_name + "/ptl_info/ptl_" + str(curr_iter+rst_pnt) + ".h5", key='data', mode='w',format='table')  
@@ -434,6 +455,7 @@ with timed("Startup"):
         p_ptls_pid, p_ptls_vel, p_ptls_pos = load_or_pickle_ptl_data(curr_sparta_file, str(p_snap), p_snapshot_path, p_scale_factor)
 
     with timed("p_snap SPARTA load"):
+        global mass
         p_halos_pos, p_halos_r200m, p_halos_id, p_halos_status, p_halos_last_snap, p_parent_id, mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
 
     with timed("c_snap load"):
@@ -580,9 +602,6 @@ with timed("Startup"):
     for i in range(len(prnt_halo_splits)):
         if i < len(prnt_halo_splits) - 1:
             print(((np.sum(train_halo_mem[prnt_halo_splits[i]:prnt_halo_splits[i+1]])) + 128 )*1e-9,"GB")
-        else:
-            print(train_halo_mem.shape,prnt_halo_splits[i])
-            print((np.sum(train_halo_mem[prnt_halo_splits[i]:]))*1e-9,"GB")
         
 with timed("Finished Calc"):   
     train_num_iter = len(train_halo_splits)

@@ -60,6 +60,11 @@ model_type = config["XGBOOST"]["model_type"]
 test_sims = json.loads(config.get("XGBOOST","test_sims"))
 eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
 
+dens_prf_plt = config.getboolean("XGBOOST","dens_prf_plt")
+phase_space_plts = config.getboolean("XGBOOST","phase_space_plts")
+misclass_plt = config.getboolean("XGBOOST","misclass_plt")
+per_err_plt = config.getboolean("XGBOOST","per_err_plt")
+
 if on_zaratan:
     from dask_mpi import initialize
     from mpi4py import MPI
@@ -132,7 +137,20 @@ if __name__ == "__main__":
         if i != len(test_sims)-1:
             combined_test_name += "_"
         
+    scale_rad=False
+    use_weights=False
+    if reduce_rad > 0 and reduce_perc > 0:
+        scale_rad = True
+    if weight_rad > 0 and min_weight > 0:
+        use_weights=True    
+    
     model_name = model_type + "_" + combined_model_name + "nu" + nu_string
+
+    if scale_rad:
+        model_name += "scl_rad" + str(reduce_rad) + "_" + str(reduce_perc)
+    if use_weights:
+        model_name += "wght" + str(weight_rad) + "_" + str(min_weight)
+        
     test_dataset_loc = path_to_xgboost + combined_test_name + "/datasets/"
     model_save_loc = path_to_xgboost + combined_model_name + "/" + model_name + "/"
     
@@ -163,16 +181,17 @@ if __name__ == "__main__":
                     halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + "Test" + "/halo_info/"))
             else:
                 for sim in test_sims:
+                    print(path_to_calc_info + sim + "/" + dset_name + "/halo_info/")
                     halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + dset_name + "/halo_info/"))
 
             halo_df = pd.concat(halo_dfs)
             
-            data,scale_pos_weight,weights = load_data(client,test_sims,dset_name)
+            data,scale_pos_weight = load_data(client,test_sims,dset_name)
 
             X = data[feature_columns]
             y = data[target_column]
 
-            eval_model(model_info, client, bst, use_sims=test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, combined_name=combined_test_name, plot_save_loc=plot_loc, dens_prf = True, r_rv_tv = True, misclass=True)
+            eval_model(model_info, client, bst, use_sims=test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, combined_name=combined_test_name, plot_save_loc=plot_loc,dens_prf=dens_prf_plt,r_rv_tv=phase_space_plts,misclass=misclass_plt,per_err=per_err_plt)
             del data #otherwise garbage collection doesn't work
             del X
             del y
