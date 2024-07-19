@@ -14,13 +14,14 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from colossus.lss import peaks
 from dask.distributed import Client
+import time
 
 from skopt import gp_minimize
 from skopt.space import Real
 from sklearn.metrics import accuracy_score
 from functools import partial
 
-from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, find_closest_z, conv_halo_id_spid, timed
+from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, find_closest_z, conv_halo_id_spid, timed, split_data_by_halo
 from utils.visualization_functions import compare_density_prf, plot_r_rv_tv_graph, plot_misclassified, plot_per_err
 from utils.calculation_functions import create_mass_prf
 from sparta_tools import sparta # type: ignore
@@ -69,6 +70,8 @@ reduce_perc = config.getfloat("XGBOOST", "reduce_perc")
 weight_rad = config.getfloat("XGBOOST","weight_rad")
 min_weight = config.getfloat("XGBOOST","min_weight")
 weight_exp = config.getfloat("XGBOOST","weight_exp")
+
+hpo_loss = config.get("XGBOOST","hpo_loss")
 
 nu_splits = parse_ranges(nu_splits)
 nu_string = create_nu_string(nu_splits)
@@ -143,7 +146,7 @@ def split_calc_name(sim):
     match = re.search(sim_pat, sim)
     if match:
         sparta_name = match.group(0)
-    sim_search_pat = sim_pat + r"_(\d+)r200m"
+    sim_search_pat = sim_pat + r"_(\d+)r200m_(\d+)v200m"
     match = re.search(sim_search_pat, sim)
     if match:
         search_name = match.group(0)
@@ -181,7 +184,7 @@ def weight_by_rad(radii,orb_inf,use_weight_rad=weight_rad,use_min_weight=min_wei
     else:
         print("No weights calculated set weight_inf and/or weight_orb = True")
         return pd.DataFrame(weights)
-    weights[mask] = (np.exp((np.log(use_min_weight)/(np.max(radii)-use_weight_rad)) * (radii[mask]-use_weight_rad)))**weight_exp
+    weights[mask] = (np.exp((np.log(use_min_weight)/(np.max(radii)-use_weight_rad)) * (radii[mask]-use_weight_rad)))**use_weight_exp
 
     return pd.DataFrame(weights)
 
@@ -464,19 +467,13 @@ def load_sprta_mass_prf(sim_splits,all_idxs,use_sims):
         else:
             use_idxs = all_idxs[sim_splits[i]:]
         
+        
+        sparta_name, sparta_search_name = split_calc_name(sim)
         # find the snapshots for this simulation
         snap_pat = r"(\d+)to(\d+)"
         match = re.search(snap_pat, sim)
         if match:
             curr_snap_list = [match.group(1), match.group(2)] 
-        sim_pat = r"cbol_l(\d+)_n(\d+)"
-        match = re.search(sim_pat, sim)
-        if match:
-            sparta_name = match.group(0)
-        sim_search_pat = sim_pat + r"_(\d+)r200m"
-        match = re.search(sim_search_pat, sim)
-        if match:
-            sparta_search_name = match.group(0)
         
         with open(path_to_calc_info + sim + "/config.pickle", "rb") as file:
             config_dict = pickle.load(file)
@@ -570,9 +567,8 @@ def print_tree(bst,tree_num):# if there are multiple simulations, to correctly i
     fig, ax = plt.subplots(figsize=(400, 10))
     xgb.plot_tree(bst, num_trees=tree_num, ax=ax)
     plt.savefig(path_to_MLOIS + "Random_figs/tree_plot.png")
-    
-    
-def dens_prf_loss(halo_ddf,use_sims,radii,labels):
+       
+def dens_prf_loss(halo_ddf,use_sims,radii,labels,use_orb_prf,use_inf_prf):
     halo_first = halo_ddf["Halo_first"].values
     halo_n = halo_ddf["Halo_n"].values
     all_idxs = halo_ddf["Halo_indices"].values
@@ -590,30 +586,51 @@ def dens_prf_loss(halo_ddf,use_sims,radii,labels):
                
     sparta_mass_prf_all,sparta_mass_prf_orb,all_masses,bins = load_sprta_mass_prf(sim_splits,all_idxs,use_sims)
     sparta_mass_prf_inf = sparta_mass_prf_all - sparta_mass_prf_orb
+    sparta_mass_prf_orb = np.sum(sparta_mass_prf_orb,axis=0)
+    sparta_mass_prf_inf = np.sum(sparta_mass_prf_inf,axis=0)
     #TODO make this robust for multiple sims
     calc_mass_prf_all,calc_mass_prf_orb,calc_mass_prf_inf = create_mass_prf(radii,labels,bins,all_masses[0]) 
     
-    orb_loss = np.nanmean(((sparta_mass_prf_orb / calc_mass_prf_orb) - 1)**2)
-    inf_loss = np.nanmean(((sparta_mass_prf_inf / calc_mass_prf_inf) - 1)**2)
+    if use_orb_prf:
+        use_orb = np.where(sparta_mass_prf_orb > 0)[0]
+        orb_loss = np.sum(np.abs((sparta_mass_prf_orb[use_orb] - calc_mass_prf_orb[use_orb]) / sparta_mass_prf_orb[use_orb])) / bins.size
+        if orb_loss == np.NaN:
+            orb_loss = 50
+        elif orb_loss == np.inf:
+            orb_loss == 50
     
-    if orb_loss == np.NaN:
-        orb_loss = 50
-    elif orb_loss == np.inf:
-        orb_loss == 50
-    elif inf_loss == np.NaN:
-        inf_loss = 50
-    elif inf_loss == np.inf:
-        inf_loss == 50
-    print(orb_loss,inf_loss,orb_loss+inf_loss)
+    if use_inf_prf:
+        use_inf = np.where(sparta_mass_prf_inf > 0)[0]
+        inf_loss = np.sum(np.abs((sparta_mass_prf_inf[use_inf] - calc_mass_prf_inf[use_inf]) / sparta_mass_prf_inf[use_inf])) / bins.size
+        if inf_loss == np.NaN:
+            inf_loss = 50
+        elif inf_loss == np.inf:
+            inf_loss == 50
     
-    return orb_loss+inf_loss
+    if use_orb_prf and use_inf_prf:
+        print(orb_loss,inf_loss,orb_loss+inf_loss)
+        return orb_loss+inf_loss
+    elif use_orb_prf:
+        print(orb_loss)
+        return orb_loss
+    elif use_inf_prf:
+        print(inf_loss)
+        return inf_loss
+
+def weight_objective(params,client,model_params,ptl_ddf,halo_ddf,use_sims,feat_cols,tar_col):
+    train_dst,val_dst,train_halos,val_halos = split_data_by_halo(0.6,halo_ddf,ptl_ddf,return_halo=True)
+
+    X_train = train_dst[feat_cols]
+    y_train = train_dst[tar_col]
     
-def weight_objective(params,client,model_params,X,y,halo_ddf,use_sims):
+    X_val = val_dst[feat_cols]
+    y_val = val_dst[tar_col]
+    
     curr_weight_rad, curr_min_weight, curr_weight_exp = params
 
-    radii = X["p_Scaled_radii"].values.compute()
+    train_radii = X_train["p_Scaled_radii"].values.compute()
 
-    weights = weight_by_rad(radii,y.compute().values.flatten(), curr_weight_rad, curr_min_weight, curr_weight_exp)
+    weights = weight_by_rad(train_radii,y_train.compute().values.flatten(), curr_weight_rad, curr_min_weight, curr_weight_exp)
 
     dask_weights = []
     scatter_weight = client.scatter(weights)
@@ -622,10 +639,10 @@ def weight_objective(params,client,model_params,X,y,halo_ddf,use_sims):
         
     train_weights = dd.concat(dask_weights)
     
-    train_weights = train_weights.repartition(npartitions=X.npartitions)
+    train_weights = train_weights.repartition(npartitions=X_train.npartitions)
 
         
-    dtrain = xgb.dask.DaskDMatrix(client, X, y, weight=train_weights)
+    dtrain = xgb.dask.DaskDMatrix(client, X_train, y_train, weight=train_weights)
     
     output = dxgb.train(
                 client,
@@ -638,32 +655,48 @@ def weight_objective(params,client,model_params,X,y,halo_ddf,use_sims):
                 )
     bst = output["booster"]
 
-    y_pred = make_preds(client, bst, X, y, report_name="Report", print_report=False)
-    y = y.compute().values.flatten()
-    only_orb = np.where(y == 1)[0]
-    only_inf = np.where(y == 0)[0]
-    accuracy = accuracy_score(y, y_pred)
-    # accuracy = accuracy_score(y[only_orb], y_pred.iloc[only_orb].values)
-    # accuracy = accuracy_score(y[only_inf], y_pred.iloc[only_inf].values)
+    y_pred = make_preds(client, bst, X_val, y_val, report_name="Report", print_report=False)
+    y_val = y_val.compute().values.flatten()
     
-    # accuracy = dens_prf_loss(halo_ddf,use_sims,radii,y_pred)
-    
-    return -accuracy
+    # multiply the accuracies by -1 because we want to maximize them but we are using minimization
+    if hpo_loss == "all":
+        accuracy = -1 * accuracy_score(y_val, y_pred)
+    elif hpo_loss == "orb":
+        only_orb = np.where(y_val == 1)[0]
+        accuracy = -1 * accuracy_score(y_val[only_orb], y_pred.iloc[only_orb].values)
+    elif hpo_loss == "inf":
+        only_inf = np.where(y_val == 0)[0]
+        accuracy = -1 * accuracy_score(y[only_inf], y_pred.iloc[only_inf].values)
+    elif hpo_loss == "mprf_all":
+        val_radii = X_val["p_Scaled_radii"].values.compute()
+        accuracy = dens_prf_loss(val_halos,use_sims,val_radii,y_pred,use_orb_prf=True,use_inf_prf=True)
+    elif hpo_loss == "mprf_orb":
+        val_radii = X_val["p_Scaled_radii"].values.compute()
+        accuracy = dens_prf_loss(val_halos,use_sims,val_radii,y_pred,use_orb_prf=True,use_inf_prf=False)
+    elif hpo_loss == "mprf_inf":
+        val_radii = X_val["p_Scaled_radii"].values.compute()
+        accuracy = dens_prf_loss(val_halos,use_sims,val_radii,y_pred,use_orb_prf=False,use_inf_prf=True)
 
-def scal_rad_objective(params,client,model_params,data,halo_ddf,use_sims):
-    data_pd = data.compute()
+    return accuracy
+
+def scal_rad_objective(params,client,model_params,ptl_ddf,halo_ddf,use_sims,feat_cols,tar_col):
+    train_dst,val_dst,train_halos,val_halos = split_data_by_halo(client,0.5,halo_ddf,ptl_ddf,return_halo=True)
+    
+    X_val = val_dst[feat_cols]
+    y_val = val_dst[tar_col]
+    
+    data_pd = train_dst.compute()
     num_bins=100
     bin_edges = np.logspace(np.log10(0.001),np.log10(10),num_bins)
     scld_data = scale_by_rad(data_pd,bin_edges,params[0],params[1])
     
-    feature_columns = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
-    target_column = ["Orbit_infall"]
+    scatter_scld = client.scatter(scld_data)
+    scld_data_ddf = dd.from_delayed(scatter_scld)
+
+    X_train = scld_data_ddf[feat_cols]
+    y_train = scld_data_ddf[tar_col]
     
-    scld_data_ddf = dd.from_pandas(scld_data,npartitions=7)
-    X = scld_data_ddf[feature_columns]
-    y = scld_data_ddf[target_column]
-    
-    dtrain = xgb.dask.DaskDMatrix(client, X, y)
+    dtrain = xgb.dask.DaskDMatrix(client, X_train, y_train)
     
     output = dxgb.train(
                 client,
@@ -676,16 +709,17 @@ def scal_rad_objective(params,client,model_params,data,halo_ddf,use_sims):
                 )
     bst = output["booster"]
 
-    y_pred = make_preds(client, bst, X, y, report_name="Report", print_report=False)
-    y = y.compute().values.flatten()
-    only_orb = np.where(y == 1)[0]
-    only_inf = np.where(y == 0)[0]
-    accuracy = accuracy_score(y, y_pred)
+    y_pred = make_preds(client, bst, X_val, y_val, report_name="Report", print_report=False)
+    y_val = y_val.compute().values.flatten()
+    only_orb = np.where(y_val == 1)[0]
+    only_inf = np.where(y_val == 0)[0]
+
+    accuracy = accuracy_score(y_val, y_pred)
     # accuracy = accuracy_score(y[only_orb], y_pred.iloc[only_orb].values)
     # accuracy = accuracy_score(y[only_inf], y_pred.iloc[only_inf].values)
     
-    # radii = X["p_Scaled_radii"].values.compute()
-    # accuracy = dens_prf_loss(halo_ddf,use_sims,radii,y_pred)
+    # val_radii = X_val["p_Scaled_radii"].values.compute()
+    # accuracy = -1 * dens_prf_loss(val_halos,use_sims,val_radii,y_pred)
     
     return -accuracy
 
@@ -693,14 +727,14 @@ def print_iteration(res):
     iteration = len(res.x_iters)
     print(f"Iteration {iteration}: Current params: {res.x_iters[-1]}, Current score: {res.func_vals[-1]}")
 
-def optimize_weights(client,model_params,X,y,halo_ddf,use_sims):
+def optimize_weights(client,model_params,ptl_ddf,halo_ddf,use_sims,feat_cols,tar_col):
     print("Start Optimization of Weights")
     space  = [Real(0.1, 5.0, name='weight_rad'),
             Real(0.001, 0.2, name='min_weight'),
-            Real(0,10,name='weight_exp')]
+            Real(0.1,10,name='weight_exp')]
 
-    objective_with_params = partial(weight_objective,client=client,model_params=model_params,X=X,y=y,halo_ddf=halo_ddf,use_sims=use_sims)
-    res = gp_minimize(objective_with_params, space, n_calls=30, random_state=0, callback=[print_iteration])
+    objective_with_params = partial(weight_objective,client=client,model_params=model_params,ptl_ddf=ptl_ddf,halo_ddf=halo_ddf,use_sims=use_sims,feat_cols=feat_cols,tar_col=tar_col)
+    res = gp_minimize(objective_with_params, space, n_calls=50, random_state=0, callback=[print_iteration])
 
     print("Best parameters: ", res.x)
     print("Best accuracy: ", -res.fun)
@@ -708,13 +742,13 @@ def optimize_weights(client,model_params,X,y,halo_ddf,use_sims):
     return res.x[0],res.x[1],res.x[2]
     
     
-def optimize_scale_rad(client,model_params,data,halo_ddf,use_sims):    
+def optimize_scale_rad(client,model_params,ptl_ddf,halo_ddf,use_sims,feat_cols,tar_col):    
     print("Start Optimization of Scaling Radii")
     space  = [Real(0.1, 5.0, name='reduce_rad'),
-            Real(0.001, 0.25, name='reduce_perc')]
+            Real(0.0001, 0.25, name='reduce_perc')]
 
-    objective_with_params = partial(scal_rad_objective,client=client,model_params=model_params,data=data,halo_ddf=halo_ddf,use_sims=use_sims)
-    res = gp_minimize(objective_with_params, space, n_calls=20, random_state=0, callback=[print_iteration])
+    objective_with_params = partial(scal_rad_objective,client=client,model_params=model_params,ptl_ddf=ptl_ddf,halo_ddf=halo_ddf,use_sims=use_sims,feat_cols=feat_cols,tar_col=tar_col)
+    res = gp_minimize(objective_with_params, space, n_calls=50, random_state=0, callback=[print_iteration])
 
     print("Best parameters: ", res.x)
     print("Best accuracy: ", -res.fun)

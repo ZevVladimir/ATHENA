@@ -106,8 +106,8 @@ from pygadgetreader import readsnap, readheader # type: ignore
 from sparta_tools import sparta # type: ignore
 
 if __name__ == "__main__":
-    feature_columns = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
-    target_column = ["Orbit_infall"]
+    feat_cols = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
+    tar_col = ["Orbit_infall"]
     
     if on_zaratan:
         if 'SLURM_CPUS_PER_TASK' in os.environ:
@@ -127,8 +127,11 @@ if __name__ == "__main__":
         logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}")
     else:
         client = get_CUDA_cluster()
-             
+    
+    # create a string for the model that combines all the simulations used 
+    # create a string for the radius and v200m limits used       
     combined_name = ""
+    combined_lims = ""
     for i,sim in enumerate(model_sims):
         pattern = r"(\d+)to(\d+)"
         match = re.search(pattern, sim)
@@ -138,10 +141,12 @@ if __name__ == "__main__":
         else:
             print("Pattern not found in the string.")
         parts = sim.split("_")
-        combined_name += parts[1] + parts[2] + "s" + parts[4] 
+        combined_name += parts[1] + parts[2] + "s" + parts[5] 
+        combined_lims += parts[3] + parts[4]
         if i != len(model_sims)-1:
             combined_name += "_"
-    
+            combined_lims += "_"
+
     scale_rad=False
     use_weights=False
     
@@ -150,13 +155,16 @@ if __name__ == "__main__":
     if weight_rad > 0 and min_weight > 0 and not opt_wghts:
         use_weights=True
         
-    model_name = model_type + "_" + combined_name + "nu" + nu_string 
-    if scale_rad:
-        model_name += "scl_rad" + str(reduce_rad) + "_" + str(reduce_perc)
-    if use_weights:
-        model_name += "wght" + str(weight_rad) + "_" + str(min_weight)
+    model_dir = model_type + "_" + combined_lims + "nu" + nu_string 
 
-    model_save_loc = path_to_xgboost + combined_name + "/" + model_name + "/"
+    if scale_rad:
+        model_dir += "scl_rad" + str(reduce_rad) + "_" + str(reduce_perc)
+    if use_weights:
+        model_dir += "wght" + str(weight_rad) + "_" + str(min_weight)
+        
+    model_name =  model_dir + combined_name
+
+    model_save_loc = path_to_xgboost + combined_name + "/" + model_dir + "/"
     gen_plot_save_loc = model_save_loc + "plots/"
      
     if os.path.isfile(model_save_loc + "model_info.pickle") and retrain < 2:
@@ -208,8 +216,8 @@ if __name__ == "__main__":
             train_data,scale_pos_weight = load_data(client,model_sims,"Train",scale_rad=scale_rad,use_weights=use_weights,filter_nu=False)
 
         print("scale_pos_weight:",scale_pos_weight)
-        X_train = train_data[feature_columns]
-        y_train = train_data[target_column]
+        X_train = train_data[feat_cols]
+        y_train = train_data[tar_col]
 
         if opt_wghts or opt_scale_rad:
             params = {
@@ -222,10 +230,6 @@ if __name__ == "__main__":
                     'objective': 'binary:logistic',
                     }
 
-            opt_data = train_data.sample(frac=0.4, random_state=rand_seed)
-            X_opt = opt_data[feature_columns]
-            y_opt = opt_data[target_column] 
-            
             halo_files = []
 
             halo_dfs = []
@@ -236,7 +240,7 @@ if __name__ == "__main__":
 
         if opt_wghts:  
             use_weights = True          
-            opt_weight_rad, opt_min_weight, opt_weight_exp = optimize_weights(client,params,X_opt,y_opt,halo_df,model_sims)
+            opt_weight_rad, opt_min_weight, opt_weight_exp = optimize_weights(client,params,train_data,halo_df,model_sims,feat_cols,tar_col)
             
             train_weights = weight_by_rad(X_train["p_Scaled_radii"].values.compute(),y_train.compute().values.flatten(), opt_weight_rad, opt_min_weight)
             dask_weights = []
@@ -249,6 +253,7 @@ if __name__ == "__main__":
             train_weights = train_weights.repartition(npartitions=X_train.npartitions)
             
             model_name += "wght" + str(np.round(opt_weight_rad,3)) + "_" + str(np.round(opt_min_weight,3)) + "_" + str(np.round(opt_weight_exp,3))
+            model_dir += "wght" + str(np.round(opt_weight_rad,3)) + "_" + str(np.round(opt_min_weight,3)) + "_" + str(np.round(opt_weight_exp,3))
             weight_rad_info = {
                 "Used weighting by radius": use_weights,
                 "Optimized weights": opt_wghts,
@@ -261,13 +266,17 @@ if __name__ == "__main__":
             scale_rad = True
             num_bins=100
             bin_edges = np.logspace(np.log10(0.001),np.log10(10),num_bins)
-            opt_reduce_rad, opt_reduce_perc = optimize_scale_rad(client,params,opt_data,halo_df,model_sims)
-            train_data = scale_by_rad(train_data.compute(),bin_edges,opt_reduce_rad,opt_reduce_perc)
-            train_data = dd.from_pandas(train_data,npartitions=7)
-            X_train = train_data[feature_columns]
-            y_train = train_data[target_column]
+            opt_reduce_rad, opt_reduce_perc = optimize_scale_rad(client,params,train_data,halo_df,model_sims,feat_cols,tar_col)
+            scld_data = scale_by_rad(train_data.compute(),bin_edges,opt_reduce_rad,opt_reduce_perc)
+            
+            scatter_train = client.scatter(scld_data)
+            scld_train_data = dd.from_delayed(scatter_train)
+            
+            X_train = scld_train_data[feat_cols]
+            y_train = scld_train_data[tar_col]
             
             model_name += "scl_rad" + str(np.round(opt_reduce_rad,3)) + "_" + str(np.round(opt_reduce_perc,3))
+            model_dir += "scl_rad" + str(np.round(opt_reduce_rad,3)) + "_" + str(np.round(opt_reduce_perc,3))
             scale_rad_info = {
             "Used scale_rad": scale_rad,
             "Optimized Scale by Radius": opt_scale_rad,
@@ -280,7 +289,7 @@ if __name__ == "__main__":
             "Weighting by Radii": weight_rad_info,
         }
         
-        model_save_loc = path_to_xgboost + combined_name + "/" + model_name + "/"
+        model_save_loc = path_to_xgboost + combined_name + "/" + model_dir + "/"
         gen_plot_save_loc = model_save_loc + "plots/"
         create_directory(model_save_loc)
         create_directory(gen_plot_save_loc)
@@ -356,8 +365,8 @@ if __name__ == "__main__":
         halo_df = pd.concat(halo_dfs)
         
         test_data,test_scale_pos_weight = load_data(client,model_sims,"Test")
-        X_test = test_data[feature_columns]
-        y_test = test_data[target_column]
+        X_test = test_data[feat_cols]
+        y_test = test_data[tar_col]
         
         eval_model(model_info, client, bst, use_sims=model_sims, dst_type="Test", X=X_test, y=y_test, halo_ddf=halo_df, combined_name=combined_name, plot_save_loc=plot_loc, dens_prf=dens_prf_plt,r_rv_tv=phase_space_plts,misclass=misclass_plt,per_err=per_err_plt)
    

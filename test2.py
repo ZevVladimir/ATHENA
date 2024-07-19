@@ -1,9 +1,18 @@
-from utils.ML_support import print_model_prop
+from utils.ML_support import print_model_prop,load_data
 import numpy as np
+from utils.visualization_functions import plot_log_vel
+import pandas as pd
+import os
+import h5py
 
-arr = np.array([1,2,np.inf,3,4])
-print(np.where(np.isinf(arr))[0])
+folder_path = "/home/zvladimi/MLOIS/calculated_info/cbol_l0063_n0256_4r200m_3v200m_190to166/Train/ptl_info/"
 
-# print_model_prop("/home/zvladimi/MLOIS/xgboost_results/l0063n0256s190to166/base_l0063n0256s190to166nu0-10wght4.304_0.17/model_info.pickle")
+all_dfs = []
 
-# print_model_prop("/home/zvladimi/MLOIS/xgboost_results/l0063n0256s190to166/base_l0063n0256s190to166nu0-10wght1.558_0.012/model_info.pickle")
+for file in os.listdir(folder_path):
+    all_dfs.append(pd.read_hdf(folder_path + file))
+    
+    
+ptl_df = pd.concat(all_dfs)
+
+plot_log_vel(ptl_df["p_phys_vel"].values,ptl_df["p_Scaled_radii"].values,ptl_df["Orbit_infall"].values,"/home/zvladimi/MLOIS/Random_figs/",3)

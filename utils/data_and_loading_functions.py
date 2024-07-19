@@ -8,6 +8,7 @@ from itertools import repeat
 from contextlib import contextmanager
 import time
 import re
+import dask.dataframe as dd
 
 def create_directory(path):
     os.makedirs(path,exist_ok=True)
@@ -160,14 +161,14 @@ def load_or_pickle_SPARTA_data(sparta_name, scale_factor, snap, sparta_snap):
         halos_status = sparta_output['halos']['status'][:,sparta_snap]
         with open(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/halos_status.pickle", "wb") as pickle_file:
             pickle.dump(halos_status, pickle_file)
-        parent_id = sparta_output['halos']['parent_id'][:,sparta_snap]
-        with open(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/parent_id.pickle", "wb") as pickle_file:
-            pickle.dump(parent_id, pickle_file)
+        pid = sparta_output['halos']['pid'][:,sparta_snap]
+        with open(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/pid.pickle", "wb") as pickle_file:
+            pickle.dump(pid, pickle_file)
         ptl_mass = sparta_output["simulation"]["particle_mass"]
         with open(path_to_pickle + str(snap) + "_" + str(sparta_name) + "/ptl_mass.pickle", "wb") as pickle_file:
             pickle.dump(ptl_mass, pickle_file)
 
-    return halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass 
+    return halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, pid, ptl_mass 
 
 def split_dataset_by_mass(halo_first, halo_n, path_to_dataset, curr_dataset):
     with h5py.File((path_to_dataset), 'r') as all_ptl_properties:
@@ -212,21 +213,37 @@ def save_to_hdf5(hdf5_file, data_name, dataset, chunk, max_shape):
             hdf5_file[data_name].resize((hdf5_file[data_name].shape[0] + dataset.shape[0]), axis = 0)
             hdf5_file[data_name][-dataset.shape[0]:] = dataset   
         
-def choose_halo_split(indices, snap, halo_props, particle_props, num_features):
-    start_idxs = halo_props["Halo_start_ind_" + snap].to_numpy()
-    num_ptls = halo_props["Halo_num_ptl_" + snap].to_numpy()
+def split_data_by_halo(client,frac, halo_props, ptl_data, return_halo=False):
+    #TODO implement functionality for multiple sims
+    halo_first = halo_props["Halo_first"]
+    halo_n = halo_props["Halo_n"]
 
-    dataset = np.zeros((np.sum(num_ptls[indices]), num_features))
-    start = 0
-    for idx in indices:
-        start_ind = start_idxs[idx]
-        curr_num_ptl = num_ptls[idx]
-        dataset[start:start+curr_num_ptl] = particle_props[start_ind:start_ind+curr_num_ptl]
+    num_halos = len(halo_first)
+    
+    split_halo = int(np.ceil(frac * num_halos))
+    
+    halo_1 = halo_props.loc[:split_halo]
+    halo_2 = halo_props.loc[split_halo:]
+    
+    halo_2.loc[:,"Halo_first"] = halo_2["Halo_first"] - halo_2["Halo_first"].iloc[0]
+    
+    num_ptls = halo_n.loc[:split_halo].sum()
+    
+    ptl_1 = ptl_data.compute().iloc[:num_ptls,:]
+    ptl_2 = ptl_data.compute().iloc[num_ptls:,:]
 
-        start = start + curr_num_ptl
-
-    return dataset
-
+    
+    scatter_ptl_1 = client.scatter(ptl_1)
+    ptl_1 = dd.from_delayed(scatter_ptl_1)
+    
+    scatter_ptl_2 = client.scatter(ptl_2)
+    ptl_2 = dd.from_delayed(scatter_ptl_2)
+    
+    if return_halo:
+        return ptl_1, ptl_2, halo_1, halo_2
+    else:
+        return ptl_1, ptl_2
+    
 def find_closest_z(value,snap_loc,snap_form):
     all_z = np.ones(total_num_snaps) * -1000
     for i in range(total_num_snaps):
