@@ -449,7 +449,7 @@ with timed("Startup"):
             "box_size": p_box_size,
             "h":little_h
         }
-        
+    print(little_h)
     if reset_lvl == 3:
         clean_dir(path_to_pickle + str(p_snap) + "_" + str(sparta_name) + "_" + str(int(search_rad)) + "r200m/")
 
