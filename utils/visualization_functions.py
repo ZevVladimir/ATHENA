@@ -284,20 +284,20 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         # lower_calc_dens_prf_all = np.nanpercentile(calc_dens_prf_all, q=15.9, axis=0)
         
         # Same for actual profiles    
-        upper_orb_dens_ratio = np.nanpercentile(orb_dens_ratio, q=84.1, axis=0)
-        lower_orb_dens_ratio = np.nanpercentile(orb_dens_ratio, q=15.9, axis=0)
-        upper_inf_dens_ratio = np.nanpercentile(inf_dens_ratio, q=84.1, axis=0)
-        lower_inf_dens_ratio = np.nanpercentile(inf_dens_ratio, q=15.9, axis=0)
-        upper_all_dens_ratio = np.nanpercentile(all_dens_ratio, q=84.1, axis=0)
-        lower_all_dens_ratio = np.nanpercentile(all_dens_ratio, q=15.9, axis=0)
+        upper_orb_dens_ratio = np.percentile(orb_dens_ratio, q=84.1, axis=0)
+        lower_orb_dens_ratio = np.percentile(orb_dens_ratio, q=15.9, axis=0)
+        upper_inf_dens_ratio = np.percentile(inf_dens_ratio, q=84.1, axis=0)
+        lower_inf_dens_ratio = np.percentile(inf_dens_ratio, q=15.9, axis=0)
+        upper_all_dens_ratio = np.percentile(all_dens_ratio, q=84.1, axis=0)
+        lower_all_dens_ratio = np.percentile(all_dens_ratio, q=15.9, axis=0)
         print(calc_dens_prf_inf[40])
         print(act_dens_prf_inf[40])
         print(inf_dens_ratio[40])
         print(lower_inf_dens_ratio)
         # Take the median value of the ratios
-        med_all_ratio = np.nanmedian(all_dens_ratio, axis=0)
-        med_inf_ratio = np.nanmedian(inf_dens_ratio, axis=0)
-        med_orb_ratio = np.nanmedian(orb_dens_ratio, axis=0)
+        med_all_ratio = np.median(all_dens_ratio, axis=0)
+        med_inf_ratio = np.median(inf_dens_ratio, axis=0)
+        med_orb_ratio = np.median(orb_dens_ratio, axis=0)
 
 
         middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
@@ -1262,7 +1262,7 @@ def plot_log_vel(phys_vel,radii,label,save_loc,v200m):
         title = "no_cut"
     else:
         title = str(v200m) + "v200m"
-    log_phys_vel = np.log10(phys_vel)
+    log_phys_vel = np.log10(phys_vel/(.7**2))
     
     orb_loc = np.where(label == 1)[0]
     inf_loc = np.where(label == 0)[0]
