@@ -1262,7 +1262,7 @@ def plot_log_vel(phys_vel,radii,label,save_loc,v200m):
         title = "no_cut"
     else:
         title = str(v200m) + "v200m"
-    log_phys_vel = np.log10(phys_vel/(.7**2))
+    log_phys_vel = np.log10(phys_vel)
     
     orb_loc = np.where(label == 1)[0]
     inf_loc = np.where(label == 0)[0]
@@ -1271,8 +1271,8 @@ def plot_log_vel(phys_vel,radii,label,save_loc,v200m):
     pv_range = [np.min(log_phys_vel),np.max(log_phys_vel)]
     plot_range = [r_range,pv_range]
     
-    num_bins = 100
-    min_ptl = 10
+    num_bins = 500
+    min_ptl = 1
     
     all_hist = histogram(radii,log_phys_vel,num_bins,plot_range,min_ptl,min_ptl)    
     
