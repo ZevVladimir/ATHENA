@@ -271,7 +271,8 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
             halo_first = sparta_output['halos']['ptl_oct_first'][:]
             halo_n = sparta_output['halos']['ptl_oct_n'][:]
             
-            # Use multiprocessing to search multiple halos at the same time and add information to shared arrays
+            # Use multiprocessing to search multiple halos at the same time and add information to shared array
+            
             with mp.Pool(processes=num_processes) as p:
                 p_all_HIPIDs, p_all_orb_assn, p_all_rad_vel, p_all_tang_vel, p_all_scal_rad, p_phys_vel = zip(*p.starmap(search_halos, 
                                             zip(repeat(False), repeat(p_dict), p_use_halo_idxs,
@@ -328,8 +329,7 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
                 c_use_halo_idxs = use_halo_idxs[has_ptls]
                 c_tot_num_use_ptls = int(np.sum(c_use_num_ptls))
                 c_curr_num_halos = c_curr_ptl_indices.shape[0]
-                
-                
+
                 with mp.Pool(processes=num_processes) as p:
                     c_all_HIPIDs, c_all_rad_vel, c_all_tang_vel, c_all_scal_rad = zip(*p.starmap(search_halos, 
                                                 zip(repeat(True), repeat(c_dict),c_use_halo_idxs,
@@ -449,7 +449,7 @@ with timed("Startup"):
             "box_size": p_box_size,
             "h":little_h
         }
-    print(little_h)
+
     if reset_lvl == 3:
         clean_dir(path_to_pickle + str(p_snap) + "_" + str(sparta_name) + "_" + str(int(search_rad)) + "r200m/")
 

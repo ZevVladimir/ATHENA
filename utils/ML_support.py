@@ -147,9 +147,19 @@ def split_calc_name(sim):
     if match:
         sparta_name = match.group(0)
     sim_search_pat = sim_pat + r"_(\d+)r200m_(\d+)v200m"
-    match = re.search(sim_search_pat, sim)
-    if match:
-        search_name = match.group(0)
+    name_match = re.search(sim_search_pat, sim)
+    
+    # also check if there is a decimal for v200m
+    if not name_match:
+        sim_search_pat = sim_pat + r"_(\d+)r200m_(\d+)-(\d+)v200m"
+        name_match = re.search(sim_search_pat, sim)
+    
+    if name_match:
+        search_name = name_match.group(0)
+        
+    if not name_match and not match:
+        print("Couldn't read sim name correctly:",sim)
+        print(match)
     
     return sparta_name, search_name
 

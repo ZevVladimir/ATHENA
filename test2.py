@@ -7,7 +7,7 @@ import h5py
 
 
 
-folder_path = "/home/zvladimi/MLOIS/calculated_info/cbol_l0063_n0256_4r200m_3v200m_190to166/Train/ptl_info/"
+folder_path = "/home/zvladimi/MLOIS/calculated_info/cbol_l0063_n0256_4r200m_1-5v200m_190to166/Train/ptl_info/"
 
 all_dfs = []
 
@@ -17,4 +17,4 @@ for file in os.listdir(folder_path):
     
 ptl_df = pd.concat(all_dfs)
 
-plot_log_vel(ptl_df["p_phys_vel"].values,ptl_df["p_Scaled_radii"].values,ptl_df["Orbit_infall"].values,"/home/zvladimi/MLOIS/Random_figs/",3)
+plot_log_vel(ptl_df["p_phys_vel"].values,ptl_df["p_Scaled_radii"].values,ptl_df["Orbit_infall"].values,"/home/zvladimi/MLOIS/Random_figs/",1.5)
