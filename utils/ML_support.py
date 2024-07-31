@@ -97,7 +97,7 @@ def get_CUDA_cluster():
 
 def make_preds(client, bst, X, y_np, report_name="Classification Report", print_report=False):
     #X = da.from_array(X_np,chunks=(chunk_size,X_np.shape[1]))
-    
+
     preds = dxgb.inplace_predict(client, bst, X).compute()
     # preds = np.round(preds)
     threshold = 0.5

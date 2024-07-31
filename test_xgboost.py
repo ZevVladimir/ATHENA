@@ -158,7 +158,6 @@ if __name__ == "__main__":
                     halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + "Test" + "/halo_info/"))
             else:
                 for sim in test_sims:
-                    print(path_to_calc_info + sim + "/" + dset_name + "/halo_info/")
                     halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + dset_name + "/halo_info/"))
 
             halo_df = pd.concat(halo_dfs)
