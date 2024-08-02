@@ -22,7 +22,6 @@ from matplotlib.animation import FuncAnimation
 import seaborn as sns
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import ipyvolume as ipv
 
 from utils.data_and_loading_functions import check_pickle_exist_gadget, create_directory, find_closest_z, load_or_pickle_ptl_data, timed
 from utils.calculation_functions import calc_v200m, calculate_density, create_mass_prf
@@ -36,6 +35,7 @@ config = configparser.ConfigParser()
 config.read(os.environ.get('PWD') + "/config.ini")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 rand_seed = config.getint("MISC","random_seed")
+on_zaratan = config.getboolean("MISC","on_zaratan")
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
 path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
@@ -51,6 +51,9 @@ path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
 path_to_sparta = config["PATHS"]["path_to_sparta"]
 snap_format = config["MISC"]["snap_format"]
 curr_chunk_size = config.getint("SEARCH","chunk_size")
+
+if not on_zaratan:
+    import ipyvolume as ipv
 
 sys.path.insert(1, path_to_pygadgetreader)  
 from pygadgetreader import readsnap, readheader # type: ignore
@@ -290,10 +293,10 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         lower_inf_dens_ratio = np.percentile(inf_dens_ratio, q=15.9, axis=0)
         upper_all_dens_ratio = np.percentile(all_dens_ratio, q=84.1, axis=0)
         lower_all_dens_ratio = np.percentile(all_dens_ratio, q=15.9, axis=0)
-        print(calc_dens_prf_inf[40])
-        print(act_dens_prf_inf[40])
-        print(inf_dens_ratio[40])
-        print(lower_inf_dens_ratio)
+        # print(calc_dens_prf_inf[40])
+        # print(act_dens_prf_inf[40])
+        # print(inf_dens_ratio[40])
+        # print(lower_inf_dens_ratio)
         # Take the median value of the ratios
         med_all_ratio = np.median(all_dens_ratio, axis=0)
         med_inf_ratio = np.median(inf_dens_ratio, axis=0)

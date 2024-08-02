@@ -322,7 +322,7 @@ def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,use_wei
         
         # Calculate scale position weight
         scal_pos_weight = calc_scal_pos_weight(ptl_df)
-        print(scal_pos_weight)
+
         # If the dataframe is too large split it up
         max_mem = int(np.floor(config_params["HDF5 Mem Size"] / 2))
         if ptl_df.memory_usage(index=True).sum() > max_mem:

@@ -110,8 +110,6 @@ if __name__ == "__main__":
         client = get_CUDA_cluster()
     
     model_comb_name, model_comb_lims = get_combined_name(model_sims) 
-    test_comb_name, test_comb_lims = get_combined_name(test_sims) 
-            
     scale_rad=False
     use_weights=False
     if reduce_rad > 0 and reduce_perc > 0:
@@ -127,14 +125,13 @@ if __name__ == "__main__":
         model_dir += "wght" + str(weight_rad) + "_" + str(min_weight)
         
     model_name =  model_dir + model_comb_name
-    
         
     model_save_loc = path_to_xgboost + model_comb_name + "/" + model_dir + "/"
     
     try:
         bst = xgb.Booster()
         bst.load_model(model_save_loc + model_name + ".json")
-        print("Loaded Booster")
+        print("Loaded Model Trained on:",model_sims)
     except:
         print("Couldn't load Booster Located at: " + model_save_loc + model_name + ".json")
         
@@ -144,34 +141,38 @@ if __name__ == "__main__":
     except FileNotFoundError:
         print("Model info could not be loaded please ensure the path is correct or rerun train_xgboost.py")
         
-    #TODO check that the right sims and datasets are chosen
-    for dset_name in eval_datasets:
-        with timed("Model Evaluation on " + dset_name + " dataset"):             
-            plot_loc = model_save_loc + dset_name + "_" + test_comb_lims + "_" + test_comb_name + "/plots/"
-            create_directory(plot_loc)
+    for curr_test_sims in test_sims:
+        test_comb_name, test_comb_lims = get_combined_name(curr_test_sims) 
             
-            halo_files = []
-            halo_dfs = []
-            if dset_name == "Full":    
-                for sim in test_sims:
-                    halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + "Train" + "/halo_info/"))
-                    halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + "Test" + "/halo_info/"))
-            else:
-                for sim in test_sims:
-                    halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + dset_name + "/halo_info/"))
+        #TODO check that the right sims and datasets are chosen
+        print("Testing on:", curr_test_sims)
+        for dset_name in eval_datasets:
+            with timed("Model Evaluation on " + dset_name + " dataset"):             
+                plot_loc = model_save_loc + dset_name + "_" + test_comb_lims + "_" + test_comb_name + "/plots/"
+                create_directory(plot_loc)
+                
+                halo_files = []
+                halo_dfs = []
+                if dset_name == "Full":    
+                    for sim in curr_test_sims:
+                        halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + "Train" + "/halo_info/"))
+                        halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + "Test" + "/halo_info/"))
+                else:
+                    for sim in curr_test_sims:
+                        halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + dset_name + "/halo_info/"))
 
-            halo_df = pd.concat(halo_dfs)
-            
-            data,scale_pos_weight = load_data(client,test_sims,dset_name)
+                halo_df = pd.concat(halo_dfs)
+                
+                data,scale_pos_weight = load_data(client,curr_test_sims,dset_name)
 
-            X = data[feature_columns]
-            y = data[target_column]
+                X = data[feature_columns]
+                y = data[target_column]
 
-            eval_model(model_info, client, bst, use_sims=test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, combined_name=test_comb_name, plot_save_loc=plot_loc,dens_prf=dens_prf_plt,r_rv_tv=phase_space_plts,misclass=misclass_plt,per_err=per_err_plt)
-            del data #otherwise garbage collection doesn't work
-            del X
-            del y
-            
-    with open(model_save_loc + "model_info.pickle", "wb") as pickle_file:
-        pickle.dump(model_info, pickle_file) 
+                eval_model(model_info, client, bst, use_sims=curr_test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, combined_name=test_comb_name, plot_save_loc=plot_loc,dens_prf=dens_prf_plt,r_rv_tv=phase_space_plts,misclass=misclass_plt,per_err=per_err_plt)
+                del data #otherwise garbage collection doesn't work
+                del X
+                del y
+                
+        with open(model_save_loc + "model_info.pickle", "wb") as pickle_file:
+            pickle.dump(model_info, pickle_file) 
     client.close()
