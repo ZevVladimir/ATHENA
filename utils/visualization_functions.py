@@ -49,7 +49,6 @@ path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
 path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
 path_to_sparta = config["PATHS"]["path_to_sparta"]
-snap_format = config["MISC"]["snap_format"]
 curr_chunk_size = config.getint("SEARCH","chunk_size")
 
 if not on_zaratan:

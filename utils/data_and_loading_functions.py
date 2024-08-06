@@ -32,6 +32,7 @@ path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
 path_to_sparta = config["PATHS"]["path_to_sparta"]
 path_to_xgboost = config["PATHS"]["path_to_xgboost"]
 
+snap_dir_format = config["MISC"]["snap_dir_format"]
 snap_format = config["MISC"]["snap_format"]
 
 reset_lvl = config.getint("SEARCH","reset")
@@ -244,22 +245,22 @@ def split_data_by_halo(client,frac, halo_props, ptl_data, return_halo=False):
     else:
         return ptl_1, ptl_2
     
-def find_closest_z(value,snap_loc,snap_form):
+def find_closest_z(value,snap_loc,snap_dir_format,snap_format):
     all_z = np.ones(total_num_snaps) * -1000
     for i in range(total_num_snaps):
         # Sometimes not all snaps exist
-        if os.path.isdir(snap_loc + "snapdir_" + snap_form.format(i)):
-            all_z[i] = readheader(snap_loc + "snapdir_" + snap_form.format(i) + "/snapshot_" + snap_form.format(i), 'redshift')
+        if os.path.isdir(snap_loc + "snapdir_" + snap_dir_format.format(i)):
+            all_z[i] = readheader(snap_loc + "snapdir_" + snap_dir_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift')
 
     idx = (np.abs(all_z - value)).argmin()
     return idx, all_z[idx]
 
-def find_closest_snap(value, cosmology, snap_loc):
+def find_closest_snap(value, cosmology, snap_loc, snap_dir_format, snap_format):
     all_times = np.ones(total_num_snaps) * -1000
     for i in range(total_num_snaps):
         # Sometimes not all snaps exist
-        if os.path.isdir(snap_loc + "snapdir_" + snap_format.format(i)):
-            all_times[i] = cosmology.age(readheader(snap_loc + "snapdir_" + snap_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift'))
+        if os.path.isdir(snap_loc + "snapdir_" + snap_dir_format.format(i)):
+            all_times[i] = cosmology.age(readheader(snap_loc + "snapdir_" + snap_dir_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift'))
     idx = (np.abs(all_times - value)).argmin()
     return idx
 
@@ -269,15 +270,15 @@ def conv_halo_id_spid(my_halo_ids, sdata, snapshot):
         sparta_idx[i] = int(np.where(my_id == sdata['halos']['id'][:,snapshot])[0])
     return sparta_idx
 
-def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red_shifts, snap_format, snap_loc):
+def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red_shifts, snap_dir_format, snap_format, snap_loc):
     # calculate one dynamical time ago and set that as the comparison snap
     curr_time = cosmol.age(p_red_shift)
     past_time = curr_time - (t_dyn_step * t_dyn)
-    c_snap = find_closest_snap(past_time, cosmol, snap_loc)
+    c_snap = find_closest_snap(past_time, cosmol, snap_loc, snap_dir_format, snap_format)
     snapshot_list.append(c_snap)
 
     # switch to comparison snap
-    snapshot_path = snap_loc + "/snapdir_" + snap_format.format(c_snap) + "/snapshot_" + snap_format.format(c_snap)
+    snapshot_path = snap_loc + "/snapdir_" + snap_dir_format.format(c_snap) + "/snapshot_" + snap_format.format(c_snap)
         
     # get constants from pygadgetreader
     c_red_shift = readheader(snapshot_path, 'redshift')
