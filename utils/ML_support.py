@@ -60,6 +60,8 @@ model_sims = json.loads(config.get("XGBOOST","model_sims"))
 global p_red_shift
 p_red_shift = config.getfloat("SEARCH","p_red_shift")
 search_rad = config.getfloat("SEARCH","search_rad")
+
+file_lim = config.getint("XGBOOST","file_lim")
 model_type = config["XGBOOST"]["model_type"]
 train_rad = config.getint("XGBOOST","training_rad")
 nu_splits = config["XGBOOST"]["nu_splits"]
@@ -250,6 +252,9 @@ def sort_files(folder_path):
         if f.endswith('.h5'):
             hdf5_files.append(f)
     hdf5_files.sort()
+    if file_lim > 0 and file_lim < len(hdf5_files):
+        hdf5_files = hdf5_files[:file_lim]
+
     return hdf5_files
     
 def sim_info_for_nus(sim,config_params):
@@ -489,8 +494,9 @@ def load_sprta_mass_prf(sim_splits,all_idxs,use_sims):
             config_dict = pickle.load(file)
             
             curr_z = config_dict["p_snap_info"]["red_shift"][()]
+            curr_snap_dir_format = config_dict["snap_dir_format"]
             curr_snap_format = config_dict["snap_format"]
-            new_p_snap, curr_z = find_closest_z(curr_z,path_to_snaps + sparta_name + "/",curr_snap_format)
+            new_p_snap, curr_z = find_closest_z(curr_z,path_to_snaps + sparta_name + "/",curr_snap_dir_format,curr_snap_format)
             p_scale_factor = 1/(1+curr_z)
             
         with h5py.File(path_to_SPARTA_data + sparta_name + "/" + sparta_search_name + ".hdf5","r") as f:
