@@ -190,13 +190,13 @@ if __name__ == "__main__":
             
         #TODO add if statements for if scale rad or weight rad 
         if scale_rad and use_weights:
-            train_data,scale_pos_weight,train_weights,bin_edges = load_data(client,model_sims,"Train",scale_rad=scale_rad,use_weights=use_weights,filter_nu=False)
+            train_data,scale_pos_weight,train_weights,bin_edges = load_data(client,model_sims,"Train",scale_rad=scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
         elif scale_rad and not use_weights:
-            train_data,scale_pos_weight,bin_edges = load_data(client,model_sims,"Train",scale_rad=scale_rad,use_weights=use_weights,filter_nu=False)
+            train_data,scale_pos_weight,bin_edges = load_data(client,model_sims,"Train",scale_rad=scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
         elif not scale_rad and use_weights:
-            train_data,scale_pos_weight,train_weights = load_data(client,model_sims,"Train",scale_rad=scale_rad,use_weights=use_weights,filter_nu=False)
+            train_data,scale_pos_weight,train_weights = load_data(client,model_sims,"Train",scale_rad=scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
         else:
-            train_data,scale_pos_weight = load_data(client,model_sims,"Train",scale_rad=scale_rad,use_weights=use_weights,filter_nu=False)
+            train_data,scale_pos_weight = load_data(client,model_sims,"Train",scale_rad=scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
 
         print("scale_pos_weight:",scale_pos_weight)
         X_train = train_data[feat_cols]
@@ -347,7 +347,7 @@ if __name__ == "__main__":
 
         halo_df = pd.concat(halo_dfs)
         
-        test_data,test_scale_pos_weight = load_data(client,model_sims,"Test")
+        test_data,test_scale_pos_weight = load_data(client,model_sims,"Test",,limit_files=False)
         X_test = test_data[feat_cols]
         y_test = test_data[tar_col]
         
