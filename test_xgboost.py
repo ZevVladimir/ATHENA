@@ -160,7 +160,7 @@ if __name__ == "__main__":
 
                 halo_df = pd.concat(halo_dfs)
                 
-                data,scale_pos_weight = load_data(client,curr_test_sims,dset_name)
+                data,scale_pos_weight = load_data(client,curr_test_sims,dset_name,limit_files=False)
 
                 X = data[feature_columns]
                 y = data[target_column]

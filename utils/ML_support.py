@@ -246,13 +246,13 @@ def reform_df(folder_path):
         dfs.append(df) 
     return pd.concat(dfs, ignore_index=True)
 
-def sort_files(folder_path):
+def sort_files(folder_path,limit_files=False):
     hdf5_files = []
     for f in os.listdir(folder_path):
         if f.endswith('.h5'):
             hdf5_files.append(f)
     hdf5_files.sort()
-    if file_lim > 0 and file_lim < len(hdf5_files):
+    if file_lim > 0 and file_lim < len(hdf5_files) and limit_files:
         hdf5_files = hdf5_files[:file_lim]
 
     return hdf5_files
@@ -296,8 +296,8 @@ def split_dataframe(df, max_size, weights=None, use_weights = False):
     else:
         return split_dfs
 
-def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,use_weights=False,filter_nu=None):
-    ptl_files = sort_files(folder_path + "/ptl_info/")
+def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,use_weights=False,filter_nu=None,limit_files=False):
+    ptl_files = sort_files(folder_path + "/ptl_info/",limit_files=limit_files)
     
     # Function to process each file
     @delayed
@@ -401,7 +401,7 @@ def calc_scal_pos_weight(df):
     scale_pos_weight = count_negatives / count_positives
     return scale_pos_weight
 
-def load_data(client, sims, dset_name, scale_rad=False, use_weights=False, filter_nu=False):
+def load_data(client, sims, dset_name, limit_files = False, scale_rad=False, use_weights=False, filter_nu=False):
     dask_dfs = []
     all_scal_pos_weight = []
     all_weights = []
@@ -415,13 +415,13 @@ def load_data(client, sims, dset_name, scale_rad=False, use_weights=False, filte
             with timed("Reformed " + "Train" + " Dataset: " + sim):    
                 files_loc = path_to_calc_info + sim + "/" + "Train"
                 if scale_rad and use_weights:
-                    ptl_ddf,sim_scal_pos_weight, weights, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu)  
+                    ptl_ddf,sim_scal_pos_weight, weights, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files)  
                 elif scale_rad and not use_weights:
-                    ptl_ddf,sim_scal_pos_weight, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu)
+                    ptl_ddf,sim_scal_pos_weight, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files)
                 elif not scale_rad and use_weights:
-                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu) 
+                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files) 
                 else:
-                    ptl_ddf,sim_scal_pos_weight = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu)  
+                    ptl_ddf,sim_scal_pos_weight = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files)  
             print("num of partitions:",ptl_ddf.npartitions)
             all_scal_pos_weight.append(sim_scal_pos_weight)
             dask_dfs.append(ptl_ddf)
@@ -430,13 +430,13 @@ def load_data(client, sims, dset_name, scale_rad=False, use_weights=False, filte
             with timed("Reformed " + "Test" + " Dataset: " + sim):
                 files_loc = path_to_calc_info + sim + "/" + "Test"
                 if scale_rad and use_weights:
-                    ptl_ddf,sim_scal_pos_weight, weights, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu)  
+                    ptl_ddf,sim_scal_pos_weight, weights, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files)  
                 elif scale_rad and not use_weights:
-                    ptl_ddf,sim_scal_pos_weight, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu)
+                    ptl_ddf,sim_scal_pos_weight, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files)
                 elif not scale_rad and use_weights:
-                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu) 
+                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files) 
                 else:
-                    ptl_ddf,sim_scal_pos_weight = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu) 
+                    ptl_ddf,sim_scal_pos_weight = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files) 
             print("num of partitions:",ptl_ddf.npartitions)
             all_scal_pos_weight.append(sim_scal_pos_weight)
             dask_dfs.append(ptl_ddf)
@@ -445,13 +445,13 @@ def load_data(client, sims, dset_name, scale_rad=False, use_weights=False, filte
         else:
             with timed("Reformed " + dset_name + " Dataset: " + sim):  
                 if scale_rad and use_weights:
-                    ptl_ddf,sim_scal_pos_weight, weights, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu)  
+                    ptl_ddf,sim_scal_pos_weight, weights, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files)  
                 elif scale_rad and not use_weights:
-                    ptl_ddf,sim_scal_pos_weight, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu)
+                    ptl_ddf,sim_scal_pos_weight, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files)
                 elif not scale_rad and use_weights:
-                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu) 
+                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files) 
                 else:
-                    ptl_ddf,sim_scal_pos_weight = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu)   
+                    ptl_ddf,sim_scal_pos_weight = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files)   
             print("num of partitions:",ptl_ddf.npartitions)
             all_scal_pos_weight.append(sim_scal_pos_weight)
             dask_dfs.append(ptl_ddf)
