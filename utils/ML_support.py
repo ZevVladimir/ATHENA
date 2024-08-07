@@ -254,7 +254,6 @@ def sort_files(folder_path,limit_files=False):
     hdf5_files.sort()
     if file_lim > 0 and file_lim < len(hdf5_files) and limit_files:
         hdf5_files = hdf5_files[:file_lim]
-
     return hdf5_files
     
 def sim_info_for_nus(sim,config_params):

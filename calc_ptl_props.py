@@ -50,7 +50,6 @@ p_red_shift = config.getfloat("SEARCH","p_red_shift")
 global search_rad
 search_rad = config.getfloat("SEARCH","search_rad")
 total_num_snaps = config.getint("SEARCH","total_num_snaps")
-per_n_halo_per_split = config.getfloat("SEARCH","per_n_halo_per_split")
 # num_processes = int(os.environ['SLURM_CPUS_PER_TASK'])
 num_processes = mp.cpu_count()
 curr_chunk_size = config.getint("SEARCH","chunk_size")
@@ -574,7 +573,7 @@ with timed("Startup"):
         "p_red_shift":p_red_shift,
         "search_rad": search_rad,
         "total_num_snaps": total_num_snaps,
-        "per_n_halo_per_split": per_n_halo_per_split,
+        "test_halos_ratio": test_halos_ratio,
         "chunk_size": curr_chunk_size,
         "HDF5 Mem Size": mem_size,
         "p_snap_info": p_snap_dict,
