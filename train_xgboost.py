@@ -347,7 +347,7 @@ if __name__ == "__main__":
 
         halo_df = pd.concat(halo_dfs)
         
-        test_data,test_scale_pos_weight = load_data(client,model_sims,"Test",,limit_files=False)
+        test_data,test_scale_pos_weight = load_data(client,model_sims,"Test",limit_files=False)
         X_test = test_data[feat_cols]
         y_test = test_data[tar_col]
         
