@@ -15,7 +15,6 @@ import numpy as np
 import json
 import re
 from colossus.cosmology import cosmology
-cosmol = cosmology.setCosmology("bolshoi")
 
 from utils.ML_support import *
 from utils.data_and_loading_functions import create_directory, timed
@@ -40,6 +39,7 @@ path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
 path_to_sparta = config["PATHS"]["path_to_sparta"]
 path_to_xgboost = config["PATHS"]["path_to_xgboost"]
 
+sim_cosmol = config["MISC"]["sim_cosmol"]
 t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
 p_red_shift = config.getfloat("SEARCH","p_red_shift")
 radii_splits = config.get("XGBOOST","rad_splits").split(',')
@@ -61,6 +61,11 @@ dens_prf_plt = config.getboolean("XGBOOST","dens_prf_plt")
 phase_space_plts = config.getboolean("XGBOOST","phase_space_plts")
 misclass_plt = config.getboolean("XGBOOST","misclass_plt")
 per_err_plt = config.getboolean("XGBOOST","per_err_plt")
+
+if sim_cosmol == "planck13-nbody":
+    cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
+else:
+    cosmol = cosmology.setCosmology(sim_cosmol) 
 
 if on_zaratan:
     from dask_mpi import initialize

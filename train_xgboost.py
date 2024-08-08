@@ -18,7 +18,7 @@ import re
 import pandas as pd
 import subprocess
 from colossus.cosmology import cosmology
-cosmol = cosmology.setCosmology("bolshoi")
+
 
 from utils.data_and_loading_functions import create_directory, timed
 from utils.visualization_functions import *
@@ -41,6 +41,7 @@ config.read(os.environ.get('PWD') + "/config.ini")
 rand_seed = config.getint("MISC","random_seed")
 on_zaratan = config.getboolean("MISC","on_zaratan")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
+sim_cosmol = config["MISC"]["sim_cosmol"]
 
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
@@ -81,6 +82,11 @@ per_err_plt = config.getboolean("XGBOOST","per_err_plt")
 
 nu_splits = parse_ranges(nu_splits)
 nu_string = create_nu_string(nu_splits)
+
+if sim_cosmol == "planck13-nbody":
+    cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
+else:
+    cosmol = cosmology.setCosmology(sim_cosmol) 
 
 try:
     subprocess.check_output('nvidia-smi')

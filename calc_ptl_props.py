@@ -41,6 +41,7 @@ create_directory(path_to_pickle)
 create_directory(path_to_calc_info)
 snap_dir_format = config["MISC"]["snap_dir_format"]
 snap_format = config["MISC"]["snap_format"]
+sim_cosmol = config["MISC"]["sim_cosmol"]
 reset_lvl = config.getint("SEARCH","reset")
 global prim_only
 prim_only = config.getboolean("SEARCH","prim_only")
@@ -415,7 +416,10 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
         return halo_idx, ptl_idx
                 
 with timed("Startup"):
-    cosmol = cosmology.setCosmology("bolshoi") 
+    if sim_cosmol == "planck13-nbody":
+        cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
+    else:
+        cosmol = cosmology.setCosmology(sim_cosmol) 
 
     with timed("p_snap information load"):
         p_snap, p_red_shift = find_closest_z(p_red_shift,snap_loc,snap_dir_format,snap_format)
