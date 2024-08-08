@@ -46,7 +46,10 @@ sim_cosmol = config["MISC"]["sim_cosmol"]
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
 path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
-sim_pat = r"cbol_l(\d+)_n(\d+)"
+if sim_cosmol == "planck13-nbody":
+    sim_pat = r"cpla_l(\d+)_n(\d+)"
+else:
+    sim_pat = r"cbol_l(\d+)_n(\d+)"
 match = re.search(sim_pat, curr_sparta_file)
 if match:
     sparta_name = match.group(0)
