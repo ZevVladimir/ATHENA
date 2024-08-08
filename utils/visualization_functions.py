@@ -440,16 +440,14 @@ def split_orb_inf(data, labels):
     orbit = data[np.where(labels == 1)[0]]
     return infall, orbit
  
-def phase_plot(ax, x, y, min_ptl, max_ptl, range, num_bins, cmap, x_label="", y_label="", norm = "log", xrange=None, yrange=None, hide_xticks=False, hide_yticks=False,text="", axisfontsize=18, title=""):
+def phase_plot(ax, x, y, min_ptl, max_ptl, range, num_bins, cmap, x_label="", y_label="", norm = "log", xrange=None, yrange=None, hide_xticks=False, hide_yticks=False,text="", axisfontsize=20, title=""):
     ax.hist2d(x, y, bins=num_bins, range=range, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm=norm, vmin=min_ptl, vmax=max_ptl)
     
     ax.tick_params(axis='both', which='major', labelsize=16)
     ax.tick_params(axis='both', which='minor', labelsize=14)
     
-    if xrange != None:
-        ax.set_xlim(xrange)
-    if yrange != None:
-        ax.set_ylim(yrange)
+    if text != "":
+        ax.text(.01,.03, text, ha="left", va="bottom", transform=ax.transAxes, fontsize=18, bbox={"facecolor":'white',"alpha":.9,})
     if title != "":
         ax.set_title(title,fontsize=24)
     if x_label != "":
@@ -460,16 +458,21 @@ def phase_plot(ax, x, y, min_ptl, max_ptl, range, num_bins, cmap, x_label="", y_
         ax.tick_params(axis='x', which='both',bottom=False,labelbottom=False) 
     if hide_yticks:
         ax.tick_params(axis='y', which='both',left=False,labelleft=False) 
-    if text != "":
-        ax.text(.01,.03, text, ha="left", va="bottom", transform=ax.transAxes, fontsize="x-large", bbox={"facecolor":'white',"alpha":.9,})
-        
-        
-def imshow_plot(ax, img, extent, x_label="", y_label="", text="", title="", return_img=False, hide_xticks=False, hide_yticks=False, axisfontsize=16, kwargs={}):
+    if xrange != None:
+        ax.set_xlim(xrange)
+    if yrange != None:
+        ax.set_ylim(yrange)    
+               
+def imshow_plot(ax, img, extent, x_label="", y_label="", text="", title="", return_img=False, hide_xticks=False, hide_yticks=False, axisfontsize=20, kwargs={}):
     img=ax.imshow(img, interpolation="none", extent = extent, **kwargs)
+    
+    ax.tick_params(axis='both', which='major', labelsize=16)
+    ax.tick_params(axis='both', which='minor', labelsize=14)
+    
     if text != "":
-        ax.text(.01,.03, text, ha="left", va="bottom", transform=ax.transAxes, fontsize="large", bbox={"facecolor":'white',"alpha":0.9,})
+        ax.text(.01,.03, text, ha="left", va="bottom", transform=ax.transAxes, fontsize=18, bbox={"facecolor":'white',"alpha":0.9,})
     if title != "":
-        ax.set_title(title)
+        ax.set_title(title,fontsize=24)
     if x_label != "":
         ax.set_xlabel(x_label,fontsize=axisfontsize)
     if y_label != "":
@@ -650,54 +653,57 @@ def plot_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, c
         }
 
         widths = [4,4,4,4,.5]
-        heights = [4,4,4,4,4,4,4]
+        heights = [4,4,4,4]
         
-        scal_miss_class_fig = plt.figure(constrained_layout=True, figsize=(15,25))
+        scal_miss_class_fig = plt.figure(constrained_layout=True, figsize=(25,25))
         #scal_miss_class_fig.suptitle("Misclassified Particles/Num Targets " + title)
         gs = scal_miss_class_fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
+                
+        # imshow_plot(scal_miss_class_fig.add_subplot(gs[1,0]), c_all_inc_r_rv.T, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified",kwargs=all_miss_class_args)
+        # imshow_plot(scal_miss_class_fig.add_subplot(gs[1,1]), p_all_inc_r_rv.T, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="All Misclassified",kwargs=all_miss_class_args)
+        # imshow_plot(scal_miss_class_fig.add_subplot(gs[1,2]), p_all_inc_r_tv.T, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=all_miss_class_args)
+        # imshow_plot(scal_miss_class_fig.add_subplot(gs[1,3]), p_all_inc_rv_tv.T, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=all_miss_class_args)
         
-        plt.rcParams.update({'font.size': 12})
+        # imshow_plot(scal_miss_class_fig.add_subplot(gs[2,0]), c_all_inc_inf_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",hide_xticks=True,kwargs=all_miss_class_args)
+        # imshow_plot(scal_miss_class_fig.add_subplot(gs[2,1]), p_all_inc_inf_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",kwargs=all_miss_class_args)
+        # imshow_plot(scal_miss_class_fig.add_subplot(gs[2,2]), p_all_inc_inf_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=all_miss_class_args)
+        # imshow_plot(scal_miss_class_fig.add_subplot(gs[2,3]), p_all_inc_inf_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=all_miss_class_args)
         
-        phase_plot(scal_miss_class_fig.add_subplot(gs[0,0]), c_r, c_rv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,y_label="$v_r/v_{200m}$", hide_xticks=True, text="Actual\nDistribution", title="Secondary Snap")
-        phase_plot(scal_miss_class_fig.add_subplot(gs[0,1]), p_r, p_rv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap, hide_xticks=True, hide_yticks=False,y_label="$v_r/v_{200m}$",text="Actual\nDistribution")
-        phase_plot(scal_miss_class_fig.add_subplot(gs[0,2]), p_r, p_tv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,tv_range],num_bins=num_bins,cmap=cividis_cmap,y_label="$v_t/v_{200m}$",hide_xticks=True)
-        phase_plot(scal_miss_class_fig.add_subplot(gs[0,3]), p_rv, p_tv, min_ptl=10, max_ptl=p_max_all_ptl, range=[rv_range,tv_range],num_bins=num_bins,cmap=cividis_cmap, hide_xticks=True, hide_yticks=True)
+        # imshow_plot(scal_miss_class_fig.add_subplot(gs[3,0]), c_all_inc_orb_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",hide_xticks=True,kwargs=all_miss_class_args)
+        # imshow_plot(scal_miss_class_fig.add_subplot(gs[3,1]), p_all_inc_orb_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",kwargs=all_miss_class_args)
+        # imshow_plot(scal_miss_class_fig.add_subplot(gs[3,2]), p_all_inc_orb_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=all_miss_class_args)
+        # imshow_plot(scal_miss_class_fig.add_subplot(gs[3,3]), p_all_inc_orb_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=all_miss_class_args)
         
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[1,0]), c_all_inc_r_rv.T, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified",kwargs=all_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[1,1]), p_all_inc_r_rv.T, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="All Misclassified",kwargs=all_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[1,2]), p_all_inc_r_tv.T, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=all_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[1,3]), p_all_inc_rv_tv.T, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=all_miss_class_args)
-        
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[2,0]), c_all_inc_inf_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",hide_xticks=True,kwargs=all_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[2,1]), p_all_inc_inf_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",kwargs=all_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[2,2]), p_all_inc_inf_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=all_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[2,3]), p_all_inc_inf_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=all_miss_class_args)
-        
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[3,0]), c_all_inc_orb_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",hide_xticks=True,kwargs=all_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[3,1]), p_all_inc_orb_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",kwargs=all_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[3,2]), p_all_inc_orb_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=all_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[3,3]), p_all_inc_orb_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=all_miss_class_args)
-        
-        phase_plt_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=1, vmax=p_max_all_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[0:4,-1]))
-        phase_plt_color_bar.set_label("Number of Particles")
 
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[4,0]), c_scaled_inf_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",hide_xticks=True,kwargs=scale_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[4,1]), p_scaled_inf_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",kwargs=scale_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[4,2]), p_scaled_inf_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=scale_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[4,3]), p_scaled_inf_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[0,0]), p_scaled_inf_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",kwargs=scale_miss_class_args, title="Primary Snap")
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[0,1]), p_scaled_inf_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[0,2]), p_scaled_inf_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[0,3]), c_scaled_inf_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",hide_xticks=True,kwargs=scale_miss_class_args, title="Secondary Snap")
         
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[5,0]), c_scaled_orb_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",hide_xticks=True,kwargs=scale_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[5,1]), p_scaled_orb_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",kwargs=scale_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[5,2]), p_scaled_orb_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=scale_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[5,3]), p_scaled_orb_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[1,0]), p_scaled_orb_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[1,1]), p_scaled_orb_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[1,2]), p_scaled_orb_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[1,3]), c_scaled_orb_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",hide_xticks=True,kwargs=scale_miss_class_args)
         
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[6,0]), c_scaled_all_r_rv, extent=[0,max_r,min_rv,max_rv],x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="All Misclassified\nScaled",kwargs=scale_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[6,1]), p_scaled_all_r_rv, extent=[0,max_r,min_rv,max_rv],x_label="$r/R_{200m}$",hide_yticks=False,y_label="$v_r/v_{200m}$",text="All Misclassified\nScaled",kwargs=scale_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[6,2]), p_scaled_all_r_tv, extent=[0,max_r,min_tv,max_tv],x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",kwargs=scale_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[6,3]), p_scaled_all_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],x_label="$v_r/v_{200m}$",hide_yticks=True,kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[2,0]), p_scaled_all_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,y_label="$v_r/v_{200m}$",text="All Misclassified\nScaled",kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[2,1]), p_scaled_all_r_tv, extent=[0,max_r,min_tv,max_tv],hide_xticks=True,y_label="$v_t/v_{200m}$",kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[2,2]), p_scaled_all_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[2,3]), c_scaled_all_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True, y_label="$v_r/v_{200m}$",text="All Misclassified\nScaled",kwargs=scale_miss_class_args)
         
-        scal_misclas_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=p_min_ptl, vmax=p_max_diff),cmap=magma_cmap), cax=plt.subplot(gs[4:,-1]))
-        scal_misclas_color_bar.set_label("Num Incorrect Particles (inf/orb) / Total Particles (inf/orb)")
+        scal_misclas_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=p_min_ptl, vmax=p_max_diff),cmap=magma_cmap), cax=plt.subplot(gs[:3,-1]))
+        scal_misclas_color_bar.set_label("Num Incorrect Particles (inf/orb) / Total Particles (inf/orb)",fontsize=16)
+        scal_misclas_color_bar.ax.tick_params(labelsize=14)
+        
+        phase_plot(scal_miss_class_fig.add_subplot(gs[3,0]), p_r, p_rv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,x_label="$r/R_{200m}$",hide_yticks=False,y_label="$v_r/v_{200m}$",text="Actual\nDistribution")
+        phase_plot(scal_miss_class_fig.add_subplot(gs[3,1]), p_r, p_tv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,tv_range],num_bins=num_bins,cmap=cividis_cmap,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$")
+        phase_plot(scal_miss_class_fig.add_subplot(gs[3,2]), p_rv, p_tv, min_ptl=10, max_ptl=p_max_all_ptl, range=[rv_range,tv_range],num_bins=num_bins,cmap=cividis_cmap, x_label="$v_r/v_{200m}$",hide_yticks=True)
+        phase_plot(scal_miss_class_fig.add_subplot(gs[3,3]), c_r, c_rv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$", text="Actual\nDistribution")
+        
+        phase_plt_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=1, vmax=p_max_all_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[3,-1]))
+        phase_plt_color_bar.ax.tick_params(labelsize=14)
+        phase_plt_color_bar.set_label("Number of Particles",fontsize=16)
+        
+        
         
         scal_miss_class_fig.savefig(save_location + title + "scaled_miss_class.png")
 
