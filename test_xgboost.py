@@ -115,15 +115,15 @@ if __name__ == "__main__":
     else:
         client = get_CUDA_cluster()
     
-    model_comb_name, model_comb_lims = get_combined_name(model_sims) 
+    model_comb_name = get_combined_name(model_sims) 
     scale_rad=False
     use_weights=False
     if reduce_rad > 0 and reduce_perc > 0:
         scale_rad = True
     if weight_rad > 0 and min_weight > 0:
         use_weights=True    
-        
-    model_dir = model_type + "_" + model_comb_lims + "nu" + nu_string 
+    
+    model_dir = model_type + "_" + model_comb_name + "nu" + nu_string 
 
     if scale_rad:
         model_dir += "scl_rad" + str(reduce_rad) + "_" + str(reduce_perc)
@@ -148,13 +148,13 @@ if __name__ == "__main__":
         print("Model info could not be loaded please ensure the path is correct or rerun train_xgboost.py")
         
     for curr_test_sims in test_sims:
-        test_comb_name, test_comb_lims = get_combined_name(curr_test_sims) 
+        test_comb_name = get_combined_name(curr_test_sims) 
             
         #TODO check that the right sims and datasets are chosen
         print("Testing on:", curr_test_sims)
         for dset_name in eval_datasets:
             with timed("Model Evaluation on " + dset_name + " dataset"):             
-                plot_loc = model_save_loc + dset_name + "_" + test_comb_lims + "_" + test_comb_name + "/plots/"
+                plot_loc = model_save_loc + dset_name + "_" + test_comb_name + "/plots/"
                 create_directory(plot_loc)
                 
                 halo_files = []

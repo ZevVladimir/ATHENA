@@ -145,9 +145,9 @@ if __name__ == "__main__":
     if weight_rad > 0 and min_weight > 0 and not opt_wghts:
         use_weights=True
         
-    combined_name, combined_lims = get_combined_name(model_sims) 
+    combined_name = get_combined_name(model_sims) 
         
-    model_dir = model_type + "_" + combined_lims + "nu" + nu_string 
+    model_dir = model_type + "_" + combined_name + "nu" + nu_string 
 
     if scale_rad:
         model_dir += "scl_rad" + str(reduce_rad) + "_" + str(reduce_perc)
@@ -345,7 +345,7 @@ if __name__ == "__main__":
         fig.savefig(gen_plot_save_loc + "ex_tree.png",bbox_inches="tight")
         
     with timed("Model Evaluation"):
-        plot_loc = model_save_loc + "Test_" + combined_lims + "_" + combined_name + "/plots/"
+        plot_loc = model_save_loc + "Test_" + combined_name + "/plots/"
         create_directory(plot_loc)
         
         halo_files = []

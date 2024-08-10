@@ -779,21 +779,8 @@ def get_combined_name(model_sims):
     combined_name = ""
     combined_lims = ""
     for i,sim in enumerate(model_sims):
-        pattern = r"(\d+)to(\d+)"
-        match = re.search(pattern, sim)
-
-        if match:
-            curr_snap_list = [match.group(1), match.group(2)] 
-        else:
-            print("Pattern not found in the string.")
-        parts = sim.split("_")
-        #TODO make this work for sims that don't do a v200m cut
-        combined_name += parts[1] + parts[2] + "s" + parts[5] 
-        combined_lims += parts[3] + parts[4]
-        if i != len(model_sims)-1:
-            combined_name += "_"
-            combined_lims += "_"
+        combined_name += sim
     
-    return combined_name,combined_lims
+    return combined_name
     
     

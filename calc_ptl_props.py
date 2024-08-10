@@ -36,6 +36,7 @@ match = re.search(sim_pat, curr_sparta_file)
 if match:
     sparta_name = match.group(0)
 path_to_hdf5_file = path_to_SPARTA_data + sparta_name + "/" + curr_sparta_file + ".hdf5"
+snap_loc = path_to_snaps + sparta_name + "/"
 path_to_pickle = config["PATHS"]["path_to_pickle"]
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
 path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
