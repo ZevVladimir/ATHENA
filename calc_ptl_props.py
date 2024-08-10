@@ -459,7 +459,7 @@ with timed("Startup"):
         }
 
     if reset_lvl == 3:
-        clean_dir(path_to_pickle + str(p_snap) + "_" + str(sparta_name) + "_" + str(int(search_rad)) + "r200m/")
+        clean_dir(path_to_pickle + str(p_snap) + "_" + curr_sparta_file + "/")
 
     # load all information needed for the primary snap
     with timed("p_snap ptl load"):
