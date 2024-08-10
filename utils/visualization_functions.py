@@ -434,9 +434,35 @@ def rv_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = None):
     
     return ax.plot(hubble_vel[:,0], hubble_vel[:,1], color = "purple", alpha = 0.5, linestyle = "dashed", label = r"Hubble Flow")
 
-def histogram(x,y,bins,range,min_ptl,set_ptl):
-    hist = np.histogram2d(x, y, bins=bins, range=range)
+def histogram(x,y,n_bins,range,min_ptl,set_ptl,use_bins=None,split_yscale_dict=None):
+    if use_bins != None:
+        x_bins = use_bins[0]
+        y_bins = use_bins[1]
+    else:
+        x_bins = n_bins
+        y_bins = n_bins
+        
+    if split_yscale_dict != None:
+        linthrsh = split_yscale_dict["linthrsh"]
+        lin_nbin = split_yscale_dict["lin_nbin"]
+        log_nbin = split_yscale_dict["log_nbin"]
+        
+        y_range = range[1]
+        # if the y axis goes to the negatives
+        if y_range[0] < 0:
+            lin_bins = np.linspace(-linthrsh,linthrsh,lin_nbin,endpoint=False)
+            neg_log_bins = -np.logspace(np.log10(-y_range[0]),np.log10(linthrsh),log_nbin,endpoint=False)
+            pos_log_bins = np.logspace(np.log10(linthrsh),np.log10(y_range[1]),log_nbin)
+            y_bins = np.concatenate([neg_log_bins,lin_bins,pos_log_bins])
+            
+        else:
+            lin_bins = np.linspace(y_range[0],linthrsh,lin_nbin,endpoint=False)
+            pos_log_bins = np.logspace(np.log10(linthrsh),np.log10(y_range[1]),log_nbin)
+            y_bins = np.concatenate([lin_bins,pos_log_bins])
+    
+    hist = np.histogram2d(x, y, bins=[x_bins,y_bins], range=range)
     hist[0][hist[0] < min_ptl] = set_ptl
+    
     return hist
   
 def split_orb_inf(data, labels):
@@ -444,8 +470,39 @@ def split_orb_inf(data, labels):
     orbit = data[np.where(labels == 1)[0]]
     return infall, orbit
  
-def phase_plot(ax, x, y, min_ptl, max_ptl, range, num_bins, cmap, x_label="", y_label="", norm = "log", xrange=None, yrange=None, hide_xticks=False, hide_yticks=False,text="", axisfontsize=20, title=""):
-    ax.hist2d(x, y, bins=num_bins, range=range, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm=norm, vmin=min_ptl, vmax=max_ptl)
+def phase_plot(ax, x, y, min_ptl, max_ptl, range, num_bins, cmap, x_label="", y_label="", norm = "log", xrange=None, yrange=None, split_yscale_dict = None, hide_xticks=False, hide_yticks=False,text="", axisfontsize=20, title=""):
+    bins = [num_bins,num_bins]
+    if split_yscale_dict != None:
+        linthrsh = split_yscale_dict["linthrsh"]
+        lin_nbin = split_yscale_dict["lin_nbin"]
+        log_nbin = split_yscale_dict["log_nbin"]
+        lin_ntick = split_yscale_dict["lin_ntick"]
+        log_ntick= split_yscale_dict["log_ntick"]
+        
+        y_range = range[1]
+        # if the y axis goes to the negatives
+        if y_range[0] < 0:
+            lin_bins = np.linspace(-linthrsh,linthrsh,lin_nbin,endpoint=False)
+            neg_log_bins = -np.logspace(np.log10(-y_range[0]),np.log10(linthrsh),log_nbin,endpoint=False)
+            pos_log_bins = np.logspace(np.log10(linthrsh),np.log10(y_range[1]),log_nbin)
+            y_bins = np.concatenate([neg_log_bins,lin_bins,pos_log_bins])
+            
+            lin_ticks = np.linspace(-linthrsh,linthrsh,lin_ntick,endpoint=False)
+            neg_log_ticks = -np.logspace(np.log10(-y_range[0]),np.log10(linthrsh),log_ntick,endpoint=False)
+            pos_log_ticks = np.logspace(np.log10(linthrsh),np.log10(y_range[1]),log_ntick)
+            y_ticks = np.concatenate([neg_log_ticks,lin_ticks,pos_log_ticks])
+            
+        else:
+            lin_bins = np.linspace(y_range[0],linthrsh,lin_nbin,endpoint=False)
+            pos_log_bins = np.logspace(np.log10(linthrsh),np.log10(y_range[1]),log_nbin)
+            y_bins = np.concatenate([lin_bins,pos_log_bins])
+            
+            lin_ticks = np.linspace(y_range[0],linthrsh,lin_ntick,endpoint=False)
+            pos_log_ticks = np.logspace(np.log10(linthrsh),np.log10(y_range[1]),log_ntick)
+            y_ticks = np.concatenate([lin_ticks,pos_log_ticks])
+        ax.set_yticks(y_ticks) 
+        bins = [num_bins,y_bins]
+    ax.hist2d(x, y, bins=bins, range=range, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm=norm, vmin=min_ptl, vmax=max_ptl)
     
     ax.tick_params(axis='both', which='major', labelsize=16)
     ax.tick_params(axis='both', which='minor', labelsize=14)
@@ -466,8 +523,9 @@ def phase_plot(ax, x, y, min_ptl, max_ptl, range, num_bins, cmap, x_label="", y_
         ax.set_xlim(xrange)
     if yrange != None:
         ax.set_ylim(yrange)    
+    
                
-def imshow_plot(ax, img, extent, x_label="", y_label="", text="", title="", return_img=False, hide_xticks=False, hide_yticks=False, axisfontsize=20, kwargs={}):
+def imshow_plot(ax, img, extent, x_label="", y_label="", text="", title="", split_yscale_dict = None, return_img=False, hide_xticks=False, hide_yticks=False, axisfontsize=20, kwargs={}):
     img=ax.imshow(img, interpolation="none", extent = extent, **kwargs)
     
     ax.tick_params(axis='both', which='major', labelsize=16)
@@ -484,7 +542,25 @@ def imshow_plot(ax, img, extent, x_label="", y_label="", text="", title="", retu
     if hide_xticks:
         ax.tick_params(axis='x', which='both',bottom=False,labelbottom=False) 
     if hide_yticks:
-        ax.tick_params(axis='y', which='both',left=False,labelleft=False) 
+        ax.tick_params(axis='y', which='both',left=False,labelleft=False)   
+    if split_yscale_dict != None:
+        linthrsh = split_yscale_dict["linthrsh"]
+        lin_ntick = split_yscale_dict["lin_ntick"]
+        log_ntick= split_yscale_dict["log_ntick"]
+        
+        y_range = extent[2:]
+        # if the y axis goes to the negatives
+        if y_range[0] < 0:
+            lin_ticks = np.linspace(-linthrsh,linthrsh,lin_ntick,endpoint=False)
+            neg_log_ticks = -np.logspace(np.log10(-y_range[0]),np.log10(linthrsh),log_ntick,endpoint=False)
+            pos_log_ticks = np.logspace(np.log10(linthrsh),np.log10(y_range[1]),log_ntick)
+            y_ticks = np.concatenate([neg_log_ticks,lin_ticks,pos_log_ticks])
+            
+        else:
+            lin_ticks = np.linspace(y_range[0],linthrsh,lin_ntick,endpoint=False)
+            pos_log_ticks = np.logspace(np.log10(linthrsh),np.log10(y_range[1]),log_ntick)
+            y_ticks = np.concatenate([lin_ticks,pos_log_ticks])
+        ax.set_yticks(y_ticks)           
     if return_img:
         return img
 
@@ -495,22 +571,21 @@ def update_miss_class(img, miss_class, act, miss_class_min, act_min):
     img = np.where((miss_class >= 1) & (img < miss_class_min) & (act >= act_min), miss_class_min, img)
     return img.T
 
-def create_hist_max_ptl(min_ptl, set_ptl, inf_r, orb_r, inf_rv, orb_rv, inf_tv, orb_tv, num_bins, r_range, rv_range, tv_range, bin_r_rv = None, bin_r_tv = None, bin_rv_tv = None):
+def create_hist_max_ptl(min_ptl, set_ptl, inf_r, orb_r, inf_rv, orb_rv, inf_tv, orb_tv, num_bins, r_range, rv_range, tv_range, split_yscale_dict = None, bin_r_rv = None, bin_r_tv = None, bin_rv_tv = None):
     if bin_r_rv == None:
-        bins = num_bins
-        orb_r_rv = histogram(orb_r, orb_rv, bins=bins, range=[r_range,rv_range],min_ptl=min_ptl,set_ptl=set_ptl)
-        orb_r_tv = histogram(orb_r, orb_tv, bins=bins, range=[r_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl)
-        orb_rv_tv = histogram(orb_rv, orb_tv, bins=bins, range=[rv_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl)
-        inf_r_rv = histogram(inf_r, inf_rv, bins=bins, range=[r_range,rv_range],min_ptl=min_ptl,set_ptl=set_ptl)
-        inf_r_tv = histogram(inf_r, inf_tv, bins=bins, range=[r_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl)
-        inf_rv_tv = histogram(inf_rv, inf_tv, bins=bins, range=[rv_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl)
+        orb_r_rv = histogram(orb_r, orb_rv, n_bins=num_bins, range=[r_range,rv_range],min_ptl=min_ptl,set_ptl=set_ptl,split_yscale_dict=split_yscale_dict)
+        orb_r_tv = histogram(orb_r, orb_tv, n_bins=num_bins, range=[r_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl,split_yscale_dict=split_yscale_dict)
+        orb_rv_tv = histogram(orb_rv, orb_tv, n_bins=num_bins, range=[rv_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl,split_yscale_dict=split_yscale_dict)
+        inf_r_rv = histogram(inf_r, inf_rv, n_bins=num_bins, range=[r_range,rv_range],min_ptl=min_ptl,set_ptl=set_ptl,split_yscale_dict=split_yscale_dict)
+        inf_r_tv = histogram(inf_r, inf_tv, n_bins=num_bins, range=[r_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl,split_yscale_dict=split_yscale_dict)
+        inf_rv_tv = histogram(inf_rv, inf_tv, n_bins=num_bins, range=[rv_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl,split_yscale_dict=split_yscale_dict)
     else:
-        orb_r_rv = histogram(orb_r, orb_rv, bins=bin_r_rv, range=[r_range,rv_range],min_ptl=min_ptl,set_ptl=set_ptl)
-        orb_r_tv = histogram(orb_r, orb_tv, bins=bin_r_tv, range=[r_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl)
-        orb_rv_tv = histogram(orb_rv, orb_tv, bins=bin_rv_tv, range=[rv_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl)
-        inf_r_rv = histogram(inf_r, inf_rv, bins=bin_r_rv, range=[r_range,rv_range],min_ptl=min_ptl,set_ptl=set_ptl)
-        inf_r_tv = histogram(inf_r, inf_tv, bins=bin_r_tv, range=[r_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl)
-        inf_rv_tv = histogram(inf_rv, inf_tv, bins=bin_rv_tv, range=[rv_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl)
+        orb_r_rv = histogram(orb_r, orb_rv,n_bins=num_bins,range=[r_range,rv_range],min_ptl=min_ptl,set_ptl=set_ptl,use_bins=bin_r_rv,split_yscale_dict=split_yscale_dict)
+        orb_r_tv = histogram(orb_r, orb_tv,n_bins=num_bins,range=[r_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl,use_bins=bin_r_tv,split_yscale_dict=split_yscale_dict)
+        orb_rv_tv = histogram(orb_rv, orb_tv,n_bins=num_bins,range=[rv_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl,use_bins=bin_rv_tv,split_yscale_dict=split_yscale_dict)
+        inf_r_rv = histogram(inf_r, inf_rv,n_bins=num_bins,range=[r_range,rv_range],min_ptl=min_ptl,set_ptl=set_ptl,use_bins=bin_r_rv,split_yscale_dict=split_yscale_dict)
+        inf_r_tv = histogram(inf_r, inf_tv,n_bins=num_bins,range=[r_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl,use_bins=bin_r_tv,split_yscale_dict=split_yscale_dict)
+        inf_rv_tv = histogram(inf_rv, inf_tv,n_bins=num_bins,range=[rv_range,tv_range],min_ptl=min_ptl,set_ptl=set_ptl,use_bins=bin_rv_tv,split_yscale_dict=split_yscale_dict)
 
     max_ptl = np.max(np.array([np.max(orb_r_rv[0]),np.max(orb_r_tv[0]),np.max(orb_rv_tv[0]),np.max(inf_r_rv[0]),np.max(inf_r_tv[0]),np.max(inf_rv_tv[0]),]))
     
@@ -519,7 +594,7 @@ def create_hist_max_ptl(min_ptl, set_ptl, inf_r, orb_r, inf_rv, orb_rv, inf_tv, 
 def percent_error(pred, act):
     return ((pred - act)/act) * 100
 
-def calc_misclassified(correct_labels, ml_labels, r, rv, tv, r_range, rv_range, tv_range, num_bins, model_info,dataset_name): 
+def calc_misclassified(correct_labels, ml_labels, r, rv, tv, r_range, rv_range, tv_range, num_bins, split_yscale_dict, model_info,dataset_name): 
     min_ptl = 1e-4
     act_min_ptl = 10
 
@@ -548,8 +623,8 @@ def calc_misclassified(correct_labels, ml_labels, r, rv, tv, r_range, rv_range, 
     act_inf_rv, act_orb_rv = split_orb_inf(rv, correct_labels)
     act_inf_tv, act_orb_tv = split_orb_inf(tv, correct_labels)
 
-    max_all_ptl, act_orb_r_rv, act_orb_r_tv, act_orb_rv_tv, act_inf_r_rv, act_inf_r_tv, act_inf_rv_tv = create_hist_max_ptl(act_min_ptl, 0, act_inf_r, act_orb_r, act_inf_rv, act_orb_rv, act_inf_tv, act_orb_tv, num_bins, r_range, rv_range, tv_range)    
-    max_ptl, inc_orb_r_rv, inc_orb_r_tv, inc_orb_rv_tv, inc_inf_r_rv, inc_inf_r_tv, inc_inf_rv_tv = create_hist_max_ptl(min_ptl, min_ptl, inc_inf_r, inc_orb_r, inc_inf_rv, inc_orb_rv, inc_inf_tv, inc_orb_tv, num_bins, r_range, rv_range, tv_range, bin_r_rv=act_orb_r_rv[1:], bin_r_tv=act_orb_r_tv[1:],bin_rv_tv=act_orb_rv_tv[1:])
+    max_all_ptl, act_orb_r_rv, act_orb_r_tv, act_orb_rv_tv, act_inf_r_rv, act_inf_r_tv, act_inf_rv_tv = create_hist_max_ptl(act_min_ptl, 0, act_inf_r, act_orb_r, act_inf_rv, act_orb_rv, act_inf_tv, act_orb_tv, num_bins, r_range, rv_range, tv_range, split_yscale_dict=split_yscale_dict)    
+    max_ptl, inc_orb_r_rv, inc_orb_r_tv, inc_orb_rv_tv, inc_inf_r_rv, inc_inf_r_tv, inc_inf_rv_tv = create_hist_max_ptl(min_ptl, min_ptl, inc_inf_r, inc_orb_r, inc_inf_rv, inc_orb_rv, inc_inf_tv, inc_orb_tv, num_bins, r_range, rv_range, tv_range, bin_r_rv=act_orb_r_rv[1:], bin_r_tv=act_orb_r_tv[1:],bin_rv_tv=act_orb_rv_tv[1:],split_yscale_dict=split_yscale_dict)
 
     all_inc_r_rv = (inc_orb_r_rv[0] + inc_inf_r_rv[0])
     all_inc_r_tv = (inc_orb_r_tv[0] + inc_inf_r_tv[0])
@@ -621,10 +696,18 @@ def plot_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, c
         c_corr_labels[np.argwhere(np.isnan(c_r)).flatten()] = -99
         c_ml_labels[np.argwhere(np.isnan(c_r)).flatten()] = -99
         
+        split_yscale_dict = {
+            "linthrsh":2,
+            "lin_nbin":30,
+            "log_nbin":15,
+            "lin_ntick":5,
+            "log_ntick":3
+        }   
+        
         print("Primary Snap Misclassification")
-        p_misclass_dict, p_min_ptl, p_max_diff, p_max_all_ptl, p_all_inc_r_rv, p_all_inc_r_tv, p_all_inc_rv_tv, p_scaled_inf_r_rv, p_scaled_inf_r_tv, p_scaled_inf_rv_tv, p_scaled_orb_r_rv, p_scaled_orb_r_tv, p_scaled_orb_rv_tv, p_scaled_all_r_rv, p_scaled_all_r_tv, p_scaled_all_rv_tv,p_all_inc_inf_r_rv,p_all_inc_inf_r_tv,p_all_inc_inf_rv_tv,p_all_inc_orb_r_rv,p_all_inc_orb_r_tv,p_all_inc_orb_rv_tv = calc_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, r_range, rv_range, tv_range, num_bins=num_bins, model_info=model_info,dataset_name=dataset_name)
+        p_misclass_dict, p_min_ptl, p_max_diff, p_max_all_ptl, p_all_inc_r_rv, p_all_inc_r_tv, p_all_inc_rv_tv, p_scaled_inf_r_rv, p_scaled_inf_r_tv, p_scaled_inf_rv_tv, p_scaled_orb_r_rv, p_scaled_orb_r_tv, p_scaled_orb_rv_tv, p_scaled_all_r_rv, p_scaled_all_r_tv, p_scaled_all_rv_tv,p_all_inc_inf_r_rv,p_all_inc_inf_r_tv,p_all_inc_inf_rv_tv,p_all_inc_orb_r_rv,p_all_inc_orb_r_tv,p_all_inc_orb_rv_tv = calc_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, r_range, rv_range, tv_range, num_bins=num_bins, split_yscale_dict=split_yscale_dict,model_info=model_info,dataset_name=dataset_name)
         print("Secondary Snap Misclassification")
-        c_misclass_dict, c_min_ptl, c_max_diff, c_max_all_ptl, c_all_inc_r_rv, c_all_inc_r_tv, c_all_inc_rv_tv, c_scaled_inf_r_rv, c_scaled_inf_r_tv, c_scaled_inf_rv_tv, c_scaled_orb_r_rv, c_scaled_orb_r_tv, c_scaled_orb_rv_tv, c_scaled_all_r_rv, c_scaled_all_r_tv, c_scaled_all_rv_tv,c_all_inc_inf_r_rv,c_all_inc_inf_r_tv,c_all_inc_inf_rv_tv,c_all_inc_orb_r_rv,c_all_inc_orb_r_tv,c_all_inc_orb_rv_tv = calc_misclassified(c_corr_labels, c_ml_labels, c_r, c_rv, c_tv, r_range, rv_range, tv_range, num_bins=num_bins, model_info=model_info,dataset_name=dataset_name)
+        c_misclass_dict, c_min_ptl, c_max_diff, c_max_all_ptl, c_all_inc_r_rv, c_all_inc_r_tv, c_all_inc_rv_tv, c_scaled_inf_r_rv, c_scaled_inf_r_tv, c_scaled_inf_rv_tv, c_scaled_orb_r_rv, c_scaled_orb_r_tv, c_scaled_orb_rv_tv, c_scaled_all_r_rv, c_scaled_all_r_tv, c_scaled_all_rv_tv,c_all_inc_inf_r_rv,c_all_inc_inf_r_tv,c_all_inc_inf_rv_tv,c_all_inc_orb_r_rv,c_all_inc_orb_r_tv,c_all_inc_orb_rv_tv = calc_misclassified(c_corr_labels, c_ml_labels, c_r, c_rv, c_tv, r_range, rv_range, tv_range, num_bins=num_bins, split_yscale_dict=split_yscale_dict,model_info=model_info,dataset_name=dataset_name)
         
         if dataset_name not in model_info["Results"]:
             model_info["Results"][dataset_name]={}
@@ -657,11 +740,10 @@ def plot_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, c
         }
 
         widths = [4,4,4,4,.5]
-        heights = [4,4,4,4]
+        heights = [4,4,4]
         
-        scal_miss_class_fig = plt.figure(constrained_layout=True, figsize=(25,25))
-        #scal_miss_class_fig.suptitle("Misclassified Particles/Num Targets " + title)
-        gs = scal_miss_class_fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
+        ptl_distr_fig = plt.figure(constrained_layout=True, figsize=(25,25))
+        gs = ptl_distr_fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
                 
         # imshow_plot(scal_miss_class_fig.add_subplot(gs[1,0]), c_all_inc_r_rv.T, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified",kwargs=all_miss_class_args)
         # imshow_plot(scal_miss_class_fig.add_subplot(gs[1,1]), p_all_inc_r_rv.T, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="All Misclassified",kwargs=all_miss_class_args)
@@ -678,36 +760,55 @@ def plot_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, c
         # imshow_plot(scal_miss_class_fig.add_subplot(gs[3,2]), p_all_inc_orb_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=all_miss_class_args)
         # imshow_plot(scal_miss_class_fig.add_subplot(gs[3,3]), p_all_inc_orb_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=all_miss_class_args)
         
+        inf_loc = np.where(p_corr_labels == 0)[0]
+        orb_loc = np.where(p_corr_labels == 1)[0]
+        
+        phase_plot(ptl_distr_fig.add_subplot(gs[0,0]), p_r, p_rv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",hide_yticks=False,y_label="$v_r/v_{200m}$",text="Actual\nDistribution")
+        phase_plot(ptl_distr_fig.add_subplot(gs[0,1]), p_r, p_tv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,tv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$")
+        phase_plot(ptl_distr_fig.add_subplot(gs[0,2]), p_rv, p_tv, min_ptl=10, max_ptl=p_max_all_ptl, range=[rv_range,tv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$v_r/v_{200m}$",hide_yticks=True)
+        phase_plot(ptl_distr_fig.add_subplot(gs[0,3]), c_r, c_rv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$", text="Actual\nDistribution")
+        
+        phase_plot(ptl_distr_fig.add_subplot(gs[1,0]), p_r[inf_loc], p_rv[inf_loc], min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",hide_yticks=False,y_label="$v_r/v_{200m}$",text="Actual\nDistribution")
+        phase_plot(ptl_distr_fig.add_subplot(gs[1,1]), p_r[inf_loc], p_tv[inf_loc], min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,tv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$")
+        phase_plot(ptl_distr_fig.add_subplot(gs[1,2]), p_rv[inf_loc], p_tv[inf_loc], min_ptl=10, max_ptl=p_max_all_ptl, range=[rv_range,tv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$v_r/v_{200m}$",hide_yticks=True)
+        phase_plot(ptl_distr_fig.add_subplot(gs[1,3]), c_r[inf_loc], c_rv[inf_loc], min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$", text="Actual\nDistribution")
 
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[0,0]), p_scaled_inf_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",kwargs=scale_miss_class_args, title="Primary Snap")
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[0,1]), p_scaled_inf_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=scale_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[0,2]), p_scaled_inf_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[0,3]), c_scaled_inf_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",hide_xticks=True,kwargs=scale_miss_class_args, title="Secondary Snap")
+        phase_plot(ptl_distr_fig.add_subplot(gs[2,0]), p_r[orb_loc], p_rv[orb_loc], min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",hide_yticks=False,y_label="$v_r/v_{200m}$",text="Actual\nDistribution")
+        phase_plot(ptl_distr_fig.add_subplot(gs[2,1]), p_r[orb_loc], p_tv[orb_loc], min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,tv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$")
+        phase_plot(ptl_distr_fig.add_subplot(gs[2,2]), p_rv[orb_loc], p_tv[orb_loc], min_ptl=10, max_ptl=p_max_all_ptl, range=[rv_range,tv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$v_r/v_{200m}$",hide_yticks=True)
+        phase_plot(ptl_distr_fig.add_subplot(gs[2,3]), c_r[orb_loc], c_rv[orb_loc], min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$", text="Actual\nDistribution")
+
         
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[1,0]), p_scaled_orb_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",kwargs=scale_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[1,1]), p_scaled_orb_r_tv, extent=[0,max_r,min_tv,max_tv],y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=scale_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[1,2]), p_scaled_orb_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[1,3]), c_scaled_orb_r_rv, extent=[0,max_r,min_rv,max_rv],y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",hide_xticks=True,kwargs=scale_miss_class_args)
-        
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[2,0]), p_scaled_all_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True,y_label="$v_r/v_{200m}$",text="All Misclassified\nScaled",kwargs=scale_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[2,1]), p_scaled_all_r_tv, extent=[0,max_r,min_tv,max_tv],hide_xticks=True,y_label="$v_t/v_{200m}$",kwargs=scale_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[2,2]), p_scaled_all_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
-        imshow_plot(scal_miss_class_fig.add_subplot(gs[2,3]), c_scaled_all_r_rv, extent=[0,max_r,min_rv,max_rv],hide_xticks=True, y_label="$v_r/v_{200m}$",text="All Misclassified\nScaled",kwargs=scale_miss_class_args)
-        
-        scal_misclas_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=p_min_ptl, vmax=p_max_diff),cmap=magma_cmap), cax=plt.subplot(gs[:3,-1]))
-        scal_misclas_color_bar.set_label("Num Incorrect Particles (inf/orb) / Total Particles (inf/orb)",fontsize=16)
-        scal_misclas_color_bar.ax.tick_params(labelsize=14)
-        
-        phase_plot(scal_miss_class_fig.add_subplot(gs[3,0]), p_r, p_rv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,x_label="$r/R_{200m}$",hide_yticks=False,y_label="$v_r/v_{200m}$",text="Actual\nDistribution")
-        phase_plot(scal_miss_class_fig.add_subplot(gs[3,1]), p_r, p_tv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,tv_range],num_bins=num_bins,cmap=cividis_cmap,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$")
-        phase_plot(scal_miss_class_fig.add_subplot(gs[3,2]), p_rv, p_tv, min_ptl=10, max_ptl=p_max_all_ptl, range=[rv_range,tv_range],num_bins=num_bins,cmap=cividis_cmap, x_label="$v_r/v_{200m}$",hide_yticks=True)
-        phase_plot(scal_miss_class_fig.add_subplot(gs[3,3]), c_r, c_rv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$", text="Actual\nDistribution")
-        
-        phase_plt_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=1, vmax=p_max_all_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[3,-1]))
+        phase_plt_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=1, vmax=p_max_all_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[:,-1]))
         phase_plt_color_bar.ax.tick_params(labelsize=14)
         phase_plt_color_bar.set_label("Number of Particles",fontsize=16)
         
+        ptl_distr_fig.savefig(save_location + title + "ptl_distr.png")
+
+        widths = [4,4,4,4,.5]
+        heights = [4,4,4]
         
+        scal_miss_class_fig = plt.figure(constrained_layout=True, figsize=(30,25))
+        gs = scal_miss_class_fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
+
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[0,0]), p_scaled_inf_r_rv, extent=[0,max_r,min_rv,max_rv],split_yscale_dict=split_yscale_dict,hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",kwargs=scale_miss_class_args, title="Primary Snap")
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[0,1]), p_scaled_inf_r_tv, extent=[0,max_r,min_tv,max_tv],split_yscale_dict=split_yscale_dict,y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[0,2]), p_scaled_inf_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],split_yscale_dict=split_yscale_dict,hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[0,3]), c_scaled_inf_r_rv, extent=[0,max_r,min_rv,max_rv],split_yscale_dict=split_yscale_dict,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",hide_xticks=True,kwargs=scale_miss_class_args, title="Secondary Snap")
+        
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[1,0]), p_scaled_orb_r_rv, extent=[0,max_r,min_rv,max_rv],split_yscale_dict=split_yscale_dict,hide_xticks=True,hide_yticks=False,y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[1,1]), p_scaled_orb_r_tv, extent=[0,max_r,min_tv,max_tv],split_yscale_dict=split_yscale_dict,y_label="$v_t/v_{200m}$",hide_xticks=True,kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[1,2]), p_scaled_orb_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],split_yscale_dict=split_yscale_dict,hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[1,3]), c_scaled_orb_r_rv, extent=[0,max_r,min_rv,max_rv],split_yscale_dict=split_yscale_dict,y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",hide_xticks=True,kwargs=scale_miss_class_args)
+        
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[2,0]), p_scaled_all_r_rv, extent=[0,max_r,min_rv,max_rv],split_yscale_dict=split_yscale_dict,y_label="$v_r/v_{200m}$",text="All Misclassified\nScaled",kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[2,1]), p_scaled_all_r_tv, extent=[0,max_r,min_tv,max_tv],split_yscale_dict=split_yscale_dict,y_label="$v_t/v_{200m}$",kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[2,2]), p_scaled_all_rv_tv, extent=[min_rv,max_rv,min_tv,max_tv],split_yscale_dict=split_yscale_dict,hide_yticks=True,kwargs=scale_miss_class_args)
+        imshow_plot(scal_miss_class_fig.add_subplot(gs[2,3]), c_scaled_all_r_rv, extent=[0,max_r,min_rv,max_rv],split_yscale_dict=split_yscale_dict,y_label="$v_r/v_{200m}$",text="All Misclassified\nScaled",kwargs=scale_miss_class_args)
+        
+        scal_misclas_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=p_min_ptl, vmax=p_max_diff),cmap=magma_cmap), cax=plt.subplot(gs[:,-1]))
+        scal_misclas_color_bar.set_label("Num Incorrect Particles (inf/orb) / Total Particles (inf/orb)",fontsize=16)
+        scal_misclas_color_bar.ax.tick_params(labelsize=14)
         
         scal_miss_class_fig.savefig(save_location + title + "scaled_miss_class.png")
 
