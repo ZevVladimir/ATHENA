@@ -298,7 +298,7 @@ def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red
     # c_box_size = c_box_size + 0.001 # NEED TO MAKE WORK FOR PARTICLES ON THE VERY EDGE
     
     if reset_lvl == 3:
-        clean_dir(path_to_pickle + str(c_snap) + "_" + str(sparta_name) +  "_" + str(int(search_rad)) + "r200m/")
+        clean_dir(path_to_pickle + str(c_snap) + "_" + curr_sparta_file + "/")
     # load particle data and SPARTA data for the comparison snap
     with timed("c_snap ptl load"):
         c_particles_pid, c_particles_vel, c_particles_pos = load_or_pickle_ptl_data(curr_sparta_file, str(c_snap), snapshot_path, c_scale_factor)
