@@ -774,12 +774,21 @@ def optimize_scale_rad(client,model_params,ptl_ddf,halo_ddf,use_sims,feat_cols,t
     return res.x[0],res.x[1]
     
 def get_combined_name(model_sims):
-    # create a string for the model that combines all the simulations used 
-    # create a string for the radius and v200m limits used       
     combined_name = ""
-    combined_lims = ""
     for i,sim in enumerate(model_sims):
-        combined_name += sim
+        split_string = sim.split('_')
+        
+        r_patt = r'(\d+-\d+|\d+)r'
+        r_match = re.search(r_patt,split_string[3])
+
+        
+        v_patt = r'(\d+-\d+|\d+)v'
+        v_match = re.search(v_patt, split_string[4])
+
+
+        cond_string = split_string[0] + split_string[1] + split_string[2] + "r" + r_match.group(1) + "v" + v_match.group(1) + "s" + split_string[5]
+        
+        combined_name += cond_string
     
     return combined_name
     
