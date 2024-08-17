@@ -150,8 +150,13 @@ def create_dmatrix(client, X_cpu, y_cpu, features, chunk_size, frac_use_data = 1
 def split_calc_name(sim):
     sim_pat = r"cbol_l(\d+)_n(\d+)"
     match = re.search(sim_pat, sim)
+    if not match:
+        sim_pat = r"cpla_l(\d+)_n(\d+)"
+        match = re.search(sim_pat,sim)
+        
     if match:
         sparta_name = match.group(0)
+           
     sim_search_pat = sim_pat + r"_(\d+)r200m_(\d+)v200m"
     name_match = re.search(sim_search_pat, sim)
     
@@ -786,7 +791,9 @@ def get_combined_name(model_sims):
         v_match = re.search(v_patt, split_string[4])
 
 
-        cond_string = split_string[0] + split_string[1] + split_string[2] + "r" + r_match.group(1) + "v" + v_match.group(1) + "s" + split_string[5]
+        cond_string = split_string[0] + split_string[1] + split_string[2] 
+        # can add these for more information per name
+        #+ "r" + r_match.group(1) + "v" + v_match.group(1) + "s" + split_string[5]
         
         combined_name += cond_string
     

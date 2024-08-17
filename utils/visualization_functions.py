@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import re
 import pickle
 mpl.use('agg')
@@ -476,33 +477,66 @@ def phase_plot(ax, x, y, min_ptl, max_ptl, range, num_bins, cmap, x_label="", y_
         linthrsh = split_yscale_dict["linthrsh"]
         lin_nbin = split_yscale_dict["lin_nbin"]
         log_nbin = split_yscale_dict["log_nbin"]
-        lin_ntick = split_yscale_dict["lin_ntick"]
-        log_ntick= split_yscale_dict["log_ntick"]
-        
+
         y_range = range[1]
         # if the y axis goes to the negatives
         if y_range[0] < 0:
             lin_bins = np.linspace(-linthrsh,linthrsh,lin_nbin,endpoint=False)
             neg_log_bins = -np.logspace(np.log10(-y_range[0]),np.log10(linthrsh),log_nbin,endpoint=False)
             pos_log_bins = np.logspace(np.log10(linthrsh),np.log10(y_range[1]),log_nbin)
-            y_bins = np.concatenate([neg_log_bins,lin_bins,pos_log_bins])
+            y_bins = np.concatenate([neg_log_bins,lin_bins,pos_log_bins])            
             
-            lin_ticks = np.linspace(-linthrsh,linthrsh,lin_ntick,endpoint=False)
-            neg_log_ticks = -np.logspace(np.log10(-y_range[0]),np.log10(linthrsh),log_ntick,endpoint=False)
-            pos_log_ticks = np.logspace(np.log10(linthrsh),np.log10(y_range[1]),log_ntick)
-            y_ticks = np.concatenate([neg_log_ticks,lin_ticks,pos_log_ticks])
+            bins = [num_bins,y_bins]
+            
+            ax.hist2d(x[np.where((y >= -linthrsh) & (y <= linthrsh))], y[np.where((y >= -linthrsh) & y <= linthrsh)], bins=bins, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm=norm, vmin=min_ptl, vmax=max_ptl)
+            ax.set_yscale('linear')
+            ax.set_ylim(-linthrsh,linthrsh)
+            ax.spines[["bottom","top"]].set_visible(False)
+            ax.get_xaxis().set_visible(False)
+            
+            divider = make_axes_locatable(ax)
+            axposlog = divider.append_axes("top", size="100%", pad=0, sharex=ax)
+            axposlog.hist2d(x[np.where(y >= linthrsh)[0]], y[np.where(y >= linthrsh)[0]], bins=bins, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm=norm, vmin=min_ptl, vmax=max_ptl)
+            axposlog.set_yscale('symlog',linthresh=linthrsh)
+            axposlog.set_ylim((linthrsh,y_range[1]))
+            axposlog.spines[["bottom"]].set_visible(False)
+            axposlog.get_xaxis().set_visible(False)
+            axposlog.tick_params(axis='both', which='major', labelsize=16)
+            axposlog.tick_params(axis='both', which='minor', labelsize=14)
+            
+            axneglog = divider.append_axes("bottom", size="100%", pad=0, sharex=ax)            
+            axneglog.hist2d(x[np.where(y < -linthrsh)[0]], y[np.where(y < -linthrsh)[0]], bins=bins, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm=norm, vmin=min_ptl, vmax=max_ptl)
+            axneglog.set_yscale('symlog',linthresh=linthrsh)
+            axneglog.set_ylim((y_range[0],-linthrsh))
+            axneglog.spines[["top"]].set_visible(False)
+            axneglog.tick_params(axis='both', which='major', labelsize=16)
+            axneglog.tick_params(axis='both', which='minor', labelsize=14)
             
         else:
             lin_bins = np.linspace(y_range[0],linthrsh,lin_nbin,endpoint=False)
             pos_log_bins = np.logspace(np.log10(linthrsh),np.log10(y_range[1]),log_nbin)
             y_bins = np.concatenate([lin_bins,pos_log_bins])
             
-            lin_ticks = np.linspace(y_range[0],linthrsh,lin_ntick,endpoint=False)
-            pos_log_ticks = np.logspace(np.log10(linthrsh),np.log10(y_range[1]),log_ntick)
-            y_ticks = np.concatenate([lin_ticks,pos_log_ticks])
-        ax.set_yticks(y_ticks) 
-        bins = [num_bins,y_bins]
-    ax.hist2d(x, y, bins=bins, range=range, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm=norm, vmin=min_ptl, vmax=max_ptl)
+            bins = [num_bins,y_bins]
+            
+            ax.hist2d(x[np.where((y <= linthrsh))], y[np.where(y <= linthrsh)], bins=bins, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm=norm, vmin=min_ptl, vmax=max_ptl)
+            ax.set_yscale('linear')
+            ax.set_ylim(0,linthrsh)
+            ax.spines[["top"]].set_visible(False)
+            
+            divider = make_axes_locatable(ax)
+            axposlog = divider.append_axes("top", size="100%", pad=0, sharex=ax)
+            axposlog.hist2d(x[np.where(y >= linthrsh)[0]], y[np.where(y >= linthrsh)[0]], bins=bins, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm=norm, vmin=min_ptl, vmax=max_ptl)
+            axposlog.set_yscale('symlog',linthresh=linthrsh)
+            axposlog.set_ylim((linthrsh,y_range[1]))
+            axposlog.spines[["bottom"]].set_visible(False)
+            axposlog.get_xaxis().set_visible(False)
+            axposlog.tick_params(axis='both', which='major', labelsize=16)
+            axposlog.tick_params(axis='both', which='minor', labelsize=14)
+        # ax.set_yticks(y_ticks) 
+        
+    else:
+        ax.hist2d(x, y, bins=bins, range=range, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm=norm, vmin=min_ptl, vmax=max_ptl)
     
     ax.tick_params(axis='both', which='major', labelsize=16)
     ax.tick_params(axis='both', which='minor', labelsize=14)
@@ -510,7 +544,10 @@ def phase_plot(ax, x, y, min_ptl, max_ptl, range, num_bins, cmap, x_label="", y_
     if text != "":
         ax.text(.01,.03, text, ha="left", va="bottom", transform=ax.transAxes, fontsize=18, bbox={"facecolor":'white',"alpha":.9,})
     if title != "":
-        ax.set_title(title,fontsize=24)
+        if split_yscale_dict != None and y_range[0] < 0:
+            axneglog.set_title(title,fontsize=24)
+        else:
+            ax.set_title(title,fontsize=24)
     if x_label != "":
         ax.set_xlabel(x_label,fontsize=axisfontsize)
     if y_label != "":
@@ -700,8 +737,6 @@ def plot_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, c
             "linthrsh":2,
             "lin_nbin":30,
             "log_nbin":15,
-            "lin_ntick":5,
-            "log_ntick":3
         }   
         
         print("Primary Snap Misclassification")
@@ -763,20 +798,20 @@ def plot_misclassified(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, c
         inf_loc = np.where(p_corr_labels == 0)[0]
         orb_loc = np.where(p_corr_labels == 1)[0]
         
-        phase_plot(ptl_distr_fig.add_subplot(gs[0,0]), p_r, p_rv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",hide_yticks=False,y_label="$v_r/v_{200m}$",text="Actual\nDistribution")
+        phase_plot(ptl_distr_fig.add_subplot(gs[0,0]), p_r, p_rv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",hide_yticks=False,y_label="$v_r/v_{200m}$",text="All\nParticles")
         phase_plot(ptl_distr_fig.add_subplot(gs[0,1]), p_r, p_tv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,tv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$")
         phase_plot(ptl_distr_fig.add_subplot(gs[0,2]), p_rv, p_tv, min_ptl=10, max_ptl=p_max_all_ptl, range=[rv_range,tv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$v_r/v_{200m}$",hide_yticks=True)
-        phase_plot(ptl_distr_fig.add_subplot(gs[0,3]), c_r, c_rv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$", text="Actual\nDistribution")
+        phase_plot(ptl_distr_fig.add_subplot(gs[0,3]), c_r, c_rv, min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$", text="All\nParticles")
         
-        phase_plot(ptl_distr_fig.add_subplot(gs[1,0]), p_r[inf_loc], p_rv[inf_loc], min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",hide_yticks=False,y_label="$v_r/v_{200m}$",text="Actual\nDistribution")
+        phase_plot(ptl_distr_fig.add_subplot(gs[1,0]), p_r[inf_loc], p_rv[inf_loc], min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",hide_yticks=False,y_label="$v_r/v_{200m}$",text="Infalling\nParticles")
         phase_plot(ptl_distr_fig.add_subplot(gs[1,1]), p_r[inf_loc], p_tv[inf_loc], min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,tv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$")
         phase_plot(ptl_distr_fig.add_subplot(gs[1,2]), p_rv[inf_loc], p_tv[inf_loc], min_ptl=10, max_ptl=p_max_all_ptl, range=[rv_range,tv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$v_r/v_{200m}$",hide_yticks=True)
-        phase_plot(ptl_distr_fig.add_subplot(gs[1,3]), c_r[inf_loc], c_rv[inf_loc], min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$", text="Actual\nDistribution")
+        phase_plot(ptl_distr_fig.add_subplot(gs[1,3]), c_r[inf_loc], c_rv[inf_loc], min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$", text="Infalling\nParticles")
 
-        phase_plot(ptl_distr_fig.add_subplot(gs[2,0]), p_r[orb_loc], p_rv[orb_loc], min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",hide_yticks=False,y_label="$v_r/v_{200m}$",text="Actual\nDistribution")
+        phase_plot(ptl_distr_fig.add_subplot(gs[2,0]), p_r[orb_loc], p_rv[orb_loc], min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",hide_yticks=False,y_label="$v_r/v_{200m}$",text="Orbiting\nParticles")
         phase_plot(ptl_distr_fig.add_subplot(gs[2,1]), p_r[orb_loc], p_tv[orb_loc], min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,tv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$")
         phase_plot(ptl_distr_fig.add_subplot(gs[2,2]), p_rv[orb_loc], p_tv[orb_loc], min_ptl=10, max_ptl=p_max_all_ptl, range=[rv_range,tv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$v_r/v_{200m}$",hide_yticks=True)
-        phase_plot(ptl_distr_fig.add_subplot(gs[2,3]), c_r[orb_loc], c_rv[orb_loc], min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$", text="Actual\nDistribution")
+        phase_plot(ptl_distr_fig.add_subplot(gs[2,3]), c_r[orb_loc], c_rv[orb_loc], min_ptl=10, max_ptl=p_max_all_ptl, range=[r_range,rv_range],num_bins=num_bins,cmap=cividis_cmap,split_yscale_dict=split_yscale_dict,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$", text="Orbiting\nParticles")
 
         
         phase_plt_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=1, vmax=p_max_all_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[:,-1]))
