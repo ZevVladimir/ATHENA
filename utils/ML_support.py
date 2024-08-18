@@ -576,7 +576,7 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
     if full_dist:
         plot_full_ptl_dist(p_corr_labels=p_corr_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,num_bins=num_bins,save_loc=plot_save_loc)
     if missclass:
-        plot_miss_class_dist(p_corr_labels=p_corr_labels,p_ml_labels=p_ml_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,num_bins=num_bins,save_loc=plot_save_loc)
+        plot_miss_class_dist(p_corr_labels=p_corr_labels,p_ml_labels=p_ml_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,num_bins=num_bins,save_loc=plot_save_loc,model_info=model_info,dataset_name=dst_type)
             
     if per_err:
         with h5py.File(path_to_hdf5_file,"r") as f:
