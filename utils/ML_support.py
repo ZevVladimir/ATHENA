@@ -22,7 +22,8 @@ from sklearn.metrics import accuracy_score
 from functools import partial
 
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, find_closest_z, conv_halo_id_spid, timed, split_data_by_halo
-from utils.visualization_functions import compare_density_prf, plot_r_rv_tv_graph, plot_misclassified, plot_per_err
+from utils.visualization_functions import compare_density_prf, plot_r_rv_tv_graph, plot_per_err
+from utils.update_vis_fxns import plot_full_ptl_dist, plot_miss_class_dist
 from utils.calculation_functions import create_mass_prf
 from sparta_tools import sparta # type: ignore
 
@@ -536,7 +537,7 @@ def load_sprta_mass_prf(sim_splits,all_idxs,use_sims):
 
     return mass_prf_all,mass_prf_1halo,all_masses,bins
 
-def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, combined_name, plot_save_loc, dens_prf = False, r_rv_tv = False, misclass=False,per_err=False): 
+def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, combined_name, plot_save_loc, dens_prf = False,missclass=False,full_dist=False,per_err=False): 
     with timed("Predictions"):
         print(f"Starting predictions for {y.size.compute():.3e} particles")
         preds = make_preds(client, model, X, y, report_name="Report", print_report=False)
@@ -563,12 +564,20 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
 
         compare_density_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=sparta_mass_prf_all, act_mass_prf_orb=sparta_mass_prf_1halo, mass=all_masses, orbit_assn=preds, prf_bins=bins, title="", save_location=plot_save_loc, use_mp=True, save_graph=True)
     
-    if r_rv_tv:
-        plot_r_rv_tv_graph(preds, X["p_Scaled_radii"].values.compute(), X["p_Radial_vel"].values.compute(), X["p_Tangential_vel"].values.compute(), y, title="", num_bins=num_bins, save_location=plot_save_loc)
+    if missclass or full_dist:       
+        p_corr_labels=y.compute().values.flatten()
+        p_ml_labels=preds.values
+        p_r=X["p_Scaled_radii"].values.compute()
+        p_rv=X["p_Radial_vel"].values.compute()
+        p_tv=X["p_Tangential_vel"].values.compute()
+        c_r=X["c_Scaled_radii"].values.compute()
+        c_rv=X["c_Radial_vel"].values.compute()
     
-    if misclass:       
-        plot_misclassified(p_corr_labels=y.compute().values.flatten(), p_ml_labels=preds.values, p_r=X["p_Scaled_radii"].values.compute(), p_rv=X["p_Radial_vel"].values.compute(), p_tv=X["p_Tangential_vel"].values.compute(), c_r=X["c_Scaled_radii"].values.compute(), c_rv=X["c_Radial_vel"].values.compute(), c_tv=X["c_Tangential_vel"].values.compute(),title="",num_bins=num_bins,save_location=plot_save_loc,model_info=model_info,dataset_name=dst_type + "_" + combined_name)
-    
+    if full_dist:
+        plot_full_ptl_dist(p_corr_labels=p_corr_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,num_bins=num_bins,save_loc=plot_save_loc)
+    if missclass:
+        plot_miss_class_dist(p_corr_labels=p_corr_labels,p_ml_labels=p_ml_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,num_bins=num_bins,save_loc=plot_save_loc)
+            
     if per_err:
         with h5py.File(path_to_hdf5_file,"r") as f:
             dic_sim = {}

@@ -62,8 +62,8 @@ test_sims = json.loads(config.get("XGBOOST","test_sims"))
 eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
 
 dens_prf_plt = config.getboolean("XGBOOST","dens_prf_plt")
-phase_space_plts = config.getboolean("XGBOOST","phase_space_plts")
 misclass_plt = config.getboolean("XGBOOST","misclass_plt")
+fulldist_plt = config.getboolean("XGBOOST","fulldist_plt")
 per_err_plt = config.getboolean("XGBOOST","per_err_plt")
 
 if sim_cosmol == "planck13-nbody":
@@ -174,7 +174,7 @@ if __name__ == "__main__":
                 X = data[feature_columns]
                 y = data[target_column]
 
-                eval_model(model_info, client, bst, use_sims=curr_test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, combined_name=test_comb_name, plot_save_loc=plot_loc,dens_prf=dens_prf_plt,r_rv_tv=phase_space_plts,misclass=misclass_plt,per_err=per_err_plt)
+                eval_model(model_info, client, bst, use_sims=curr_test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, combined_name=test_comb_name, plot_save_loc=plot_loc,dens_prf=dens_prf_plt,missclass=misclass_plt,full_dist=fulldist_plt,per_err=per_err_plt)
                 del data #otherwise garbage collection doesn't work
                 del X
                 del y
