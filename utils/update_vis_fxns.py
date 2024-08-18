@@ -246,14 +246,9 @@ def scale_hists(inc_hist, act_hist, act_min, inc_min):
     
     return scaled_hist
 
-def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, num_bins, save_loc):
+def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_yscale_dict, num_bins, save_loc):
     with timed("Finished Full Ptl Dist Plot"):
         print("Starting Full Ptl Dist Plot")
-        split_yscale_dict = {
-            "linthrsh":2, 
-            "lin_nbin":30,
-            "log_nbin":15,
-        }
         
         p_r_range = [np.min(p_r),np.max(p_r)]
         p_rv_range = [np.min(p_rv),np.max(p_rv)]
@@ -326,14 +321,10 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, num_bins, save
         
         fig.savefig(save_loc + "ptl_distr.png")
 
-def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, num_bins, save_loc, model_info,dataset_name):
+def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, split_yscale_dict, num_bins, save_loc, model_info,dataset_name):
     with timed("Finished Miss Class Dist Plot"):
         print("Starting Miss Class Dist Plot")
-        split_yscale_dict = {
-            "linthrsh":2, 
-            "lin_nbin":30,
-            "log_nbin":15,
-        }
+
         p_r_range = [np.min(p_r),np.max(p_r)]
         p_rv_range = [np.min(p_rv),np.max(p_rv)]
         p_tv_range = [np.min(p_tv),np.max(p_tv)]
