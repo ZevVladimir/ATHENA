@@ -2,185 +2,74 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib.ticker import LogLocator, NullFormatter
 from utils.data_and_loading_functions import split_orb_inf, timed
 
-def phase_plot(ax, x, y, min_ptl, max_ptl, range, num_bins, cmap, x_label="", y_label="", norm = "log", xrange=None, yrange=None, split_yscale_dict = None, hide_xticks=False, hide_yticks=False,text="", axisfontsize=20, title=""):
-    bins = [num_bins,num_bins]
-    if split_yscale_dict != None:
-        linthrsh = split_yscale_dict["linthrsh"]
-        lin_nbin = split_yscale_dict["lin_nbin"]
-        log_nbin = split_yscale_dict["log_nbin"]
-        
-        x_range = range[0]
-        y_range = range[1]
-        use_yrange = y_range
-        # if the y axis goes to the negatives
-        if y_range[0] < 0:
-            # keep the plot symmetric around 0
-            if y_range[0] > y_range[1]:
-                use_yrange[1] = -y_range[0]
-            elif y_range[1] > y_range[0]:
-                use_yrange[0] = -y_range[1]
-            
-            lin_bins = np.linspace(-linthrsh,linthrsh,lin_nbin,endpoint=False)
-            neg_log_bins = -np.logspace(np.log10(-use_yrange[0]),np.log10(linthrsh),log_nbin,endpoint=False)
-            pos_log_bins = np.logspace(np.log10(linthrsh),np.log10(use_yrange[1]),log_nbin)
-            y_bins = np.concatenate([neg_log_bins,lin_bins,pos_log_bins])            
-            
-            bins = [num_bins,y_bins]
-            
-            ax.hist2d(x[np.where((y >= -linthrsh) & (y <= linthrsh))], y[np.where((y >= -linthrsh) & (y <= linthrsh))], bins=bins, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm=norm, vmin=min_ptl, vmax=max_ptl)
-            ax.set_yscale('linear')
-            ax.set_ylim(-linthrsh,linthrsh)
-            ax.set_xlim(x_range[0],x_range[1])
-            ax.spines[["bottom","top"]].set_visible(False)
-            ax.get_xaxis().set_visible(False)
-            
-            divider = make_axes_locatable(ax)
-            axposlog = divider.append_axes("top", size="100%", pad=0, sharex=ax)
-            axposlog.hist2d(x[np.where(y >= linthrsh)[0]], y[np.where(y >= linthrsh)[0]], bins=bins, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm=norm, vmin=min_ptl, vmax=max_ptl)
-            axposlog.set_yscale('symlog',linthresh=linthrsh)
-            axposlog.set_ylim((linthrsh,use_yrange[1]))
-            axposlog.set_xlim(x_range[0],x_range[1])
-            axposlog.spines[["bottom"]].set_visible(False)
-            axposlog.get_xaxis().set_visible(False)
-            
-            axneglog = divider.append_axes("bottom", size="100%", pad=0, sharex=ax)            
-            axneglog.hist2d(x[np.where(y < -linthrsh)[0]], y[np.where(y < -linthrsh)[0]], bins=bins, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm=norm, vmin=min_ptl, vmax=max_ptl)
-            axneglog.set_yscale('symlog',linthresh=linthrsh)
-            axneglog.set_ylim((use_yrange[0],-linthrsh))
-            axneglog.set_xlim(x_range[0],x_range[1])
-            axneglog.spines[["top"]].set_visible(False)
-            
-        else:
-            lin_bins = np.linspace(use_yrange[0],linthrsh,lin_nbin,endpoint=False)
-            pos_log_bins = np.logspace(np.log10(linthrsh),np.log10(use_yrange[1]),log_nbin)
-            y_bins = np.concatenate([lin_bins,pos_log_bins])
-            
-            bins = [num_bins,y_bins]
-            
-            ax.hist2d(x[np.where((y <= linthrsh))], y[np.where(y <= linthrsh)], bins=bins, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm=norm, vmin=min_ptl, vmax=max_ptl)
-            ax.set_yscale('linear')
-            ax.set_ylim(0,linthrsh)
-            ax.set_xlim(x_range[0],x_range[1])
-            ax.spines[["top"]].set_visible(False)
-            
-            divider = make_axes_locatable(ax)
-            axposlog = divider.append_axes("top", size="100%", pad=0, sharex=ax)
-            axposlog.hist2d(x[np.where(y >= linthrsh)[0]], y[np.where(y >= linthrsh)[0]], bins=bins, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm=norm, vmin=min_ptl, vmax=max_ptl)
-            axposlog.set_yscale('symlog',linthresh=linthrsh)
-            axposlog.set_ylim((linthrsh,use_yrange[1]))
-            axposlog.set_xlim(x_range[0],x_range[1])
-            axposlog.spines[["bottom"]].set_visible(False)
-            axposlog.get_xaxis().set_visible(False)
-    else:
-        ax.hist2d(x, y, bins=bins, range=range, density=False, weights=None, cmin=min_ptl, cmap=cmap, norm=norm, vmin=min_ptl, vmax=max_ptl)
-    
-    if text != "":
-        if split_yscale_dict != None and y_range[0] < 0:
-            axneglog.text(.01,.03, text, ha="left", va="bottom", transform=axneglog.transAxes, fontsize=18, bbox={"facecolor":'white',"alpha":.9,})
-        else:
-            ax.text(.01,.03, text, ha="left", va="bottom", transform=ax.transAxes, fontsize=18, bbox={"facecolor":'white',"alpha":.9,})
-    if title != "":
-        if split_yscale_dict != None:
-            axposlog.set_title(title,fontsize=24)
-        else:
-            ax.set_title(title,fontsize=24)
-    if x_label != "":
-        if split_yscale_dict != None and y_range[0] < 0:
-            axneglog.set_xlabel(x_label,fontsize=axisfontsize)
-        else:
-            ax.set_xlabel(x_label,fontsize=axisfontsize)
-    if y_label != "":
-        ax.set_ylabel(y_label,fontsize=axisfontsize)
-    if hide_xticks:
-        if split_yscale_dict != None and y_range[0] < 0:
-            ax.tick_params(axis='x', which='both',bottom=False,labelbottom=False)
-            axposlog.tick_params(axis='x', which='both',bottom=False,labelbottom=False)
-            axneglog.tick_params(axis='x', which='both',bottom=False,labelbottom=False)
-        elif split_yscale_dict != None and y_range[0] >= 0:
-            ax.tick_params(axis='x', which='both',bottom=False,labelbottom=False)
-            axposlog.tick_params(axis='x', which='both',bottom=False,labelbottom=False)
-        else:
-            ax.tick_params(axis='x', which='both',bottom=False,labelbottom=False) 
-    else:
-        if split_yscale_dict != None and y_range[0] < 0:
-            ax.tick_params(axis='x', which='major', labelsize=16)
-            ax.tick_params(axis='x', which='minor', labelsize=14)
-            axposlog.tick_params(axis='x', which='major', labelsize=16)
-            axposlog.tick_params(axis='x', which='minor', labelsize=14)
-            axneglog.tick_params(axis='x', which='major', labelsize=16)
-            axneglog.tick_params(axis='x', which='minor', labelsize=14) 
-        elif split_yscale_dict != None and y_range[0] >= 0:
-            ax.tick_params(axis='x', which='major', labelsize=16)
-            ax.tick_params(axis='x', which='minor', labelsize=14)
-            axposlog.tick_params(axis='x', which='major', labelsize=16)
-            axposlog.tick_params(axis='x', which='minor', labelsize=14)
-        else:
-            ax.tick_params(axis='x', which='major', labelsize=16)
-            ax.tick_params(axis='x', which='minor', labelsize=14)
+# used to find the location of a number within bins 
+def get_bin_loc(bin_edges,search_num):
+    # Find the location where 0 would be placed. Accounts for if there is no 0 by finding between which bins but also will find 0 if it is there
+    upper_index = np.searchsorted(bin_edges, search_num, side='right')
+    lower_index = upper_index - 1
 
-    if hide_yticks:
-        if split_yscale_dict != None and y_range[0] < 0:
-            ax.tick_params(axis='y', which='both',left=False,labelleft=False) 
-            axposlog.tick_params(axis='y', which='both',left=False,labelleft=False) 
-            axneglog.tick_params(axis='y', which='both',left=False,labelleft=False) 
-        elif split_yscale_dict != None and y_range[0] >= 0:
-            ax.tick_params(axis='y', which='both',left=False,labelleft=False) 
-            axposlog.tick_params(axis='y', which='both',left=False,labelleft=False) 
-        else:
-            ax.tick_params(axis='y', which='both',left=False,labelleft=False) 
-    else:
-        if split_yscale_dict != None and y_range[0] < 0:
-            ax.tick_params(axis='y', which='major', labelsize=16)
-            ax.tick_params(axis='y', which='minor', labelsize=14)
-            axposlog.tick_params(axis='y', which='major', labelsize=16)
-            axposlog.tick_params(axis='y', which='minor', labelsize=14)
-            axneglog.tick_params(axis='y', which='major', labelsize=16)
-            axneglog.tick_params(axis='y', which='minor', labelsize=14) 
-        elif split_yscale_dict != None and y_range[0] >= 0:
-            ax.tick_params(axis='y', which='major', labelsize=16)
-            ax.tick_params(axis='y', which='minor', labelsize=14)
-            axposlog.tick_params(axis='y', which='major', labelsize=16)
-            axposlog.tick_params(axis='y', which='minor', labelsize=14)
-        else:
-            ax.tick_params(axis='y', which='major', labelsize=16)
-            ax.tick_params(axis='y', which='minor', labelsize=14)
+    lower_edge = bin_edges[lower_index]
+    upper_edge = bin_edges[upper_index]
+
+    # Interpolate the fractional position of 0 between the two edges
+    fraction = (search_num - lower_edge) / (upper_edge - lower_edge)
+    search_loc = lower_index + fraction
+    
+    return search_loc
 
 def gen_ticks(bin_edges,spacing=6):
     ticks = []
+    tick_loc = []
 
-    # Include 0 if it is within the range of bin edges
-    if bin_edges.min() <= 0 <= bin_edges.max():
-        ticks.append(0)
-
-    # Add every 2nd bin edge
+    # Add every spacing bin edge
     ticks.extend(bin_edges[::spacing])
 
     # Ensure the first and last bin edges are included
     ticks.extend([bin_edges[0], bin_edges[-1]])
 
+    tick_loc = np.arange(bin_edges.size)[::spacing].tolist()
+    tick_loc.extend([0,bin_edges.size-1])
+
+    zero_loc = get_bin_loc(bin_edges,0)
+
+    # only add the tick if it is noticeably far away from 0
+    if zero_loc > 0.05:
+        tick_loc.append(zero_loc)
+        ticks.append(0)
+
+    # Remove ticks that will get rounded down to 0
+    ticks = np.round(ticks,2).tolist()
+    rmv_ticks = np.where(ticks == 0)[0]
+    if rmv_ticks.size > 0:
+        ticks = ticks.pop(rmv_ticks)
+        tick_loc = tick_loc.pop(rmv_ticks)
+
     # Remove duplicates and sort the list
     ticks = sorted(set(ticks))
-
-    return np.round(ticks,2)
-
-def imshow_plot(ax, img, extent, x_label="", y_label="", text="", title="", hide_xticks=False, hide_yticks=False, xticks = None, yticks = None, axisfontsize=20, return_img=False, kwargs={}):
-    ret_img=ax.imshow(img["hist"].T, interpolation="none", extent = extent, **kwargs)
+    tick_loc = sorted(set(tick_loc))
     
-    if xticks == None and not hide_xticks:
-        xticks = gen_ticks(img["x_edge"])
-        ax.set_xticks(xticks)
-        ax.set_xticklabels(ax.get_xticks(), rotation=90)
-    elif xticks != None and not hide_xticks:
-        ax.set_xticks(xticks)
-        ax.set_xticklabels(ax.get_xticks(), rotation=90)
-    if yticks == None and not hide_yticks:
-        yticks = gen_ticks(img["y_edge"])
-        ax.set_yticks(yticks)
-    elif yticks != None and not hide_yticks:
-        ax.set_yticks(yticks)        
+    return tick_loc, ticks
+
+def imshow_plot(ax, img, extent, x_label="", y_label="", text="", title="", hide_xticks=False, hide_yticks=False, xticks = None, yticks = None, linthrsh = 0, axisfontsize=20, return_img=False, kwargs={}):
+    ret_img=ax.imshow(img["hist"].T, interpolation="none", **kwargs)
     
+    xticks_loc, xticks = gen_ticks(img["x_edge"])
+    yticks_loc, yticks = gen_ticks(img["y_edge"])
+    
+    if not hide_xticks:
+        ax.set_xticks(xticks_loc,xticks)
+    if not hide_yticks:
+        ax.set_yticks(yticks_loc,yticks)
+        
+    linthrsh_loc = get_bin_loc(img["y_edge"],linthrsh)
+    ax.axhline(y=linthrsh_loc, color='grey', linestyle='--', alpha=1)
+    if np.where(np.array(yticks,dtype=np.float32) < 0)[0].size > 0:
+        neg_linthrsh_loc = get_bin_loc(img["y_edge"],-linthrsh)
+        ax.axhline(y=neg_linthrsh_loc, color='grey', linestyle='--', alpha=1)
+
     if text != "":
         ax.text(.01,.03, text, ha="left", va="bottom", transform=ax.transAxes, fontsize=18, bbox={"facecolor":'white',"alpha":0.9,})
         
@@ -209,6 +98,7 @@ def imshow_plot(ax, img, extent, x_label="", y_label="", text="", title="", hide
 # Can also do a linear binning then a logarithmic binning (similar to symlog) but allows for 
 # special case of only positive log and not negative log
 def histogram(x,y,use_bins,hist_range,min_ptl,set_ptl,split_yscale_dict=None):
+    #TODO add so that it is doable for x axis too
     if split_yscale_dict != None:
         linthrsh = split_yscale_dict["linthrsh"]
         lin_nbin = split_yscale_dict["lin_nbin"]
@@ -228,7 +118,7 @@ def histogram(x,y,use_bins,hist_range,min_ptl,set_ptl,split_yscale_dict=None):
             y_bins = np.concatenate([lin_bins,pos_log_bins])
 
         use_bins[1] = y_bins
-    
+
     hist = np.histogram2d(x, y, bins=use_bins, range=hist_range)
     
     fin_hist = {
@@ -354,20 +244,20 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_yscale_d
         fig = plt.figure(constrained_layout=True, figsize=(30,25))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
         
-        imshow_plot(fig.add_subplot(gs[1,0]),all_p_r_p_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",text="All Particles",title="Primary Snap",hide_xticks=True,yticks=rv_yticks,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[1,1]),all_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,yticks=tv_yticks,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[1,2]),all_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[1,3]),all_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",title="Secondary Snap",hide_xticks=True,yticks=rv_yticks,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[1,0]),all_p_r_p_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",text="All Particles",title="Primary Snap",hide_xticks=True,yticks=rv_yticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[1,1]),all_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,yticks=tv_yticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[1,2]),all_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[1,3]),all_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",title="Secondary Snap",hide_xticks=True,yticks=rv_yticks,linthrsh=linthrsh,kwargs=plot_kwargs)
         
-        imshow_plot(fig.add_subplot(gs[2,0]),inf_p_r_p_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",text="Infalling Particles",hide_xticks=True,yticks=rv_yticks,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[2,1]),inf_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,yticks=tv_yticks,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[2,2]),inf_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[2,3]),inf_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",hide_xticks=True,yticks=rv_yticks,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[2,0]),inf_p_r_p_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",text="Infalling Particles",hide_xticks=True,yticks=rv_yticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[2,1]),inf_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,yticks=tv_yticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[2,2]),inf_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[2,3]),inf_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",hide_xticks=True,yticks=rv_yticks,linthrsh=linthrsh,kwargs=plot_kwargs)
                     
-        imshow_plot(fig.add_subplot(gs[3,0]),orb_p_r_p_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Orbiting Particles",yticks=rv_yticks,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[3,1]),orb_p_r_p_tv,extent=p_r_range+p_tv_range,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",yticks=tv_yticks,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[3,2]),orb_p_rv_p_tv,extent=p_rv_range+p_tv_range,x_label="$v_r/v_{200m}$",hide_yticks=True,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[3,3]),orb_c_r_c_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",yticks=rv_yticks,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,0]),orb_p_r_p_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Orbiting Particles",yticks=rv_yticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,1]),orb_p_r_p_tv,extent=p_r_range+p_tv_range,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",yticks=tv_yticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,2]),orb_p_rv_p_tv,extent=p_rv_range+p_tv_range,x_label="$v_r/v_{200m}$",hide_yticks=True,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,3]),orb_c_r_c_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",yticks=rv_yticks,linthrsh=linthrsh,kwargs=plot_kwargs)
 
         color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=scale_min_ptl, vmax=max_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[1:,-1]))
         color_bar.set_label("N / N_tot / dx / dy",fontsize=16)
@@ -520,20 +410,20 @@ def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv,
         fig = plt.figure(constrained_layout=True,figsize=(30,25))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
 
-        imshow_plot(fig.add_subplot(gs[1,0]), scale_inc_all_p_r_p_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified\nScaled",yticks=rv_yticks,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[1,1]), scale_inc_all_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,yticks=tv_yticks,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[1,2]), scale_inc_all_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[1,3]), scale_inc_all_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified\nScaled",yticks=rv_yticks,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[1,0]), scale_inc_all_p_r_p_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified\nScaled",yticks=rv_yticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[1,1]), scale_inc_all_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,yticks=tv_yticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[1,2]), scale_inc_all_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[1,3]), scale_inc_all_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified\nScaled",yticks=rv_yticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
 
-        imshow_plot(fig.add_subplot(gs[2,0]), scale_inc_inf_p_r_p_rv,extent=p_r_range+p_rv_range,hide_xticks=True,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",yticks=rv_yticks,kwargs=scale_miss_class_args, title="Primary Snap")
-        imshow_plot(fig.add_subplot(gs[2,1]), scale_inc_inf_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,yticks=tv_yticks,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[2,2]), scale_inc_inf_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[2,3]), scale_inc_inf_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",hide_xticks=True,yticks=rv_yticks,kwargs=scale_miss_class_args, title="Secondary Snap")
+        imshow_plot(fig.add_subplot(gs[2,0]), scale_inc_inf_p_r_p_rv,extent=p_r_range+p_rv_range,hide_xticks=True,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",yticks=rv_yticks,linthrsh=linthrsh,kwargs=scale_miss_class_args, title="Primary Snap")
+        imshow_plot(fig.add_subplot(gs[2,1]), scale_inc_inf_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,yticks=tv_yticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[2,2]), scale_inc_inf_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[2,3]), scale_inc_inf_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",hide_xticks=True,yticks=rv_yticks,linthrsh=linthrsh,kwargs=scale_miss_class_args, title="Secondary Snap")
         
-        imshow_plot(fig.add_subplot(gs[3,0]), scale_inc_orb_p_r_p_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",yticks=rv_yticks,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[3,1]), scale_inc_orb_p_r_p_tv,extent=p_r_range+p_tv_range,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",yticks=tv_yticks,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[3,2]), scale_inc_orb_p_rv_p_tv,extent=p_rv_range+p_tv_range,x_label="$v_r/v_{200m}$",hide_yticks=True,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[3,3]), scale_inc_orb_c_r_c_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",yticks=rv_yticks,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[3,0]), scale_inc_orb_p_r_p_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",yticks=rv_yticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[3,1]), scale_inc_orb_p_r_p_tv,extent=p_r_range+p_tv_range,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",yticks=tv_yticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[3,2]), scale_inc_orb_p_rv_p_tv,extent=p_rv_range+p_tv_range,x_label="$v_r/v_{200m}$",hide_yticks=True,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[3,3]), scale_inc_orb_c_r_c_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",yticks=rv_yticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
         
         color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=inc_min_ptl, vmax=1),cmap=magma_cmap), cax=plt.subplot(gs[1:,-1]))
         color_bar.set_label("Num Incorrect Particles (inf/orb) / Total Particles (inf/orb)",fontsize=16)
