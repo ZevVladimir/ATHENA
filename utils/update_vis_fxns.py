@@ -7,7 +7,9 @@ from utils.data_and_loading_functions import split_orb_inf, timed
 
 # used to find the location of a number within bins 
 def get_bin_loc(bin_edges,search_num):
-    # Find the location where 0 would be placed. Accounts for if there is no 0 by finding between which bins but also will find 0 if it is there
+    if search_num > bin_edges[-1]:
+        search_num = np.floor(bin_edges[-1])
+
     upper_index = np.searchsorted(bin_edges, search_num, side='right')
     lower_index = upper_index - 1
 
@@ -53,11 +55,21 @@ def gen_ticks(bin_edges,spacing=6):
     
     return tick_loc, ticks
 
-def imshow_plot(ax, img, extent, x_label="", y_label="", text="", title="", hide_xticks=False, hide_yticks=False, xticks = None, yticks = None, linthrsh = 0, axisfontsize=20, return_img=False, kwargs={}):
+def imshow_plot(ax, img, extent, x_label="", y_label="", text="", title="", hide_xticks=False, hide_yticks=False, xticks = None, yticks = None, linthrsh = 0, axisfontsize=26, return_img=False, kwargs={}):
+    plt.xticks(rotation=70)
+
     ret_img=ax.imshow(img["hist"].T, interpolation="none", **kwargs)
     
-    xticks_loc, xticks = gen_ticks(img["x_edge"])
-    yticks_loc, yticks = gen_ticks(img["y_edge"])
+    xticks_loc = []
+    yticks_loc = []
+    
+    for tick in xticks:
+        xticks_loc.append(get_bin_loc(img["x_edge"],tick))
+    for tick in yticks:
+        yticks_loc.append(get_bin_loc(img["y_edge"],tick))
+    
+    # xticks_loc, xticks = gen_ticks(img["x_edge"])
+    # yticks_loc, yticks = gen_ticks(img["y_edge"])
     
     if not hide_xticks:
         ax.set_xticks(xticks_loc,xticks)
@@ -71,10 +83,10 @@ def imshow_plot(ax, img, extent, x_label="", y_label="", text="", title="", hide
         ax.axhline(y=neg_linthrsh_loc, color='grey', linestyle='--', alpha=1)
 
     if text != "":
-        ax.text(.01,.03, text, ha="left", va="bottom", transform=ax.transAxes, fontsize=18, bbox={"facecolor":'white',"alpha":0.9,})
+        ax.text(.01,.03, text, ha="left", va="bottom", transform=ax.transAxes, fontsize=axisfontsize, bbox={"facecolor":'white',"alpha":0.9,})
         
     if title != "":
-        ax.set_title(title,fontsize=24)
+        ax.set_title(title,fontsize=28)
     if x_label != "":
         ax.set_xlabel(x_label,fontsize=axisfontsize)
     if y_label != "":
@@ -82,14 +94,14 @@ def imshow_plot(ax, img, extent, x_label="", y_label="", text="", title="", hide
     if hide_xticks:
         ax.tick_params(axis='x', which='both',bottom=False,labelbottom=False)
     else:
-        ax.tick_params(axis='x', which='major', labelsize=16)
-        ax.tick_params(axis='x', which='minor', labelsize=14)
+        ax.tick_params(axis='x', which='major', labelsize=22)
+        ax.tick_params(axis='x', which='minor', labelsize=20)
          
     if hide_yticks:
         ax.tick_params(axis='y', which='both',left=False,labelleft=False)
     else:
-        ax.tick_params(axis='y', which='major', labelsize=16)
-        ax.tick_params(axis='y', which='minor', labelsize=14)
+        ax.tick_params(axis='y', which='major', labelsize=22)
+        ax.tick_params(axis='y', which='minor', labelsize=20)
            
     if return_img:
         return ret_img
@@ -97,19 +109,18 @@ def imshow_plot(ax, img, extent, x_label="", y_label="", text="", title="", hide
 # Uses np.histogram2d to create a histogram and the edges of the histogram in one dictionary
 # Can also do a linear binning then a logarithmic binning (similar to symlog) but allows for 
 # special case of only positive log and not negative log
-def histogram(x,y,use_bins,hist_range,min_ptl,set_ptl,split_yscale_dict=None):
-    #TODO add so that it is doable for x axis too
+def histogram(x,y,use_bins,hist_range,min_ptl,set_ptl,split_xscale_dict=None,split_yscale_dict=None):
     if split_yscale_dict != None:
         linthrsh = split_yscale_dict["linthrsh"]
         lin_nbin = split_yscale_dict["lin_nbin"]
         log_nbin = split_yscale_dict["log_nbin"]
         
         y_range = hist_range[1]
-        # if the y axis goes to the negatives
+        # if the y axis goes to the negatives we split the number of log bins in two for pos and neg so there are the same amount of bins as if it was just positive
         if y_range[0] < 0:
             lin_bins = np.linspace(-linthrsh,linthrsh,lin_nbin,endpoint=False)
-            neg_log_bins = -np.logspace(np.log10(-y_range[0]),np.log10(linthrsh),log_nbin,endpoint=False)
-            pos_log_bins = np.logspace(np.log10(linthrsh),np.log10(y_range[1]),log_nbin)
+            neg_log_bins = -np.logspace(np.log10(-y_range[0]),np.log10(linthrsh),int(log_nbin/2),endpoint=False)
+            pos_log_bins = np.logspace(np.log10(linthrsh),np.log10(y_range[1]),int(log_nbin/2))
             y_bins = np.concatenate([neg_log_bins,lin_bins,pos_log_bins])
             
         else:
@@ -117,7 +128,30 @@ def histogram(x,y,use_bins,hist_range,min_ptl,set_ptl,split_yscale_dict=None):
             pos_log_bins = np.logspace(np.log10(linthrsh),np.log10(y_range[1]),log_nbin)
             y_bins = np.concatenate([lin_bins,pos_log_bins])
 
+        if split_xscale_dict == None:
+            use_bins[0] = y_bins.size 
         use_bins[1] = y_bins
+        
+    if split_xscale_dict != None:
+        linthrsh = split_xscale_dict["linthrsh"]
+        lin_nbin = split_xscale_dict["lin_nbin"]
+        log_nbin = split_xscale_dict["log_nbin"]
+        
+        x_range = hist_range[0]
+        # if the y axis goes to the negatives
+        if x_range[0] < 0:
+            lin_bins = np.linspace(-linthrsh,linthrsh,lin_nbin,endpoint=False)
+            neg_log_bins = -np.logspace(np.log10(-x_range[0]),np.log10(linthrsh),int(log_nbin/2),endpoint=False)
+            pos_log_bins = np.logspace(np.log10(linthrsh),np.log10(x_range[1]),int(log_nbin/2))
+            x_bins = np.concatenate([neg_log_bins,lin_bins,pos_log_bins])    
+        else:
+            lin_bins = np.linspace(x_range[0],linthrsh,lin_nbin,endpoint=False)
+            pos_log_bins = np.logspace(np.log10(linthrsh),np.log10(x_range[1]),log_nbin)
+            x_bins = np.concatenate([lin_bins,pos_log_bins])
+
+        use_bins[0] = x_bins
+        if split_yscale_dict == None:
+            use_bins[1] = x_bins.size 
 
     hist = np.histogram2d(x, y, bins=use_bins, range=hist_range)
     
@@ -160,12 +194,12 @@ def normalize_hists(hist,tot_nptl,min_ptl):
     
     return scaled_hist
 
-def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_yscale_dict, num_bins, save_loc):
+def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_dict, num_bins, save_loc):
     with timed("Finished Full Ptl Dist Plot"):
         print("Starting Full Ptl Dist Plot")
         
-        linthrsh = split_yscale_dict["linthrsh"]
-        log_nbin = split_yscale_dict["log_nbin"]
+        linthrsh = split_scale_dict["linthrsh"]
+        log_nbin = split_scale_dict["log_nbin"]
         
         p_r_range = [np.min(p_r),np.max(p_r)]
         p_rv_range = [np.min(p_rv),np.max(p_rv)]
@@ -182,20 +216,20 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_yscale_d
         inf_c_rv, orb_c_rv = split_orb_inf(c_rv,p_corr_labels)
         
         # Use the binning from all particles for the orbiting and infalling plots and the secondary snap to keep it consistent
-        all_p_r_p_rv = histogram(p_r,p_rv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_yscale_dict)
-        all_p_r_p_tv = histogram(p_r,p_tv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_yscale_dict)
-        all_p_rv_p_tv = histogram(p_rv,p_tv,use_bins=[num_bins,num_bins],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_yscale_dict)
-        all_c_r_c_rv = histogram(c_r,c_rv,use_bins=[all_p_r_p_rv["x_edge"],all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_yscale_dict)
+        all_p_r_p_rv = histogram(p_r,p_rv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+        all_p_r_p_tv = histogram(p_r,p_tv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+        all_p_rv_p_tv = histogram(p_rv,p_tv,use_bins=[num_bins,num_bins],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
+        all_c_r_c_rv = histogram(c_r,c_rv,use_bins=[all_p_r_p_rv["x_edge"],all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
         
-        inf_p_r_p_rv = histogram(inf_p_r,inf_p_rv,use_bins=[all_p_r_p_rv["x_edge"],all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_yscale_dict)
-        inf_p_r_p_tv = histogram(inf_p_r,inf_p_tv,use_bins=[all_p_r_p_tv["x_edge"],all_p_r_p_tv["y_edge"]],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_yscale_dict)
-        inf_p_rv_p_tv = histogram(inf_p_rv,inf_p_tv,use_bins=[all_p_rv_p_tv["x_edge"],all_p_rv_p_tv["y_edge"]],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_yscale_dict)
-        inf_c_r_c_rv = histogram(inf_c_r,inf_c_rv,use_bins=[all_c_r_c_rv["x_edge"],all_c_r_c_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_yscale_dict)
+        inf_p_r_p_rv = histogram(inf_p_r,inf_p_rv,use_bins=[all_p_r_p_rv["x_edge"],all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+        inf_p_r_p_tv = histogram(inf_p_r,inf_p_tv,use_bins=[all_p_r_p_tv["x_edge"],all_p_r_p_tv["y_edge"]],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+        inf_p_rv_p_tv = histogram(inf_p_rv,inf_p_tv,use_bins=[all_p_rv_p_tv["x_edge"],all_p_rv_p_tv["y_edge"]],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
+        inf_c_r_c_rv = histogram(inf_c_r,inf_c_rv,use_bins=[all_c_r_c_rv["x_edge"],all_c_r_c_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
         
-        orb_p_r_p_rv = histogram(orb_p_r,orb_p_rv,use_bins=[all_p_r_p_rv["x_edge"],all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_yscale_dict)
-        orb_p_r_p_tv = histogram(orb_p_r,orb_p_tv,use_bins=[all_p_r_p_tv["x_edge"],all_p_r_p_tv["y_edge"]],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_yscale_dict)
-        orb_p_rv_p_tv = histogram(orb_p_rv,orb_p_tv,use_bins=[all_p_rv_p_tv["x_edge"],all_p_rv_p_tv["y_edge"]],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_yscale_dict)
-        orb_c_r_c_rv = histogram(orb_c_r,orb_c_rv,use_bins=[all_p_r_p_rv["x_edge"],all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_yscale_dict)
+        orb_p_r_p_rv = histogram(orb_p_r,orb_p_rv,use_bins=[all_p_r_p_rv["x_edge"],all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+        orb_p_r_p_tv = histogram(orb_p_r,orb_p_tv,use_bins=[all_p_r_p_tv["x_edge"],all_p_r_p_tv["y_edge"]],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+        orb_p_rv_p_tv = histogram(orb_p_rv,orb_p_tv,use_bins=[all_p_rv_p_tv["x_edge"],all_p_rv_p_tv["y_edge"]],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
+        orb_c_r_c_rv = histogram(orb_c_r,orb_c_rv,use_bins=[all_p_r_p_rv["x_edge"],all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
         
         tot_nptl = p_r.shape[0]
         
@@ -230,47 +264,48 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_yscale_d
                 "cmap":cividis_cmap,
         }
         
-        rv_yticks=[-linthrsh,np.round(-linthrsh/2,2),0,np.round(linthrsh/2,2),linthrsh]
-        rv_yticks.extend(np.logspace(np.log10(linthrsh),np.log10(p_rv_range[1]),int(np.floor(log_nbin/5))+1))
-        rv_yticks.extend(-np.logspace(np.log10(-p_rv_range[0]),np.log10(linthrsh),int(np.floor(log_nbin/5))+1))
+        r_ticks = split_scale_dict["lin_rticks"] + split_scale_dict["log_rticks"]
         
-        tv_yticks = [0,np.round(linthrsh/2,2),linthrsh]
-        tv_yticks.extend(np.logspace(np.log10(linthrsh),np.log10(p_tv_range[1]),int(np.floor(log_nbin/5))+1))
-        
+        rv_ticks = split_scale_dict["lin_rvticks"] + split_scale_dict["log_rvticks"]
+        rv_ticks = rv_ticks + [-x for x in rv_ticks if x != 0]
+        rv_ticks.sort()
+
+        tv_ticks = split_scale_dict["lin_tvticks"] + split_scale_dict["log_tvticks"]       
         
         widths = [4,4,4,4,.5]
         heights = [0.15,4,4,4] # have extra row up top so there is space for the title
         
-        fig = plt.figure(constrained_layout=True, figsize=(30,25))
+        fig = plt.figure(constrained_layout=True, figsize=(35,25))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
         
-        imshow_plot(fig.add_subplot(gs[1,0]),all_p_r_p_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",text="All Particles",title="Primary Snap",hide_xticks=True,yticks=rv_yticks,linthrsh=linthrsh,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[1,1]),all_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,yticks=tv_yticks,linthrsh=linthrsh,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[1,2]),all_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,linthrsh=linthrsh,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[1,3]),all_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",title="Secondary Snap",hide_xticks=True,yticks=rv_yticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[1,0]),all_p_r_p_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",text="All Particles",title="Primary Snap",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[1,1]),all_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[1,2]),all_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[1,3]),all_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",title="Secondary Snap",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
         
-        imshow_plot(fig.add_subplot(gs[2,0]),inf_p_r_p_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",text="Infalling Particles",hide_xticks=True,yticks=rv_yticks,linthrsh=linthrsh,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[2,1]),inf_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,yticks=tv_yticks,linthrsh=linthrsh,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[2,2]),inf_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,linthrsh=linthrsh,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[2,3]),inf_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",hide_xticks=True,yticks=rv_yticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[2,0]),inf_p_r_p_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",text="Infalling Particles",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[2,1]),inf_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[2,2]),inf_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[2,3]),inf_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
                     
-        imshow_plot(fig.add_subplot(gs[3,0]),orb_p_r_p_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Orbiting Particles",yticks=rv_yticks,linthrsh=linthrsh,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[3,1]),orb_p_r_p_tv,extent=p_r_range+p_tv_range,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",yticks=tv_yticks,linthrsh=linthrsh,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[3,2]),orb_p_rv_p_tv,extent=p_rv_range+p_tv_range,x_label="$v_r/v_{200m}$",hide_yticks=True,linthrsh=linthrsh,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[3,3]),orb_c_r_c_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",yticks=rv_yticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,0]),orb_p_r_p_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Orbiting Particles",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,1]),orb_p_r_p_tv,extent=p_r_range+p_tv_range,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",xticks=r_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,2]),orb_p_rv_p_tv,extent=p_rv_range+p_tv_range,x_label="$v_r/v_{200m}$",hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,3]),orb_c_r_c_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
 
         color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=scale_min_ptl, vmax=max_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[1:,-1]))
-        color_bar.set_label("N / N_tot / dx / dy",fontsize=16)
-        color_bar.ax.tick_params(labelsize=14)
+        color_bar.set_label("$N / N_{tot} / dx / dy$",fontsize=20)
+        color_bar.ax.tick_params(labelsize=18)
         
         fig.savefig(save_loc + "ptl_distr.png")
+        plt.close()
 
-def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, split_yscale_dict, num_bins, save_loc, model_info,dataset_name):
+def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_dict, num_bins, save_loc, model_info,dataset_name):
     with timed("Finished Miss Class Dist Plot"):
         print("Starting Miss Class Dist Plot")
 
-        linthrsh = split_yscale_dict["linthrsh"]
-        log_nbin = split_yscale_dict["log_nbin"]
+        linthrsh = split_scale_dict["linthrsh"]
+        log_nbin = split_scale_dict["log_nbin"]
 
         p_r_range = [np.min(p_r),np.max(p_r)]
         p_rv_range = [np.min(p_rv),np.max(p_rv)]
@@ -322,30 +357,30 @@ def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv,
         
         # Create histograms for all particles and then for the incorrect particles
         # Use the binning from all particles for the orbiting and infalling plots and the secondary snap to keep it consistent
-        act_all_p_r_p_rv = histogram(p_r,p_rv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_yscale_dict)
-        act_all_p_r_p_tv = histogram(p_r,p_tv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_yscale_dict)
-        act_all_p_rv_p_tv = histogram(p_rv,p_tv,use_bins=[num_bins,num_bins],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_yscale_dict)
-        act_all_c_r_c_rv = histogram(c_r,c_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_yscale_dict)
+        act_all_p_r_p_rv = histogram(p_r,p_rv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
+        act_all_p_r_p_tv = histogram(p_r,p_tv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
+        act_all_p_rv_p_tv = histogram(p_rv,p_tv,use_bins=[num_bins,num_bins],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
+        act_all_c_r_c_rv = histogram(c_r,c_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
         
-        act_inf_p_r_p_rv = histogram(act_inf_p_r,act_inf_p_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_yscale_dict)
-        act_inf_p_r_p_tv = histogram(act_inf_p_r,act_inf_p_tv,use_bins=[act_all_p_r_p_tv["x_edge"],act_all_p_r_p_tv["y_edge"]],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_yscale_dict)
-        act_inf_p_rv_p_tv = histogram(act_inf_p_rv,act_inf_p_tv,use_bins=[act_all_p_rv_p_tv["x_edge"],act_all_p_rv_p_tv["y_edge"]],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_yscale_dict)
-        act_inf_c_r_c_rv = histogram(act_inf_c_r,act_inf_c_rv,use_bins=[act_all_c_r_c_rv["x_edge"],act_all_c_r_c_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_yscale_dict)
+        act_inf_p_r_p_rv = histogram(act_inf_p_r,act_inf_p_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
+        act_inf_p_r_p_tv = histogram(act_inf_p_r,act_inf_p_tv,use_bins=[act_all_p_r_p_tv["x_edge"],act_all_p_r_p_tv["y_edge"]],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
+        act_inf_p_rv_p_tv = histogram(act_inf_p_rv,act_inf_p_tv,use_bins=[act_all_p_rv_p_tv["x_edge"],act_all_p_rv_p_tv["y_edge"]],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
+        act_inf_c_r_c_rv = histogram(act_inf_c_r,act_inf_c_rv,use_bins=[act_all_c_r_c_rv["x_edge"],act_all_c_r_c_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
         
-        act_orb_p_r_p_rv = histogram(act_orb_p_r,act_orb_p_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_yscale_dict)
-        act_orb_p_r_p_tv = histogram(act_orb_p_r,act_orb_p_tv,use_bins=[act_all_p_r_p_tv["x_edge"],act_all_p_r_p_tv["y_edge"]],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_yscale_dict)
-        act_orb_p_rv_p_tv = histogram(act_orb_p_rv,act_orb_p_tv,use_bins=[act_all_p_rv_p_tv["x_edge"],act_all_p_rv_p_tv["y_edge"]],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_yscale_dict)
-        act_orb_c_r_c_rv = histogram(act_orb_c_r,act_orb_c_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_yscale_dict)
+        act_orb_p_r_p_rv = histogram(act_orb_p_r,act_orb_p_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
+        act_orb_p_r_p_tv = histogram(act_orb_p_r,act_orb_p_tv,use_bins=[act_all_p_r_p_tv["x_edge"],act_all_p_r_p_tv["y_edge"]],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
+        act_orb_p_rv_p_tv = histogram(act_orb_p_rv,act_orb_p_tv,use_bins=[act_all_p_rv_p_tv["x_edge"],act_all_p_rv_p_tv["y_edge"]],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
+        act_orb_c_r_c_rv = histogram(act_orb_c_r,act_orb_c_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
             
-        inc_inf_p_r_p_rv = histogram(inc_inf_p_r,inc_inf_p_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_yscale_dict)
-        inc_inf_p_r_p_tv = histogram(inc_inf_p_r,inc_inf_p_tv,use_bins=[act_all_p_r_p_tv["x_edge"],act_all_p_r_p_tv["y_edge"]],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_yscale_dict)
-        inc_inf_p_rv_p_tv = histogram(inc_inf_p_rv,inc_inf_p_tv,use_bins=[act_all_p_rv_p_tv["x_edge"],act_all_p_rv_p_tv["y_edge"]],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_yscale_dict)
-        inc_inf_c_r_c_rv = histogram(inc_inf_c_r,inc_inf_c_rv,use_bins=[act_all_c_r_c_rv["x_edge"],act_all_c_r_c_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_yscale_dict)
+        inc_inf_p_r_p_rv = histogram(inc_inf_p_r,inc_inf_p_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
+        inc_inf_p_r_p_tv = histogram(inc_inf_p_r,inc_inf_p_tv,use_bins=[act_all_p_r_p_tv["x_edge"],act_all_p_r_p_tv["y_edge"]],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
+        inc_inf_p_rv_p_tv = histogram(inc_inf_p_rv,inc_inf_p_tv,use_bins=[act_all_p_rv_p_tv["x_edge"],act_all_p_rv_p_tv["y_edge"]],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
+        inc_inf_c_r_c_rv = histogram(inc_inf_c_r,inc_inf_c_rv,use_bins=[act_all_c_r_c_rv["x_edge"],act_all_c_r_c_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
         
-        inc_orb_p_r_p_rv = histogram(inc_orb_p_r,inc_orb_p_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_yscale_dict)
-        inc_orb_p_r_p_tv = histogram(inc_orb_p_r,inc_orb_p_tv,use_bins=[act_all_p_r_p_tv["x_edge"],act_all_p_r_p_tv["y_edge"]],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_yscale_dict)
-        inc_orb_p_rv_p_tv = histogram(inc_orb_p_rv,inc_orb_p_tv,use_bins=[act_all_p_rv_p_tv["x_edge"],act_all_p_rv_p_tv["y_edge"]],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_yscale_dict)
-        inc_orb_c_r_c_rv = histogram(inc_orb_c_r,inc_orb_c_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_yscale_dict)
+        inc_orb_p_r_p_rv = histogram(inc_orb_p_r,inc_orb_p_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
+        inc_orb_p_r_p_tv = histogram(inc_orb_p_r,inc_orb_p_tv,use_bins=[act_all_p_r_p_tv["x_edge"],act_all_p_r_p_tv["y_edge"]],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
+        inc_orb_p_rv_p_tv = histogram(inc_orb_p_rv,inc_orb_p_tv,use_bins=[act_all_p_rv_p_tv["x_edge"],act_all_p_rv_p_tv["y_edge"]],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
+        inc_orb_c_r_c_rv = histogram(inc_orb_c_r,inc_orb_c_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
 
         
         inc_all_p_r_p_rv = {
@@ -368,8 +403,7 @@ def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv,
             "x_edge":act_all_c_r_c_rv["x_edge"],
             "y_edge":act_all_c_r_c_rv["y_edge"]
         }
-        
-        
+
         scale_inc_all_p_r_p_rv = scale_hists(inc_all_p_r_p_rv,act_all_p_r_p_rv,act_min=act_min_ptl,inc_min=inc_min_ptl)
         scale_inc_all_p_r_p_tv = scale_hists(inc_all_p_r_p_tv,act_all_p_r_p_tv,act_min=act_min_ptl,inc_min=inc_min_ptl)
         scale_inc_all_p_rv_p_tv = scale_hists(inc_all_p_rv_p_tv,act_all_p_rv_p_tv,act_min=act_min_ptl,inc_min=inc_min_ptl)
@@ -397,39 +431,41 @@ def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv,
                 "cmap":magma_cmap,
         }
         
-        rv_yticks=[-linthrsh,np.round(-linthrsh/2,2),0,np.round(linthrsh/2,2),linthrsh]
-        rv_yticks.extend(np.logspace(np.log10(linthrsh),np.log10(p_rv_range[1]),int(np.floor(log_nbin/5))+1))
-        rv_yticks.extend(-np.logspace(np.log10(-p_rv_range[0]),np.log10(linthrsh),int(np.floor(log_nbin/5))+1))
+        r_ticks = split_scale_dict["lin_rticks"] + split_scale_dict["log_rticks"]
         
-        tv_yticks = [0,np.round(linthrsh/2,2),linthrsh]
-        tv_yticks.extend(np.logspace(np.log10(linthrsh),np.log10(p_tv_range[1]),int(np.floor(log_nbin/5))+1))
+        rv_ticks = split_scale_dict["lin_rvticks"] + split_scale_dict["log_rvticks"]
+        rv_ticks = rv_ticks + [-x for x in rv_ticks if x != 0]
+        rv_ticks.sort()
+
+        tv_ticks = split_scale_dict["lin_tvticks"] + split_scale_dict["log_tvticks"]     
         
         widths = [4,4,4,4,.5]
         heights = [0.12,4,4,4]
         
-        fig = plt.figure(constrained_layout=True,figsize=(30,25))
+        fig = plt.figure(constrained_layout=True,figsize=(35,25))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
 
-        imshow_plot(fig.add_subplot(gs[1,0]), scale_inc_all_p_r_p_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified\nScaled",yticks=rv_yticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[1,1]), scale_inc_all_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,yticks=tv_yticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[1,2]), scale_inc_all_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,linthrsh=linthrsh,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[1,3]), scale_inc_all_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified\nScaled",yticks=rv_yticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[1,0]), scale_inc_all_p_r_p_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified\nScaled",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[1,1]), scale_inc_all_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[1,2]), scale_inc_all_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,xticks=tv_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[1,3]), scale_inc_all_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified\nScaled",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
 
-        imshow_plot(fig.add_subplot(gs[2,0]), scale_inc_inf_p_r_p_rv,extent=p_r_range+p_rv_range,hide_xticks=True,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",yticks=rv_yticks,linthrsh=linthrsh,kwargs=scale_miss_class_args, title="Primary Snap")
-        imshow_plot(fig.add_subplot(gs[2,1]), scale_inc_inf_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,yticks=tv_yticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[2,2]), scale_inc_inf_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,linthrsh=linthrsh,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[2,3]), scale_inc_inf_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",hide_xticks=True,yticks=rv_yticks,linthrsh=linthrsh,kwargs=scale_miss_class_args, title="Secondary Snap")
+        imshow_plot(fig.add_subplot(gs[2,0]), scale_inc_inf_p_r_p_rv,extent=p_r_range+p_rv_range,hide_xticks=True,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args, title="Primary Snap")
+        imshow_plot(fig.add_subplot(gs[2,1]), scale_inc_inf_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[2,2]), scale_inc_inf_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[2,3]), scale_inc_inf_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args, title="Secondary Snap")
         
-        imshow_plot(fig.add_subplot(gs[3,0]), scale_inc_orb_p_r_p_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",yticks=rv_yticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[3,1]), scale_inc_orb_p_r_p_tv,extent=p_r_range+p_tv_range,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",yticks=tv_yticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[3,2]), scale_inc_orb_p_rv_p_tv,extent=p_rv_range+p_tv_range,x_label="$v_r/v_{200m}$",hide_yticks=True,linthrsh=linthrsh,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[3,3]), scale_inc_orb_c_r_c_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",yticks=rv_yticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[3,0]), scale_inc_orb_p_r_p_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[3,1]), scale_inc_orb_p_r_p_tv,extent=p_r_range+p_tv_range,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",xticks=r_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[3,2]), scale_inc_orb_p_rv_p_tv,extent=p_rv_range+p_tv_range,x_label="$v_r/v_{200m}$",hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[3,3]), scale_inc_orb_c_r_c_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
         
         color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=inc_min_ptl, vmax=1),cmap=magma_cmap), cax=plt.subplot(gs[1:,-1]))
-        color_bar.set_label("Num Incorrect Particles (inf/orb) / Total Particles (inf/orb)",fontsize=16)
-        color_bar.ax.tick_params(labelsize=14)
+        color_bar.set_label("Num Incorrect Particles (inf/orb) / Total Particles (inf/orb)",fontsize=20)
+        color_bar.ax.tick_params(labelsize=18)
         
         fig.savefig(save_loc + "scaled_miss_class.png")
+        plt.close()
 
 def plot_perr_err():
     return
