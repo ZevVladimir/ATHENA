@@ -252,7 +252,7 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         # Can just do the all particle arrays since inf/orb will have equal or less
         max_ptl = np.max(np.array([np.max(all_p_r_p_rv["hist"]),np.max(all_p_r_p_tv["hist"]),np.max(all_p_rv_p_tv["hist"]),np.max(all_c_r_c_rv["hist"])]))
         
-        cividis_cmap = plt.get_cmap("cividis_r")
+        cividis_cmap = plt.get_cmap("cividis")
         cividis_cmap.set_under(color='white')  
         
         plot_kwargs = {
@@ -294,8 +294,8 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         imshow_plot(fig.add_subplot(gs[3,3]),orb_c_r_c_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
 
         color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=scale_min_ptl, vmax=max_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[1:,-1]))
-        color_bar.set_label("$N / N_{tot} / dx / dy$",fontsize=20)
-        color_bar.ax.tick_params(labelsize=18)
+        color_bar.set_label("$\frac{N_{\mathrm{pop, inc}}{N_{\mathrm{pop, tot} dx dy}$",fontsize=24)
+        color_bar.ax.tick_params(labelsize=22)
         
         fig.savefig(save_loc + "ptl_distr.png")
         plt.close()
@@ -445,10 +445,10 @@ def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv,
         fig = plt.figure(constrained_layout=True,figsize=(35,25))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
 
-        imshow_plot(fig.add_subplot(gs[1,0]), scale_inc_all_p_r_p_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified\nScaled",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[1,0]), scale_inc_all_p_r_p_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified Scaled",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
         imshow_plot(fig.add_subplot(gs[1,1]), scale_inc_all_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
         imshow_plot(fig.add_subplot(gs[1,2]), scale_inc_all_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,xticks=tv_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[1,3]), scale_inc_all_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified\nScaled",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[1,3]), scale_inc_all_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified Scaled",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
 
         imshow_plot(fig.add_subplot(gs[2,0]), scale_inc_inf_p_r_p_rv,extent=p_r_range+p_rv_range,hide_xticks=True,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args, title="Primary Snap")
         imshow_plot(fig.add_subplot(gs[2,1]), scale_inc_inf_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
@@ -461,8 +461,8 @@ def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv,
         imshow_plot(fig.add_subplot(gs[3,3]), scale_inc_orb_c_r_c_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
         
         color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=inc_min_ptl, vmax=1),cmap=magma_cmap), cax=plt.subplot(gs[1:,-1]))
-        color_bar.set_label("Num Incorrect Particles (inf/orb) / Total Particles (inf/orb)",fontsize=20)
-        color_bar.ax.tick_params(labelsize=18)
+        color_bar.set_label("Num Incorrect Particles (inf/orb) / Total Particles (inf/orb)",fontsize=24)
+        color_bar.ax.tick_params(labelsize=22)
         
         fig.savefig(save_loc + "scaled_miss_class.png")
         plt.close()
