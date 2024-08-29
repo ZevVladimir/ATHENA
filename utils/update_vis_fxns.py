@@ -55,7 +55,7 @@ def gen_ticks(bin_edges,spacing=6):
     
     return tick_loc, ticks
 
-def imshow_plot(ax, img, extent, x_label="", y_label="", text="", title="", hide_xticks=False, hide_yticks=False, xticks = None, yticks = None, linthrsh = 0, axisfontsize=26, return_img=False, kwargs={}):
+def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xticks=False, hide_yticks=False, xticks = None, yticks = None, xlinthrsh = 0, ylinthrsh = 0, axisfontsize=26, return_img=False, kwargs={}):
     plt.xticks(rotation=70)
 
     ret_img=ax.imshow(img["hist"].T, interpolation="none", **kwargs)
@@ -76,11 +76,17 @@ def imshow_plot(ax, img, extent, x_label="", y_label="", text="", title="", hide
     if not hide_yticks:
         ax.set_yticks(yticks_loc,yticks)
         
-    linthrsh_loc = get_bin_loc(img["y_edge"],linthrsh)
-    ax.axhline(y=linthrsh_loc, color='grey', linestyle='--', alpha=1)
+    ylinthrsh_loc = get_bin_loc(img["y_edge"],ylinthrsh)
+    ax.axhline(y=ylinthrsh_loc, color='grey', linestyle='--', alpha=1)
     if np.where(np.array(yticks,dtype=np.float32) < 0)[0].size > 0:
-        neg_linthrsh_loc = get_bin_loc(img["y_edge"],-linthrsh)
-        ax.axhline(y=neg_linthrsh_loc, color='grey', linestyle='--', alpha=1)
+        neg_ylinthrsh_loc = get_bin_loc(img["y_edge"],-ylinthrsh)
+        ax.axhline(y=neg_ylinthrsh_loc, color='grey', linestyle='--', alpha=1)
+        
+    xlinthrsh_loc = get_bin_loc(img["x_edge"],xlinthrsh)
+    ax.axvline(x=xlinthrsh_loc, color='grey', linestyle='--', alpha=1)
+    if np.where(np.array(xticks,dtype=np.float32) < 0)[0].size > 0:
+        neg_xlinthrsh_loc = get_bin_loc(img["x_edge"],-xlinthrsh)
+        ax.axvline(x=neg_xlinthrsh_loc, color='grey', linestyle='--', alpha=1)
 
     if text != "":
         ax.text(.01,.03, text, ha="left", va="bottom", transform=ax.transAxes, fontsize=axisfontsize, bbox={"facecolor":'white',"alpha":0.9,})
@@ -278,20 +284,20 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         fig = plt.figure(constrained_layout=True, figsize=(35,25))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
         
-        imshow_plot(fig.add_subplot(gs[1,0]),all_p_r_p_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",text="All Particles",title="Primary Snap",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[1,1]),all_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[1,2]),all_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[1,3]),all_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",title="Secondary Snap",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[1,0]),all_p_r_p_rv,y_label="$v_r/v_{200m}$",text="All Particles",title="Primary Snap",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[1,1]),all_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[1,2]),all_p_rv_p_tv,hide_xticks=True,hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[1,3]),all_c_r_c_rv,y_label="$v_r/v_{200m}$",title="Secondary Snap",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
         
-        imshow_plot(fig.add_subplot(gs[2,0]),inf_p_r_p_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",text="Infalling Particles",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[2,1]),inf_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[2,2]),inf_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[2,3]),inf_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[2,0]),inf_p_r_p_rv,y_label="$v_r/v_{200m}$",text="Infalling Particles",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[2,1]),inf_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[2,2]),inf_p_rv_p_tv,hide_xticks=True,hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[2,3]),inf_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
                     
-        imshow_plot(fig.add_subplot(gs[3,0]),orb_p_r_p_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Orbiting Particles",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[3,1]),orb_p_r_p_tv,extent=p_r_range+p_tv_range,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",xticks=r_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[3,2]),orb_p_rv_p_tv,extent=p_rv_range+p_tv_range,x_label="$v_r/v_{200m}$",hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[3,3]),orb_c_r_c_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,0]),orb_p_r_p_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Orbiting Particles",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,1]),orb_p_r_p_tv,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,2]),orb_p_rv_p_tv,x_label="$v_r/v_{200m}$",hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,3]),orb_c_r_c_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
 
         color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=scale_min_ptl, vmax=max_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[1:,-1]))
         color_bar.set_label("$\frac{N_{\mathrm{pop, inc}}{N_{\mathrm{pop, tot} dx dy}$",fontsize=24)
@@ -445,20 +451,20 @@ def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv,
         fig = plt.figure(constrained_layout=True,figsize=(35,25))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
 
-        imshow_plot(fig.add_subplot(gs[1,0]), scale_inc_all_p_r_p_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified Scaled",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[1,1]), scale_inc_all_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[1,2]), scale_inc_all_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,xticks=tv_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[1,3]), scale_inc_all_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified Scaled",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[1,0]),scale_inc_all_p_r_p_rv,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified Scaled",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[1,1]),scale_inc_all_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[1,2]),scale_inc_all_p_rv_p_tv,hide_xticks=True,hide_yticks=True,xticks=tv_ticks,yticks=rv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[1,3]),scale_inc_all_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified Scaled",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
 
-        imshow_plot(fig.add_subplot(gs[2,0]), scale_inc_inf_p_r_p_rv,extent=p_r_range+p_rv_range,hide_xticks=True,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args, title="Primary Snap")
-        imshow_plot(fig.add_subplot(gs[2,1]), scale_inc_inf_p_r_p_tv,extent=p_r_range+p_tv_range,y_label="$v_t/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[2,2]), scale_inc_inf_p_rv_p_tv,extent=p_rv_range+p_tv_range,hide_xticks=True,hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[2,3]), scale_inc_inf_c_r_c_rv,extent=p_r_range+p_rv_range,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args, title="Secondary Snap")
+        imshow_plot(fig.add_subplot(gs[2,0]),scale_inc_inf_p_r_p_rv,hide_xticks=True,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args, title="Primary Snap")
+        imshow_plot(fig.add_subplot(gs[2,1]),scale_inc_inf_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[2,2]),scale_inc_inf_p_rv_p_tv,hide_xticks=True,hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[2,3]),scale_inc_inf_c_r_c_rv,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args, title="Secondary Snap")
         
-        imshow_plot(fig.add_subplot(gs[3,0]), scale_inc_orb_p_r_p_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[3,1]), scale_inc_orb_p_r_p_tv,extent=p_r_range+p_tv_range,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",xticks=r_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[3,2]), scale_inc_orb_p_rv_p_tv,extent=p_rv_range+p_tv_range,x_label="$v_r/v_{200m}$",hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[3,3]), scale_inc_orb_c_r_c_rv,extent=p_r_range+p_rv_range,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",xticks=r_ticks,yticks=rv_ticks,linthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[3,0]),scale_inc_orb_p_r_p_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[3,1]),scale_inc_orb_p_r_p_tv,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[3,2]),scale_inc_orb_p_rv_p_tv,x_label="$v_r/v_{200m}$",hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[3,3]),scale_inc_orb_c_r_c_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
         
         color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=inc_min_ptl, vmax=1),cmap=magma_cmap), cax=plt.subplot(gs[1:,-1]))
         color_bar.set_label("Num Incorrect Particles (inf/orb) / Total Particles (inf/orb)",fontsize=24)
