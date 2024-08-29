@@ -7,18 +7,19 @@ from utils.data_and_loading_functions import split_orb_inf, timed
 
 # used to find the location of a number within bins 
 def get_bin_loc(bin_edges,search_num):
-    if search_num > bin_edges[-1]:
-        search_num = np.floor(bin_edges[-1])
+    # if the search number is at or beyond the bins set it to be the maximum location
+    if search_num >= bin_edges[-1]:
+        search_loc = bin_edges.size - 1
+    else:
+        upper_index = np.searchsorted(bin_edges, search_num, side='right')
+        lower_index = upper_index - 1
 
-    upper_index = np.searchsorted(bin_edges, search_num, side='right')
-    lower_index = upper_index - 1
+        lower_edge = bin_edges[lower_index]
+        upper_edge = bin_edges[upper_index]
 
-    lower_edge = bin_edges[lower_index]
-    upper_edge = bin_edges[upper_index]
-
-    # Interpolate the fractional position of 0 between the two edges
-    fraction = (search_num - lower_edge) / (upper_edge - lower_edge)
-    search_loc = lower_index + fraction
+        # Interpolate the fractional position of 0 between the two edges
+        fraction = (search_num - lower_edge) / (upper_edge - lower_edge)
+        search_loc = lower_index + fraction
     
     return search_loc
 
@@ -55,7 +56,7 @@ def gen_ticks(bin_edges,spacing=6):
     
     return tick_loc, ticks
 
-def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xticks=False, hide_yticks=False, xticks = None, yticks = None, xlinthrsh = 0, ylinthrsh = 0, axisfontsize=26, return_img=False, kwargs={}):
+def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xticks=False, hide_yticks=False, xticks = None, yticks = None, xlinthrsh = None, ylinthrsh = None, axisfontsize=26, return_img=False, kwargs={}):
     plt.xticks(rotation=70)
 
     ret_img=ax.imshow(img["hist"].T, interpolation="none", **kwargs)
@@ -76,17 +77,19 @@ def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xticks=
     if not hide_yticks:
         ax.set_yticks(yticks_loc,yticks)
         
-    ylinthrsh_loc = get_bin_loc(img["y_edge"],ylinthrsh)
-    ax.axhline(y=ylinthrsh_loc, color='grey', linestyle='--', alpha=1)
-    if np.where(np.array(yticks,dtype=np.float32) < 0)[0].size > 0:
-        neg_ylinthrsh_loc = get_bin_loc(img["y_edge"],-ylinthrsh)
-        ax.axhline(y=neg_ylinthrsh_loc, color='grey', linestyle='--', alpha=1)
-        
-    xlinthrsh_loc = get_bin_loc(img["x_edge"],xlinthrsh)
-    ax.axvline(x=xlinthrsh_loc, color='grey', linestyle='--', alpha=1)
-    if np.where(np.array(xticks,dtype=np.float32) < 0)[0].size > 0:
-        neg_xlinthrsh_loc = get_bin_loc(img["x_edge"],-xlinthrsh)
-        ax.axvline(x=neg_xlinthrsh_loc, color='grey', linestyle='--', alpha=1)
+    if ylinthrsh != None:
+        ylinthrsh_loc = get_bin_loc(img["y_edge"],ylinthrsh)
+        ax.axhline(y=ylinthrsh_loc, color='grey', linestyle='--', alpha=1)
+        if np.where(np.array(yticks,dtype=np.float32) < 0)[0].size > 0:
+            neg_ylinthrsh_loc = get_bin_loc(img["y_edge"],-ylinthrsh)
+            ax.axhline(y=neg_ylinthrsh_loc, color='grey', linestyle='--', alpha=1)
+    
+    if xlinthrsh != None:
+        xlinthrsh_loc = get_bin_loc(img["x_edge"],xlinthrsh)
+        ax.axvline(x=xlinthrsh_loc, color='grey', linestyle='--', alpha=1)
+        if np.where(np.array(xticks,dtype=np.float32) < 0)[0].size > 0:
+            neg_xlinthrsh_loc = get_bin_loc(img["x_edge"],-xlinthrsh)
+            ax.axvline(x=neg_xlinthrsh_loc, color='grey', linestyle='--', alpha=1)
 
     if text != "":
         ax.text(.01,.03, text, ha="left", va="bottom", transform=ax.transAxes, fontsize=axisfontsize, bbox={"facecolor":'white',"alpha":0.9,})
@@ -300,7 +303,7 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         imshow_plot(fig.add_subplot(gs[3,3]),orb_c_r_c_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
 
         color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=scale_min_ptl, vmax=max_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[1:,-1]))
-        color_bar.set_label("$\frac{N_{\mathrm{pop, inc}}{N_{\mathrm{pop, tot} dx dy}$",fontsize=24)
+        color_bar.set_label(r"$\frac{N_{\mathrm{pop, inc}}}{N_{\mathrm{pop, tot}} dx dy}$",fontsize=32)
         color_bar.ax.tick_params(labelsize=22)
         
         fig.savefig(save_loc + "ptl_distr.png")
@@ -467,7 +470,7 @@ def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv,
         imshow_plot(fig.add_subplot(gs[3,3]),scale_inc_orb_c_r_c_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
         
         color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=inc_min_ptl, vmax=1),cmap=magma_cmap), cax=plt.subplot(gs[1:,-1]))
-        color_bar.set_label("Num Incorrect Particles (inf/orb) / Total Particles (inf/orb)",fontsize=24)
+        color_bar.set_label(r"$\frac{N_{\mathrm{pop, inc}}}{N_{\mathrm{pop, tot}}}$",fontsize=32)
         color_bar.ax.tick_params(labelsize=22)
         
         fig.savefig(save_loc + "scaled_miss_class.png")
