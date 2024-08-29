@@ -7,18 +7,19 @@ from utils.data_and_loading_functions import split_orb_inf, timed
 
 # used to find the location of a number within bins 
 def get_bin_loc(bin_edges,search_num):
-    if search_num > bin_edges[-1]:
-        search_num = np.floor(bin_edges[-1])
+    # if the search number is at or beyond the bins set it to be the maximum location
+    if search_num >= bin_edges[-1]:
+        search_loc = bin_edges.size - 1
+    else:
+        upper_index = np.searchsorted(bin_edges, search_num, side='right')
+        lower_index = upper_index - 1
 
-    upper_index = np.searchsorted(bin_edges, search_num, side='right')
-    lower_index = upper_index - 1
+        lower_edge = bin_edges[lower_index]
+        upper_edge = bin_edges[upper_index]
 
-    lower_edge = bin_edges[lower_index]
-    upper_edge = bin_edges[upper_index]
-
-    # Interpolate the fractional position of 0 between the two edges
-    fraction = (search_num - lower_edge) / (upper_edge - lower_edge)
-    search_loc = lower_index + fraction
+        # Interpolate the fractional position of 0 between the two edges
+        fraction = (search_num - lower_edge) / (upper_edge - lower_edge)
+        search_loc = lower_index + fraction
     
     return search_loc
 
