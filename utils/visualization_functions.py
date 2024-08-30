@@ -29,6 +29,10 @@ from utils.calculation_functions import calc_v200m, calculate_density, create_ma
 
 num_processes = mp.cpu_count()
 
+#TODO make font seriph using rcparams font family and mattext.fontset
+#TODO keep legend outside of boxs frameon=False
+#TODO put ticks inside of box
+
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
