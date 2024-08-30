@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.ticker import LogLocator, NullFormatter
 from utils.data_and_loading_functions import split_orb_inf, timed
+plt.rcParams['mathtext.fontset'] = 'dejavuserif'
+plt.rcParams['font.family'] = 'serif'
 
 # used to find the location of a number within bins 
 def get_bin_loc(bin_edges,search_num):
@@ -69,13 +71,12 @@ def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xticks=
     for tick in yticks:
         yticks_loc.append(get_bin_loc(img["y_edge"],tick))
     
-    # xticks_loc, xticks = gen_ticks(img["x_edge"])
-    # yticks_loc, yticks = gen_ticks(img["y_edge"])
-    
     if not hide_xticks:
         ax.set_xticks(xticks_loc,xticks)
+        ax.tick_params(axis="x",direction="in")
     if not hide_yticks:
         ax.set_yticks(yticks_loc,yticks)
+        ax.tick_params(axis="y",direction="in")
         
     if ylinthrsh != None:
         ylinthrsh_loc = get_bin_loc(img["y_edge"],ylinthrsh)
@@ -453,16 +454,16 @@ def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv,
         
         fig = plt.figure(constrained_layout=True,figsize=(35,25))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
-        #TODO make sure the titles are in the right row
-        imshow_plot(fig.add_subplot(gs[1,0]),scale_inc_all_p_r_p_rv,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified Scaled",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
+
+        imshow_plot(fig.add_subplot(gs[1,0]),scale_inc_all_p_r_p_rv,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified Scaled",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args, title="Primary Snap")
         imshow_plot(fig.add_subplot(gs[1,1]),scale_inc_all_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
         imshow_plot(fig.add_subplot(gs[1,2]),scale_inc_all_p_rv_p_tv,hide_xticks=True,hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[1,3]),scale_inc_all_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified Scaled",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[1,3]),scale_inc_all_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified Scaled",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args, title="Secondary Snap")
 
-        imshow_plot(fig.add_subplot(gs[2,0]),scale_inc_inf_p_r_p_rv,hide_xticks=True,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args, title="Primary Snap")
+        imshow_plot(fig.add_subplot(gs[2,0]),scale_inc_inf_p_r_p_rv,hide_xticks=True,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
         imshow_plot(fig.add_subplot(gs[2,1]),scale_inc_inf_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
         imshow_plot(fig.add_subplot(gs[2,2]),scale_inc_inf_p_rv_p_tv,hide_xticks=True,hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[2,3]),scale_inc_inf_c_r_c_rv,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args, title="Secondary Snap")
+        imshow_plot(fig.add_subplot(gs[2,3]),scale_inc_inf_c_r_c_rv,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
         
         imshow_plot(fig.add_subplot(gs[3,0]),scale_inc_orb_p_r_p_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
         imshow_plot(fig.add_subplot(gs[3,1]),scale_inc_orb_p_r_p_tv,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,kwargs=scale_miss_class_args)
