@@ -21,6 +21,8 @@ from matplotlib.animation import FuncAnimation
 import seaborn as sns
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from matplotlib.legend_handler import HandlerLine2D, HandlerTuple
+import json
 
 from utils.data_and_loading_functions import check_pickle_exist_gadget, create_directory, find_closest_z, load_or_pickle_ptl_data, timed
 from utils.calculation_functions import calc_v200m, calculate_density, create_mass_prf
@@ -55,6 +57,7 @@ path_to_calc_info = config["PATHS"]["path_to_calc_info"]
 path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
 path_to_sparta = config["PATHS"]["path_to_sparta"]
 curr_chunk_size = config.getint("SEARCH","chunk_size")
+lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
 
 if not on_zaratan:
     import ipyvolume as ipv
@@ -115,7 +118,7 @@ def comb_prf(prf, num_halo, dtype):
     prf = prf.astype(dtype)
 
     return prf
-    
+
 def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act_mass_prf_orb, mass, orbit_assn, prf_bins, title, save_location, use_mp = False, show_graph = False, save_graph = True):
     # Shape of profiles should be (num halo,num bins)
     # EX: 10 halos, 80 bins (10,80)
@@ -234,37 +237,37 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
             
         # for each bin checking how many halos have particles there
         # if there are less than half the total number of halos then just treat that bin as having 0
-        # for i in range(calc_mass_prf_orb.shape[1]):
-        #     if np.where(calc_mass_prf_orb[:,i] > 0)[0].shape[0] < min_disp_halos:
-        #         calc_mass_prf_orb[:,i] = np.NaN
-        #         act_mass_prf_orb[:,i] = np.NaN
-        #         med_calc_mass_prf_orb[i] = np.NaN
-        #         med_act_mass_prf_orb[i] = np.NaN
-        #     if np.where(calc_mass_prf_inf[:,i] > 0)[0].shape[0] < min_disp_halos:
-        #         calc_mass_prf_inf[:,i] = np.NaN
-        #         act_mass_prf_inf[:,i] = np.NaN
-        #         med_calc_mass_prf_inf[i] = np.NaN
-        #         med_act_mass_prf_inf[i] = np.NaN
-        #     if np.where(calc_mass_prf_all[:,i] > 0)[0].shape[0] < min_disp_halos:
-        #         calc_mass_prf_all[:,i] = np.NaN
-        #         act_mass_prf_all[:,i] = np.NaN
-        #         med_calc_mass_prf_all[i] = np.NaN
-        #         med_act_mass_prf_all[i] = np.NaN
-        #     if np.where(calc_dens_prf_orb[:,i] > 0)[0].shape[0] < min_disp_halos:
-        #         calc_dens_prf_orb[:,i] = np.NaN
-        #         act_dens_prf_orb[:,i] = np.NaN
-        #         med_calc_dens_prf_orb[i] = np.NaN
-        #         med_act_dens_prf_orb[i] = np.NaN
-        #     if np.where(calc_dens_prf_inf[:,i] > 0)[0].shape[0] < min_disp_halos:
-        #         calc_dens_prf_inf[:,i] = np.NaN
-        #         act_dens_prf_inf[:,i] = np.NaN
-        #         med_calc_dens_prf_inf[i] = np.NaN
-        #         med_act_dens_prf_inf[i] = np.NaN
-        #     if np.where(calc_dens_prf_all[:,i] > 0)[0].shape[0] < min_disp_halos:
-        #         calc_dens_prf_all[:,i] = np.NaN
-        #         act_dens_prf_all[:,i] = np.NaN
-        #         med_calc_dens_prf_all[i] = np.NaN
-        #         med_act_dens_prf_all[i] = np.NaN
+        for i in range(calc_mass_prf_orb.shape[1]):
+            if np.where(calc_mass_prf_orb[:,i] > 0)[0].shape[0] < min_disp_halos:
+                calc_mass_prf_orb[:,i] = np.NaN
+                act_mass_prf_orb[:,i] = np.NaN
+                med_calc_mass_prf_orb[i] = np.NaN
+                med_act_mass_prf_orb[i] = np.NaN
+            if np.where(calc_mass_prf_inf[:,i] > 0)[0].shape[0] < min_disp_halos:
+                calc_mass_prf_inf[:,i] = np.NaN
+                act_mass_prf_inf[:,i] = np.NaN
+                med_calc_mass_prf_inf[i] = np.NaN
+                med_act_mass_prf_inf[i] = np.NaN
+            if np.where(calc_mass_prf_all[:,i] > 0)[0].shape[0] < min_disp_halos:
+                calc_mass_prf_all[:,i] = np.NaN
+                act_mass_prf_all[:,i] = np.NaN
+                med_calc_mass_prf_all[i] = np.NaN
+                med_act_mass_prf_all[i] = np.NaN
+            if np.where(calc_dens_prf_orb[:,i] > 0)[0].shape[0] < min_disp_halos:
+                calc_dens_prf_orb[:,i] = np.NaN
+                act_dens_prf_orb[:,i] = np.NaN
+                med_calc_dens_prf_orb[i] = np.NaN
+                med_act_dens_prf_orb[i] = np.NaN
+            if np.where(calc_dens_prf_inf[:,i] > 0)[0].shape[0] < min_disp_halos:
+                calc_dens_prf_inf[:,i] = np.NaN
+                act_dens_prf_inf[:,i] = np.NaN
+                med_calc_dens_prf_inf[i] = np.NaN
+                med_act_dens_prf_inf[i] = np.NaN
+            if np.where(calc_dens_prf_all[:,i] > 0)[0].shape[0] < min_disp_halos:
+                calc_dens_prf_all[:,i] = np.NaN
+                act_dens_prf_all[:,i] = np.NaN
+                med_calc_dens_prf_all[i] = np.NaN
+                med_act_dens_prf_all[i] = np.NaN
         
         # Get the ratio of the calculated profile with the actual profile
         with np.errstate(divide='ignore', invalid='ignore'):
@@ -273,22 +276,6 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
             orb_dens_ratio = np.divide(calc_dens_prf_orb,act_dens_prf_orb) - 1
         
         inf_dens_ratio[np.isinf(inf_dens_ratio)] = 0
-
-        
-        # Find the upper and lower bound for scatter for calculated profiles
-        # Want shape to be (1,80)
-        # upper_calc_mass_prf_orb = np.nanpercentile(calc_mass_prf_orb, q=84.1, axis=0)
-        # lower_calc_mass_prf_orb = np.nanpercentile(calc_mass_prf_orb, q=15.9, axis=0)
-        # upper_calc_mass_prf_inf = np.nanpercentile(calc_mass_prf_inf, q=84.1, axis=0)
-        # lower_calc_mass_prf_inf = np.nanpercentile(calc_mass_prf_inf, q=15.9, axis=0)
-        # upper_calc_mass_prf_all = np.nanpercentile(calc_mass_prf_all, q=84.1, axis=0)
-        # lower_calc_mass_prf_all = np.nanpercentile(calc_mass_prf_all, q=15.9, axis=0)
-        # upper_calc_dens_prf_orb = np.nanpercentile(calc_dens_prf_orb, q=84.1, axis=0)
-        # lower_calc_dens_prf_orb = np.nanpercentile(calc_dens_prf_orb, q=15.9, axis=0)
-        # upper_calc_dens_prf_inf = np.nanpercentile(calc_dens_prf_inf, q=84.1, axis=0)
-        # lower_calc_dens_prf_inf = np.nanpercentile(calc_dens_prf_inf, q=15.9, axis=0)
-        # upper_calc_dens_prf_all = np.nanpercentile(calc_dens_prf_all, q=84.1, axis=0)
-        # lower_calc_dens_prf_all = np.nanpercentile(calc_dens_prf_all, q=15.9, axis=0)
         
         # Same for actual profiles    
         upper_orb_dens_ratio = np.percentile(orb_dens_ratio, q=84.1, axis=0)
@@ -297,33 +284,24 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         lower_inf_dens_ratio = np.percentile(inf_dens_ratio, q=15.9, axis=0)
         upper_all_dens_ratio = np.percentile(all_dens_ratio, q=84.1, axis=0)
         lower_all_dens_ratio = np.percentile(all_dens_ratio, q=15.9, axis=0)
-        # print(calc_dens_prf_inf[40])
-        # print(act_dens_prf_inf[40])
-        # print(inf_dens_ratio[40])
-        # print(lower_inf_dens_ratio)
+
         # Take the median value of the ratios
         med_all_ratio = np.median(all_dens_ratio, axis=0)
         med_inf_ratio = np.median(inf_dens_ratio, axis=0)
         med_orb_ratio = np.median(orb_dens_ratio, axis=0)
 
-
         middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
-        
-        # fig, ax = plt.subplots(1,3,figsize=(15,30))
-        # ax[0].scatter(middle_bins,diff_n_inf_ptls,c="g")
-        # ax[1].scatter(middle_bins,diff_n_orb_ptls,c="b")
-        # ax[2].scatter(middle_bins,np.round(diff_n_all_ptls,5),c="r")
-        # ax[0].set_xscale("log")
-        # ax[1].set_xscale("log")
-        # ax[2].set_xscale("log")
-        # fig.set_size_inches(50, 25)
-        # fig.savefig(save_location + title + "num_ptls_wrng.png", bbox_inches='tight')
 
-        fig, ax = plt.subplots(1,3, figsize=(15,30))
-        titlefntsize=26
-        axisfntsize=22
-        tickfntsize=20
-        legendfntsize=18
+        widths = [1]
+        heights = [1,0.5]
+        
+        fig = plt.figure(constrained_layout=True,figsize=(8,10))
+        gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
+        
+        titlefntsize=22
+        axisfntsize=20
+        tickfntsize=16
+        legendfntsize=16
         fill_alpha = 0.2
         
         # Get rid of the jump from 0 to the first occupied bin by setting them to nan
@@ -340,51 +318,56 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         med_act_dens_prf_orb[med_act_dens_prf_orb == 0] = np.NaN
         med_act_dens_prf_inf[med_act_dens_prf_inf == 0] = np.NaN
         
-        ax[0].plot(middle_bins, med_calc_mass_prf_all, 'r-', label = "ML mass profile all ptls")
-        ax[0].plot(middle_bins, med_calc_mass_prf_orb, 'b-', label = "ML mass profile orb ptls")
-        ax[0].plot(middle_bins, med_calc_mass_prf_inf, 'g-', label = "ML mass profile inf ptls")
-        ax[0].plot(middle_bins, med_act_mass_prf_all, 'r--', label = "SPARTA mass profile all ptls")
-        ax[0].plot(middle_bins, med_act_mass_prf_orb, 'b--', label = "SPARTA mass profile orb ptls")
-        ax[0].plot(middle_bins, med_act_mass_prf_inf, 'g--', label = "SPARTA mass profile inf ptls")
+        # ax[0].plot(middle_bins, med_calc_mass_prf_all, 'r-', label = "ML mass profile all ptls")
+        # ax[0].plot(middle_bins, med_calc_mass_prf_orb, 'b-', label = "ML mass profile orb ptls")
+        # ax[0].plot(middle_bins, med_calc_mass_prf_inf, 'g-', label = "ML mass profile inf ptls")
+        # ax[0].plot(middle_bins, med_act_mass_prf_all, 'r--', label = "SPARTA mass profile all ptls")
+        # ax[0].plot(middle_bins, med_act_mass_prf_orb, 'b--', label = "SPARTA mass profile orb ptls")
+        # ax[0].plot(middle_bins, med_act_mass_prf_inf, 'g--', label = "SPARTA mass profile inf ptls")
 
         
-        ax[0].set_title("ML Predicted vs Actual Mass Profile",fontsize=titlefntsize)
-        ax[0].set_xlabel("Radius $r/R_{200m}$", fontsize=axisfntsize)
-        ax[0].set_ylabel("Mass $M_\odot$", fontsize=axisfntsize)
-        ax[0].set_xscale("log")
-        ax[0].set_yscale("log")
-        ax[0].set_box_aspect(1)
-        ax[0].tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
-        ax[0].legend(fontsize=legendfntsize,frameon=False)
+        # ax[0].set_title("ML Predicted vs Actual Mass Profile",fontsize=titlefntsize)
+        # ax[0].set_xlabel("Radius $r/R_{200m}$", fontsize=axisfntsize)
+        # ax[0].set_ylabel("Mass $M_\odot$", fontsize=axisfntsize)
+        # ax[0].set_xscale("log")
+        # ax[0].set_yscale("log")
+        # ax[0].set_box_aspect(1)
+        # ax[0].tick_params(axis='both',which='both',labelsize=tickfntsize)
+        # ax[0].legend(fontsize=legendfntsize)
         
-        ax[1].plot(middle_bins, med_calc_dens_prf_all, 'r-', label = "ML density profile all ptls")
-        ax[1].plot(middle_bins, med_calc_dens_prf_orb, 'b-', label = "ML density profile orb ptls")
-        ax[1].plot(middle_bins, med_calc_dens_prf_inf, 'g-', label = "ML density profile inf ptls")
-        ax[1].plot(middle_bins, med_act_dens_prf_all, 'r--', label = "SPARTA density profile all ptls")
-        ax[1].plot(middle_bins, med_act_dens_prf_orb, 'b--', label = "SPARTA density profile orb ptls")
-        ax[1].plot(middle_bins, med_act_dens_prf_inf, 'g--', label = "SPARTA density profile inf ptls")
+        ax_0 = fig.add_subplot(gs[0])
+        ax_1 = fig.add_subplot(gs[1])
+        
+        invis_calc, = ax_0.plot([0], [0], color='black', linestyle='-')
+        invis_act, = ax_0.plot([0], [0], color='black', linestyle='--')
+        
+        all_lb, = ax_0.plot(middle_bins, med_calc_dens_prf_all, 'r-', label = "All")
+        orb_lb, = ax_0.plot(middle_bins, med_calc_dens_prf_orb, 'b-', label = "Orbiting")
+        inf_lb, = ax_0.plot(middle_bins, med_calc_dens_prf_inf, 'g-', label = "Infalling")
+        ax_0.plot(middle_bins, med_act_dens_prf_all, 'r--')
+        ax_0.plot(middle_bins, med_act_dens_prf_orb, 'b--')
+        ax_0.plot(middle_bins, med_act_dens_prf_inf, 'g--')
 
-        ax[1].set_title("ML Predicted vs Actual Density Profile",fontsize=titlefntsize)
-        ax[1].set_xlabel("Radius $r/R_{200m}$", fontsize=axisfntsize)
-        ax[1].set_ylabel("Density $M_\odot/kpc^3$", fontsize=axisfntsize)
-        ax[1].set_xscale("log")
-        ax[1].set_yscale("log")
-        ax[1].set_box_aspect(1)
-        ax[1].tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
-        ax[1].legend(fontsize=legendfntsize,frameon=False)
-        
-        ax[2].plot(middle_bins, med_all_ratio, 'r', label = "(ML density profile / SPARTA density profile all) - 1")
-        ax[2].plot(middle_bins, med_orb_ratio, 'b', label = "(ML density profile / SPARTA density profile orb) - 1")
-        ax[2].plot(middle_bins, med_inf_ratio, 'g', label = "(ML density profile / SPARTA density profile inf) - 1")
+        # ax_0.text(.01,.03, "Density Profiles", ha="left", va="bottom", transform=ax_0.transAxes, fontsize=titlefntsize)
+        ax_0.set_ylabel(r"$\rho (M_\odot \mathrm{kpc}^{-3})$", fontsize=axisfntsize)
+        ax_0.set_xscale("log")
+        ax_0.set_yscale("log")
+        ax_0.tick_params(axis='x', which='both',bottom=False,labelbottom=False)
+        ax_0.tick_params(axis='y',which='both',direction="in",labelsize=tickfntsize)
+        fig.legend([(invis_calc, invis_act),all_lb,orb_lb,inf_lb], ['Predicted, Actual','All','Orbiting','Infalling'], numpoints=1,handlelength=3,handler_map={tuple: HandlerTuple(ndivide=None)},loc='outside left upper',bbox_to_anchor=(1, 1),frameon=False,fontsize=legendfntsize)
+
+        ax_1.plot(middle_bins, med_all_ratio, 'r')
+        ax_1.plot(middle_bins, med_orb_ratio, 'b')
+        ax_1.plot(middle_bins, med_inf_ratio, 'g')
         
         if tot_num_halos > 5:
-            ax[2].fill_between(middle_bins, lower_all_dens_ratio, upper_all_dens_ratio, color='r', alpha=fill_alpha)
-            ax[2].fill_between(middle_bins, lower_inf_dens_ratio, upper_inf_dens_ratio, color='g', alpha=fill_alpha)
-            ax[2].fill_between(middle_bins, lower_orb_dens_ratio, upper_orb_dens_ratio, color='b', alpha=fill_alpha)    
+            ax_1.fill_between(middle_bins, lower_all_dens_ratio, upper_all_dens_ratio, color='r', alpha=fill_alpha)
+            ax_1.fill_between(middle_bins, lower_inf_dens_ratio, upper_inf_dens_ratio, color='g', alpha=fill_alpha)
+            ax_1.fill_between(middle_bins, lower_orb_dens_ratio, upper_orb_dens_ratio, color='b', alpha=fill_alpha)    
             
-        ax[2].set_title("(ML Predicted / Actual Density Profile) - 1",fontsize=titlefntsize)
-        ax[2].set_xlabel("Radius $r/R_{200m}$", fontsize=axisfntsize)
-        ax[2].set_ylabel("(ML Dens Prf / Act Dens Prf) - 1", fontsize=axisfntsize)
+        # ax_1.text(.01,.03, "Ratio", ha="left", va="bottom", transform=ax_1.transAxes, fontsize=titlefntsize)
+        ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
+        ax_1.set_ylabel(r"$\frac{\rho_{pred}}{\rho_{act}} - 1$", fontsize=axisfntsize)
         
         all_ticks = [0]
         if tot_num_halos > 5:
@@ -393,22 +376,22 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
             all_ticks.append(np.round(np.nanmax(upper_inf_dens_ratio),4))
             all_ticks.append(np.round(np.nanmin(lower_inf_dens_ratio),4))
 
-            # ax[2].vlines(middle_bins[np.where(med_orb_ratio > 0)[0][0]],ymin=np.min([all_ticks[2],all_ticks[4]]),ymax=np.max([all_ticks[1],all_ticks[3]]),colors="black",label="orb ratio > 0: " + str(np.round(middle_bins[np.where(med_orb_ratio > 0)[0][0]],3)) + "R200m")
         all_ticks.append(np.round(np.nanmax(med_orb_ratio),4))
         all_ticks.append(np.round(np.nanmin(med_orb_ratio),4))
         all_ticks.append(np.round(np.nanmax(med_inf_ratio),4))
         all_ticks.append(np.round(np.nanmin(med_inf_ratio),4))
 
-        ax[2].set_xscale("log")
-        # ax[2].set_yscale("symlog")
-        ax[2].set_box_aspect(1)
-        ax[2].tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
-        # ax[2].set_yticks(all_ticks)
-        ax[2].legend(fontsize=legendfntsize,frameon=False)    
+        ax_1.set_xscale("log")
+        tick_locs = lin_rticks
+        if 0 in lin_rticks:
+            tick_locs.remove(0)
+        strng_ticks = list(map(str, lin_rticks))
         
+        ax_1.set_xticks(tick_locs,strng_ticks)  
+        ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
+
         if save_graph:
-            fig.set_size_inches(50, 25)
-            fig.savefig(save_location + title + "dens_prfl_rat.png", bbox_inches='tight')
+            fig.savefig(save_location + title + "dens_prfl_rat.png",bbox_inches='tight')
         if show_graph:
             plt.show()
         plt.close()
