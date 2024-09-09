@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.ticker import LogLocator, NullFormatter
 from utils.data_and_loading_functions import split_orb_inf, timed
+from matplotlib.colors import LinearSegmentedColormap
 plt.rcParams['mathtext.fontset'] = 'dejavuserif'
 plt.rcParams['font.family'] = 'serif'
 
@@ -432,8 +433,11 @@ def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv,
         scale_inc_orb_p_rv_p_tv = scale_hists(inc_orb_p_rv_p_tv,act_orb_p_rv_p_tv,act_min=act_min_ptl,inc_min=inc_min_ptl)
         scale_inc_orb_c_r_c_rv = scale_hists(inc_orb_c_r_c_rv,act_orb_c_r_c_rv,act_min=act_min_ptl,inc_min=inc_min_ptl)
         
-        magma_cmap = plt.get_cmap("magma_r")
-        magma_cmap.set_under(color='white')
+        magma_cmap = plt.get_cmap("magma")
+        magma_cmap = LinearSegmentedColormap.from_list('magma_truncated', magma_cmap(np.linspace(0.15, 1, 256)))
+        magma_cmap.set_under(color='black')
+        magma_cmap.set_bad(color='black')
+        
         
         scale_miss_class_args = {
                 "vmin":inc_min_ptl,
