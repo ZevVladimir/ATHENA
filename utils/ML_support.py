@@ -572,7 +572,7 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
                     
         sparta_mass_prf_all, sparta_mass_prf_1halo,all_masses,bins = load_sprta_mass_prf(sim_splits,all_idxs,use_sims)
 
-        compare_density_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=sparta_mass_prf_all, act_mass_prf_orb=sparta_mass_prf_1halo, mass=all_masses, orbit_assn=preds, prf_bins=bins, title="", save_location=plot_save_loc, use_mp=True, save_graph=True)
+        compare_density_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=sparta_mass_prf_all, act_mass_prf_orb=sparta_mass_prf_1halo, mass=all_masses, orbit_assn=preds, prf_bins=bins, title="", save_location=plot_save_loc, use_mp=True)
     
     if missclass or full_dist:       
         p_corr_labels=y.compute().values.flatten()

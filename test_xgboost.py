@@ -124,7 +124,7 @@ if __name__ == "__main__":
         use_weights=True    
     
     model_dir = model_type + "_" + model_comb_name + "nu" + nu_string 
-
+    
     if scale_rad:
         model_dir += "scl_rad" + str(reduce_rad) + "_" + str(reduce_perc)
     if use_weights:
