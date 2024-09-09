@@ -222,8 +222,6 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
             med_calc_mass_prf_all += np.median(curr_calc_mass_prf_all,axis=0) 
             med_calc_mass_prf_orb += np.median(curr_calc_mass_prf_orb,axis=0) 
             med_calc_mass_prf_inf += np.median(curr_calc_mass_prf_inf,axis=0) 
-            print(curr_calc_dens_prf_all)
-            print(np.median(curr_calc_dens_prf_all,axis=0) )
             med_calc_dens_prf_all += np.median(curr_calc_dens_prf_all,axis=0) 
             med_calc_dens_prf_orb += np.median(curr_calc_dens_prf_orb,axis=0) 
             med_calc_dens_prf_inf += np.median(curr_calc_dens_prf_inf,axis=0)
@@ -312,29 +310,40 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         
         # Get the ratio of the calculated profile with the actual profile
         with np.errstate(divide='ignore', invalid='ignore'):
-            all_dens_ratio = np.divide(calc_dens_prf_all,act_dens_prf_all) - 1
-            inf_dens_ratio = np.divide(calc_dens_prf_inf,act_dens_prf_inf) - 1
-            orb_dens_ratio = np.divide(calc_dens_prf_orb,act_dens_prf_orb) - 1
+            med_all_dens_ratio = np.divide(med_calc_dens_prf_all,act_dens_prf_all) - 1
+            med_inf_dens_ratio = np.divide(med_calc_dens_prf_inf,act_dens_prf_inf) - 1
+            med_orb_dens_ratio = np.divide(med_calc_dens_prf_orb,act_dens_prf_orb) - 1
+            avg_all_dens_ratio = np.divide(avg_calc_dens_prf_all,act_dens_prf_all) - 1
+            avg_inf_dens_ratio = np.divide(avg_calc_dens_prf_inf,act_dens_prf_inf) - 1
+            avg_orb_dens_ratio = np.divide(avg_calc_dens_prf_orb,act_dens_prf_orb) - 1
 
-        inf_dens_ratio[np.isinf(inf_dens_ratio)] = np.NaN
+        med_inf_dens_ratio[np.isinf(med_inf_dens_ratio)] = np.NaN
+        avg_inf_dens_ratio[np.isinf(avg_inf_dens_ratio)] = np.NaN
         
         # Same for actual profiles    
-        upper_orb_dens_ratio = np.nanpercentile(orb_dens_ratio, q=84.1, axis=0)
-        lower_orb_dens_ratio = np.nanpercentile(orb_dens_ratio, q=15.9, axis=0)
-        upper_inf_dens_ratio = np.nanpercentile(inf_dens_ratio, q=84.1, axis=0)
-        lower_inf_dens_ratio = np.nanpercentile(inf_dens_ratio, q=15.9, axis=0)
-        upper_all_dens_ratio = np.nanpercentile(all_dens_ratio, q=84.1, axis=0)
-        lower_all_dens_ratio = np.nanpercentile(all_dens_ratio, q=15.9, axis=0)
+        med_upper_orb_dens_ratio = np.nanpercentile(med_orb_dens_ratio, q=84.1, axis=0)
+        med_lower_orb_dens_ratio = np.nanpercentile(med_orb_dens_ratio, q=15.9, axis=0)
+        med_upper_inf_dens_ratio = np.nanpercentile(med_inf_dens_ratio, q=84.1, axis=0)
+        med_lower_inf_dens_ratio = np.nanpercentile(med_inf_dens_ratio, q=15.9, axis=0)
+        med_upper_all_dens_ratio = np.nanpercentile(med_all_dens_ratio, q=84.1, axis=0)
+        med_lower_all_dens_ratio = np.nanpercentile(med_all_dens_ratio, q=15.9, axis=0)
+        
+        avg_upper_orb_dens_ratio = np.nanpercentile(avg_orb_dens_ratio, q=84.1, axis=0)
+        avg_lower_orb_dens_ratio = np.nanpercentile(avg_orb_dens_ratio, q=15.9, axis=0)
+        avg_upper_inf_dens_ratio = np.nanpercentile(avg_inf_dens_ratio, q=84.1, axis=0)
+        avg_lower_inf_dens_ratio = np.nanpercentile(avg_inf_dens_ratio, q=15.9, axis=0)
+        avg_upper_all_dens_ratio = np.nanpercentile(avg_all_dens_ratio, q=84.1, axis=0)
+        avg_lower_all_dens_ratio = np.nanpercentile(avg_all_dens_ratio, q=15.9, axis=0)
 
 
         # Take the median value of the ratios
-        med_all_ratio = np.nanmedian(all_dens_ratio, axis=0)
-        med_inf_ratio = np.nanmedian(inf_dens_ratio, axis=0)
-        med_orb_ratio = np.nanmedian(orb_dens_ratio, axis=0)
+        med_all_ratio = np.nanmedian(med_all_dens_ratio, axis=0)
+        med_inf_ratio = np.nanmedian(med_inf_dens_ratio, axis=0)
+        med_orb_ratio = np.nanmedian(med_orb_dens_ratio, axis=0)
 
-        avg_all_ratio = np.nanmean(all_dens_ratio, axis=0)
-        avg_inf_ratio = np.nanmean(inf_dens_ratio, axis=0)
-        avg_orb_ratio = np.nanmean(orb_dens_ratio, axis=0)
+        avg_all_ratio = np.nanmedian(avg_all_dens_ratio, axis=0)
+        avg_inf_ratio = np.nanmedian(avg_inf_dens_ratio, axis=0)
+        avg_orb_ratio = np.nanmedian(avg_orb_dens_ratio, axis=0)
 
         middle_bins = (prf_bins[1:] + prf_bins[:-1]) / 2
 
@@ -402,9 +411,9 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         ax_1.plot(middle_bins, med_inf_ratio, 'g')
         
         if tot_num_halos > 5:
-            ax_1.fill_between(middle_bins, lower_all_dens_ratio, upper_all_dens_ratio, color='r', alpha=fill_alpha)
-            ax_1.fill_between(middle_bins, lower_inf_dens_ratio, upper_inf_dens_ratio, color='g', alpha=fill_alpha)
-            ax_1.fill_between(middle_bins, lower_orb_dens_ratio, upper_orb_dens_ratio, color='b', alpha=fill_alpha)    
+            ax_1.fill_between(middle_bins, med_lower_all_dens_ratio, med_upper_all_dens_ratio, color='r', alpha=fill_alpha)
+            ax_1.fill_between(middle_bins, med_lower_inf_dens_ratio, med_upper_inf_dens_ratio, color='g', alpha=fill_alpha)
+            ax_1.fill_between(middle_bins, med_lower_orb_dens_ratio, med_upper_orb_dens_ratio, color='b', alpha=fill_alpha)    
             
         ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
         ax_1.set_ylabel(r"$\frac{\rho_{pred}}{\rho_{act}} - 1$", fontsize=axisfntsize)
@@ -449,9 +458,9 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         ax_1.plot(middle_bins, avg_inf_ratio, 'g')
         
         if tot_num_halos > 5:
-            ax_1.fill_between(middle_bins, lower_all_dens_ratio, upper_all_dens_ratio, color='r', alpha=fill_alpha)
-            ax_1.fill_between(middle_bins, lower_inf_dens_ratio, upper_inf_dens_ratio, color='g', alpha=fill_alpha)
-            ax_1.fill_between(middle_bins, lower_orb_dens_ratio, upper_orb_dens_ratio, color='b', alpha=fill_alpha)    
+            ax_1.fill_between(middle_bins, avg_lower_all_dens_ratio, avg_upper_all_dens_ratio, color='r', alpha=fill_alpha)
+            ax_1.fill_between(middle_bins, avg_lower_inf_dens_ratio, avg_upper_inf_dens_ratio, color='g', alpha=fill_alpha)
+            ax_1.fill_between(middle_bins, avg_lower_orb_dens_ratio, avg_upper_orb_dens_ratio, color='b', alpha=fill_alpha)    
             
         ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
         ax_1.set_ylabel(r"$\frac{\rho_{pred}}{\rho_{act}} - 1$", fontsize=axisfntsize)
