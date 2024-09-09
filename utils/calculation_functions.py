@@ -155,26 +155,33 @@ def diff_n_prf(diff_n_ptl, radii, idx, start_bin, end_bin, mass, act_prf):
         
     return diff_n_ptl
 
-def create_mass_prf(radii, orbit_assn, prf_bins, mass):
+def create_mass_prf(radii, orbit_assn, prf_bins, mass):   
     # Create bins for the density profile calculation
     num_prf_bins = prf_bins.shape[0] - 1
 
     calc_mass_prf_orb = np.zeros(num_prf_bins)
     calc_mass_prf_inf = np.zeros(num_prf_bins)
     calc_mass_prf_all = np.zeros(num_prf_bins)
-    
-    # determine which radii correspond to orbiting and which to infalling
-    orbit_radii = radii[np.where(orbit_assn == 1)[0]]
-    infall_radii = radii[np.where(orbit_assn == 0)[0]]
 
-    # loop through each bin's radii range and get the mass of each type of particle
-    for i in range(num_prf_bins):
-        start_bin = prf_bins[i]
-        end_bin = prf_bins[i+1]          
+    # Can adjust this to cut out halos that don't have enough particles within R200m
+    min_ptl = 0
+    if np.where(radii <= 1)[0].size < min_ptl:
+        calc_mass_prf_orb[:]=np.NaN
+        calc_mass_prf_inf[:]=np.NaN
+        calc_mass_prf_all[:]=np.NaN
+    else:
+        # determine which radii correspond to orbiting and which to infalling
+        orbit_radii = radii[np.where(orbit_assn == 1)[0]]
+        infall_radii = radii[np.where(orbit_assn == 0)[0]]
 
-        calc_mass_prf_all  = update_density_prf(calc_mass_prf_all, radii, i, start_bin, end_bin, mass)    
-        calc_mass_prf_orb = update_density_prf(calc_mass_prf_orb, orbit_radii, i, start_bin, end_bin, mass)      
-        calc_mass_prf_inf = update_density_prf(calc_mass_prf_inf, infall_radii, i, start_bin, end_bin, mass)      
-    
+        # loop through each bin's radii range and get the mass of each type of particle
+        for i in range(num_prf_bins):
+            start_bin = prf_bins[i]
+            end_bin = prf_bins[i+1]          
+
+            calc_mass_prf_all  = update_density_prf(calc_mass_prf_all, radii, i, start_bin, end_bin, mass)    
+            calc_mass_prf_orb = update_density_prf(calc_mass_prf_orb, orbit_radii, i, start_bin, end_bin, mass)      
+            calc_mass_prf_inf = update_density_prf(calc_mass_prf_inf, infall_radii, i, start_bin, end_bin, mass)      
+        
     
     return calc_mass_prf_all,calc_mass_prf_orb, calc_mass_prf_inf
