@@ -308,9 +308,9 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         
         # Get the ratio of the calculated profile with the actual profile
         with np.errstate(divide='ignore', invalid='ignore'):
-            med_all_dens_ratio = np.divide(med_calc_dens_prf_all,act_dens_prf_all) - 1
-            med_inf_dens_ratio = np.divide(med_calc_dens_prf_inf,act_dens_prf_inf) - 1
-            med_orb_dens_ratio = np.divide(med_calc_dens_prf_orb,act_dens_prf_orb) - 1
+            med_all_dens_ratio = np.divide(calc_dens_prf_all,act_dens_prf_all) - 1
+            med_inf_dens_ratio = np.divide(calc_dens_prf_inf,act_dens_prf_inf) - 1
+            med_orb_dens_ratio = np.divide(calc_dens_prf_orb,act_dens_prf_orb) - 1
             avg_all_dens_ratio = np.divide(avg_calc_dens_prf_all,act_dens_prf_all) - 1
             avg_inf_dens_ratio = np.divide(avg_calc_dens_prf_inf,act_dens_prf_inf) - 1
             avg_orb_dens_ratio = np.divide(avg_calc_dens_prf_orb,act_dens_prf_orb) - 1
@@ -400,6 +400,7 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         ax_0.set_ylabel(r"$\rho (M_\odot \mathrm{kpc}^{-3})$", fontsize=axisfntsize)
         ax_0.set_xscale("log")
         ax_0.set_yscale("log")
+        ax_0.set_xlim(0.05)
         ax_0.tick_params(axis='x', which='both',bottom=False,labelbottom=False)
         ax_0.tick_params(axis='y',which='both',direction="in",labelsize=tickfntsize)
         fig.legend([(invis_calc, invis_act),all_lb,orb_lb,inf_lb], ['Predicted, Actual','All','Orbiting','Infalling'], numpoints=1,handlelength=3,handler_map={tuple: HandlerTuple(ndivide=None)},loc='outside left upper',bbox_to_anchor=(1, 1),frameon=False,fontsize=legendfntsize)
@@ -415,7 +416,9 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
             
         ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
         ax_1.set_ylabel(r"$\frac{\rho_{pred}}{\rho_{act}} - 1$", fontsize=axisfntsize)
-
+        
+        ax_1.set_xlim(0.05)
+        ax_1.set_ylim(bottom=-0.3,top=0.3)
         ax_1.set_xscale("log")
         tick_locs = lin_rticks
         if 0 in lin_rticks:
@@ -447,6 +450,7 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         ax_0.set_ylabel(r"$\rho (M_\odot \mathrm{kpc}^{-3})$", fontsize=axisfntsize)
         ax_0.set_xscale("log")
         ax_0.set_yscale("log")
+        ax_0.set_xlim(0.05)
         ax_0.tick_params(axis='x', which='both',bottom=False,labelbottom=False)
         ax_0.tick_params(axis='y',which='both',direction="in",labelsize=tickfntsize)
         fig.legend([(invis_calc, invis_act),all_lb,orb_lb,inf_lb], ['Predicted, Actual','All','Orbiting','Infalling'], numpoints=1,handlelength=3,handler_map={tuple: HandlerTuple(ndivide=None)},loc='outside left upper',bbox_to_anchor=(1, 1),frameon=False,fontsize=legendfntsize)
@@ -463,6 +467,8 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
         ax_1.set_ylabel(r"$\frac{\rho_{pred}}{\rho_{act}} - 1$", fontsize=axisfntsize)
 
+        ax_1.set_xlim(0.05)
+        ax_1.set_ylim(top=0.3)
         ax_1.set_xscale("log")
         tick_locs = lin_rticks
         if 0 in lin_rticks:
