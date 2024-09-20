@@ -39,7 +39,7 @@ def create_nu_string(nu_list):
 # LOAD CONFIG PARAMETERS
 import configparser
 config = configparser.ConfigParser()
-config.read(os.environ.get('PWD') + "/config.ini")
+config.read(os.getcwd() + "/config.ini")
 rand_seed = config.getint("MISC","random_seed")
 on_zaratan = config.getboolean("MISC","on_zaratan")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
