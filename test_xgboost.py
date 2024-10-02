@@ -22,8 +22,9 @@ from utils.data_and_loading_functions import create_directory, timed
 # LOAD CONFIG PARAMETERS
 import configparser
 config = configparser.ConfigParser()
-config.read(os.environ.get('PWD') + "/config.ini")
+config.read(os.getcwd() + "/config.ini")
 on_zaratan = config.getboolean("MISC","on_zaratan")
+use_gpu = config.getboolean("MISC","use_gpu")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
@@ -71,17 +72,19 @@ if sim_cosmol == "planck13-nbody":
 else:
     cosmol = cosmology.setCosmology(sim_cosmol) 
 
-if on_zaratan:
+if use_gpu:
+    from dask_cuda import LocalCUDACluster
+    from cuml.metrics.accuracy import accuracy_score #TODO fix cupy installation??
+    from sklearn.metrics import make_scorer
+    import dask_ml.model_selection as dcv
+    import cudf
+elif not use_gpu and on_zaratan:
     from dask_mpi import initialize
     from mpi4py import MPI
     from distributed.scheduler import logger
     import socket
     #from dask_jobqueue import SLURMCluster
-else:
-    from dask_cuda import LocalCUDACluster
-    from cuml.metrics.accuracy import accuracy_score #TODO fix cupy installation??
-    from sklearn.metrics import make_scorer
-    import dask_ml.model_selection as dcv
+    
 
 import subprocess
 
@@ -96,7 +99,7 @@ if __name__ == "__main__":
     feature_columns = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
     target_column = ["Orbit_infall"]
     
-    if on_zaratan:
+    if not use_gpu and on_zaratan:
         if 'SLURM_CPUS_PER_TASK' in os.environ:
             cpus_per_task = int(os.environ['SLURM_CPUS_PER_TASK'])
         else:
@@ -137,6 +140,7 @@ if __name__ == "__main__":
     try:
         bst = xgb.Booster()
         bst.load_model(model_save_loc + model_name + ".json")
+        bst.set_param({"device": "cuda:0"})
         print("Loaded Model Trained on:",model_sims)
     except:
         print("Couldn't load Booster Located at: " + model_save_loc + model_name + ".json")

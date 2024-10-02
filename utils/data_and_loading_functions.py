@@ -60,6 +60,7 @@ from sparta_tools import sparta # type: ignore
 ##################################################################################################################
 @contextmanager
 def timed(txt):
+    print("Starting " + txt)
     t0 = time.time()
     yield
     t1 = time.time()

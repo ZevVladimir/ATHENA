@@ -14,8 +14,6 @@ from itertools import repeat
 from sparta_tools import sparta # type: ignore
 import os
 from contextlib import contextmanager
-import h5py
-from scipy.spatial import cKDTree
 import sys
 from matplotlib.animation import FuncAnimation
 import seaborn as sns
@@ -121,8 +119,7 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
     # Shape of profiles should be (num halo,num bins)
     # EX: 10 halos, 80 bins (10,80)
 
-    with timed("Finished Density Profile Plot"):
-        print("Starting Density Profile Plot")
+    with timed("Density Profile Plot"):
         act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
         tot_num_halos = halo_first.shape[0]
         if tot_num_halos > 5:
@@ -403,7 +400,7 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         ax_0.set_xlim(0.05)
         ax_0.tick_params(axis='x', which='both',bottom=False,labelbottom=False)
         ax_0.tick_params(axis='y',which='both',direction="in",labelsize=tickfntsize)
-        fig.legend([(invis_calc, invis_act),all_lb,orb_lb,inf_lb], ['Predicted, Actual','All','Orbiting','Infalling'], numpoints=1,handlelength=3,handler_map={tuple: HandlerTuple(ndivide=None)},loc='outside left upper',bbox_to_anchor=(1, 1),frameon=False,fontsize=legendfntsize)
+        fig.legend([(invis_calc, invis_act),all_lb,orb_lb,inf_lb], ['Predicted, Actual','All','Orbiting','Infalling'], numpoints=1,handlelength=3,handler_map={tuple: HandlerTuple(ndivide=None)},frameon=False,fontsize=legendfntsize)
 
         ax_1.plot(middle_bins, med_all_ratio, 'r')
         ax_1.plot(middle_bins, med_orb_ratio, 'b')
