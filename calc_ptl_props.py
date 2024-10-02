@@ -21,7 +21,7 @@ from utils.visualization_functions import halo_plot_3d_vec, compare_density_prf
 # LOAD CONFIG PARAMETERS
 import configparser
 config = configparser.ConfigParser()
-config.read(os.environ.get('PWD') + "/config.ini")
+config.read(os.getcwd() + "/config.ini")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 rand_seed = config.getint("MISC","random_seed")
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]

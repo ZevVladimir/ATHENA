@@ -16,7 +16,7 @@ def create_directory(path):
 # LOAD CONFIG PARAMETERS
 import configparser
 config = configparser.ConfigParser()
-config.read(os.environ.get('PWD') + "/config.ini")
+config.read(os.getcwd() + "/config.ini")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
@@ -60,6 +60,7 @@ from sparta_tools import sparta # type: ignore
 ##################################################################################################################
 @contextmanager
 def timed(txt):
+    print("Starting " + txt)
     t0 = time.time()
     yield
     t1 = time.time()

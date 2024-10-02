@@ -14,8 +14,6 @@ from itertools import repeat
 from sparta_tools import sparta # type: ignore
 import os
 from contextlib import contextmanager
-import h5py
-from scipy.spatial import cKDTree
 import sys
 from matplotlib.animation import FuncAnimation
 import seaborn as sns
@@ -35,7 +33,7 @@ num_processes = mp.cpu_count()
 # LOAD CONFIG PARAMETERS
 import configparser
 config = configparser.ConfigParser()
-config.read(os.environ.get('PWD') + "/config.ini")
+config.read(os.getcwd() + "/config.ini")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 rand_seed = config.getint("MISC","random_seed")
 on_zaratan = config.getboolean("MISC","on_zaratan")
@@ -59,8 +57,6 @@ path_to_sparta = config["PATHS"]["path_to_sparta"]
 curr_chunk_size = config.getint("SEARCH","chunk_size")
 lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
 
-if not on_zaratan:
-    import ipyvolume as ipv
 
 sys.path.insert(1, path_to_pygadgetreader)  
 from pygadgetreader import readsnap, readheader # type: ignore
@@ -123,8 +119,7 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
     # Shape of profiles should be (num halo,num bins)
     # EX: 10 halos, 80 bins (10,80)
 
-    with timed("Finished Density Profile Plot"):
-        print("Starting Density Profile Plot")
+    with timed("Density Profile Plot"):
         act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
         tot_num_halos = halo_first.shape[0]
         if tot_num_halos > 5:
@@ -405,7 +400,7 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         ax_0.set_xlim(0.05)
         ax_0.tick_params(axis='x', which='both',bottom=False,labelbottom=False)
         ax_0.tick_params(axis='y',which='both',direction="in",labelsize=tickfntsize)
-        fig.legend([(invis_calc, invis_act),all_lb,orb_lb,inf_lb], ['Predicted, Actual','All','Orbiting','Infalling'], numpoints=1,handlelength=3,handler_map={tuple: HandlerTuple(ndivide=None)},loc='outside left upper',bbox_to_anchor=(1, 1),frameon=False,fontsize=legendfntsize)
+        fig.legend([(invis_calc, invis_act),all_lb,orb_lb,inf_lb], ['Predicted, Actual','All','Orbiting','Infalling'], numpoints=1,handlelength=3,handler_map={tuple: HandlerTuple(ndivide=None)},frameon=False,fontsize=legendfntsize)
 
         ax_1.plot(middle_bins, med_all_ratio, 'r')
         ax_1.plot(middle_bins, med_orb_ratio, 'b')
@@ -1605,12 +1600,7 @@ def plot_orb_inf_dist(num_bins, radii, orb_inf, save_path):
     ax[1].legend(frameon=False)
     
     fig.savefig(save_path + "orb_inf_dist.png",bbox_inches="tight")
-    
-def mov_3d_plt(ptl_pos,ptl_vel,labels):
-    inf_mask = np.where(labels == 0)[0]
-    orb_msk = np.where(labels == 1)[0]
-    inf_ptls = ipv.quiver(ptl_pos[:,0,0],ptl_pos[:,1,0],ptl_pos[:,2,0],ptl_vel[:,0,0],ptl_vel[:,1,0],ptl_vel[:,2,0])
-   
+
 def plot_log_vel(phys_vel,radii,label,save_loc,v200m):
     if v200m == -1:
         title = "no_cut"

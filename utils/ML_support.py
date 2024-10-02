@@ -26,6 +26,7 @@ from utils.visualization_functions import compare_density_prf, plot_r_rv_tv_grap
 from utils.update_vis_fxns import plot_full_ptl_dist, plot_miss_class_dist
 from utils.calculation_functions import create_mass_prf
 from sparta_tools import sparta # type: ignore
+from colossus.cosmology import cosmology
 
 def parse_ranges(ranges_str):
     ranges = []
@@ -39,9 +40,10 @@ def create_nu_string(nu_list):
 # LOAD CONFIG PARAMETERS
 import configparser
 config = configparser.ConfigParser()
-config.read(os.environ.get('PWD') + "/config.ini")
+config.read(os.getcwd() + "/config.ini")
 rand_seed = config.getint("MISC","random_seed")
 on_zaratan = config.getboolean("MISC","on_zaratan")
+use_gpu = config.getboolean("MISC","use_gpu")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
@@ -93,17 +95,24 @@ log_tvticks = json.loads(config.get("XGBOOST","log_tvticks"))
 lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
 log_rticks = json.loads(config.get("XGBOOST","log_rticks"))
 
-if on_zaratan:
+if sim_cosmol == "planck13-nbody":
+    cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
+else:
+    cosmol = cosmology.setCosmology(sim_cosmol) 
+
+if use_gpu:
+    from dask_cuda import LocalCUDACluster
+    from cuml.metrics.accuracy import accuracy_score #TODO fix cupy installation??
+    from sklearn.metrics import make_scorer
+    import dask_ml.model_selection as dcv
+    import cudf
+    import dask_cudf as dc
+elif not use_gpu and on_zaratan:
     from dask_mpi import initialize
     from mpi4py import MPI
     from distributed.scheduler import logger
     import socket
     #from dask_jobqueue import SLURMCluster
-else:
-    from dask_cuda import LocalCUDACluster
-    from cuml.metrics.accuracy import accuracy_score #TODO fix cupy installation??
-    from sklearn.metrics import make_scorer
-    import dask_ml.model_selection as dcv
 
 def get_CUDA_cluster():
     cluster = LocalCUDACluster(
@@ -374,44 +383,63 @@ def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,use_wei
     results = client.compute(delayed_results, sync=True)
 
     # Unpack the results
-    
     ddfs,sim_scal_pos_weight,dask_weights = [], [], []
     if scale_rad and use_weights:    
         for ptl_df, scal_pos_weight, weight, bin_edge in results:
             scatter_df = client.scatter(ptl_df)
             dask_df = dd.from_delayed(scatter_df)
+            dask_df = dask_df.map_partitions(cudf.from_pandas)
             ddfs.append(dask_df)
             sim_scal_pos_weight.append(scal_pos_weight)
             scatter_weight = client.scatter(weight)
             dask_weight = dd.from_delayed(scatter_weight) 
             dask_weights.append(dask_weight)
             bin_edges = bin_edge
-        return dd.concat(ddfs),sim_scal_pos_weight,dd.concat(dask_weights),bin_edges
+        if use_gpu:
+            all_ddfs = dc.concat(ddfs,axis=0)
+        else:
+            all_ddfs = dd.concat(ddfs)
+        return all_ddfs,sim_scal_pos_weight,dd.concat(dask_weights),bin_edges
     elif scale_rad and not use_weights:
         for ptl_df, scal_pos_weight, bin_edge in results:
             scatter_df = client.scatter(ptl_df)
             dask_df = dd.from_delayed(scatter_df)
+            dask_df = dask_df.map_partitions(cudf.from_pandas)
             ddfs.append(dask_df)
             sim_scal_pos_weight.append(scal_pos_weight)
             bin_edges = bin_edge
-        return dd.concat(ddfs),sim_scal_pos_weight,bin_edges
+        if use_gpu:
+            all_ddfs = dc.concat(ddfs,axis=0)
+        else:
+            all_ddfs = dd.concat(ddfs)
+        return all_ddfs,sim_scal_pos_weight,bin_edges
     elif not scale_rad and use_weights:
         for ptl_df, scal_pos_weight, weight in results:
             scatter_df = client.scatter(ptl_df)
             dask_df = dd.from_delayed(scatter_df)
+            dask_df = dask_df.map_partitions(cudf.from_pandas)
             ddfs.append(dask_df)
             sim_scal_pos_weight.append(scal_pos_weight)
             scatter_weight = client.scatter(weight)
             dask_weight = dd.from_delayed(scatter_weight) 
             dask_weights.append(dask_weight)
-        return dd.concat(ddfs),sim_scal_pos_weight,dd.concat(dask_weights)
+        if use_gpu:
+            all_ddfs = dc.concat(ddfs,axis=0)
+        else:
+            all_ddfs = dd.concat(ddfs)
+        return all_ddfs,sim_scal_pos_weight,dd.concat(dask_weights)
     else:
         for ptl_df, scal_pos_weight in results:
             scatter_df = client.scatter(ptl_df)
             dask_df = dd.from_delayed(scatter_df)
+            dask_df = dask_df.map_partitions(cudf.from_pandas)
             ddfs.append(dask_df)    
             sim_scal_pos_weight.append(scal_pos_weight)
-        return dd.concat(ddfs),sim_scal_pos_weight
+        if use_gpu:
+            all_ddfs = dc.concat(ddfs,axis=0)
+        else:
+            all_ddfs = dd.concat(ddfs)
+        return all_ddfs,sim_scal_pos_weight
         
 def calc_scal_pos_weight(df):
     count_negatives = (df['Orbit_infall'] == 0).sum()
@@ -480,14 +508,19 @@ def load_data(client, sims, dset_name, limit_files = False, scale_rad=False, use
     all_scal_pos_weight = np.average(np.concatenate([np.array(sublist).flatten() for sublist in all_scal_pos_weight]))
     act_scale_pos_weight = np.average(all_scal_pos_weight)
     
-    if scale_rad and use_weights:
-        return dd.concat(dask_dfs),act_scale_pos_weight, dd.concat(all_weights), bin_edges
-    elif scale_rad and not use_weights:
-        return dd.concat(dask_dfs),act_scale_pos_weight, bin_edges
-    elif not scale_rad and use_weights:
-        return dd.concat(dask_dfs),act_scale_pos_weight, dd.concat(all_weights)
+    if use_gpu:
+        all_dask_dfs = dc.concat(dask_dfs,axis=0)
     else:
-        return dd.concat(dask_dfs),act_scale_pos_weight
+        all_dask_dfs = dd.concat(dask_dfs)
+    
+    if scale_rad and use_weights:
+        return all_dask_dfs,act_scale_pos_weight, dd.concat(all_weights), bin_edges
+    elif scale_rad and not use_weights:
+        return all_dask_dfs,act_scale_pos_weight, bin_edges
+    elif not scale_rad and use_weights:
+        return all_dask_dfs,act_scale_pos_weight, dd.concat(all_weights)
+    else:
+        return all_dask_dfs,act_scale_pos_weight
 
 def load_sprta_mass_prf(sim_splits,all_idxs,use_sims):                
     mass_prf_all_list = []
@@ -553,7 +586,7 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
         preds = make_preds(client, model, X, y, report_name="Report", print_report=False)
     
     num_bins = 30
-    
+
     if dens_prf:
         halo_first = halo_ddf["Halo_first"].values
         halo_n = halo_ddf["Halo_n"].values
@@ -571,8 +604,8 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
                     halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
                     
         sparta_mass_prf_all, sparta_mass_prf_1halo,all_masses,bins = load_sprta_mass_prf(sim_splits,all_idxs,use_sims)
-
-        compare_density_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=sparta_mass_prf_all, act_mass_prf_orb=sparta_mass_prf_1halo, mass=all_masses, orbit_assn=preds, prf_bins=bins, title="", save_location=plot_save_loc, use_mp=True)
+        print(preds)
+        compare_density_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=sparta_mass_prf_all, act_mass_prf_orb=sparta_mass_prf_1halo, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, title="", save_location=plot_save_loc, use_mp=False)
     
     if missclass or full_dist:       
         p_corr_labels=y.compute().values.flatten()

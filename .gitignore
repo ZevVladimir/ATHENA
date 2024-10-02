@@ -14,3 +14,4 @@ test.py
 /pickle_data/
 /utils/__pycache__/
 test2.py
+*.png
