@@ -15,6 +15,7 @@ import numpy as np
 import json
 import re
 from colossus.cosmology import cosmology
+import multiprocessing as mp
 
 from utils.ML_support import *
 from utils.data_and_loading_functions import create_directory, timed
@@ -73,7 +74,6 @@ else:
     cosmol = cosmology.setCosmology(sim_cosmol) 
 
 if use_gpu:
-    from dask_cuda import LocalCUDACluster
     from cuml.metrics.accuracy import accuracy_score #TODO fix cupy installation??
     from sklearn.metrics import make_scorer
     import dask_ml.model_selection as dcv
@@ -84,7 +84,8 @@ elif not use_gpu and on_zaratan:
     from distributed.scheduler import logger
     import socket
     #from dask_jobqueue import SLURMCluster
-    
+elif not on_zaratan:
+    from dask_cuda import LocalCUDACluster
 
 import subprocess
 
@@ -99,6 +100,9 @@ if __name__ == "__main__":
     feature_columns = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
     target_column = ["Orbit_infall"]
     
+    if use_gpu:
+        mp.set_start_method("spawn")
+
     if not use_gpu and on_zaratan:
         if 'SLURM_CPUS_PER_TASK' in os.environ:
             cpus_per_task = int(os.environ['SLURM_CPUS_PER_TASK'])

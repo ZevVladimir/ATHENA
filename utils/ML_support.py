@@ -15,6 +15,7 @@ import pandas as pd
 from colossus.lss import peaks
 from dask.distributed import Client
 import time
+import multiprocessing as mp
 
 from skopt import gp_minimize
 from skopt.space import Real
@@ -113,7 +114,10 @@ elif not use_gpu and on_zaratan:
     from distributed.scheduler import logger
     import socket
     #from dask_jobqueue import SLURMCluster
-
+elif not on_zaratan:
+    from dask_cuda import LocalCUDACluster
+    
+    
 def get_CUDA_cluster():
     cluster = LocalCUDACluster(
                                device_memory_limit='10GB',
@@ -388,7 +392,8 @@ def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,use_wei
         for ptl_df, scal_pos_weight, weight, bin_edge in results:
             scatter_df = client.scatter(ptl_df)
             dask_df = dd.from_delayed(scatter_df)
-            dask_df = dask_df.map_partitions(cudf.from_pandas)
+            if use_gpu:
+                dask_df = dask_df.map_partitions(cudf.from_pandas)
             ddfs.append(dask_df)
             sim_scal_pos_weight.append(scal_pos_weight)
             scatter_weight = client.scatter(weight)
@@ -404,7 +409,8 @@ def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,use_wei
         for ptl_df, scal_pos_weight, bin_edge in results:
             scatter_df = client.scatter(ptl_df)
             dask_df = dd.from_delayed(scatter_df)
-            dask_df = dask_df.map_partitions(cudf.from_pandas)
+            if use_gpu:
+                dask_df = dask_df.map_partitions(cudf.from_pandas)
             ddfs.append(dask_df)
             sim_scal_pos_weight.append(scal_pos_weight)
             bin_edges = bin_edge
@@ -417,7 +423,8 @@ def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,use_wei
         for ptl_df, scal_pos_weight, weight in results:
             scatter_df = client.scatter(ptl_df)
             dask_df = dd.from_delayed(scatter_df)
-            dask_df = dask_df.map_partitions(cudf.from_pandas)
+            if use_gpu:
+                dask_df = dask_df.map_partitions(cudf.from_pandas)
             ddfs.append(dask_df)
             sim_scal_pos_weight.append(scal_pos_weight)
             scatter_weight = client.scatter(weight)
@@ -432,7 +439,8 @@ def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,use_wei
         for ptl_df, scal_pos_weight in results:
             scatter_df = client.scatter(ptl_df)
             dask_df = dd.from_delayed(scatter_df)
-            dask_df = dask_df.map_partitions(cudf.from_pandas)
+            if use_gpu:
+                dask_df = dask_df.map_partitions(cudf.from_pandas)
             ddfs.append(dask_df)    
             sim_scal_pos_weight.append(scal_pos_weight)
         if use_gpu:
@@ -584,6 +592,15 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
     with timed("Predictions"):
         print(f"Starting predictions for {y.size.compute():.3e} particles")
         preds = make_preds(client, model, X, y, report_name="Report", print_report=False)
+
+    X = X.compute()
+    y = y.compute()
+    
+    X_scatter = client.scatter(X)
+    X = dd.from_delayed(X_scatter)
+    y_scatter = client.scatter(y)
+    y = dd.from_delayed(y_scatter)
+
     
     num_bins = 30
 
@@ -602,10 +619,9 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
                     halo_first[sim_splits[i]:sim_splits[i+1]] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
                 else:
                     halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
-                    
+
         sparta_mass_prf_all, sparta_mass_prf_1halo,all_masses,bins = load_sprta_mass_prf(sim_splits,all_idxs,use_sims)
-        print(preds)
-        compare_density_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=sparta_mass_prf_all, act_mass_prf_orb=sparta_mass_prf_1halo, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, title="", save_location=plot_save_loc, use_mp=False)
+        compare_density_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=sparta_mass_prf_all, act_mass_prf_orb=sparta_mass_prf_1halo, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, title="", save_location=plot_save_loc, use_mp=True)
     
     if missclass or full_dist:       
         p_corr_labels=y.compute().values.flatten()
