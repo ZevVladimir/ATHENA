@@ -63,6 +63,24 @@ if __name__ == '__main__':
         orb_outloc = (X_df["p_Scaled_radii"] > 0.5) & (X_df["p_Scaled_radii"] < 1) & (X_df["p_Radial_vel"] < 0.6) & (X_df["p_Radial_vel"] > 0) 
         orb_badloc = (X_df["p_Scaled_radii"] > 0.3) & (X_df["p_Scaled_radii"] < 0.5) & (X_df["p_Radial_vel"] < 0.6) & (X_df["p_Radial_vel"] > -0.6)
         
+        
+        orb_in_dict = {
+            'X_filter': {
+                "p_Scaled_radii": ('<',0.2),
+                "p_Radial_vel": ('<',0.6),
+                "p_Radial_vel": ('>',-0.6)
+            }
+        }
+        
+        orb_out_dict = {
+            'X_filter': {
+                "p_Scaled_radii": ('>',0.5),
+                "p_Scaled_radii": ('<',0.1),
+                "p_Radial_vel": ('<',0.6),
+                "p_Radial_vel": ('>',-0.6)
+            }
+        }
+        
         good_orb_in_Xdf = X_df[orb_inloc]
         good_orb_out_Xdf = X_df[orb_outloc]
         bad_orb_Xdf = X_df[orb_badloc]

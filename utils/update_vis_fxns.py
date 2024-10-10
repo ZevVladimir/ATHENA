@@ -5,6 +5,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.ticker import LogLocator, NullFormatter
 from utils.data_and_loading_functions import split_orb_inf, timed
 from matplotlib.colors import LinearSegmentedColormap
+import shap
 plt.rcParams['mathtext.fontset'] = 'dejavuserif'
 plt.rcParams['font.family'] = 'serif'
 
@@ -492,3 +493,49 @@ def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv,
 
 def plot_perr_err():
     return
+
+def shap_with_filter(explainer, fltr_dic, X, y, preds, col_names = None):
+    for feature, (operator, value) in fltr_dic["X_filter"].items():
+        if operator == '>':
+            y = y[X[feature] > value]
+            preds = preds[X[feature] > value]
+            X = X[X[feature] > value]
+        elif operator == '<':
+            y = y[X[feature] < value]
+            preds = preds[X[feature] < value]
+            X = X[X[feature] < value]
+        elif operator == '>=':
+            y = y[X[feature] >= value]
+            preds = preds[X[feature] >= value]
+            X = X[X[feature] >= value]
+        elif operator == '<=':
+            y = y[X[feature] <= value]
+            preds = preds[X[feature] <= value]
+            X = X[X[feature] <= value]
+        elif operator == '==':
+            y = y[X[feature] == value]
+            preds = preds[X[feature] > value]
+            X = X[X[feature] == value]
+        elif operator == '!=':
+            y = y[X[feature] != value]
+            preds = preds[X[feature] != value]
+            X = X[X[feature] != value]
+            
+            
+    X = X.compute()
+    y = y.compute()
+    
+    for feature, (label_type,value) in fltr_dic["label_filter"].items():
+        if label_type == "act":
+            X = X[y == value]
+            preds = preds[y == value]
+            y = y[y == value]
+        elif label_type == "pred":
+            X = X[preds == value]
+            y = y[preds == value]
+            preds = preds[preds == value]
+            
+    if col_names != None:
+        X.columns = col_names
+        
+    return explainer(X)
