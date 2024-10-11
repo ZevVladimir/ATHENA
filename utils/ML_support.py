@@ -884,4 +884,53 @@ def get_combined_name(model_sims):
     
     return combined_name
     
+def shap_with_filter(explainer, fltr_dic, X, y, preds, col_names = None, sample=0):
+    for feature, (operator, value) in fltr_dic["X_filter"].items():
+        if operator == '>':
+            y = y[X[feature] > value]
+            preds = preds[X[feature] > value]
+            X = X[X[feature] > value]
+        elif operator == '<':
+            y = y[X[feature] < value]
+            preds = preds[X[feature] < value]
+            X = X[X[feature] < value]
+        elif operator == '>=':
+            y = y[X[feature] >= value]
+            preds = preds[X[feature] >= value]
+            X = X[X[feature] >= value]
+        elif operator == '<=':
+            y = y[X[feature] <= value]
+            preds = preds[X[feature] <= value]
+            X = X[X[feature] <= value]
+        elif operator == '==':
+            y = y[X[feature] == value]
+            preds = preds[X[feature] > value]
+            X = X[X[feature] == value]
+        elif operator == '!=':
+            y = y[X[feature] != value]
+            preds = preds[X[feature] != value]
+            X = X[X[feature] != value]
+            
+            
+    X = X.compute()
+    y = y.compute()
+    
+    for feature, value in fltr_dic["label_filter"].items():
+        if feature == "act":
+            X = X[y == value]
+            preds = preds[y == value]
+            y = y[y == value]
+        elif feature == "pred":
+            X = X[preds == value]
+            y = y[preds == value]
+            preds = preds[preds == value]
+    
+    if sample > 0 and sample < 1:
+        X = X.sample(frac=sample,random_state=rand_seed)
+    
+    if col_names != None:
+        X.columns = col_names
+        
+    return explainer(X)
+    
     

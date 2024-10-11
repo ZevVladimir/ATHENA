@@ -56,83 +56,66 @@ if __name__ == '__main__':
                 
         preds = make_preds(client, bst, X_df, y_df, report_name="Report", print_report=False)
         preds = preds.values
-
-        #no_secondary_df = X_df[X_df["c_Scaled_radii"].isna()]
-        #no_secondary_df = no_secondary_df.sample(frac=0.01,random_state=rand_seed)
-        orb_inloc = (X_df["p_Scaled_radii"] < 0.2) & (X_df["p_Radial_vel"] < 0.6) & (X_df["p_Radial_vel"] > -0.6) 
-        orb_outloc = (X_df["p_Scaled_radii"] > 0.5) & (X_df["p_Scaled_radii"] < 1) & (X_df["p_Radial_vel"] < 0.6) & (X_df["p_Radial_vel"] > 0) 
-        orb_badloc = (X_df["p_Scaled_radii"] > 0.3) & (X_df["p_Scaled_radii"] < 0.5) & (X_df["p_Radial_vel"] < 0.6) & (X_df["p_Radial_vel"] > -0.6)
         
+        new_columns = ["Current $r/R_{\mathrm{200m}}$","Current $v_{\mathrm{r}}/V_{\mathrm{200m}}$","Current $v_{\mathrm{t}}/V_{\mathrm{200m}}$","Past $r/R_{\mathrm{200m}}$","Past $v_{\mathrm{r}}/V_{\mathrm{200m}}$","Past $v_{\mathrm{t}}/V_{\mathrm{200m}}$"]
+        col2num = {col: i for i, col in enumerate(new_columns)}
+        order = list(map(col2num.get, new_columns))
+        
+        bst.set_param({"device": "cuda:0"})
+        explainer = shap.TreeExplainer(bst)
+        
+        no_second_dict = {
+            'X_filter': {
+                "c_Scaled_radii": ('==',"NaN"),
+            },
+            'label_filter': {
+            }
+        }
         
         orb_in_dict = {
             'X_filter': {
                 "p_Scaled_radii": ('<',0.2),
                 "p_Radial_vel": ('<',0.6),
                 "p_Radial_vel": ('>',-0.6)
+            },
+            'label_filter': {
+                'act':1,
+                'pred':0
             }
         }
         
         orb_out_dict = {
             'X_filter': {
                 "p_Scaled_radii": ('>',0.5),
-                "p_Scaled_radii": ('<',0.1),
+                "p_Scaled_radii": ('<',1),
                 "p_Radial_vel": ('<',0.6),
-                "p_Radial_vel": ('>',-0.6)
+                "p_Radial_vel": ('>',0)
+            },
+            'label_filter': {
+                'act':1,
+                'pred':0
             }
         }
         
-        good_orb_in_Xdf = X_df[orb_inloc]
-        good_orb_out_Xdf = X_df[orb_outloc]
-        bad_orb_Xdf = X_df[orb_badloc]
-        good_orb_in_ydf = y_df[orb_inloc]
-        good_orb_out_ydf = y_df[orb_outloc]
-        bad_orb_ydf = y_df[orb_badloc]
-        good_orb_in_preds = preds[orb_inloc]
-        good_orb_out_preds = preds[orb_outloc]
-        bad_orb_preds = preds[orb_badloc]
+        orb_bad_dict = {
+            'X_filter': {
+                "p_Scaled_radii": ('>',0.3),
+                "p_Scaled_radii": ('<',0.5),
+                "p_Radial_vel": ('<',0.6),
+                "p_Radial_vel": ('>',-0.6)
+            },
+            'label_filter': {
+                'act':1,
+                'pred':0
+            }
+        }        
 
-        new_columns = ["Current $r/R_{\mathrm{200m}}$","Current $v_{\mathrm{r}}/V_{\mathrm{200m}}$","Current $v_{\mathrm{t}}/V_{\mathrm{200m}}$","Past $r/R_{\mathrm{200m}}$","Past $v_{\mathrm{r}}/V_{\mathrm{200m}}$","Past $v_{\mathrm{t}}/V_{\mathrm{200m}}$"]
-        col2num = {col: i for i, col in enumerate(new_columns)}
-        order = list(map(col2num.get, new_columns))
-
-
-        bst.set_param({"device": "cuda:0"})
-        explainer = shap.TreeExplainer(bst)
-
-        #no_secondary = no_secondary_df.compute()
-        good_orb_in_X = good_orb_in_Xdf.compute()
-        good_orb_out_X = good_orb_out_Xdf.compute()
-        bad_orb_X = bad_orb_Xdf.compute()
-        good_orb_in_y = good_orb_in_ydf.compute()
-        good_orb_out_y = good_orb_out_ydf.compute()
-        bad_orb_y = bad_orb_ydf.compute()
-
-        good_orb_in_X = good_orb_in_X[(good_orb_in_y["Orbit_infall"] == 1) & (good_orb_in_preds == 0)]
-        good_orb_out_X = good_orb_out_X[(good_orb_out_y["Orbit_infall"] == 1) & (good_orb_out_preds == 0)]
-        bad_orb_X = bad_orb_X[(bad_orb_y["Orbit_infall"] == 1) & (bad_orb_preds == 0)]
+        no_second_shap = shap_with_filter(explainer,no_second_dict,X_df,y_df,preds,new_columns,sample=0.01)
+        good_orb_in_shap = shap_with_filter(explainer,orb_in_dict,X_df,y_df,preds,new_columns)
+        good_orb_out_shap = shap_with_filter(explainer,orb_out_dict,X_df,y_df,preds,new_columns)
+        bad_orb_shap = shap_with_filter(explainer,orb_bad_dict,X_df,y_df,preds,new_columns)
         
-        # good_orb_in = good_orb_in.sample(frac=0.1,random_state=rand_seed)
-        # good_orb_out = good_orb_out.sample(frac=0.1,random_state=rand_seed)
-        # bad_orb = bad_orb.sample(frac=0.1,random_state=rand_seed)
-
-        #print("no secondary:",no_secondary.shape)
-        print("good in:",good_orb_in_X.shape)
-        print("good out:",good_orb_out_X.shape)
-        print("bad:", bad_orb_X.shape)
-        #no_secondary.columns = new_columns
-        good_orb_in_X.columns = new_columns
-        good_orb_out_X.columns = new_columns
-        bad_orb_X.columns = new_columns
-
-        #no_secondary = no_secondary.reset_index(drop=True)
-        good_orb_in_X = good_orb_in_X.reset_index(drop=True)
-        good_orb_out_X = good_orb_out_X.reset_index(drop=True)
-        bad_orb_X = bad_orb_X.reset_index(drop=True)
-
         #no_secondary_shap_values = explainer(no_secondary)
-        good_orb_in_shap_values = explainer(good_orb_in_X)
-        good_orb_out_shap_values = explainer(good_orb_out_X)
-        bad_orb_shap_values = explainer(bad_orb_X)
 
     with timed("SHAP Summary Chart"):
         #ax_no_secondary = shap.plots.beeswarm(no_secondary_shap_values,plot_size=(15,10),show=False,order=order)
@@ -151,7 +134,7 @@ if __name__ == '__main__':
         ax_bad = fig.add_subplot(gs[2,0])
 
         plt.sca(ax_good_in)
-        beeswarm_good_in = shap.plots.beeswarm(good_orb_in_shap_values,plot_size=(15,10),show=False,color_bar=False,order=order)
+        beeswarm_good_in = shap.plots.beeswarm(good_orb_in_shap,plot_size=(15,10),show=False,color_bar=False,order=order)
         ax_good_in.set_title("Well Classified Inner Population")
         ax_good_in.set_xlim(-6,10)
         ax_good_in.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
@@ -161,7 +144,7 @@ if __name__ == '__main__':
         #plt.clf()
 
         plt.sca(ax_good_out)
-        beeswarm_good_out = shap.plots.beeswarm(good_orb_out_shap_values,plot_size=(15,10),show=False,color_bar=False,order=order)
+        beeswarm_good_out = shap.plots.beeswarm(good_orb_out_shap,plot_size=(15,10),show=False,color_bar=False,order=order)
         ax_good_out.set_title("Well Classified Outer Population")
         ax_good_out.set_xlim(-6,10)
         ax_good_out.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
@@ -171,8 +154,7 @@ if __name__ == '__main__':
         #plt.clf()
 
         plt.sca(ax_bad)
-        beeswarm_good_out = shap.plots.beeswarm(good_orb_out_shap_values,plot_size=(15,10),show=False,color_bar=False,order=order)
-        beeswarm_bad = shap.plots.beeswarm(bad_orb_shap_values,plot_size=(15,10),show=False,color_bar=False,order=order)
+        beeswarm_bad = shap.plots.beeswarm(bad_orb_shap,plot_size=(15,10),show=False,color_bar=False,order=order)
         ax_bad.set_title("Adaquately Classified Between Population")
         ax_bad.set_xlim(-6,10)
         #plt.savefig(gen_plot_save_loc + "bad_orb_beeswarm.png")
