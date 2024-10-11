@@ -115,7 +115,6 @@ if __name__ == '__main__':
         good_orb_out_shap = shap_with_filter(explainer,orb_out_dict,X_df,y_df,preds,new_columns)
         bad_orb_shap = shap_with_filter(explainer,orb_bad_dict,X_df,y_df,preds,new_columns)
         
-        #no_secondary_shap_values = explainer(no_secondary)
 
     with timed("SHAP Summary Chart"):
         #ax_no_secondary = shap.plots.beeswarm(no_secondary_shap_values,plot_size=(15,10),show=False,order=order)
@@ -189,3 +188,34 @@ if __name__ == '__main__':
         cb.outline.set_visible(False)
         
         fig.savefig(plot_loc + "all_vr_r_orb_beeswarm.png")
+    
+    with timed("SHAP Indiv Feature"):
+        n = len(new_columns)
+        ncols = int(np.ceil(np.sqrt(n)))
+        nrows = int(np.ceil(n / ncols))
+        
+        fig,axes = plt.subplots(nrows,ncols,constrained_layout=True,figsize=(15*nrows,10*ncols))
+
+        if n == 1:
+            axes = [axes]
+        else:
+            axes = axes.flatten()
+            
+        for i,feature in enumerate(new_columns):
+            plt.sca(axes[i])
+            shap.plots.beeswarm(good_orb_in_shap[:,i],plot_size=(15,10),show=False,color_bar=False,order=order)
+            shap.plots.beeswarm(good_orb_out_shap[:,i],plot_size=(15,10),show=False,color_bar=False,order=order)
+            shap.plots.beeswarm(bad_orb_shap[:,i],plot_size=(15,10),show=False,color_bar=False,order=order)
+            axes[i].set_title(feature)
+            axes[i].set_xlim(-6,10)
+        color_bar_label=labels["FEATURE_VALUE"]
+        m = cm.ScalarMappable(cmap=color)
+        m.set_array([0, 1])
+        cb = fig.colorbar(m, ax=axes, orientation='vertical', ticks=[0, 1], aspect=80, shrink=0.8, pad=0.05)
+        cb.set_ticklabels([labels['FEATURE_VALUE_LOW'], labels['FEATURE_VALUE_HIGH']])
+        cb.set_label(color_bar_label, size=12, labelpad=0)
+        cb.ax.tick_params(labelsize=11, length=0)
+        cb.set_alpha(1)
+        cb.outline.set_visible(False)
+        fig.savefig(plot_loc + "indiv_feat_beeswarm.png")
+    
