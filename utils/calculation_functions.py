@@ -155,7 +155,7 @@ def diff_n_prf(diff_n_ptl, radii, idx, start_bin, end_bin, mass, act_prf):
         
     return diff_n_ptl
 
-def create_mass_prf(radii, orbit_assn, prf_bins, mass):   
+def create_mass_prf(radii, orbit_assn, prf_bins, mass):  
     # Create bins for the density profile calculation
     num_prf_bins = prf_bins.shape[0] - 1
 

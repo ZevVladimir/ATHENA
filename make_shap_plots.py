@@ -5,6 +5,10 @@ import configparser
 import matplotlib.pyplot as plt
 from colossus.cosmology import cosmology
 import shap
+import matplotlib.cm as cm
+from  shap.plots import colors
+from shap.plots._utils import convert_color
+from utils.data_and_loading_functions import create_directory
 
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
@@ -41,29 +45,154 @@ if __name__ == '__main__':
             print("Couldn't load Booster Located at: " + model_save_loc + model_name + ".json")
 
         for curr_test_sims in test_sims:
+            test_comb_name = get_combined_name(curr_test_sims) 
             for dset_name in eval_datasets:
+                plot_loc = model_save_loc + dset_name + "_" + test_comb_name + "/plots/"
+                create_directory(plot_loc)
                 
                 data,scale_pos_weight = load_data(client,curr_test_sims,dset_name,limit_files=False)
                 X_df = data[feature_columns]
                 y_df = data[target_column]
+                
+        preds = make_preds(client, bst, X_df, dask = True, report_name="Report", print_report=False)
 
-        print(X_df.shape[0].compute(),X_df.shape[1])
-        X = X_df.sample(frac = 0.001, random_state = 42)
-        X = X.compute()
-        print(X.shape)
 
+        new_columns = ["Current $r/R_{\mathrm{200m}}$","Current $v_{\mathrm{r}}/V_{\mathrm{200m}}$","Current $v_{\mathrm{t}}/V_{\mathrm{200m}}$","Past $r/R_{\mathrm{200m}}$","Past $v_{\mathrm{r}}/V_{\mathrm{200m}}$","Past $v_{\mathrm{t}}/V_{\mathrm{200m}}$"]
+        col2num = {col: i for i, col in enumerate(new_columns)}
+        order = list(map(col2num.get, new_columns))
+        
         bst.set_param({"device": "cuda:0"})
         explainer = shap.TreeExplainer(bst)
-        shap_values = explainer.shap_values(X)
+        
+        expected_value = explainer.expected_value
+        if isinstance(expected_value, list):
+            expected_value = expected_value[1]
+        print(f"Explainer expected value: {expected_value}")
 
-    with timed("Summary Bar Chart"):
-        fig = shap.summary_plot(shap_values, X, plot_type="bar",show=False)
-        plt.savefig(gen_plot_save_loc + "shap_summ_bar.png")
+        
+        no_second_dict = {
+            'X_filter': {
+                "c_Scaled_radii": ('==',"NaN"),
+            },
+            'label_filter': {
+            }
+        }
+        
+        orb_in_dict = {
+            'X_filter': {
+                "p_Scaled_radii": ('<',0.2),
+                "p_Radial_vel": ('<',0.6),
+                "p_Radial_vel": ('>',-0.6)
+            },
+            'label_filter': {
+                'act':1,
+                'pred':0
+            }
+        }
+        
+        orb_out_dict = {
+            'X_filter': {
+                "p_Scaled_radii": ('>',0.5),
+                "p_Scaled_radii": ('<',1),
+                "p_Radial_vel": ('<',0.6),
+                "p_Radial_vel": ('>',0)
+            },
+            'label_filter': {
+                'act':1,
+                'pred':0
+            }
+        }
+        
+        orb_bad_misclass_dict = {
+            'X_filter': {
+                "p_Scaled_radii": ('>',0.3),
+                "p_Scaled_radii": ('<',0.5),
+                "p_Radial_vel": ('<',0.6),
+                "p_Radial_vel": ('>',-0.6)
+            },
+            'label_filter': {
+                'act':1,
+                'pred':0
+            }
+        }        
+        
+        orb_bad_corr_dict = {
+            'X_filter': {
+                "p_Scaled_radii": ('>',0.3),
+                "p_Scaled_radii": ('<',0.5),
+                "p_Radial_vel": ('<',0.6),
+                "p_Radial_vel": ('>',-0.6)
+            },
+            'label_filter': {
+                'act':1,
+                'pred':1
+            }
+        }       
+        
+        in_btwn_dict = {
+            'X_filter': {
+                "p_Scaled_radii": ('>',0.3),
+                "p_Scaled_radii": ('<',0.5),
+                "p_Radial_vel": ('<',0.6),
+                "p_Radial_vel": ('>',-0.6)
+            },
+        }
 
-    with timed("SHAP Summary Chart"):
-        fig = shap.summary_plot(shap_values, X,show=False)
-        plt.savefig(gen_plot_save_loc + "shap_summ.png")
+        # no_second_shap = shap_with_filter(explainer,no_second_dict,X_df,y_df,preds,new_columns,sample=0.01)
+        # good_orb_in_shap,good_orb_in_shap_values = shap_with_filter(explainer,orb_in_dict,X_df,y_df,preds,new_columns)
+        # good_orb_out_shap,good_orb_out_shap_values = shap_with_filter(explainer,orb_out_dict,X_df,y_df,preds,new_columns)
+        bad_orb_missclass_shap,bad_orb_missclass_shap_values, bad_orb_missclass_X = shap_with_filter(explainer,orb_bad_misclass_dict,X_df,y_df,preds,new_columns)
+        bad_orb_corr_shap,bad_orb_corr_shap_values, bad_orb_corr_X = shap_with_filter(explainer,orb_bad_corr_dict,X_df,y_df,preds,new_columns)
+        # in_btwn_shap,in_btwn_shap_values = shap_with_filter(explainer,in_btwn_dict,X_df,y_df,preds,new_columns,sample=0.0001)
 
-    with timed("SHAP PR vs PRV"):
-        fig = shap.dependence_plot("p_Scaled_radii",shap_values,X,interaction_index="p_Radial_vel",show=False)
-        plt.savefig(gen_plot_save_loc + "pr_prv.png")
+    with timed("Make SHAP plots"):
+        #ax_no_secondary = shap.plots.beeswarm(no_secondary_shap_values,plot_size=(15,10),show=False,order=order)
+        #plt.title("No Secondary Snapshot Population")
+        #plt.xlim(-6,10)
+        #plt.savefig(gen_plot_save_loc + "no_secondary_beeswarm.png")
+        #print("finished no secondary")
+
+        widths = [4]
+        heights = [4]
+        fig = plt.figure(constrained_layout=True,figsize=(30,25))
+        gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
+
+        ax1 = fig.add_subplot(gs[0,0])
+        # ax2 = fig.add_subplot(gs[1,0])
+
+        plt.sca(ax1)
+        r = shap.decision_plot(expected_value, bad_orb_corr_shap_values,features=bad_orb_corr_X,feature_names=new_columns,auto_size_plot=False,show=False,return_objects=True)
+        shap.decision_plot(expected_value, bad_orb_missclass_shap_values,features=bad_orb_missclass_X,feature_names=new_columns,auto_size_plot=False,show=False,feature_order=None,xlim=r.xlim)
+        
+        # labels = {
+        # 'MAIN_EFFECT': "SHAP main effect value for\n%s",
+        # 'INTERACTION_VALUE': "SHAP interaction value",
+        # 'INTERACTION_EFFECT': "SHAP interaction value for\n%s and %s",
+        # 'VALUE': "SHAP value (impact on model output)",
+        # 'GLOBAL_VALUE': "mean(|SHAP value|) (average impact on model output magnitude)",
+        # 'VALUE_FOR': "SHAP value for\n%s",
+        # 'PLOT_FOR': "SHAP plot for %s",
+        # 'FEATURE': "Feature %s",
+        # 'FEATURE_VALUE': "Feature value",
+        # 'FEATURE_VALUE_LOW': "Low",
+        # 'FEATURE_VALUE_HIGH': "High",
+        # 'JOINT_VALUE': "Joint SHAP value",
+        # 'MODEL_OUTPUT': "Model output value"
+        # }
+        
+        # color = colors.red_blue
+        # color = convert_color(color)
+
+        # color_bar_label=labels["FEATURE_VALUE"]
+        # m = cm.ScalarMappable(cmap=color)
+        # m.set_array([0, 1])
+        # cb = plt.colorbar(m, cax=plt.subplot(gs[:,-1]), ticks=[0, 1], aspect=80)
+        # cb.set_ticklabels([labels['FEATURE_VALUE_LOW'], labels['FEATURE_VALUE_HIGH']])
+        # cb.set_label(color_bar_label, size=12, labelpad=0)
+        # cb.ax.tick_params(labelsize=11, length=0)
+        # cb.set_alpha(1)
+        # cb.outline.set_visible(False)
+        
+        fig.savefig(plot_loc + "vr_r_orb_middle_decision.png")
+
+    
