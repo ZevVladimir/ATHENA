@@ -54,15 +54,21 @@ if __name__ == '__main__':
                 X_df = data[feature_columns]
                 y_df = data[target_column]
                 
-        preds = make_preds(client, bst, X_df, y_df, report_name="Report", print_report=False)
-        preds = preds.values
-        
+        preds = make_preds(client, bst, X_df, dask = True, report_name="Report", print_report=False)
+
+
         new_columns = ["Current $r/R_{\mathrm{200m}}$","Current $v_{\mathrm{r}}/V_{\mathrm{200m}}$","Current $v_{\mathrm{t}}/V_{\mathrm{200m}}$","Past $r/R_{\mathrm{200m}}$","Past $v_{\mathrm{r}}/V_{\mathrm{200m}}$","Past $v_{\mathrm{t}}/V_{\mathrm{200m}}$"]
         col2num = {col: i for i, col in enumerate(new_columns)}
         order = list(map(col2num.get, new_columns))
         
         bst.set_param({"device": "cuda:0"})
         explainer = shap.TreeExplainer(bst)
+        
+        expected_value = explainer.expected_value
+        if isinstance(expected_value, list):
+            expected_value = expected_value[1]
+        print(f"Explainer expected value: {expected_value}")
+
         
         no_second_dict = {
             'X_filter': {
@@ -97,7 +103,7 @@ if __name__ == '__main__':
             }
         }
         
-        orb_bad_dict = {
+        orb_bad_misclass_dict = {
             'X_filter': {
                 "p_Scaled_radii": ('>',0.3),
                 "p_Scaled_radii": ('<',0.5),
@@ -109,113 +115,84 @@ if __name__ == '__main__':
                 'pred':0
             }
         }        
-
-        no_second_shap = shap_with_filter(explainer,no_second_dict,X_df,y_df,preds,new_columns,sample=0.01)
-        good_orb_in_shap = shap_with_filter(explainer,orb_in_dict,X_df,y_df,preds,new_columns)
-        good_orb_out_shap = shap_with_filter(explainer,orb_out_dict,X_df,y_df,preds,new_columns)
-        bad_orb_shap = shap_with_filter(explainer,orb_bad_dict,X_df,y_df,preds,new_columns)
         
+        orb_bad_corr_dict = {
+            'X_filter': {
+                "p_Scaled_radii": ('>',0.3),
+                "p_Scaled_radii": ('<',0.5),
+                "p_Radial_vel": ('<',0.6),
+                "p_Radial_vel": ('>',-0.6)
+            },
+            'label_filter': {
+                'act':1,
+                'pred':1
+            }
+        }       
+        
+        in_btwn_dict = {
+            'X_filter': {
+                "p_Scaled_radii": ('>',0.3),
+                "p_Scaled_radii": ('<',0.5),
+                "p_Radial_vel": ('<',0.6),
+                "p_Radial_vel": ('>',-0.6)
+            },
+        }
 
-    with timed("SHAP Summary Chart"):
+        # no_second_shap = shap_with_filter(explainer,no_second_dict,X_df,y_df,preds,new_columns,sample=0.01)
+        # good_orb_in_shap,good_orb_in_shap_values = shap_with_filter(explainer,orb_in_dict,X_df,y_df,preds,new_columns)
+        # good_orb_out_shap,good_orb_out_shap_values = shap_with_filter(explainer,orb_out_dict,X_df,y_df,preds,new_columns)
+        bad_orb_missclass_shap,bad_orb_missclass_shap_values, bad_orb_missclass_X = shap_with_filter(explainer,orb_bad_misclass_dict,X_df,y_df,preds,new_columns)
+        bad_orb_corr_shap,bad_orb_corr_shap_values, bad_orb_corr_X = shap_with_filter(explainer,orb_bad_corr_dict,X_df,y_df,preds,new_columns)
+        # in_btwn_shap,in_btwn_shap_values = shap_with_filter(explainer,in_btwn_dict,X_df,y_df,preds,new_columns,sample=0.0001)
+
+    with timed("Make SHAP plots"):
         #ax_no_secondary = shap.plots.beeswarm(no_secondary_shap_values,plot_size=(15,10),show=False,order=order)
         #plt.title("No Secondary Snapshot Population")
         #plt.xlim(-6,10)
         #plt.savefig(gen_plot_save_loc + "no_secondary_beeswarm.png")
         #print("finished no secondary")
 
-        widths = [4,.15]
-        heights = [4,4,4]
-        fig = plt.figure(constrained_layout=True,figsize=(45,10))
+        widths = [4]
+        heights = [4]
+        fig = plt.figure(constrained_layout=True,figsize=(30,25))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
 
-        ax_good_in = fig.add_subplot(gs[0,0])
-        ax_good_out = fig.add_subplot(gs[1,0])
-        ax_bad = fig.add_subplot(gs[2,0])
+        ax1 = fig.add_subplot(gs[0,0])
+        # ax2 = fig.add_subplot(gs[1,0])
 
-        plt.sca(ax_good_in)
-        beeswarm_good_in = shap.plots.beeswarm(good_orb_in_shap,plot_size=(15,10),show=False,color_bar=False,order=order)
-        ax_good_in.set_title("Well Classified Inner Population")
-        ax_good_in.set_xlim(-6,10)
-        ax_good_in.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
-        ax_good_in.set_xlabel('')
-       #plt.savefig(gen_plot_save_loc + "good_orb_in_beeswarm.png")
-        print("finished good orb in")
-        #plt.clf()
-
-        plt.sca(ax_good_out)
-        beeswarm_good_out = shap.plots.beeswarm(good_orb_out_shap,plot_size=(15,10),show=False,color_bar=False,order=order)
-        ax_good_out.set_title("Well Classified Outer Population")
-        ax_good_out.set_xlim(-6,10)
-        ax_good_out.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
-        ax_good_out.set_xlabel('')
-        #plt.savefig(gen_plot_save_loc + "good_orb_out_beeswarm.png")
-        print("finished good orb out")
-        #plt.clf()
-
-        plt.sca(ax_bad)
-        beeswarm_bad = shap.plots.beeswarm(bad_orb_shap,plot_size=(15,10),show=False,color_bar=False,order=order)
-        ax_bad.set_title("Adaquately Classified Between Population")
-        ax_bad.set_xlim(-6,10)
-        #plt.savefig(gen_plot_save_loc + "bad_orb_beeswarm.png")
-
-        labels = {
-        'MAIN_EFFECT': "SHAP main effect value for\n%s",
-        'INTERACTION_VALUE': "SHAP interaction value",
-        'INTERACTION_EFFECT': "SHAP interaction value for\n%s and %s",
-        'VALUE': "SHAP value (impact on model output)",
-        'GLOBAL_VALUE': "mean(|SHAP value|) (average impact on model output magnitude)",
-        'VALUE_FOR': "SHAP value for\n%s",
-        'PLOT_FOR': "SHAP plot for %s",
-        'FEATURE': "Feature %s",
-        'FEATURE_VALUE': "Feature value",
-        'FEATURE_VALUE_LOW': "Low",
-        'FEATURE_VALUE_HIGH': "High",
-        'JOINT_VALUE': "Joint SHAP value",
-        'MODEL_OUTPUT': "Model output value"
-        }
+        plt.sca(ax1)
+        r = shap.decision_plot(expected_value, bad_orb_corr_shap_values,features=bad_orb_corr_X,feature_names=new_columns,auto_size_plot=False,show=False,return_objects=True)
+        shap.decision_plot(expected_value, bad_orb_missclass_shap_values,features=bad_orb_missclass_X,feature_names=new_columns,auto_size_plot=False,show=False,feature_order=None,xlim=r.xlim)
         
-        color = colors.red_blue
-        color = convert_color(color)
-
-        color_bar_label=labels["FEATURE_VALUE"]
-        m = cm.ScalarMappable(cmap=color)
-        m.set_array([0, 1])
-        cb = plt.colorbar(m, cax=plt.subplot(gs[:,-1]), ticks=[0, 1], aspect=80)
-        cb.set_ticklabels([labels['FEATURE_VALUE_LOW'], labels['FEATURE_VALUE_HIGH']])
-        cb.set_label(color_bar_label, size=12, labelpad=0)
-        cb.ax.tick_params(labelsize=11, length=0)
-        cb.set_alpha(1)
-        cb.outline.set_visible(False)
+        # labels = {
+        # 'MAIN_EFFECT': "SHAP main effect value for\n%s",
+        # 'INTERACTION_VALUE': "SHAP interaction value",
+        # 'INTERACTION_EFFECT': "SHAP interaction value for\n%s and %s",
+        # 'VALUE': "SHAP value (impact on model output)",
+        # 'GLOBAL_VALUE': "mean(|SHAP value|) (average impact on model output magnitude)",
+        # 'VALUE_FOR': "SHAP value for\n%s",
+        # 'PLOT_FOR': "SHAP plot for %s",
+        # 'FEATURE': "Feature %s",
+        # 'FEATURE_VALUE': "Feature value",
+        # 'FEATURE_VALUE_LOW': "Low",
+        # 'FEATURE_VALUE_HIGH': "High",
+        # 'JOINT_VALUE': "Joint SHAP value",
+        # 'MODEL_OUTPUT': "Model output value"
+        # }
         
-        fig.savefig(plot_loc + "all_vr_r_orb_beeswarm.png")
-    
-    with timed("SHAP Indiv Feature"):
-        n = len(new_columns)
-        ncols = int(np.ceil(np.sqrt(n)))
-        nrows = int(np.ceil(n / ncols))
-        
-        fig,axes = plt.subplots(nrows,ncols,constrained_layout=True,figsize=(15*nrows,10*ncols))
+        # color = colors.red_blue
+        # color = convert_color(color)
 
-        if n == 1:
-            axes = [axes]
-        else:
-            axes = axes.flatten()
-            
-        for i,feature in enumerate(new_columns):
-            plt.sca(axes[i])
-            shap.plots.beeswarm(good_orb_in_shap[:,i],plot_size=(15,10),show=False,color_bar=False,order=order)
-            shap.plots.beeswarm(good_orb_out_shap[:,i],plot_size=(15,10),show=False,color_bar=False,order=order)
-            shap.plots.beeswarm(bad_orb_shap[:,i],plot_size=(15,10),show=False,color_bar=False,order=order)
-            axes[i].set_title(feature)
-            axes[i].set_xlim(-6,10)
-        color_bar_label=labels["FEATURE_VALUE"]
-        m = cm.ScalarMappable(cmap=color)
-        m.set_array([0, 1])
-        cb = fig.colorbar(m, ax=axes, orientation='vertical', ticks=[0, 1], aspect=80, shrink=0.8, pad=0.05)
-        cb.set_ticklabels([labels['FEATURE_VALUE_LOW'], labels['FEATURE_VALUE_HIGH']])
-        cb.set_label(color_bar_label, size=12, labelpad=0)
-        cb.ax.tick_params(labelsize=11, length=0)
-        cb.set_alpha(1)
-        cb.outline.set_visible(False)
-        fig.savefig(plot_loc + "indiv_feat_beeswarm.png")
+        # color_bar_label=labels["FEATURE_VALUE"]
+        # m = cm.ScalarMappable(cmap=color)
+        # m.set_array([0, 1])
+        # cb = plt.colorbar(m, cax=plt.subplot(gs[:,-1]), ticks=[0, 1], aspect=80)
+        # cb.set_ticklabels([labels['FEATURE_VALUE_LOW'], labels['FEATURE_VALUE_HIGH']])
+        # cb.set_label(color_bar_label, size=12, labelpad=0)
+        # cb.ax.tick_params(labelsize=11, length=0)
+        # cb.set_alpha(1)
+        # cb.outline.set_visible(False)
+        
+        fig.savefig(plot_loc + "vr_r_orb_middle_decision.png")
+
     

@@ -125,13 +125,14 @@ def get_CUDA_cluster():
     client = Client(cluster)
     return client
 
-def make_preds(client, bst, X, y_np, report_name="Classification Report", print_report=False):
-    #X = da.from_array(X_np,chunks=(chunk_size,X_np.shape[1]))
-
-    preds = dxgb.inplace_predict(client, bst, X).compute()
-    # preds = np.round(preds)
-    threshold = 0.5
-    preds = (preds >= threshold).astype(np.int8)
+def make_preds(client, bst, X, dask = False, threshold = 0.5, report_name="Classification Report", print_report=False):
+    if dask:
+        preds = dxgb.predict(client,bst,X)
+        preds = preds.map_partitions(lambda df: (df >= threshold).astype(int))
+        return preds
+    else:
+        preds = dxgb.inplace_predict(client, bst, X).compute()
+        preds = (preds >= threshold).astype(np.int8)
     
     return preds
 
@@ -591,7 +592,7 @@ def load_sprta_mass_prf(sim_splits,all_idxs,use_sims):
 def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, combined_name, plot_save_loc, dens_prf = False,missclass=False,full_dist=False,per_err=False): 
     with timed("Predictions"):
         print(f"Starting predictions for {y.size.compute():.3e} particles")
-        preds = make_preds(client, model, X, y, report_name="Report", print_report=False)
+        preds = make_preds(client, model, X, report_name="Report", print_report=False)
 
     X = X.compute()
     y = y.compute()
@@ -764,7 +765,7 @@ def weight_objective(params,client,model_params,ptl_ddf,halo_ddf,use_sims,feat_c
                 )
     bst = output["booster"]
 
-    y_pred = make_preds(client, bst, X_val, y_val, report_name="Report", print_report=False)
+    y_pred = make_preds(client, bst, X_val, report_name="Report", print_report=False)
     y_val = y_val.compute().values.flatten()
     
     # multiply the accuracies by -1 because we want to maximize them but we are using minimization
@@ -818,7 +819,7 @@ def scal_rad_objective(params,client,model_params,ptl_ddf,halo_ddf,use_sims,feat
                 )
     bst = output["booster"]
 
-    y_pred = make_preds(client, bst, X_val, y_val, report_name="Report", print_report=False)
+    y_pred = make_preds(client, bst, X_val, report_name="Report", print_report=False)
     y_val = y_val.compute().values.flatten()
     only_orb = np.where(y_val == 1)[0]
     only_inf = np.where(y_val == 0)[0]
@@ -884,53 +885,55 @@ def get_combined_name(model_sims):
     
     return combined_name
     
-def shap_with_filter(explainer, fltr_dic, X, y, preds, col_names = None, sample=0):
-    for feature, (operator, value) in fltr_dic["X_filter"].items():
-        if operator == '>':
-            y = y[X[feature] > value]
-            preds = preds[X[feature] > value]
-            X = X[X[feature] > value]
-        elif operator == '<':
-            y = y[X[feature] < value]
-            preds = preds[X[feature] < value]
-            X = X[X[feature] < value]
-        elif operator == '>=':
-            y = y[X[feature] >= value]
-            preds = preds[X[feature] >= value]
-            X = X[X[feature] >= value]
-        elif operator == '<=':
-            y = y[X[feature] <= value]
-            preds = preds[X[feature] <= value]
-            X = X[X[feature] <= value]
-        elif operator == '==':
-            y = y[X[feature] == value]
-            preds = preds[X[feature] > value]
-            X = X[X[feature] == value]
-        elif operator == '!=':
-            y = y[X[feature] != value]
-            preds = preds[X[feature] != value]
-            X = X[X[feature] != value]
-            
-            
-    X = X.compute()
-    y = y.compute()
-    
-    for feature, value in fltr_dic["label_filter"].items():
-        if feature == "act":
-            X = X[y == value]
-            preds = preds[y == value]
-            y = y[y == value]
-        elif feature == "pred":
-            X = X[preds == value]
-            y = y[preds == value]
-            preds = preds[preds == value]
-    
+def shap_with_filter(explainer, fltr_dic, X, y, preds, col_names = None, max_size=500):
+    full_filter = None
+
+    if "X_filter" in fltr_dic:
+        for feature, (operator, value) in fltr_dic["X_filter"].items():
+            if operator == '>':
+                condition = X[feature] > value
+            elif operator == '<':
+                condition = X[feature] < value
+            elif operator == '>=':
+                condition = X[feature] >= value
+            elif operator == '<=':
+                condition = X[feature] <= value
+            elif operator == '==':
+                condition = X[feature] == value
+            elif operator == '!=':
+                condition = X[feature] != value
+                
+            if feature == next(iter(fltr_dic[next(iter(fltr_dic))])):
+                full_filter = condition
+            else:
+                full_filter &= condition
+        
+    if "label_filter" in fltr_dic:
+        for feature, value in fltr_dic["label_filter"].items():
+            if feature == "act":
+                condition = y["Orbit_infall"] == value
+            elif feature == "pred":
+                condition = preds == value
+            if feature == next(iter(fltr_dic[next(iter(fltr_dic))])):
+                full_filter = condition
+            else:
+                full_filter &= condition
+
+    X = X[full_filter]
+    nrows = X.shape[0].compute()
+    if nrows > max_size:
+        sample = max_size / nrows
+    else:
+        sample = 1.0
+        
     if sample > 0 and sample < 1:
         X = X.sample(frac=sample,random_state=rand_seed)
     
     if col_names != None:
         X.columns = col_names
-        
-    return explainer(X)
+    
+    X = X.compute()
+
+    return explainer(X), explainer.shap_values(X), X
     
     
