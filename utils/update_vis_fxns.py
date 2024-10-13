@@ -60,42 +60,55 @@ def gen_ticks(bin_edges,spacing=6):
     
     return tick_loc, ticks
 
-def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xticks=False, hide_yticks=False, xticks = None, yticks = None, xlinthrsh = None, ylinthrsh = None, axisfontsize=28, number = None, return_img=False, kwargs={}):
-    plt.xticks(rotation=70)
 
+# TODO add a configuration dictionary that can be passed instead
+def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xticks=False, hide_yticks=False, xticks = None,yticks = None,tick_color="black",xlinthrsh = None, ylinthrsh = None, xlim=None,ylim=None, axisfontsize=28, number = None, return_img=False, kwargs=None):
+    if kwargs is None:
+        kwargs = {}
+    
     ret_img=ax.imshow(img["hist"].T, interpolation="nearest", **kwargs)
     ax.tick_params(axis="both",which="major",length=6,width=2)
     ax.tick_params(axis="both",which="minor",length=4,width=1.5)
     xticks_loc = []
     yticks_loc = []
     
-    if xticks != None:
+    if xticks is not None:
         for tick in xticks:
             xticks_loc.append(get_bin_loc(img["x_edge"],tick))
         if not hide_xticks:
             ax.set_xticks(xticks_loc,xticks)
             ax.tick_params(axis="x",direction="in")
-    if yticks != None:
+    if yticks is not None:
         for tick in yticks:
             yticks_loc.append(get_bin_loc(img["y_edge"],tick))
     
         if not hide_yticks:
             ax.set_yticks(yticks_loc,yticks)
             ax.tick_params(axis="y",direction="in")
+            
+    if xlim is not None:
+        min_xloc = get_bin_loc(img["x_edge"],xlim[0])
+        max_xloc = get_bin_loc(img["x_edge"],xlim[1])
+        ax.set_xlim(min_xloc,max_xloc)
         
-    if ylinthrsh != None:
+    if ylim is not None:
+        min_yloc = get_bin_loc(img["y_edge"],ylim[0])
+        max_yloc = get_bin_loc(img["y_edge"],ylim[1])
+        ax.set_ylim(min_yloc,max_yloc)
+        
+    if ylinthrsh is not None:
         ylinthrsh_loc = get_bin_loc(img["y_edge"],ylinthrsh)
         ax.axhline(y=ylinthrsh_loc, color='grey', linestyle='--', alpha=1)
-        if np.where(np.array(yticks,dtype=np.float32) < 0)[0].size > 0:
+        if np.any(np.array(yticks, dtype=np.float32) < 0):
             neg_ylinthrsh_loc = get_bin_loc(img["y_edge"],-ylinthrsh)
             y_zero_loc = get_bin_loc(img["y_edge"],0)
             ax.axhline(y=neg_ylinthrsh_loc, color='grey', linestyle='--', alpha=1)
             ax.axhline(y=y_zero_loc, color='#e6e6fa', linestyle='-.', alpha=1)
     
-    if xlinthrsh != None:
+    if xlinthrsh is not None:
         xlinthrsh_loc = get_bin_loc(img["x_edge"],xlinthrsh)
         ax.axvline(x=xlinthrsh_loc, color='grey', linestyle='--', alpha=1)
-        if np.where(np.array(xticks,dtype=np.float32) < 0)[0].size > 0:
+        if np.any(np.array(yticks, dtype=np.float32) < 0):
             neg_xlinthrsh_loc = get_bin_loc(img["x_edge"],-xlinthrsh)
             x_zero_loc = get_bin_loc(img["x_edge"],0)
             ax.axvline(x=neg_xlinthrsh_loc, color='grey', linestyle='--', alpha=1)
@@ -103,7 +116,7 @@ def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xticks=
 
     if text != "":
         ax.text(0.01,0.03, text, ha="left", va="bottom", transform=ax.transAxes, fontsize=axisfontsize, bbox={"facecolor":'white',"alpha":0.9,})
-    if number != None:
+    if number is not None:
         ax.text(0.02,0.93,number,ha="left",va="bottom",transform=ax.transAxes,fontsize=axisfontsize,bbox={"facecolor":'white',"alpha":0.9,})
     if title != "":
         ax.set_title(title,fontsize=28)
@@ -114,14 +127,14 @@ def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xticks=
     if hide_xticks:
         ax.tick_params(axis='x', which='both',bottom=False,labelbottom=False)
     else:
-        ax.tick_params(axis='x', which='major', labelsize=24)
-        ax.tick_params(axis='x', which='minor', labelsize=22)
+        ax.tick_params(axis='x', which='major', labelsize=20,colors=tick_color,labelcolor="black")
+        ax.tick_params(axis='x', which='minor', labelsize=18,colors=tick_color,labelcolor="black")
          
     if hide_yticks:
         ax.tick_params(axis='y', which='both',left=False,labelleft=False)
     else:
-        ax.tick_params(axis='y', which='major', labelsize=24)
-        ax.tick_params(axis='y', which='minor', labelsize=22)
+        ax.tick_params(axis='y', which='major', labelsize=20,colors=tick_color,labelcolor="black")
+        ax.tick_params(axis='y', which='minor', labelsize=18,colors=tick_color,labelcolor="black")
            
     if return_img:
         return ret_img
@@ -130,7 +143,7 @@ def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xticks=
 # Can also do a linear binning then a logarithmic binning (similar to symlog) but allows for 
 # special case of only positive log and not negative log
 def histogram(x,y,use_bins,hist_range,min_ptl,set_ptl,split_xscale_dict=None,split_yscale_dict=None):
-    if split_yscale_dict != None:
+    if split_yscale_dict is not None:
         linthrsh = split_yscale_dict["linthrsh"]
         lin_nbin = split_yscale_dict["lin_nbin"]
         log_nbin = split_yscale_dict["log_nbin"]
@@ -152,7 +165,7 @@ def histogram(x,y,use_bins,hist_range,min_ptl,set_ptl,split_xscale_dict=None,spl
             use_bins[0] = y_bins.size 
         use_bins[1] = y_bins
         
-    if split_xscale_dict != None:
+    if split_xscale_dict is not None:
         linthrsh = split_xscale_dict["linthrsh"]
         lin_nbin = split_xscale_dict["lin_nbin"]
         log_nbin = split_xscale_dict["log_nbin"]
@@ -207,11 +220,12 @@ def normalize_hists(hist,tot_nptl,min_ptl):
     
     dx = np.diff(hist["x_edge"])
     dy = np.diff(hist["y_edge"])
-    
+
     scaled_hist["hist"] = hist["hist"] / tot_nptl / dx[:,None] / dy[None,:]
     # scale all bins where lower than the min to the min
+
     scaled_hist["hist"] = np.where((scaled_hist["hist"] < min_ptl) & (scaled_hist["hist"] > 0), min_ptl, scaled_hist["hist"])
-    
+
     return scaled_hist
 
 def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_dict, num_bins, save_loc):
@@ -496,26 +510,23 @@ def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv,
 def plot_perr_err():
     return
 
-def plot_log_vel(phys_vel,radii,label,save_loc,show_v200m=False,v200m=1.5):
+def plot_log_vel(phys_vel,radii,labels,save_loc,add_line=[None,None],show_v200m=False,v200m=1.5):
     if v200m == -1:
         title = "no_cut"
     else:
         title = str(v200m) + "v200m"
     log_phys_vel = np.log10(phys_vel)
     
-    orb_loc = np.where(label == 1)[0]
-    inf_loc = np.where(label == 0)[0]
+    orb_loc = np.where(labels == 1)[0]
+    inf_loc = np.where(labels == 0)[0]
     
     r_range = [0,np.max(radii)]
     pv_range = [np.min(log_phys_vel),np.max(log_phys_vel)]
-    plot_range = [r_range,pv_range]
     
     num_bins = 500
     min_ptl = 10
     set_ptl = 0
     scale_min_ptl = 1e-4
-    
-    all_hist = histogram(radii,log_phys_vel,num_bins,plot_range,min_ptl,min_ptl)   
     
     all = histogram(radii,log_phys_vel,use_bins=[num_bins,num_bins],hist_range=[r_range,pv_range],min_ptl=min_ptl,set_ptl=set_ptl)
     inf = histogram(radii[inf_loc],log_phys_vel[inf_loc],use_bins=[num_bins,num_bins],hist_range=[r_range,pv_range],min_ptl=min_ptl,set_ptl=set_ptl)
@@ -530,7 +541,10 @@ def plot_log_vel(phys_vel,radii,label,save_loc,show_v200m=False,v200m=1.5):
     # Can just do the all particle arrays since inf/orb will have equal or less
     max_ptl = np.max(np.array([np.max(all["hist"]),np.max(inf["hist"]),np.max(orb["hist"])]))
     
-    magma_cmap = plt.get_cmap("magma_r")
+    magma_cmap = plt.get_cmap("magma")
+    magma_cmap = LinearSegmentedColormap.from_list('magma_truncated', magma_cmap(np.linspace(0.15, 1, 256)))
+    magma_cmap.set_under(color='black')
+    magma_cmap.set_bad(color='black')
     
     lin_plot_kwargs = {
             "vmin":scale_min_ptl,
@@ -541,19 +555,13 @@ def plot_log_vel(phys_vel,radii,label,save_loc,show_v200m=False,v200m=1.5):
             "cmap":magma_cmap,
     }
     
-    log_plot_kwargs = {
-            "vmin":scale_min_ptl,
-            "vmax":max_ptl,
-            "norm":"log",
-            "origin":"lower",
-            "aspect":"auto",
-            "cmap":magma_cmap,
-    }
+    rticks = [0,0.5,1,2,3]
+    pv_ticks = [-2,-1,0,1,2]
     
     widths = [4,4,4,.5]
-    heights = [4,4]
+    heights = [4]
     
-    fig = plt.figure(constrained_layout=True, figsize=(25,20))
+    fig = plt.figure(constrained_layout=True, figsize=(25,10))
     if show_v200m:
         fig.suptitle(title,fontsize=32)
     gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
@@ -561,34 +569,56 @@ def plot_log_vel(phys_vel,radii,label,save_loc,show_v200m=False,v200m=1.5):
     ax1 = fig.add_subplot(gs[0,0])
     ax2 = fig.add_subplot(gs[0,1])
     ax3 = fig.add_subplot(gs[0,2])
-    ax4 = fig.add_subplot(gs[1,0])
-    ax5 = fig.add_subplot(gs[1,1])
-    ax6 = fig.add_subplot(gs[1,2])
     
-    imshow_plot(ax1,all,x_label="$r/R_{200}$",y_label="$log_{10}(v_{phys}/v_{200m})$",title="All Particles",hide_xticks=True,kwargs=lin_plot_kwargs)
-    imshow_plot(ax2,inf,x_label="$r/R_{200}$",hide_yticks=True,kwargs=lin_plot_kwargs)
-    imshow_plot(ax3,orb,x_label="$r/R_{200}$",hide_yticks=True,kwargs=lin_plot_kwargs)
+    imshow_plot(ax1,all,x_label="$r/R_{200}$",xticks=rticks,yticks=pv_ticks,y_label="$log_{10}(v_{phys}/v_{200m})$",ylim=[-3,2],title="All Particles",tick_color="white",axisfontsize=22,kwargs=lin_plot_kwargs)
+    imshow_plot(ax2,inf,x_label="$r/R_{200}$",xticks=rticks,hide_yticks=True,ylim=[-3,2],title="Infalling Particles",tick_color="white",axisfontsize=22,kwargs=lin_plot_kwargs)
+    imshow_plot(ax3,orb,x_label="$r/R_{200}$",xticks=rticks,hide_yticks=True,ylim=[-3,2],title="Orbiting Particles",tick_color="white",axisfontsize=22,kwargs=lin_plot_kwargs)
 
     if v200m > 0 and show_v200m:
         ax1.hlines(np.log10(v200m),xmin=r_range[0],xmax=r_range[1],colors="black")
         ax2.hlines(np.log10(v200m),xmin=r_range[0],xmax=r_range[1],colors="black")
         ax3.hlines(np.log10(v200m),xmin=r_range[0],xmax=r_range[1],colors="black")
     
-    lin_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(vmin=min_ptl, vmax=max_ptl),cmap=magma_cmap), cax=plt.subplot(gs[0,-1]))
-    lin_color_bar.set_label(r"$dN / N dx dy$",fontsize=26)
-    lin_color_bar.ax.tick_params(which="major",direction="in",labelsize=22,length=10,width=3)
-    lin_color_bar.ax.tick_params(which="minor",direction="in",labelsize=22,length=5,width=1.5)
     
-    imshow_plot(ax4,all,x_label="$r/R_{200}$",y_label="$log_{10}(v_{phys}/v_{200m})$",title="All Particles",hide_xticks=True,kwargs=log_plot_kwargs)
-    imshow_plot(ax5,inf,x_label="$r/R_{200}$",hide_yticks=True,kwargs=log_plot_kwargs)
-    imshow_plot(ax6,orb,x_label="$r/R_{200}$",hide_yticks=True,kwargs=log_plot_kwargs)
-    if v200m > 0 and show_v200m:
-        ax4.hlines(np.log10(v200m),xmin=r_range[0],xmax=r_range[1],colors="black")
-        ax5.hlines(np.log10(v200m),xmin=r_range[0],xmax=r_range[1],colors="black")
-        ax6.hlines(np.log10(v200m),xmin=r_range[0],xmax=r_range[1],colors="black")
-    log_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=magma_cmap), cax=plt.subplot(gs[1,-1]))
-    log_color_bar.set_label(r"$dN / N dx dy$",fontsize=26)
-    log_color_bar.ax.tick_params(which="major",direction="in",labelsize=22,length=10,width=3)
-    log_color_bar.ax.tick_params(which="minor",direction="in",labelsize=22,length=5,width=1.5)
+    line_xloc = []
+    line_yloc = []
+    if add_line[0] is not None:
+        line_xloc.append(get_bin_loc(all["x_edge"],radii.iloc[0]))
+        line_xloc.append(get_bin_loc(all["x_edge"],radii.iloc[-1]))
+        line_yloc.append(get_bin_loc(all["y_edge"],add_line[0] * radii.iloc[0] + add_line[1]))
+        line_yloc.append(get_bin_loc(all["y_edge"],add_line[0] * radii.iloc[-1] + add_line[1]))
+        ax1.plot(line_xloc, line_yloc,color="white",label=f"m={add_line[0]}\nb={add_line[1]}")    
+        ax2.plot(line_xloc, line_yloc,color="white")    
+        ax3.plot(line_xloc, line_yloc,color="white")    
+        
+        ax1.legend(fontsize=16)
+        
+
+    lin_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(vmin=scale_min_ptl, vmax=max_ptl),cmap=magma_cmap), cax=plt.subplot(gs[0,-1]))
+    lin_color_bar.set_label(r"$dN / N dx dy$",fontsize=22)
+    lin_color_bar.ax.tick_params(which="major",direction="in",labelsize=18,length=10,width=3)
+    lin_color_bar.ax.tick_params(which="minor",direction="in",labelsize=18,length=5,width=1.5)
     
     fig.savefig(save_loc + "log_phys_vel_" + title + ".png")
+    
+
+    line_y = add_line[0] * radii + add_line[1]
+    line_preds = np.zeros(radii.size) 
+    line_preds[log_phys_vel <= line_y] = 1
+
+    labels_np = labels["Orbit_infall"].values
+    
+    num_inc_inf = np.where((line_preds == 1) & (labels_np == 0))[0].shape[0]
+    num_inc_orb = np.where((line_preds == 0) & (labels_np == 1))[0].shape[0]
+    num_inf = np.where(labels_np == 0)[0].shape[0]
+    num_orb = np.where(labels_np == 1)[0].shape[0]
+    tot_num_inc = num_inc_orb + num_inc_inf
+    tot_num_ptl = num_orb + num_inf
+
+
+    print("Total Num of Particles", tot_num_ptl)
+    print("Num Incorrect Infalling Particles", str(num_inc_inf)+", "+str(np.round(((num_inc_inf/num_inf)*100),2))+"% of infalling ptls")
+    print("Num Incorrect Orbiting Particles", str(num_inc_orb)+", "+str(np.round(((num_inc_orb/num_orb)*100),2))+"% of orbiting ptls")
+    print("Num Incorrect All Particles", str(tot_num_inc)+", "+str(np.round(((tot_num_inc/tot_num_ptl)*100),2))+"% of all ptls")
+        
+
