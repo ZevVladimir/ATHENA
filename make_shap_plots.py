@@ -55,7 +55,7 @@ if __name__ == '__main__':
                 y_df = data[target_column]
                 
         preds = make_preds(client, bst, X_df, dask = True, report_name="Report", print_report=False)
-
+        print(preds)
 
         new_columns = ["Current $r/R_{\mathrm{200m}}$","Current $v_{\mathrm{r}}/V_{\mathrm{200m}}$","Current $v_{\mathrm{t}}/V_{\mathrm{200m}}$","Past $r/R_{\mathrm{200m}}$","Past $v_{\mathrm{r}}/V_{\mathrm{200m}}$","Past $v_{\mathrm{t}}/V_{\mathrm{200m}}$"]
         col2num = {col: i for i, col in enumerate(new_columns)}
