@@ -23,7 +23,7 @@ from sklearn.metrics import accuracy_score
 from functools import partial
 
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, find_closest_z, conv_halo_id_spid, timed, split_data_by_halo
-from utils.visualization_functions import compare_density_prf, plot_r_rv_tv_graph, plot_per_err
+from utils.visualization_functions import compare_density_prf, plot_per_err
 from utils.update_vis_fxns import plot_full_ptl_dist, plot_miss_class_dist
 from utils.calculation_functions import create_mass_prf
 from sparta_tools import sparta # type: ignore
@@ -886,53 +886,60 @@ def get_combined_name(model_sims):
     return combined_name
     
 def shap_with_filter(explainer, fltr_dic, X, y, preds, col_names = None, max_size=500):
-    full_filter = None
+    print("X type:",type(X))
+    print("y type:",type(y))
+    print("preds type:",type(preds))
+    with timed("Filter DF"):
+        full_filter = None
 
-    if "X_filter" in fltr_dic:
-        for feature, (operator, value) in fltr_dic["X_filter"].items():
-            if operator == '>':
-                condition = X[feature] > value
-            elif operator == '<':
-                condition = X[feature] < value
-            elif operator == '>=':
-                condition = X[feature] >= value
-            elif operator == '<=':
-                condition = X[feature] <= value
-            elif operator == '==':
-                condition = X[feature] == value
-            elif operator == '!=':
-                condition = X[feature] != value
-                
-            if feature == next(iter(fltr_dic[next(iter(fltr_dic))])):
-                full_filter = condition
-            else:
-                full_filter &= condition
-        
-    if "label_filter" in fltr_dic:
-        for feature, value in fltr_dic["label_filter"].items():
-            if feature == "act":
-                condition = y["Orbit_infall"] == value
-            elif feature == "pred":
-                condition = preds == value
-            if feature == next(iter(fltr_dic[next(iter(fltr_dic))])):
-                full_filter = condition
-            else:
-                full_filter &= condition
+        if "X_filter" in fltr_dic:
+            for feature, (operator, value) in fltr_dic["X_filter"].items():
+                if operator == '>':
+                    condition = X[feature] > value
+                elif operator == '<':
+                    condition = X[feature] < value
+                elif operator == '>=':
+                    condition = X[feature] >= value
+                elif operator == '<=':
+                    condition = X[feature] <= value
+                elif operator == '==':
+                    condition = X[feature] == value
+                elif operator == '!=':
+                    condition = X[feature] != value
+                    
+                if feature == next(iter(fltr_dic[next(iter(fltr_dic))])):
+                    full_filter = condition
+                else:
+                    full_filter &= condition
+            
+        if "label_filter" in fltr_dic:
+            for feature, value in fltr_dic["label_filter"].items():
+                if feature == "act":
+                    condition = y["Orbit_infall"] == value
+                elif feature == "pred":
+                    condition = preds == value
+                print("curr feature:",feature)
+                print("filter type",type(full_filter))
+                print("condition type:",type(condition))
+                if feature == next(iter(fltr_dic[next(iter(fltr_dic))])):
+                    full_filter = condition
+                else:
+                    full_filter &= condition
 
-    X = X[full_filter]
-    nrows = X.shape[0].compute()
-    if nrows > max_size:
-        sample = max_size / nrows
-    else:
-        sample = 1.0
+        X = X[full_filter]
+        nrows = X.shape[0].compute()
+        if nrows > max_size:
+            sample = max_size / nrows
+        else:
+            sample = 1.0
+            
+        if sample > 0 and sample < 1:
+            X = X.sample(frac=sample,random_state=rand_seed)
         
-    if sample > 0 and sample < 1:
-        X = X.sample(frac=sample,random_state=rand_seed)
-    
-    if col_names != None:
-        X.columns = col_names
-    
-    X = X.compute()
+        if col_names != None:
+            X.columns = col_names
+        
+        X = X.compute()
 
     return explainer(X), explainer.shap_values(X), X
     

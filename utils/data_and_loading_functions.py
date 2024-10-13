@@ -60,14 +60,14 @@ from sparta_tools import sparta # type: ignore
 ##################################################################################################################
 @contextmanager
 def timed(txt):
-    print("Starting " + txt)
+    print("Starting: " + txt)
     t0 = time.time()
     yield
     t1 = time.time()
     time_s = t1 - t0
     time_min = time_s / 60
     
-    print("%s time: %.5fs, %.2f min" % (txt, time_s, time_min))
+    print("Finished: %s time: %.5fs, %.2f min" % (txt, time_s, time_min))
 
 def clean_dir(path):
     try:
