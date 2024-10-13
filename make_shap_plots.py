@@ -18,8 +18,29 @@ path_to_calc_info = config["PATHS"]["path_to_calc_info"]
 sim_cosmol = config["MISC"]["sim_cosmol"]
 
 if __name__ == '__main__':
-    with timed("Setup"):
+    if use_gpu:
+        mp.set_start_method("spawn")
+
+    if not use_gpu and on_zaratan:
+        if 'SLURM_CPUS_PER_TASK' in os.environ:
+            cpus_per_task = int(os.environ['SLURM_CPUS_PER_TASK'])
+        else:
+            print("SLURM_CPUS_PER_TASK is not defined.")
+        if gpu_use:
+            initialize(local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
+        else:
+            initialize(nthreads = cpus_per_task, local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
+        print("Initialized")
+        client = Client()
+        host = client.run_on_scheduler(socket.gethostname)
+        port = client.scheduler_info()['services']['dashboard']
+        login_node_address = "zvladimi@login.zaratan.umd.edu" # Change this to the address/domain of your login node
+
+        logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}")
+    else:
         client = get_CUDA_cluster()
+    
+    with timed("Setup"):
 
         if sim_cosmol == "planck13-nbody":
             cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
@@ -55,7 +76,8 @@ if __name__ == '__main__':
                 y_df = data[target_column]
                 
         preds = make_preds(client, bst, X_df, dask = True, report_name="Report", print_report=False)
-        print(preds)
+        X_df = X_df.to_backend('pandas')
+        y_df = y_df.to_backend('pandas')
 
         new_columns = ["Current $r/R_{\mathrm{200m}}$","Current $v_{\mathrm{r}}/V_{\mathrm{200m}}$","Current $v_{\mathrm{t}}/V_{\mathrm{200m}}$","Past $r/R_{\mathrm{200m}}$","Past $v_{\mathrm{r}}/V_{\mathrm{200m}}$","Past $v_{\mathrm{t}}/V_{\mathrm{200m}}$"]
         col2num = {col: i for i, col in enumerate(new_columns)}
@@ -137,12 +159,21 @@ if __name__ == '__main__':
                 "p_Radial_vel": ('>',-0.6)
             },
         }
+        
+        test_dict = {
+            'label_filter':{
+                'pred':1,
+                'act':1,
+                }
+        }
 
         # no_second_shap = shap_with_filter(explainer,no_second_dict,X_df,y_df,preds,new_columns,sample=0.01)
         # good_orb_in_shap,good_orb_in_shap_values = shap_with_filter(explainer,orb_in_dict,X_df,y_df,preds,new_columns)
         # good_orb_out_shap,good_orb_out_shap_values = shap_with_filter(explainer,orb_out_dict,X_df,y_df,preds,new_columns)
-        bad_orb_missclass_shap,bad_orb_missclass_shap_values, bad_orb_missclass_X = shap_with_filter(explainer,orb_bad_misclass_dict,X_df,y_df,preds,new_columns)
-        bad_orb_corr_shap,bad_orb_corr_shap_values, bad_orb_corr_X = shap_with_filter(explainer,orb_bad_corr_dict,X_df,y_df,preds,new_columns)
+        # test_shap, test_vals, test_X = shap_with_filter(explainer,test_dict,X_df,y_df,preds,new_columns)
+        # bad_orb_missclass_shap,bad_orb_missclass_shap_values, bad_orb_missclass_X = shap_with_filter(explainer,orb_bad_misclass_dict,X_df,y_df,preds,new_columns)
+        # bad_orb_corr_shap,bad_orb_corr_shap_values, bad_orb_corr_X = shap_with_filter(explainer,orb_bad_corr_dict,X_df,y_df,preds,new_columns)
+        all_shap,all_shap_values, all_X = shap_with_filter(explainer,X=X_df,y=y_df,preds=preds,col_names=new_columns)
         # in_btwn_shap,in_btwn_shap_values = shap_with_filter(explainer,in_btwn_dict,X_df,y_df,preds,new_columns,sample=0.0001)
 
     with timed("Make SHAP plots"):
@@ -161,8 +192,8 @@ if __name__ == '__main__':
         # ax2 = fig.add_subplot(gs[1,0])
 
         plt.sca(ax1)
-        r = shap.decision_plot(expected_value, bad_orb_corr_shap_values,features=bad_orb_corr_X,feature_names=new_columns,auto_size_plot=False,show=False,return_objects=True)
-        shap.decision_plot(expected_value, bad_orb_missclass_shap_values,features=bad_orb_missclass_X,feature_names=new_columns,auto_size_plot=False,show=False,feature_order=None,xlim=r.xlim)
+        r = shap.decision_plot(expected_value, all_shap_values,features=all_X,feature_names=new_columns,auto_size_plot=False,show=False,return_objects=True)
+        # shap.decision_plot(expected_value, bad_orb_missclass_shap_values,features=bad_orb_missclass_X,feature_names=new_columns,auto_size_plot=False,show=False,feature_order=None,xlim=r.xlim)
         
         # labels = {
         # 'MAIN_EFFECT': "SHAP main effect value for\n%s",
