@@ -69,17 +69,19 @@ def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xticks=
     xticks_loc = []
     yticks_loc = []
     
-    for tick in xticks:
-        xticks_loc.append(get_bin_loc(img["x_edge"],tick))
-    for tick in yticks:
-        yticks_loc.append(get_bin_loc(img["y_edge"],tick))
+    if xticks != None:
+        for tick in xticks:
+            xticks_loc.append(get_bin_loc(img["x_edge"],tick))
+        if not hide_xticks:
+            ax.set_xticks(xticks_loc,xticks)
+            ax.tick_params(axis="x",direction="in")
+    if yticks != None:
+        for tick in yticks:
+            yticks_loc.append(get_bin_loc(img["y_edge"],tick))
     
-    if not hide_xticks:
-        ax.set_xticks(xticks_loc,xticks)
-        ax.tick_params(axis="x",direction="in")
-    if not hide_yticks:
-        ax.set_yticks(yticks_loc,yticks)
-        ax.tick_params(axis="y",direction="in")
+        if not hide_yticks:
+            ax.set_yticks(yticks_loc,yticks)
+            ax.tick_params(axis="y",direction="in")
         
     if ylinthrsh != None:
         ylinthrsh_loc = get_bin_loc(img["y_edge"],ylinthrsh)
@@ -494,3 +496,99 @@ def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv,
 def plot_perr_err():
     return
 
+def plot_log_vel(phys_vel,radii,label,save_loc,show_v200m=False,v200m=1.5):
+    if v200m == -1:
+        title = "no_cut"
+    else:
+        title = str(v200m) + "v200m"
+    log_phys_vel = np.log10(phys_vel)
+    
+    orb_loc = np.where(label == 1)[0]
+    inf_loc = np.where(label == 0)[0]
+    
+    r_range = [0,np.max(radii)]
+    pv_range = [np.min(log_phys_vel),np.max(log_phys_vel)]
+    plot_range = [r_range,pv_range]
+    
+    num_bins = 500
+    min_ptl = 10
+    set_ptl = 0
+    scale_min_ptl = 1e-4
+    
+    all_hist = histogram(radii,log_phys_vel,num_bins,plot_range,min_ptl,min_ptl)   
+    
+    all = histogram(radii,log_phys_vel,use_bins=[num_bins,num_bins],hist_range=[r_range,pv_range],min_ptl=min_ptl,set_ptl=set_ptl)
+    inf = histogram(radii[inf_loc],log_phys_vel[inf_loc],use_bins=[num_bins,num_bins],hist_range=[r_range,pv_range],min_ptl=min_ptl,set_ptl=set_ptl)
+    orb = histogram(radii[orb_loc],log_phys_vel[orb_loc],use_bins=[num_bins,num_bins],hist_range=[r_range,pv_range],min_ptl=min_ptl,set_ptl=set_ptl)
+    
+    tot_nptl = radii.shape[0]
+    
+    all = normalize_hists(all,tot_nptl=tot_nptl,min_ptl=scale_min_ptl)
+    inf = normalize_hists(inf,tot_nptl=tot_nptl,min_ptl=scale_min_ptl)
+    orb = normalize_hists(orb,tot_nptl=tot_nptl,min_ptl=scale_min_ptl)
+    
+    # Can just do the all particle arrays since inf/orb will have equal or less
+    max_ptl = np.max(np.array([np.max(all["hist"]),np.max(inf["hist"]),np.max(orb["hist"])]))
+    
+    magma_cmap = plt.get_cmap("magma_r")
+    
+    lin_plot_kwargs = {
+            "vmin":scale_min_ptl,
+            "vmax":max_ptl,
+            "norm":"linear",
+            "origin":"lower",
+            "aspect":"auto",
+            "cmap":magma_cmap,
+    }
+    
+    log_plot_kwargs = {
+            "vmin":scale_min_ptl,
+            "vmax":max_ptl,
+            "norm":"log",
+            "origin":"lower",
+            "aspect":"auto",
+            "cmap":magma_cmap,
+    }
+    
+    widths = [4,4,4,.5]
+    heights = [4,4]
+    
+    fig = plt.figure(constrained_layout=True, figsize=(25,20))
+    if show_v200m:
+        fig.suptitle(title,fontsize=32)
+    gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
+    
+    ax1 = fig.add_subplot(gs[0,0])
+    ax2 = fig.add_subplot(gs[0,1])
+    ax3 = fig.add_subplot(gs[0,2])
+    ax4 = fig.add_subplot(gs[1,0])
+    ax5 = fig.add_subplot(gs[1,1])
+    ax6 = fig.add_subplot(gs[1,2])
+    
+    imshow_plot(ax1,all,x_label="$r/R_{200}$",y_label="$log_{10}(v_{phys}/v_{200m})$",title="All Particles",hide_xticks=True,kwargs=lin_plot_kwargs)
+    imshow_plot(ax2,inf,x_label="$r/R_{200}$",hide_yticks=True,kwargs=lin_plot_kwargs)
+    imshow_plot(ax3,orb,x_label="$r/R_{200}$",hide_yticks=True,kwargs=lin_plot_kwargs)
+
+    if v200m > 0 and show_v200m:
+        ax1.hlines(np.log10(v200m),xmin=r_range[0],xmax=r_range[1],colors="black")
+        ax2.hlines(np.log10(v200m),xmin=r_range[0],xmax=r_range[1],colors="black")
+        ax3.hlines(np.log10(v200m),xmin=r_range[0],xmax=r_range[1],colors="black")
+    
+    lin_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(vmin=min_ptl, vmax=max_ptl),cmap=magma_cmap), cax=plt.subplot(gs[0,-1]))
+    lin_color_bar.set_label(r"$dN / N dx dy$",fontsize=26)
+    lin_color_bar.ax.tick_params(which="major",direction="in",labelsize=22,length=10,width=3)
+    lin_color_bar.ax.tick_params(which="minor",direction="in",labelsize=22,length=5,width=1.5)
+    
+    imshow_plot(ax4,all,x_label="$r/R_{200}$",y_label="$log_{10}(v_{phys}/v_{200m})$",title="All Particles",hide_xticks=True,kwargs=log_plot_kwargs)
+    imshow_plot(ax5,inf,x_label="$r/R_{200}$",hide_yticks=True,kwargs=log_plot_kwargs)
+    imshow_plot(ax6,orb,x_label="$r/R_{200}$",hide_yticks=True,kwargs=log_plot_kwargs)
+    if v200m > 0 and show_v200m:
+        ax4.hlines(np.log10(v200m),xmin=r_range[0],xmax=r_range[1],colors="black")
+        ax5.hlines(np.log10(v200m),xmin=r_range[0],xmax=r_range[1],colors="black")
+        ax6.hlines(np.log10(v200m),xmin=r_range[0],xmax=r_range[1],colors="black")
+    log_color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl),cmap=magma_cmap), cax=plt.subplot(gs[1,-1]))
+    log_color_bar.set_label(r"$dN / N dx dy$",fontsize=26)
+    log_color_bar.ax.tick_params(which="major",direction="in",labelsize=22,length=10,width=3)
+    log_color_bar.ax.tick_params(which="minor",direction="in",labelsize=22,length=5,width=1.5)
+    
+    fig.savefig(save_loc + "log_phys_vel_" + title + ".png")
