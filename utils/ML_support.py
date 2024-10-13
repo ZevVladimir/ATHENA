@@ -885,48 +885,47 @@ def get_combined_name(model_sims):
     
     return combined_name
     
-def shap_with_filter(explainer, fltr_dic, X, y, preds, col_names = None, max_size=500):
-    print("X type:",type(X))
-    print("y type:",type(y))
-    print("preds type:",type(preds))
+def shap_with_filter(explainer, X, y, preds, fltr_dic = None, col_names = None, max_size=500):
     with timed("Filter DF"):
         full_filter = None
+        if fltr_dic is not None:
+            print("hi")
+            if "X_filter" in fltr_dic:
+                for feature, (operator, value) in fltr_dic["X_filter"].items():
+                    if operator == '>':
+                        condition = X[feature] > value
+                    elif operator == '<':
+                        condition = X[feature] < value
+                    elif operator == '>=':
+                        condition = X[feature] >= value
+                    elif operator == '<=':
+                        condition = X[feature] <= value
+                    elif operator == '==':
+                        condition = X[feature] == value
+                    elif operator == '!=':
+                        condition = X[feature] != value
+                        
+                    if feature == next(iter(fltr_dic[next(iter(fltr_dic))])):
+                        full_filter = condition
+                    else:
+                        full_filter &= condition
+                
+            if "label_filter" in fltr_dic:
+                for feature, value in fltr_dic["label_filter"].items():
+                    if feature == "act":
+                        condition = y["Orbit_infall"] == value
+                    elif feature == "pred":
+                        condition = preds == value
+                    print("curr feature:",feature)
+                    print("filter type",type(full_filter))
+                    print("condition type:",type(condition))
+                    if feature == next(iter(fltr_dic[next(iter(fltr_dic))])):
+                        full_filter = condition
+                    else:
+                        full_filter &= condition
 
-        if "X_filter" in fltr_dic:
-            for feature, (operator, value) in fltr_dic["X_filter"].items():
-                if operator == '>':
-                    condition = X[feature] > value
-                elif operator == '<':
-                    condition = X[feature] < value
-                elif operator == '>=':
-                    condition = X[feature] >= value
-                elif operator == '<=':
-                    condition = X[feature] <= value
-                elif operator == '==':
-                    condition = X[feature] == value
-                elif operator == '!=':
-                    condition = X[feature] != value
-                    
-                if feature == next(iter(fltr_dic[next(iter(fltr_dic))])):
-                    full_filter = condition
-                else:
-                    full_filter &= condition
+            X = X[full_filter]
             
-        if "label_filter" in fltr_dic:
-            for feature, value in fltr_dic["label_filter"].items():
-                if feature == "act":
-                    condition = y["Orbit_infall"] == value
-                elif feature == "pred":
-                    condition = preds == value
-                print("curr feature:",feature)
-                print("filter type",type(full_filter))
-                print("condition type:",type(condition))
-                if feature == next(iter(fltr_dic[next(iter(fltr_dic))])):
-                    full_filter = condition
-                else:
-                    full_filter &= condition
-
-        X = X[full_filter]
         nrows = X.shape[0].compute()
         if nrows > max_size:
             sample = max_size / nrows

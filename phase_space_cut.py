@@ -13,9 +13,29 @@ path_to_calc_info = config["PATHS"]["path_to_calc_info"]
 sim_cosmol = config["MISC"]["sim_cosmol"]
 
 if __name__ == '__main__':
-    with timed("Setup"):
-        client = get_CUDA_cluster()
+    if use_gpu:
+        mp.set_start_method("spawn")
 
+    if not use_gpu and on_zaratan:
+        if 'SLURM_CPUS_PER_TASK' in os.environ:
+            cpus_per_task = int(os.environ['SLURM_CPUS_PER_TASK'])
+        else:
+            print("SLURM_CPUS_PER_TASK is not defined.")
+        if gpu_use:
+            initialize(local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
+        else:
+            initialize(nthreads = cpus_per_task, local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
+        print("Initialized")
+        client = Client()
+        host = client.run_on_scheduler(socket.gethostname)
+        port = client.scheduler_info()['services']['dashboard']
+        login_node_address = "zvladimi@login.zaratan.umd.edu" # Change this to the address/domain of your login node
+
+        logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}")
+    else:
+        client = get_CUDA_cluster()
+        
+    with timed("Setup"):
         if sim_cosmol == "planck13-nbody":
             cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
         else:
