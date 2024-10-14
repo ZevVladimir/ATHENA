@@ -365,7 +365,7 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
                 save_tang_vel = np.zeros((p_tot_num_use_ptls,2), dtype = np.float32)
 
                 # Match the PIDs from primary snap to the secondary snap
-                # If they don't have a match set those as np.NaN for xgboost 
+                # If they don't have a match set those as np.nan for xgboost 
                 match_hipid_idx = np.intersect1d(p_all_HIPIDs, c_all_HIPIDs, return_indices=True)
                 save_scale_radii[:,0] = p_all_scal_rad
                 save_scale_radii[match_hipid_idx[1],1] = c_all_scal_rad[match_hipid_idx[2]]
@@ -374,9 +374,9 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
                 save_tang_vel[:,0] = p_all_tang_vel
                 save_tang_vel[match_hipid_idx[1],1] = c_all_tang_vel[match_hipid_idx[2]]
                 
-                save_scale_radii[save_scale_radii[:,1] == 0, 1] = np.NaN
-                save_rad_vel[save_rad_vel[:,1] == 0, 1] = np.NaN
-                save_tang_vel[save_tang_vel[:,1] == 0, 1] = np.NaN
+                save_scale_radii[save_scale_radii[:,1] == 0, 1] = np.nan
+                save_rad_vel[save_rad_vel[:,1] == 0, 1] = np.nan
+                save_tang_vel[save_tang_vel[:,1] == 0, 1] = np.nan
             
             else:
                 use_max_shape = (tot_num_ptls)  
