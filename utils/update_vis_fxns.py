@@ -60,7 +60,6 @@ def gen_ticks(bin_edges,spacing=6):
     
     return tick_loc, ticks
 
-
 # TODO add a configuration dictionary that can be passed instead
 def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xticks=False, hide_yticks=False, xticks = None,yticks = None,tick_color="black",xlinthrsh = None, ylinthrsh = None, xlim=None,ylim=None, axisfontsize=28, number = None, return_img=False, kwargs=None):
     if kwargs is None:
@@ -621,4 +620,23 @@ def plot_log_vel(phys_vel,radii,labels,save_loc,add_line=[None,None],show_v200m=
     print("Num Incorrect Orbiting Particles", str(num_inc_orb)+", "+str(np.round(((num_inc_orb/num_orb)*100),2))+"% of orbiting ptls")
     print("Num Incorrect All Particles", str(tot_num_inc)+", "+str(np.round(((tot_num_inc/tot_num_ptl)*100),2))+"% of all ptls")
         
-
+def plot_halo_slice(pos,labels,save_loc):
+    pos[:,0] = pos[:,0] - np.mean(pos[:,0])
+    pos[:,1] = pos[:,1] - np.mean(pos[:,1])
+    
+    fig, ax = plt.subplots(1,3,constrained_layout=True)
+    ax[0].scatter(pos[:,0],pos[:,1])
+    ax[0].set_xlabel(r"$x [h^{-1}kpc]$")
+    ax[0].set_ylabel(r"$y [h^{-1}kpc]$")
+    ax[0].set_title("All Particles")
+    
+    ax[1].scatter(pos[np.where(labels==1),0],pos[np.where(labels==1),1])
+    ax[1].set_xlabel(r"$x [h^{-1}kpc]$")
+    ax[1].set_title("Orbiting Particles")
+    
+    ax[2].scatter(pos[np.where(labels==0),0],pos[np.where(labels==0),1])
+    ax[2].set_xlabel(r"$x [h^{-1}kpc]$")
+    ax[2].set_title("Infalling Particles")
+    
+    fig.savefig(save_loc+"halo_dist.png")
+    
