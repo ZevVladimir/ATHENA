@@ -625,16 +625,16 @@ def plot_halo_slice(pos,labels,save_loc):
     pos[:,1] = pos[:,1] - np.mean(pos[:,1])
     
     fig, ax = plt.subplots(1,3,constrained_layout=True)
-    ax[0].scatter(pos[:,0],pos[:,1])
+    ax[0].hist2d(pos[:,0],pos[:,1],bins=100)
     ax[0].set_xlabel(r"$x [h^{-1}kpc]$")
     ax[0].set_ylabel(r"$y [h^{-1}kpc]$")
     ax[0].set_title("All Particles")
     
-    ax[1].scatter(pos[np.where(labels==1),0],pos[np.where(labels==1),1])
+    ax[1].hist2d(pos[np.where(labels==1),0],pos[np.where(labels==1),1],bins=100)
     ax[1].set_xlabel(r"$x [h^{-1}kpc]$")
     ax[1].set_title("Orbiting Particles")
     
-    ax[2].scatter(pos[np.where(labels==0),0],pos[np.where(labels==0),1])
+    ax[2].hist2d(pos[np.where(labels==0),0],pos[np.where(labels==0),1],bins=100)
     ax[2].set_xlabel(r"$x [h^{-1}kpc]$")
     ax[2].set_title("Infalling Particles")
     
