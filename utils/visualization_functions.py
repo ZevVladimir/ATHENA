@@ -217,47 +217,47 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         # if there are less than half the total number of halos then just treat that bin as having 0
         for i in range(calc_mass_prf_orb.shape[1]):
             if np.where(calc_mass_prf_orb[:,i] > 0)[0].shape[0] < min_disp_halos:
-                calc_mass_prf_orb[:,i] = np.NaN
-                act_mass_prf_orb[:,i] = np.NaN
-                med_calc_mass_prf_orb[i] = np.NaN
-                med_act_mass_prf_orb[i] = np.NaN
-                avg_calc_mass_prf_orb[i] = np.NaN
-                avg_act_mass_prf_orb[i] = np.NaN
+                calc_mass_prf_orb[:,i] = np.nan
+                act_mass_prf_orb[:,i] = np.nan
+                med_calc_mass_prf_orb[i] = np.nan
+                med_act_mass_prf_orb[i] = np.nan
+                avg_calc_mass_prf_orb[i] = np.nan
+                avg_act_mass_prf_orb[i] = np.nan
             if np.where(calc_mass_prf_inf[:,i] > 0)[0].shape[0] < min_disp_halos:
-                calc_mass_prf_inf[:,i] = np.NaN
-                act_mass_prf_inf[:,i] = np.NaN
-                med_calc_mass_prf_inf[i] = np.NaN
-                med_act_mass_prf_inf[i] = np.NaN
-                avg_calc_mass_prf_inf[i] = np.NaN
-                avg_act_mass_prf_inf[i] = np.NaN
+                calc_mass_prf_inf[:,i] = np.nan
+                act_mass_prf_inf[:,i] = np.nan
+                med_calc_mass_prf_inf[i] = np.nan
+                med_act_mass_prf_inf[i] = np.nan
+                avg_calc_mass_prf_inf[i] = np.nan
+                avg_act_mass_prf_inf[i] = np.nan
             if np.where(calc_mass_prf_all[:,i] > 0)[0].shape[0] < min_disp_halos:
-                calc_mass_prf_all[:,i] = np.NaN
-                act_mass_prf_all[:,i] = np.NaN
-                med_calc_mass_prf_all[i] = np.NaN
-                med_act_mass_prf_all[i] = np.NaN
-                avg_calc_mass_prf_all[i] = np.NaN
-                avg_act_mass_prf_all[i] = np.NaN
+                calc_mass_prf_all[:,i] = np.nan
+                act_mass_prf_all[:,i] = np.nan
+                med_calc_mass_prf_all[i] = np.nan
+                med_act_mass_prf_all[i] = np.nan
+                avg_calc_mass_prf_all[i] = np.nan
+                avg_act_mass_prf_all[i] = np.nan
             if np.where(calc_dens_prf_orb[:,i] > 0)[0].shape[0] < min_disp_halos:
-                calc_dens_prf_orb[:,i] = np.NaN
-                act_dens_prf_orb[:,i] = np.NaN
-                med_calc_dens_prf_orb[i] = np.NaN
-                med_act_dens_prf_orb[i] = np.NaN
-                avg_calc_dens_prf_orb[i] = np.NaN
-                avg_act_dens_prf_orb[i] = np.NaN
+                calc_dens_prf_orb[:,i] = np.nan
+                act_dens_prf_orb[:,i] = np.nan
+                med_calc_dens_prf_orb[i] = np.nan
+                med_act_dens_prf_orb[i] = np.nan
+                avg_calc_dens_prf_orb[i] = np.nan
+                avg_act_dens_prf_orb[i] = np.nan
             if np.where(calc_dens_prf_inf[:,i] > 0)[0].shape[0] < min_disp_halos:
-                calc_dens_prf_inf[:,i] = np.NaN
-                act_dens_prf_inf[:,i] = np.NaN
-                med_calc_dens_prf_inf[i] = np.NaN
-                med_act_dens_prf_inf[i] = np.NaN
-                avg_calc_dens_prf_inf[i] = np.NaN
-                avg_act_dens_prf_inf[i] = np.NaN
+                calc_dens_prf_inf[:,i] = np.nan
+                act_dens_prf_inf[:,i] = np.nan
+                med_calc_dens_prf_inf[i] = np.nan
+                med_act_dens_prf_inf[i] = np.nan
+                avg_calc_dens_prf_inf[i] = np.nan
+                avg_act_dens_prf_inf[i] = np.nan
             if np.where(calc_dens_prf_all[:,i] > 0)[0].shape[0] < min_disp_halos:
-                calc_dens_prf_all[:,i] = np.NaN
-                act_dens_prf_all[:,i] = np.NaN
-                med_calc_dens_prf_all[i] = np.NaN
-                med_act_dens_prf_all[i] = np.NaN
-                avg_calc_dens_prf_all[i] = np.NaN
-                avg_act_dens_prf_all[i] = np.NaN
+                calc_dens_prf_all[:,i] = np.nan
+                act_dens_prf_all[:,i] = np.nan
+                med_calc_dens_prf_all[i] = np.nan
+                med_act_dens_prf_all[i] = np.nan
+                avg_calc_dens_prf_all[i] = np.nan
+                avg_act_dens_prf_all[i] = np.nan
         
         # Get the ratio of the calculated profile with the actual profile
         with np.errstate(divide='ignore', invalid='ignore'):
@@ -268,8 +268,8 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
             avg_inf_dens_ratio = np.divide(avg_calc_dens_prf_inf,act_dens_prf_inf) - 1
             avg_orb_dens_ratio = np.divide(avg_calc_dens_prf_orb,act_dens_prf_orb) - 1
 
-        med_inf_dens_ratio[np.isinf(med_inf_dens_ratio)] = np.NaN
-        avg_inf_dens_ratio[np.isinf(avg_inf_dens_ratio)] = np.NaN
+        med_inf_dens_ratio[np.isinf(med_inf_dens_ratio)] = np.nan
+        avg_inf_dens_ratio[np.isinf(avg_inf_dens_ratio)] = np.nan
         
         # Same for actual profiles    
         med_upper_orb_dens_ratio = np.nanpercentile(med_orb_dens_ratio, q=84.1, axis=0)
@@ -311,31 +311,31 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         fill_alpha = 0.2
         
         # Get rid of the jump from 0 to the first occupied bin by setting them to nan
-        med_calc_mass_prf_all[med_calc_mass_prf_all == 0] = np.NaN
-        med_calc_mass_prf_orb[med_calc_mass_prf_orb == 0] = np.NaN
-        med_calc_mass_prf_inf[med_calc_mass_prf_inf == 0] = np.NaN
-        med_calc_dens_prf_all[med_calc_dens_prf_all == 0] = np.NaN
-        med_calc_dens_prf_orb[med_calc_dens_prf_orb == 0] = np.NaN
-        med_calc_dens_prf_inf[med_calc_dens_prf_inf == 0] = np.NaN
-        med_act_mass_prf_all[med_act_mass_prf_all == 0] = np.NaN
-        med_act_mass_prf_orb[med_act_mass_prf_orb == 0] = np.NaN
-        med_act_mass_prf_inf[med_act_mass_prf_inf == 0] = np.NaN
-        med_act_dens_prf_all[med_act_dens_prf_all == 0] = np.NaN
-        med_act_dens_prf_orb[med_act_dens_prf_orb == 0] = np.NaN
-        med_act_dens_prf_inf[med_act_dens_prf_inf == 0] = np.NaN
+        med_calc_mass_prf_all[med_calc_mass_prf_all == 0] = np.nan
+        med_calc_mass_prf_orb[med_calc_mass_prf_orb == 0] = np.nan
+        med_calc_mass_prf_inf[med_calc_mass_prf_inf == 0] = np.nan
+        med_calc_dens_prf_all[med_calc_dens_prf_all == 0] = np.nan
+        med_calc_dens_prf_orb[med_calc_dens_prf_orb == 0] = np.nan
+        med_calc_dens_prf_inf[med_calc_dens_prf_inf == 0] = np.nan
+        med_act_mass_prf_all[med_act_mass_prf_all == 0] = np.nan
+        med_act_mass_prf_orb[med_act_mass_prf_orb == 0] = np.nan
+        med_act_mass_prf_inf[med_act_mass_prf_inf == 0] = np.nan
+        med_act_dens_prf_all[med_act_dens_prf_all == 0] = np.nan
+        med_act_dens_prf_orb[med_act_dens_prf_orb == 0] = np.nan
+        med_act_dens_prf_inf[med_act_dens_prf_inf == 0] = np.nan
         
-        avg_calc_mass_prf_all[med_calc_mass_prf_all == 0] = np.NaN
-        avg_calc_mass_prf_orb[med_calc_mass_prf_orb == 0] = np.NaN
-        avg_calc_mass_prf_inf[med_calc_mass_prf_inf == 0] = np.NaN
-        avg_calc_dens_prf_all[med_calc_dens_prf_all == 0] = np.NaN
-        avg_calc_dens_prf_orb[med_calc_dens_prf_orb == 0] = np.NaN
-        avg_calc_dens_prf_inf[med_calc_dens_prf_inf == 0] = np.NaN
-        avg_act_mass_prf_all[med_act_mass_prf_all == 0] = np.NaN
-        avg_act_mass_prf_orb[med_act_mass_prf_orb == 0] = np.NaN
-        avg_act_mass_prf_inf[med_act_mass_prf_inf == 0] = np.NaN
-        avg_act_dens_prf_all[med_act_dens_prf_all == 0] = np.NaN
-        avg_act_dens_prf_orb[med_act_dens_prf_orb == 0] = np.NaN
-        avg_act_dens_prf_inf[med_act_dens_prf_inf == 0] = np.NaN
+        avg_calc_mass_prf_all[med_calc_mass_prf_all == 0] = np.nan
+        avg_calc_mass_prf_orb[med_calc_mass_prf_orb == 0] = np.nan
+        avg_calc_mass_prf_inf[med_calc_mass_prf_inf == 0] = np.nan
+        avg_calc_dens_prf_all[med_calc_dens_prf_all == 0] = np.nan
+        avg_calc_dens_prf_orb[med_calc_dens_prf_orb == 0] = np.nan
+        avg_calc_dens_prf_inf[med_calc_dens_prf_inf == 0] = np.nan
+        avg_act_mass_prf_all[med_act_mass_prf_all == 0] = np.nan
+        avg_act_mass_prf_orb[med_act_mass_prf_orb == 0] = np.nan
+        avg_act_mass_prf_inf[med_act_mass_prf_inf == 0] = np.nan
+        avg_act_dens_prf_all[med_act_dens_prf_all == 0] = np.nan
+        avg_act_dens_prf_orb[med_act_dens_prf_orb == 0] = np.nan
+        avg_act_dens_prf_inf[med_act_dens_prf_inf == 0] = np.nan
         
         ax_0 = fig.add_subplot(gs[0])
         ax_1 = fig.add_subplot(gs[1])

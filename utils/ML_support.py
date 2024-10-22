@@ -704,7 +704,7 @@ def dens_prf_loss(halo_ddf,use_sims,radii,labels,use_orb_prf,use_inf_prf):
     if use_orb_prf:
         use_orb = np.where(sparta_mass_prf_orb > 0)[0]
         orb_loss = np.sum(np.abs((sparta_mass_prf_orb[use_orb] - calc_mass_prf_orb[use_orb]) / sparta_mass_prf_orb[use_orb])) / bins.size
-        if orb_loss == np.NaN:
+        if orb_loss == np.nan:
             orb_loss = 50
         elif orb_loss == np.inf:
             orb_loss == 50
@@ -712,7 +712,7 @@ def dens_prf_loss(halo_ddf,use_sims,radii,labels,use_orb_prf,use_inf_prf):
     if use_inf_prf:
         use_inf = np.where(sparta_mass_prf_inf > 0)[0]
         inf_loss = np.sum(np.abs((sparta_mass_prf_inf[use_inf] - calc_mass_prf_inf[use_inf]) / sparta_mass_prf_inf[use_inf])) / bins.size
-        if inf_loss == np.NaN:
+        if inf_loss == np.nan:
             inf_loss = 50
         elif inf_loss == np.inf:
             inf_loss == 50
