@@ -36,6 +36,8 @@ def parse_ranges(ranges_str):
         ranges.append((start, end))
     return ranges
 def create_nu_string(nu_list):
+    for tup in nu_list:
+        print('-'.join(map(str, tup)))
     return '_'.join('-'.join(map(str, tup)) for tup in nu_list)
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -444,10 +446,12 @@ def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,use_wei
                 dask_df = dask_df.map_partitions(cudf.from_pandas)
             ddfs.append(dask_df)    
             sim_scal_pos_weight.append(scal_pos_weight)
+            
         if use_gpu:
             all_ddfs = dc.concat(ddfs,axis=0)
         else:
             all_ddfs = dd.concat(ddfs)
+            
         return all_ddfs,sim_scal_pos_weight
         
 def calc_scal_pos_weight(df):
@@ -885,11 +889,11 @@ def get_combined_name(model_sims):
     
     return combined_name
     
+# Can set max_size to 0 to include all the particles
 def shap_with_filter(explainer, X, y, preds, fltr_dic = None, col_names = None, max_size=500):
     with timed("Filter DF"):
         full_filter = None
         if fltr_dic is not None:
-            print("hi")
             if "X_filter" in fltr_dic:
                 for feature, (operator, value) in fltr_dic["X_filter"].items():
                     if operator == '>':
@@ -901,7 +905,10 @@ def shap_with_filter(explainer, X, y, preds, fltr_dic = None, col_names = None, 
                     elif operator == '<=':
                         condition = X[feature] <= value
                     elif operator == '==':
-                        condition = X[feature] == value
+                        if value == "nan":
+                            condition = X[feature].isna()
+                        else:
+                            condition = X[feature] == value
                     elif operator == '!=':
                         condition = X[feature] != value
                         
@@ -916,9 +923,6 @@ def shap_with_filter(explainer, X, y, preds, fltr_dic = None, col_names = None, 
                         condition = y["Orbit_infall"] == value
                     elif feature == "pred":
                         condition = preds == value
-                    print("curr feature:",feature)
-                    print("filter type",type(full_filter))
-                    print("condition type:",type(condition))
                     if feature == next(iter(fltr_dic[next(iter(fltr_dic))])):
                         full_filter = condition
                     else:
@@ -927,7 +931,7 @@ def shap_with_filter(explainer, X, y, preds, fltr_dic = None, col_names = None, 
             X = X[full_filter]
             
         nrows = X.shape[0].compute()
-        if nrows > max_size:
+        if nrows > max_size and max_size > 0:
             sample = max_size / nrows
         else:
             sample = 1.0
