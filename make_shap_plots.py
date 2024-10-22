@@ -12,6 +12,8 @@ from utils.data_and_loading_functions import create_directory
 
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
+on_zaratan = config.getboolean("MISC","on_zaratan")
+use_gpu = config.getboolean("MISC","use_gpu")
 test_sims = json.loads(config.get("XGBOOST","test_sims"))
 eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
@@ -26,7 +28,7 @@ if __name__ == '__main__':
             cpus_per_task = int(os.environ['SLURM_CPUS_PER_TASK'])
         else:
             print("SLURM_CPUS_PER_TASK is not defined.")
-        if gpu_use:
+        if use_gpu:
             initialize(local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
         else:
             initialize(nthreads = cpus_per_task, local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
@@ -94,7 +96,7 @@ if __name__ == '__main__':
         
         no_second_dict = {
             'X_filter': {
-                "c_Scaled_radii": ('==',"NaN"),
+                "c_Scaled_radii": ('==',"nan"),
             },
             'label_filter': {
             }
@@ -167,21 +169,21 @@ if __name__ == '__main__':
                 }
         }
 
-        # no_second_shap = shap_with_filter(explainer,no_second_dict,X_df,y_df,preds,new_columns,sample=0.01)
+        no_second_shap,no_second_shap_values, no_second_X = shap_with_filter(explainer,X_df,y_df,preds,fltr_dic=no_second_dict,col_names=new_columns,max_size=0)
         # good_orb_in_shap,good_orb_in_shap_values = shap_with_filter(explainer,orb_in_dict,X_df,y_df,preds,new_columns)
         # good_orb_out_shap,good_orb_out_shap_values = shap_with_filter(explainer,orb_out_dict,X_df,y_df,preds,new_columns)
         # test_shap, test_vals, test_X = shap_with_filter(explainer,test_dict,X_df,y_df,preds,new_columns)
-        # bad_orb_missclass_shap,bad_orb_missclass_shap_values, bad_orb_missclass_X = shap_with_filter(explainer,orb_bad_misclass_dict,X_df,y_df,preds,new_columns)
-        # bad_orb_corr_shap,bad_orb_corr_shap_values, bad_orb_corr_X = shap_with_filter(explainer,orb_bad_corr_dict,X_df,y_df,preds,new_columns)
-        all_shap,all_shap_values, all_X = shap_with_filter(explainer,X=X_df,y=y_df,preds=preds,col_names=new_columns)
+        bad_orb_missclass_shap,bad_orb_missclass_shap_values, bad_orb_missclass_X = shap_with_filter(explainer,X_df,y_df,preds,fltr_dic = orb_bad_misclass_dict,col_names=new_columns)
+        bad_orb_corr_shap,bad_orb_corr_shap_values, bad_orb_corr_X = shap_with_filter(explainer,X_df,y_df,preds,fltr_dic=orb_bad_corr_dict,col_names=new_columns)
+        # all_shap,all_shap_values, all_X = shap_with_filter(explainer,X=X_df,y=y_df,preds=preds,col_names=new_columns)
         # in_btwn_shap,in_btwn_shap_values = shap_with_filter(explainer,in_btwn_dict,X_df,y_df,preds,new_columns,sample=0.0001)
 
     with timed("Make SHAP plots"):
-        #ax_no_secondary = shap.plots.beeswarm(no_secondary_shap_values,plot_size=(15,10),show=False,order=order)
-        #plt.title("No Secondary Snapshot Population")
-        #plt.xlim(-6,10)
-        #plt.savefig(gen_plot_save_loc + "no_secondary_beeswarm.png")
-        #print("finished no secondary")
+        ax_no_secondary = shap.plots.beeswarm(no_second_shap,plot_size=(15,10),show=False,order=order)
+        plt.title("No Secondary Snapshot Population")
+        plt.xlim(-6,10)
+        plt.savefig(plot_loc + "no_secondary_beeswarm.png")
+        print("finished no secondary")
 
         widths = [4]
         heights = [4]
@@ -192,8 +194,8 @@ if __name__ == '__main__':
         # ax2 = fig.add_subplot(gs[1,0])
 
         plt.sca(ax1)
-        r = shap.decision_plot(expected_value, all_shap_values,features=all_X,feature_names=new_columns,auto_size_plot=False,show=False,return_objects=True)
-        # shap.decision_plot(expected_value, bad_orb_missclass_shap_values,features=bad_orb_missclass_X,feature_names=new_columns,auto_size_plot=False,show=False,feature_order=None,xlim=r.xlim)
+        r = shap.decision_plot(expected_value, bad_orb_corr_shap_values,features=bad_orb_corr_X,feature_names=new_columns,plot_color="viridis",color_bar=False,auto_size_plot=False,show=False,return_objects=True)
+        shap.decision_plot(expected_value, bad_orb_missclass_shap_values,features=bad_orb_missclass_X,feature_names=new_columns,plot_color="magma",color_bar=False,auto_size_plot=False,show=False,feature_order=None,xlim=r.xlim)
         
         # labels = {
         # 'MAIN_EFFECT': "SHAP main effect value for\n%s",

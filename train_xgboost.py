@@ -91,12 +91,6 @@ if sim_cosmol == "planck13-nbody":
 else:
     cosmol = cosmology.setCosmology(sim_cosmol) 
 
-try:
-    subprocess.check_output('nvidia-smi')
-    gpu_use = True
-except Exception: # this command not being found can raise quite a few different errors depending on the configuration
-    gpu_use = False
-
 if on_zaratan:
     from dask_mpi import initialize
     from mpi4py import MPI
@@ -123,7 +117,7 @@ if __name__ == "__main__":
             cpus_per_task = int(os.environ['SLURM_CPUS_PER_TASK'])
         else:
             print("SLURM_CPUS_PER_TASK is not defined.")
-        if gpu_use:
+        if use_gpu:
             initialize(local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
         else:
             initialize(nthreads = cpus_per_task, local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")

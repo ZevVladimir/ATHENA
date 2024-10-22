@@ -84,16 +84,7 @@ elif not use_gpu and on_zaratan:
     from distributed.scheduler import logger
     import socket
     #from dask_jobqueue import SLURMCluster
-elif not on_zaratan:
-    from dask_cuda import LocalCUDACluster
 
-import subprocess
-
-try:
-    subprocess.check_output('nvidia-smi')
-    gpu_use = True
-except Exception: # this command not being found can raise quite a few different errors depending on the configuration
-    gpu_use = False
 ###############################################################################################################
 
 if __name__ == "__main__":
@@ -108,7 +99,7 @@ if __name__ == "__main__":
             cpus_per_task = int(os.environ['SLURM_CPUS_PER_TASK'])
         else:
             print("SLURM_CPUS_PER_TASK is not defined.")
-        if gpu_use:
+        if use_gpu:
             initialize(local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
         else:
             initialize(nthreads = cpus_per_task, local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")

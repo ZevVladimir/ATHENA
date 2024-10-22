@@ -64,6 +64,8 @@ mem_size = config.getfloat("SEARCH","hdf5_mem_size")
 model_sims = json.loads(config.get("XGBOOST","model_sims"))
 model_type = config["XGBOOST"]["model_type"]
 nu_splits = config["XGBOOST"]["nu_splits"]
+# nu_string = create_nu_string(nu_splits)
+
 ##################################################################################################################
 sys.path.insert(1, path_to_pygadgetreader)
 sys.path.insert(1, path_to_sparta)
@@ -72,6 +74,8 @@ from sparta_tools import sparta # type: ignore
 ##################################################################################################################
 global count
 count = 0
+global made_slice_plt
+made_slice_plt = False
 
 def memory_usage():
     process = psutil.Process(os.getpid())
@@ -212,10 +216,10 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
 
         compare_density_prf(np.array([0]),scaled_radii,np.array([0]),np.array([num_new_ptls]),dens_prf_all,dens_prf_1halo,np.array([ptl_mass]),curr_orb_assn,bins,str(curr_halo_idx),"/home/zvladimi/MLOIS/Random_figs/",save_graph=True)
 
-    if curr_halo_num == 287:
+    global made_slice_plt
+    if num_new_ptls >= 500000 and comp_snap == False:
         model_comb_name = get_combined_name(model_sims) 
 
-        nu_string = create_nu_string(nu_splits)
         model_dir = model_type + "_" + model_comb_name + "nu" + nu_string 
 
         model_save_loc = path_to_xgboost + model_comb_name + "/" + model_dir + "/"
@@ -236,9 +240,8 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
             else:
                 use_indices = indices[halo_splits[curr_iter]:]
             
-            curr_num_halos = use_indices.shape[0]
             use_halo_ids = p_halo_ids[use_indices]
-            # print(use_halo_ids[10])
+            
             # Load the halo information for the ids within this range
             sparta_output = sparta.load(filename = path_to_hdf5_file, halo_ids=use_halo_ids, log_level=0)
 
@@ -410,10 +413,6 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
                 "c_Tangential_vel":save_tang_vel[:,1],
                 "p_phys_vel":p_phys_vel
                 })
-            
-            print(np.where(p_all_orb_assn == 0)[0].shape[0] / np.where(p_all_orb_assn == 1)[0].shape[0])
-            sim_splits = [0]
-            # compare_density_prf(sim_splits,radii=ptl_df ["p_Scaled_radii"].values, halo_first=halo_df["Halo_first"], halo_n=halo_df["Halo_n"], act_mass_prf_all=dens_prf_all, act_mass_prf_orb=dens_prf_1halo, mass=all_masses, orbit_assn=preds, prf_bins=bins, title="", save_location=plot_save_loc, use_mp=True, save_graph=True)
             
             halo_df.to_hdf(save_location + dst_name + "/halo_info/halo_" + str(curr_iter+rst_pnt) + ".h5", key='data', mode='w',format='table')  
             ptl_df.to_hdf(save_location +  dst_name + "/ptl_info/ptl_" + str(curr_iter+rst_pnt) + ".h5", key='data', mode='w',format='table')  
