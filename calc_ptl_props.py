@@ -17,6 +17,8 @@ import psutil
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir
 from utils.calculation_functions import *
 from utils.visualization_functions import halo_plot_3d_vec, compare_density_prf
+from utils.update_vis_fxns import plot_halo_slice
+from utils.ML_support import *
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
@@ -27,6 +29,7 @@ rand_seed = config.getint("MISC","random_seed")
 path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
 path_to_snaps = config["PATHS"]["path_to_snaps"]
 path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
+path_to_xgboost = config["PATHS"]["path_to_xgboost"]
 sim_cosmol = config["MISC"]["sim_cosmol"]
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
@@ -50,9 +53,7 @@ reset_lvl = config.getint("SEARCH","reset")
 global prim_only
 prim_only = config.getboolean("SEARCH","prim_only")
 t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
-global p_red_shift
 p_red_shift = config.getfloat("SEARCH","p_red_shift")
-global search_rad
 search_rad = config.getfloat("SEARCH","search_rad")
 total_num_snaps = config.getint("SEARCH","total_num_snaps")
 # num_processes = int(os.environ['SLURM_CPUS_PER_TASK'])
@@ -60,6 +61,9 @@ num_processes = mp.cpu_count()
 curr_chunk_size = config.getint("SEARCH","chunk_size")
 test_halos_ratio = config.getfloat("XGBOOST","test_halos_ratio")
 mem_size = config.getfloat("SEARCH","hdf5_mem_size")
+model_sims = json.loads(config.get("XGBOOST","model_sims"))
+model_type = config["XGBOOST"]["model_type"]
+nu_splits = config["XGBOOST"]["nu_splits"]
 ##################################################################################################################
 sys.path.insert(1, path_to_pygadgetreader)
 sys.path.insert(1, path_to_sparta)
@@ -139,7 +143,7 @@ def initial_search(halo_positions, halo_r200m, comp_snap, find_mass = False, fin
     
 def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_pos, curr_ptl_vel, 
                  halo_pos, halo_vel, halo_r200m, sparta_last_pericenter_snap=None, sparta_n_pericenter=None, sparta_tracer_ids=None,
-                 sparta_n_is_lower_limit=None, dens_prf_all=None, dens_prf_1halo=None, bins=None, create_dens_prf=False):
+                 sparta_n_is_lower_limit=None, dens_prf_all=None, dens_prf_1halo=None, curr_halo_num=None, bins=None, create_dens_prf=False):
     # Doing this this way as otherwise will have to generate super large arrays for input from multiprocessing
     snap = snap_dict["snap"]
     red_shift = snap_dict["red_shift"]
@@ -186,16 +190,6 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
     scaled_radii = ptl_rad / halo_r200m
     scaled_phys_vel = phys_vel / curr_v200m
     
-    # vel_scal = 1
-    # per_of_halo = 0.05
-    # if comp_snap == False:
-    #     # particles with very high radial velocities at small radii should be considered infalling
-    #     # incorrectly classified
-    #     curr_orb_assn[np.where((scaled_radii < 1.1) & (phys_vel>(vel_scal*curr_v200m)))] = 0
-    #     if np.where((scaled_radii < 1.1) & (phys_vel>(vel_scal*curr_v200m)))[0].shape[0] > int(np.floor(per_of_halo * ptl_rad.shape[0])):
-    #         constraint = np.where((scaled_radii < 1.1) & (phys_vel>(vel_scal*curr_v200m)))[0]
-    #         halo_plot_3d_vec(curr_ptl_pos, curr_ptl_vel, halo_pos, halo_vel, halo_r200m, curr_orb_assn, constraint, curr_halo_idx,vel_scal)
-        
     scaled_radii_inds = scaled_radii.argsort()
     scaled_radii = scaled_radii[scaled_radii_inds]
     fnd_HIPIDs = fnd_HIPIDs[scaled_radii_inds]
@@ -218,6 +212,16 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
 
         compare_density_prf(np.array([0]),scaled_radii,np.array([0]),np.array([num_new_ptls]),dens_prf_all,dens_prf_1halo,np.array([ptl_mass]),curr_orb_assn,bins,str(curr_halo_idx),"/home/zvladimi/MLOIS/Random_figs/",save_graph=True)
 
+    if curr_halo_num == 287:
+        model_comb_name = get_combined_name(model_sims) 
+
+        nu_string = create_nu_string(nu_splits)
+        model_dir = model_type + "_" + model_comb_name + "nu" + nu_string 
+
+        model_save_loc = path_to_xgboost + model_comb_name + "/" + model_dir + "/"
+        gen_plot_save_loc = model_save_loc + "plots/"
+        plot_halo_slice(curr_ptl_pos,curr_orb_assn,gen_plot_save_loc)
+    
     if comp_snap == False:
         return fnd_HIPIDs, curr_orb_assn, scaled_rad_vel, scaled_tang_vel, scaled_radii, scaled_phys_vel
     else:
@@ -293,6 +297,7 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
                                             (sparta_output['tcr_ptl']['res_oct']['n_is_lower_limit'][halo_first[m]:halo_first[m]+halo_n[m]] for m in range(p_curr_num_halos)),
                                             (sparta_output['anl_prf']['M_all'][l,p_sparta_snap,:] for l in range(p_curr_num_halos)),
                                             (sparta_output['anl_prf']['M_1halo'][l,p_sparta_snap,:] for l in range(p_curr_num_halos)),
+                                            np.arange(0,p_curr_num_halos)+halo_idx,
                                             # Uncomment below to create dens profiles
                                             # repeat(sparta_output["config"]['anl_prf']["r_bins_lin"]),repeat(True) 
                                             ),chunksize=curr_chunk_size))
