@@ -74,8 +74,6 @@ from sparta_tools import sparta # type: ignore
 ##################################################################################################################
 global count
 count = 0
-global made_slice_plt
-made_slice_plt = False
 
 def memory_usage():
     process = psutil.Process(os.getpid())
@@ -214,17 +212,7 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
         dens_prf_all = np.reshape(dens_prf_all,(1,80))
         dens_prf_1halo = np.reshape(dens_prf_1halo,(1,80))
 
-        compare_density_prf(np.array([0]),scaled_radii,np.array([0]),np.array([num_new_ptls]),dens_prf_all,dens_prf_1halo,np.array([ptl_mass]),curr_orb_assn,bins,str(curr_halo_idx),"/home/zvladimi/MLOIS/Random_figs/",save_graph=True)
-
-    global made_slice_plt
-    if num_new_ptls >= 500000 and comp_snap == False:
-        model_comb_name = get_combined_name(model_sims) 
-
-        model_dir = model_type + "_" + model_comb_name + "nu" + nu_string 
-
-        model_save_loc = path_to_xgboost + model_comb_name + "/" + model_dir + "/"
-        gen_plot_save_loc = model_save_loc + "plots/"
-        plot_halo_slice(curr_ptl_pos,curr_orb_assn,gen_plot_save_loc)
+        compare_density_prf(np.array([0]),scaled_radii,np.array([0]),np.array([num_new_ptls]),dens_prf_all,dens_prf_1halo,np.array([ptl_mass]),curr_orb_assn,bins,str(curr_halo_idx),"/home/zvladimi/MLOIS/Random_figs/",save_graph=True)    
     
     if comp_snap == False:
         return fnd_HIPIDs, curr_orb_assn, scaled_rad_vel, scaled_tang_vel, scaled_radii, scaled_phys_vel
