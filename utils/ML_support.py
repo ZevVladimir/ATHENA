@@ -36,8 +36,6 @@ def parse_ranges(ranges_str):
         ranges.append((start, end))
     return ranges
 def create_nu_string(nu_list):
-    for tup in nu_list:
-        print('-'.join(map(str, tup)))
     return '_'.join('-'.join(map(str, tup)) for tup in nu_list)
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
