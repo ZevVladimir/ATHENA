@@ -50,7 +50,7 @@ halo_ddf = reform_df(path_to_calc_info + sim + "/" + "Test" + "/halo_info/")
 all_idxs = halo_ddf["Halo_indices"].values
 
 with open(path_to_calc_info + sim + "/p_ptl_tree.pickle", "rb") as pickle_file:
-        tree = pickle.load(pickle_file)
+    tree = pickle.load(pickle_file)
         
 sparta_name, sparta_search_name = split_calc_name(sim)
 # find the snapshots for this simulation
@@ -98,7 +98,7 @@ while len(used_numbers) < 10:
         use_halo_r200m = halos_r200m[use_idx]
         use_halo_id = halos_id[use_idx]
 
-        ptl_indices = tree.query_ball_point(use_halo_pos, r = search_rad * use_halo_r200m)
+        ptl_indices = tree.query_ball_point(use_halo_pos, r = search_rad * 1.5 * use_halo_r200m)
         ptl_indices = np.array(ptl_indices)
 
         curr_ptl_pos = ptls_pos[ptl_indices]
@@ -130,4 +130,4 @@ while len(used_numbers) < 10:
         matched_ids = np.intersect1d(curr_ptl_pids, sparta_tracer_ids, return_indices = True)
         curr_orb_assn[matched_ids[1]] = compare_sparta_assn[matched_ids[2]]
 
-        plot_halo_slice(curr_ptl_pos,curr_orb_assn,use_halo_pos,plot_loc,title=str(num)+"_")
+        plot_halo_slice(curr_ptl_pos,curr_orb_assn,use_halo_pos,use_halo_r200m,search_rad,plot_loc,title=str(num)+"_")

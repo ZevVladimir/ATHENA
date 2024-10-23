@@ -5,6 +5,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.ticker import LogLocator, NullFormatter
 from utils.data_and_loading_functions import split_orb_inf, timed
 from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.patches import Circle
 import shap
 plt.rcParams['mathtext.fontset'] = 'dejavuserif'
 plt.rcParams['font.family'] = 'serif'
@@ -620,7 +621,7 @@ def plot_log_vel(phys_vel,radii,labels,save_loc,add_line=[None,None],show_v200m=
     print("Num Incorrect Orbiting Particles", str(num_inc_orb)+", "+str(np.round(((num_inc_orb/num_orb)*100),2))+"% of orbiting ptls")
     print("Num Incorrect All Particles", str(tot_num_inc)+", "+str(np.round(((tot_num_inc/tot_num_ptl)*100),2))+"% of all ptls")
         
-def plot_halo_slice(ptl_pos,labels,halo_pos,save_loc,title=""):
+def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,search_rad,save_loc,title=""):
     cividis_cmap = plt.get_cmap("cividis")
     cividis_cmap.set_under(color='black')
     cividis_cmap.set_bad(color='black') 
@@ -635,19 +636,47 @@ def plot_halo_slice(ptl_pos,labels,halo_pos,save_loc,title=""):
     hist = np.histogram2d(ptl_pos[:,0],ptl_pos[:,1],bins=nbins,range=[[-xlim,xlim],[-ylim,ylim]])
     max_ptl = np.max(hist[0])
     
+    search_circle_0 = Circle((0,0),radius=search_rad*halo_r200m,edgecolor="yellow",facecolor='none',linestyle="--",fill=False,label="Search radius: 4R200m")
+    search_circle_1 = Circle((0,0),radius=search_rad*halo_r200m,edgecolor="yellow",facecolor='none',linestyle="--",fill=False,label="Search radius: 4R200m")
+    search_circle_2 = Circle((0,0),radius=search_rad*halo_r200m,edgecolor="yellow",facecolor='none',linestyle="--",fill=False,label="Search radius: 4R200m")
+    
+    r200m_circle_0 = Circle((0,0),radius=halo_r200m,edgecolor="white",facecolor='none',linestyle="--",fill=False,label="R200m")
+    r200m_circle_1 = Circle((0,0),radius=halo_r200m,edgecolor="white",facecolor='none',linestyle="--",fill=False,label="R200m")
+    r200m_circle_2 = Circle((0,0),radius=halo_r200m,edgecolor="white",facecolor='none',linestyle="--",fill=False,label="R200m")
+    
+    axisfontsize = 18
+    titlefontsize = 22
+    legendfontsize = 14
+    tickfontsize = 14
+    
     fig, ax = plt.subplots(1,3,figsize=(30,10),constrained_layout=True)
-    ax[0].hist2d(ptl_pos[:,0],ptl_pos[:,1],bins=nbins,vmax=max_ptl,range=[[-xlim,xlim],[-ylim,ylim]])
-    ax[0].set_xlabel(r"$x [h^{-1}kpc]$")
-    ax[0].set_ylabel(r"$y [h^{-1}kpc]$")
-    ax[0].set_title("All Particles")
+    ax[0].hist2d(ptl_pos[:,0],ptl_pos[:,1],bins=nbins,vmax=max_ptl,range=[[-xlim,xlim],[-ylim,ylim]],cmap=cividis_cmap)
+    ax[0].add_patch(search_circle_0)
+    ax[0].add_patch(r200m_circle_0)
+    ax[0].set_xlabel(r"$x [h^{-1}kpc]$",fontsize=axisfontsize)
+    ax[0].set_ylabel(r"$y [h^{-1}kpc]$",fontsize=axisfontsize)
+    ax[0].set_title("All Particles",fontsize=titlefontsize)
+    ax[0].tick_params(axis='x', which='major', labelsize=tickfontsize)
+    ax[0].tick_params(axis='y', which='major', labelsize=tickfontsize)
+    ax[0].legend(fontsize=legendfontsize)
     
-    ax[1].hist2d(ptl_pos[np.where(labels==1)[0],0],ptl_pos[np.where(labels==1)[0],1],bins=nbins,vmax=max_ptl,range=[[-xlim,xlim],[-ylim,ylim]])
-    ax[1].set_xlabel(r"$x [h^{-1}kpc]$")
-    ax[1].set_title("Orbiting Particles")
+    ax[1].hist2d(ptl_pos[np.where(labels==1)[0],0],ptl_pos[np.where(labels==1)[0],1],bins=nbins,vmax=max_ptl,range=[[-xlim,xlim],[-ylim,ylim]],cmap=cividis_cmap)
+    ax[1].add_patch(search_circle_1)
+    ax[1].add_patch(r200m_circle_1)
+    ax[1].set_xlabel(r"$x [h^{-1}kpc]$",fontsize=axisfontsize)
+    ax[1].set_title("Orbiting Particles",fontsize=titlefontsize)
+    ax[1].tick_params(axis='x', which='major', labelsize=tickfontsize)
+    ax[1].tick_params(axis='y', which='both',left=False,labelleft=False)
+    ax[1].legend(fontsize=legendfontsize)
     
-    ax[2].hist2d(ptl_pos[np.where(labels==0)[0],0],ptl_pos[np.where(labels==0)[0],1],bins=nbins,vmax=max_ptl,range=[[-xlim,xlim],[-ylim,ylim]])
-    ax[2].set_xlabel(r"$x [h^{-1}kpc]$")
-    ax[2].set_title("Infalling Particles")
+    ax[2].hist2d(ptl_pos[np.where(labels==0)[0],0],ptl_pos[np.where(labels==0)[0],1],bins=nbins,vmax=max_ptl,range=[[-xlim,xlim],[-ylim,ylim]],cmap=cividis_cmap)
+    ax[2].add_patch(search_circle_2)
+    ax[2].add_patch(r200m_circle_2)
+    ax[2].set_xlabel(r"$x [h^{-1}kpc]$",fontsize=axisfontsize)
+    ax[2].set_title("Infalling Particles",fontsize=titlefontsize)
+    ax[2].tick_params(axis='x', which='major', labelsize=tickfontsize)
+    ax[2].tick_params(axis='y', which='both',left=False,labelleft=False)
+    ax[2].legend(fontsize=legendfontsize)
     
     fig.savefig(save_loc+title+"halo_dist.png")
     
