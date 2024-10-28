@@ -3,6 +3,7 @@ from utils.ML_support import *
 import json
 import configparser
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from colossus.cosmology import cosmology
 import shap
 import matplotlib.cm as cm
@@ -169,7 +170,7 @@ if __name__ == '__main__':
                 }
         }
 
-        no_second_shap,no_second_shap_values, no_second_X = shap_with_filter(explainer,X_df,y_df,preds,fltr_dic=no_second_dict,col_names=new_columns,max_size=0)
+        no_second_shap,no_second_shap_values, no_second_X = shap_with_filter(explainer,X_df,y_df,preds,fltr_dic=no_second_dict,col_names=new_columns,max_size=10000)
         # good_orb_in_shap,good_orb_in_shap_values = shap_with_filter(explainer,orb_in_dict,X_df,y_df,preds,new_columns)
         # good_orb_out_shap,good_orb_out_shap_values = shap_with_filter(explainer,orb_out_dict,X_df,y_df,preds,new_columns)
         # test_shap, test_vals, test_X = shap_with_filter(explainer,test_dict,X_df,y_df,preds,new_columns)
