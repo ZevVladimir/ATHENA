@@ -5,6 +5,8 @@ from utils.ML_support import get_combined_name
 from utils.data_and_loading_functions import *
 from utils.update_vis_fxns import *
 from utils.ML_support import *
+from scipy.integrate import quad
+from scipy.optimize import curve_fit
 
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
@@ -15,35 +17,101 @@ eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
 sim_cosmol = config["MISC"]["sim_cosmol"]
 
-def get_alpha(x,a,alpha_inf):
-    return alpha_inf * (x / (a + x))
+def rho_orb_dist(x: float, alpha: float, a: float) -> float:
+    """Orbiting profile as a distribution.
 
-def get_rh(r_h_p,r_h_s,M_orb,M_p):
-    return r_h_p * (M_orb / M_p)**r_h_s
+    Parameters
+    ----------
+    x : float
+        Radial points scaled by rh
+    alpha : float
+        Slope parameter
+    a : float
+        Small scale parameter
 
-@delayed
-def get_alpha_inf(alpha_inf_p,alpha_inf_s,M_orb,M_p):
-    return alpha_inf_p * (M_orb / M_p)**alpha_inf_s
+    Returns
+    -------
+    float
 
-@delayed
-def create_orb_prf(x,A,a,alpha_inf,halo_first,halo_n):
-    start = halo_first 
-    end = halo_first + halo_n
-    curr_x = x[start:end]
-    alpha = get_alpha(curr_x,a,alpha_inf)
-    return A * ((curr_x/a)**-alpha) * np.exp(-((curr_x**2)/2))
+    """
+    alpha *= x / (a + x)
+    return np.power(x / a, -alpha) * np.exp(-0.5 * x ** 2)
 
-@delayed
-def calc_morb(halo_first,halo_n,y,mass):
-    start = halo_first 
-    end = halo_first + halo_n
-    return da.from_array(y["Orbit_infall"].loc[start:end].sum() * mass)
 
-@delayed
-def calc_r_rh(X,r_h,halo_first,halo_n):
-    start = halo_first 
-    end = halo_first + halo_n
-    return da.from_array(X["p_Scaled_radii"].loc[start:end].values / r_h)
+def rho_orb_dens_dist(r: float, r_h: float, alpha: float, a: float) -> float:
+    """Orbiting profile density distribution.
+
+    Parameters
+    ----------
+    r : float
+        Radial points
+    r_h : float
+        Halo radius
+    alpha : float
+        Slope parameter
+    a : float
+        Small scale parameter
+
+    Returns
+    -------
+    float
+        Normalized density distribution
+    """
+    distr = rho_orb_dist(r/r_h, alpha, a)
+    distr /= 4. * np.pi * r_h ** 3 * \
+        quad(lambda x, alpha, a: x**2 * rho_orb_dist(x, alpha, a),
+             a=0, b=np.inf, args=(alpha, a))[0]
+    return distr
+
+
+def rho_orb_model_with_norm(r: float, log10A: float, r_h: float, alpha: float, a: float) -> float:
+    """Orbiting density profile with free normalization constant.
+
+    Parameters
+    ----------
+    r : float
+        Radial points
+    log10A : float
+        Log 10 value of the normalization constant
+    r_h : float
+        Halo radius
+    alpha : float
+        Slope parameter
+    a : float
+        Small scale parameter
+
+    Returns
+    -------
+    float
+        Orbiting density profile
+    """
+    return np.power(10., log10A) * rho_orb_dist(x=r/r_h, alpha=alpha, a=a)
+
+
+def rho_orb_model(r: float, morb: float, r_h: float, alpha: float, a: float) -> float:
+    """Orbiting density profile imposing the constraint
+
+                M_{\rm orb} = \int \rho_{\rm rob} dV
+
+    Parameters
+    ----------
+    r : float
+        Radial points in which to 
+    morb : float
+        Orbiting mass
+    r_h : float
+        Halo radius
+    alpha : float
+        Slope parameter
+    a : float
+        Small scale parameter
+
+    Returns
+    -------
+    float
+        Orbiting density profile
+    """
+    return morb * rho_orb_dens_dist(r=r, r_h=r_h, alpha=alpha, a=a)
 
 if __name__ == '__main__':
     if use_gpu:
@@ -172,22 +240,8 @@ if __name__ == '__main__':
     r_h_s = 0.226
     r_h_p = 840.3
     M_p = 10e14
-    A = 1
+    A = 1e13
     
-    
-    alpha_inf = get_alpha_inf(alpha_inf_p,alpha_inf_s,M_orb,M_p)
-    r_h = get_rh(r_h_p,r_h_s,M_orb,M_p)
-    
-    delayed_results = [calc_r_rh(X_df,r_h[i],halo_first[i],halo_n[i]) for i in range(10)]
-    results = client.compute(delayed_results, sync=True)    
-    x = da.concatenate(results)
-    
-    scatter_x = client.scatter(x)
-    
-    delayed_results = [create_orb_prf(scatter_x,A,a,alpha_inf[i],halo_first[i],halo_n[i]) for i in range(10)]
-    results = client.compute(delayed_results, sync=True)
-    for i in range(10):
-        curr_res = results[i].compute()
-        print(curr_res.shape)
+    curve_fit(rho_orb_model)
     
     client.close()

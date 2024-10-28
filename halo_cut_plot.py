@@ -130,4 +130,4 @@ while len(used_numbers) < 10:
         matched_ids = np.intersect1d(curr_ptl_pids, sparta_tracer_ids, return_indices = True)
         curr_orb_assn[matched_ids[1]] = compare_sparta_assn[matched_ids[2]]
 
-        plot_halo_slice(curr_ptl_pos,curr_orb_assn,use_halo_pos,use_halo_r200m,search_rad,plot_loc,title=str(num)+"_")
+        plot_halo_slice(curr_ptl_pos,curr_orb_assn,use_halo_pos,use_halo_r200m,plot_loc,search_rad=0,title=str(num)+"_")

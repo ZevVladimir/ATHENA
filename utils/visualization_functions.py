@@ -338,7 +338,7 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         avg_act_dens_prf_inf[med_act_dens_prf_inf == 0] = np.nan
         
         ax_0 = fig.add_subplot(gs[0])
-        ax_1 = fig.add_subplot(gs[1])
+        ax_1 = fig.add_subplot(gs[1],sharex=ax_0)
         
         invis_calc, = ax_0.plot([0], [0], color='black', linestyle='-')
         invis_act, = ax_0.plot([0], [0], color='black', linestyle='--')
@@ -353,8 +353,8 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         ax_0.set_ylabel(r"$\rho (M_\odot \mathrm{kpc}^{-3})$", fontsize=axisfntsize)
         ax_0.set_xscale("log")
         ax_0.set_yscale("log")
-        ax_0.set_xlim(0.05)
-        ax_0.tick_params(axis='x', which='both',bottom=False,labelbottom=False)
+        ax_0.set_xlim(0.05,np.max(lin_rticks))
+
         ax_0.tick_params(axis='y',which='both',direction="in",labelsize=tickfntsize)
         fig.legend([(invis_calc, invis_act),all_lb,orb_lb,inf_lb], ['Predicted, Actual','All','Orbiting','Infalling'], numpoints=1,handlelength=3,handler_map={tuple: HandlerTuple(ndivide=None)},frameon=False,fontsize=legendfntsize)
 
@@ -370,7 +370,7 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
         ax_1.set_ylabel(r"$\frac{\rho_{pred}}{\rho_{act}} - 1$", fontsize=axisfntsize)
         
-        ax_1.set_xlim(0.05)
+        ax_1.set_xlim(0.05,np.max(lin_rticks))
         ax_1.set_ylim(bottom=-0.3,top=0.3)
         ax_1.set_xscale("log")
         tick_locs = lin_rticks
@@ -404,7 +404,6 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         ax_0.set_xscale("log")
         ax_0.set_yscale("log")
         ax_0.set_xlim(0.05)
-        ax_0.tick_params(axis='x', which='both',bottom=False,labelbottom=False)
         ax_0.tick_params(axis='y',which='both',direction="in",labelsize=tickfntsize)
         fig.legend([(invis_calc, invis_act),all_lb,orb_lb,inf_lb], ['Predicted, Actual','All','Orbiting','Infalling'], numpoints=1,handlelength=3,handler_map={tuple: HandlerTuple(ndivide=None)},loc='outside left upper',bbox_to_anchor=(1, 1),frameon=False,fontsize=legendfntsize)
 
@@ -427,10 +426,9 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         if 0 in lin_rticks:
             tick_locs.remove(0)
         strng_ticks = list(map(str, tick_locs))
-        
+
         ax_1.set_xticks(tick_locs,strng_ticks)  
         ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
-
         fig.savefig(save_location + title + "avg_dens_prfl_rat.png",bbox_inches='tight')
 
     return middle_bins
