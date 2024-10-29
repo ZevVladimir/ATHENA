@@ -354,8 +354,8 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         ax_0.set_xscale("log")
         ax_0.set_yscale("log")
         ax_0.set_xlim(0.05,np.max(lin_rticks))
-
-        ax_0.tick_params(axis='y',which='both',direction="in",labelsize=tickfntsize)
+        ax_0.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
+        ax_0.tick_params(axis='x', which='both', labelbottom=False) # we don't want the labels just the tick marks
         fig.legend([(invis_calc, invis_act),all_lb,orb_lb,inf_lb], ['Predicted, Actual','All','Orbiting','Infalling'], numpoints=1,handlelength=3,handler_map={tuple: HandlerTuple(ndivide=None)},frameon=False,fontsize=legendfntsize)
 
         ax_1.plot(middle_bins, med_all_ratio, 'r')
@@ -404,7 +404,8 @@ def compare_density_prf(splits, radii, halo_first, halo_n, act_mass_prf_all, act
         ax_0.set_xscale("log")
         ax_0.set_yscale("log")
         ax_0.set_xlim(0.05)
-        ax_0.tick_params(axis='y',which='both',direction="in",labelsize=tickfntsize)
+        ax_0.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
+        ax_0.tick_params(axis='x', which='both', labelbottom=False) # we don't want the labels just the tick marks
         fig.legend([(invis_calc, invis_act),all_lb,orb_lb,inf_lb], ['Predicted, Actual','All','Orbiting','Infalling'], numpoints=1,handlelength=3,handler_map={tuple: HandlerTuple(ndivide=None)},loc='outside left upper',bbox_to_anchor=(1, 1),frameon=False,fontsize=legendfntsize)
 
         ax_1.plot(middle_bins, avg_all_ratio, 'r')
