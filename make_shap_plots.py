@@ -85,6 +85,7 @@ if __name__ == '__main__':
         new_columns = ["Current $r/R_{\mathrm{200m}}$","Current $v_{\mathrm{r}}/V_{\mathrm{200m}}$","Current $v_{\mathrm{t}}/V_{\mathrm{200m}}$","Past $r/R_{\mathrm{200m}}$","Past $v_{\mathrm{r}}/V_{\mathrm{200m}}$","Past $v_{\mathrm{t}}/V_{\mathrm{200m}}$"]
         col2num = {col: i for i, col in enumerate(new_columns)}
         order = list(map(col2num.get, new_columns))
+        order.reverse()
         
         bst.set_param({"device": "cuda:0"})
         explainer = shap.TreeExplainer(bst)
@@ -186,17 +187,33 @@ if __name__ == '__main__':
         plt.savefig(plot_loc + "no_secondary_beeswarm.png")
         print("finished no secondary")
 
-        widths = [4]
-        heights = [4]
-        fig = plt.figure(constrained_layout=True,figsize=(30,25))
+        widths = [4,4]
+        heights = [4,4]
+        fig_width = 75
+        fig_height = 50
+        fig = plt.figure(constrained_layout=True,figsize=(fig_width,fig_height))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
 
         ax1 = fig.add_subplot(gs[0,0])
-        # ax2 = fig.add_subplot(gs[1,0])
+        ax2 = fig.add_subplot(gs[0,1])
+        ax3 = fig.add_subplot(gs[1,0])
+        ax4 = fig.add_subplot(gs[1,1])
 
         plt.sca(ax1)
-        r = shap.decision_plot(expected_value, bad_orb_corr_shap_values,features=bad_orb_corr_X,feature_names=new_columns,plot_color="viridis",color_bar=False,auto_size_plot=False,show=False,return_objects=True)
+        r=shap.decision_plot(expected_value, bad_orb_corr_shap_values,features=bad_orb_corr_X,feature_names=new_columns,plot_color="viridis",color_bar=False,auto_size_plot=False,show=False,feature_order=None,return_objects=True, hide_bot_label=True)
+        plt.sca(ax2)
+        shap.plots.beeswarm(bad_orb_corr_shap,plot_size=(fig_width/2,fig_height/2),show=False,order=order,hide_features=True, hide_xaxis=True)
+        plt.sca(ax3)
         shap.decision_plot(expected_value, bad_orb_missclass_shap_values,features=bad_orb_missclass_X,feature_names=new_columns,plot_color="magma",color_bar=False,auto_size_plot=False,show=False,feature_order=None,xlim=r.xlim)
+        plt.sca(ax4)
+        shap.plots.beeswarm(bad_orb_missclass_shap,plot_size=(fig_width/2,fig_height/2),show=False,order=order,hide_features=True)
+        
+        # Set it so the xlims for both beeswarms are the same
+        xlim2 = ax2.get_xlim()
+        xlim4 = ax4.get_xlim()
+        new_xlim = (min(xlim2[0], xlim4[0]), max(xlim2[1], xlim4[1]))
+        ax2.set_xlim(new_xlim)
+        ax4.set_xlim(new_xlim)
         
         # labels = {
         # 'MAIN_EFFECT': "SHAP main effect value for\n%s",
