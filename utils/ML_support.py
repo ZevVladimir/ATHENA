@@ -887,8 +887,7 @@ def get_combined_name(model_sims):
     
     return combined_name
     
-# Can set max_size to 0 to include all the particles
-def shap_with_filter(explainer, X, y, preds, fltr_dic = None, col_names = None, max_size=500):
+def filter_ddf(X, y = None, preds = None, fltr_dic = None, col_names = None, max_size=500):
     with timed("Filter DF"):
         full_filter = None
         if fltr_dic is not None:
@@ -939,9 +938,13 @@ def shap_with_filter(explainer, X, y, preds, fltr_dic = None, col_names = None, 
         
         if col_names != None:
             X.columns = col_names
-        
-        X = X.compute()
-
+            
+        return X
+    
+# Can set max_size to 0 to include all the particles
+def shap_with_filter(explainer, X, y, preds, fltr_dic = None, col_names = None, max_size=500):
+    X = filter_ddf(X, y, preds, fltr_dic = fltr_dic, col_names = col_names, max_size=max_size)
+    X = X.compute()
     return explainer(X), explainer.shap_values(X), X
     
     
