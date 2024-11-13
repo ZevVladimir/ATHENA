@@ -165,7 +165,8 @@ def create_mass_prf(radii, orbit_assn, prf_bins, mass):
 
     # Can adjust this to cut out halos that don't have enough particles within R200m
     min_ptl = 0
-    if np.where(radii <= 1)[0].size < min_ptl:
+    ptl_in_r200m = np.where(radii <= 1)[0].size
+    if ptl_in_r200m < min_ptl:
         calc_mass_prf_orb[:]=np.nan
         calc_mass_prf_inf[:]=np.nan
         calc_mass_prf_all[:]=np.nan
@@ -182,6 +183,7 @@ def create_mass_prf(radii, orbit_assn, prf_bins, mass):
             calc_mass_prf_all  = update_density_prf(calc_mass_prf_all, radii, i, start_bin, end_bin, mass)    
             calc_mass_prf_orb = update_density_prf(calc_mass_prf_orb, orbit_radii, i, start_bin, end_bin, mass)      
             calc_mass_prf_inf = update_density_prf(calc_mass_prf_inf, infall_radii, i, start_bin, end_bin, mass)      
-        
     
-    return calc_mass_prf_all,calc_mass_prf_orb, calc_mass_prf_inf
+        m200m = ptl_in_r200m * mass
+    
+    return calc_mass_prf_all,calc_mass_prf_orb, calc_mass_prf_inf, m200m

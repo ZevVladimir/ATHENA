@@ -626,8 +626,14 @@ def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,save_loc,search_rad=0,tit
     ptl_pos[:,0] = ptl_pos[:,0] - halo_pos[0]
     ptl_pos[:,1] = ptl_pos[:,1] - halo_pos[1]
     
-    xlim = np.max(np.abs(ptl_pos[:,0]))
-    ylim = np.max(np.abs(ptl_pos[:,1]))
+    if search_rad > 0:
+        lim = (search_rad * halo_r200m) + 0.05 * (search_rad * halo_r200m)
+        xlim = lim
+        ylim = lim
+    else:
+        xlim = np.max(np.abs(ptl_pos[:,0]))
+        ylim = np.max(np.abs(ptl_pos[:,1]))
+        
     nbins = 250
     
     hist = np.histogram2d(ptl_pos[:,0],ptl_pos[:,1],bins=nbins,range=[[-xlim,xlim],[-ylim,ylim]])
@@ -641,13 +647,15 @@ def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,save_loc,search_rad=0,tit
     r200m_circle_0 = Circle((0,0),radius=halo_r200m,edgecolor="white",facecolor='none',linestyle="--",fill=False,label="R200m")
     r200m_circle_1 = Circle((0,0),radius=halo_r200m,edgecolor="white",facecolor='none',linestyle="--",fill=False,label="R200m")
     r200m_circle_2 = Circle((0,0),radius=halo_r200m,edgecolor="white",facecolor='none',linestyle="--",fill=False,label="R200m")
-    
-    axisfontsize = 18
-    titlefontsize = 22
-    legendfontsize = 14
-    tickfontsize = 14
+            
+    axisfontsize = 22
+    titlefontsize = 24
+    legendfontsize = 18
+    tickfontsize = 16
     
     fig, ax = plt.subplots(1,3,figsize=(30,10),constrained_layout=True)
+    
+    
     ax[0].hist2d(ptl_pos[:,0],ptl_pos[:,1],bins=nbins,vmax=max_ptl,range=[[-xlim,xlim],[-ylim,ylim]],norm="log",cmap=cividis_cmap)
     ax[0].add_patch(r200m_circle_0)
     ax[0].set_xlabel(r"$x [h^{-1}kpc]$",fontsize=axisfontsize)
@@ -655,7 +663,6 @@ def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,save_loc,search_rad=0,tit
     ax[0].set_title("All Particles",fontsize=titlefontsize)
     ax[0].tick_params(axis='x', which='major', labelsize=tickfontsize)
     ax[0].tick_params(axis='y', which='major', labelsize=tickfontsize)
-    ax[0].legend(fontsize=legendfontsize)
     
     ax[1].hist2d(ptl_pos[np.where(labels==1)[0],0],ptl_pos[np.where(labels==1)[0],1],bins=nbins,vmax=max_ptl,range=[[-xlim,xlim],[-ylim,ylim]],norm="log",cmap=cividis_cmap)
     ax[1].add_patch(r200m_circle_1)
@@ -663,7 +670,7 @@ def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,save_loc,search_rad=0,tit
     ax[1].set_title("Orbiting Particles",fontsize=titlefontsize)
     ax[1].tick_params(axis='x', which='major', labelsize=tickfontsize)
     ax[1].tick_params(axis='y', which='both',left=False,labelleft=False)
-    ax[1].legend(fontsize=legendfontsize)
+    # ax[1].legend(fontsize=legendfontsize)
     
     ax[2].hist2d(ptl_pos[np.where(labels==0)[0],0],ptl_pos[np.where(labels==0)[0],1],bins=nbins,vmax=max_ptl,range=[[-xlim,xlim],[-ylim,ylim]],norm="log",cmap=cividis_cmap)
     ax[2].add_patch(r200m_circle_2)
@@ -671,13 +678,14 @@ def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,save_loc,search_rad=0,tit
     ax[2].set_title("Infalling Particles",fontsize=titlefontsize)
     ax[2].tick_params(axis='x', which='major', labelsize=tickfontsize)
     ax[2].tick_params(axis='y', which='both',left=False,labelleft=False)
+    # ax[2].legend(fontsize=legendfontsize)
     
     if search_rad > 0:
         ax[0].add_patch(search_circle_0)
         ax[1].add_patch(search_circle_1)
-        ax[2].add_patch(search_circle_2)
+        ax[2].add_patch(search_circle_2) 
     
-    ax[2].legend(fontsize=legendfontsize)
+    ax[0].legend(fontsize=legendfontsize)
     
     fig.savefig(save_loc+title+"halo_dist.png")
     

@@ -22,21 +22,13 @@ from skopt.space import Real
 from sklearn.metrics import accuracy_score
 from functools import partial
 
-from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, find_closest_z, conv_halo_id_spid, timed, split_data_by_halo
+from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, find_closest_z, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, create_nu_string
 from utils.visualization_functions import compare_density_prf, plot_per_err
 from utils.update_vis_fxns import plot_full_ptl_dist, plot_miss_class_dist
 from utils.calculation_functions import create_mass_prf
 from sparta_tools import sparta # type: ignore
 from colossus.cosmology import cosmology
 
-def parse_ranges(ranges_str):
-    ranges = []
-    for part in ranges_str.split(','):
-        start, end = map(int, part.split('-'))
-        ranges.append((start, end))
-    return ranges
-def create_nu_string(nu_list):
-    return '_'.join('-'.join(map(str, tup)) for tup in nu_list)
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
@@ -72,7 +64,7 @@ search_rad = config.getfloat("SEARCH","search_rad")
 file_lim = config.getint("XGBOOST","file_lim")
 model_type = config["XGBOOST"]["model_type"]
 train_rad = config.getint("XGBOOST","training_rad")
-nu_splits = config["XGBOOST"]["nu_splits"]
+
 
 reduce_rad = config.getfloat("XGBOOST","reduce_rad")
 reduce_perc = config.getfloat("XGBOOST", "reduce_perc")
@@ -82,7 +74,7 @@ min_weight = config.getfloat("XGBOOST","min_weight")
 weight_exp = config.getfloat("XGBOOST","weight_exp")
 
 hpo_loss = config.get("XGBOOST","hpo_loss")
-
+nu_splits = config["XGBOOST"]["nu_splits"]
 nu_splits = parse_ranges(nu_splits)
 nu_string = create_nu_string(nu_splits)
 
@@ -604,7 +596,6 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
     y_scatter = client.scatter(y)
     y = dd.from_delayed(y_scatter)
 
-    
     num_bins = 30
 
     if dens_prf:
@@ -612,19 +603,24 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
         halo_n = halo_ddf["Halo_n"].values
         all_idxs = halo_ddf["Halo_indices"].values
 
+        all_z = []
         # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
         sim_splits = np.where(halo_first == 0)[0]
         # if there are multiple simulations, to correctly index the dataset we need to update the starting values for the 
         # stacked simulations such that they correspond to the larger dataset and not one specific simulation
-        if len(use_sims) != 1:
-            for i in range(1,len(use_sims)):
+        for i,sim in enumerate(use_sims):
+            if len(use_sims) > 1:
                 if i < len(use_sims) - 1:
                     halo_first[sim_splits[i]:sim_splits[i+1]] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
                 else:
                     halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
-
+                
+            with open(path_to_calc_info + sim + "/config.pickle", "rb") as file:
+                config_dict = pickle.load(file)
+                all_z.append(config_dict["p_snap_info"]["red_shift"][()])
+                    
         sparta_mass_prf_all, sparta_mass_prf_1halo,all_masses,bins = load_sprta_mass_prf(sim_splits,all_idxs,use_sims)
-        compare_density_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=sparta_mass_prf_all, act_mass_prf_orb=sparta_mass_prf_1halo, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, title="", save_location=plot_save_loc, use_mp=True)
+        compare_density_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=sparta_mass_prf_all, act_mass_prf_orb=sparta_mass_prf_1halo, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, title="", save_location=plot_save_loc, use_mp=True, split_by_nu=True, all_z=all_z)
     
     if missclass or full_dist:       
         p_corr_labels=y.compute().values.flatten()
