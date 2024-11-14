@@ -690,7 +690,7 @@ def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,save_loc,search_rad=0,tit
     
     fig.savefig(save_loc+title+"halo_dist.png")
 
-# Profiles should be a list of lists such that each list is the calculated and the actual profiles for each nu split
+# Profiles should be a list [calc_prf,act_prf]
 def compare_dens_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title):    
     # Parameters to tune sizes of plots and fonts
     widths = [1]
@@ -711,26 +711,26 @@ def compare_dens_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_locat
     invis_act, = ax_0.plot([0], [0], color='black', linestyle='--')
     
     # Take the ratio of the calculated profiles and the actual profiles and center around 0
-    ratio_all_prf = (all_prfs[i][0] / all_prfs[i][1]) - 1
-    ratio_orb_prf = (orb_prfs[i][0] / orb_prfs[i][1]) - 1
-    ratio_inf_prf = (inf_prfs[i][0] / inf_prfs[i][1]) - 1
+    ratio_all_prf = (all_prfs[0] / all_prfs[1]) - 1
+    ratio_orb_prf = (orb_prfs[0] / orb_prfs[1]) - 1
+    ratio_inf_prf = (inf_prfs[0] / inf_prfs[1]) - 1
 
     # Plot the calculated profiles
-    all_lb, = ax_0.plot(bins, np.nanmedian(all_prfs[i][0]), 'r-', label = "All")
-    orb_lb, = ax_0.plot(bins, np.nanmedian(orb_prfs[i][0]), 'b-', label = "Orbiting")
-    inf_lb, = ax_0.plot(bins, np.nanmedian(inf_prfs[i][0]), 'g-', label = "Infalling")
+    all_lb, = ax_0.plot(bins, np.nanmedian(all_prfs[0],axis=0), 'r-', label = "All")
+    orb_lb, = ax_0.plot(bins, np.nanmedian(orb_prfs[0],axis=0), 'b-', label = "Orbiting")
+    inf_lb, = ax_0.plot(bins, np.nanmedian(inf_prfs[0],axis=0), 'g-', label = "Infalling")
     
     # Plot the SPARTA (actual) profiles 
-    ax_0.plot(bins, np.nanmedian(all_prfs[i][1]), 'r--')
-    ax_0.plot(bins, np.nanmedian(orb_prfs[i][1]), 'b--')
-    ax_0.plot(bins, np.nanmedian(inf_prfs[i][1]), 'g--')
+    ax_0.plot(bins, np.nanmedian(all_prfs[1],axis=0), 'r--')
+    ax_0.plot(bins, np.nanmedian(orb_prfs[1],axis=0), 'b--')
+    ax_0.plot(bins, np.nanmedian(inf_prfs[1],axis=0), 'g--')
 
     
     fig.legend([(invis_calc, invis_act),all_lb,orb_lb,inf_lb], ['Predicted, Actual','All','Orbiting','Infalling'], numpoints=1,handlelength=3,handler_map={tuple: HandlerTuple(ndivide=None)},frameon=False,fontsize=legendfntsize)
 
-    ax_1.plot(bins, np.nanmedian(ratio_all_prf), 'r')
-    ax_1.plot(bins, np.nanmedian(ratio_orb_prf), 'b')
-    ax_1.plot(bins, np.nanmedian(ratio_inf_prf), 'g')
+    ax_1.plot(bins, np.nanmedian(ratio_all_prf,axis=0), 'r')
+    ax_1.plot(bins, np.nanmedian(ratio_orb_prf,axis=0), 'b')
+    ax_1.plot(bins, np.nanmedian(ratio_inf_prf,axis=0), 'g')
     
     ax_1.fill_between(bins, np.nanpercentile(ratio_all_prf, q=15.9, axis=0),np.nanpercentile(ratio_all_prf, q=84.1, axis=0), color='r', alpha=fill_alpha)
     ax_1.fill_between(bins, np.nanpercentile(ratio_orb_prf, q=15.9, axis=0),np.nanpercentile(ratio_orb_prf, q=84.1, axis=0), color='g', alpha=fill_alpha)
@@ -759,8 +759,9 @@ def compare_dens_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_locat
     
     ax_1.set_xticks(tick_locs,strng_ticks)  
     ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
-    fig.savefig(save_location + title + "avg_dens_prfl_rat.png",bbox_inches='tight')
+    fig.savefig(save_location + title + "med_dens_prfl_rat.png",bbox_inches='tight')
     
+# Profiles should be a list of lists where each list consists of [calc_prf,act_prf] for each nu split
 def compare_dens_prfs_nu(plt_nu_splits, all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title):    
     # Parameters to tune sizes of plots and fonts
     widths = [1,1,1]

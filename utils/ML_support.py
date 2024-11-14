@@ -25,7 +25,7 @@ from functools import partial
 
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, find_closest_z, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, create_nu_string
 from utils.visualization_functions import plot_per_err
-from utils.update_vis_fxns import plot_full_ptl_dist, plot_miss_class_dist, compare_dens_prfs_nu
+from utils.update_vis_fxns import plot_full_ptl_dist, plot_miss_class_dist, compare_dens_prfs_nu, compare_dens_prfs
 from utils.calculation_functions import create_mass_prf, create_stack_mass_prf, adj_dens_prf, calculate_density
 from sparta_tools import sparta # type: ignore
 from colossus.cosmology import cosmology
@@ -588,7 +588,7 @@ def load_sprta_mass_prf(sim_splits,all_idxs,use_sims):
 
     return mass_prf_all,mass_prf_1halo,all_masses,bins
 
-def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, combined_name, plot_save_loc, dens_prf = False,missclass=False,full_dist=False,per_err=False): 
+def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, combined_name, plot_save_loc, dens_prf = False,missclass=False,full_dist=False,per_err=False,split_nu=False): 
     with timed("Predictions"):
         print(f"Starting predictions for {y.size.compute():.3e} particles")
         preds = make_preds(client, model, X, report_name="Report", print_report=False)
@@ -640,22 +640,27 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
         act_dens_prf_inf = calculate_density(sparta_mass_prf_inf*h, bins[1:],calc_r200m*h)
         
         tot_num_halos = halo_n.shape[0]
-        # min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
-        min_disp_halos = 0
-        
-        all_prf_lst = []
-        orb_prf_lst = []
-        inf_prf_lst = []
+        min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
 
-        for i,nu_split in enumerate(plt_nu_splits):
-            # Take the second element of the where to filter by the halos (?)
-            fltr = np.where((calc_nus > nu_split[0]) & (calc_nus < nu_split[1]))[1]
-            
-            all_prf_lst.append(adj_dens_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
-            orb_prf_lst.append(adj_dens_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
-            inf_prf_lst.append(adj_dens_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
-            
-        compare_dens_prfs_nu(plt_nu_splits,all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="")
+        if split_nu:
+            all_prf_lst = []
+            orb_prf_lst = []
+            inf_prf_lst = []
+            for i,nu_split in enumerate(plt_nu_splits):
+                # Take the second element of the where to filter by the halos (?)
+                fltr = np.where((calc_nus > nu_split[0]) & (calc_nus < nu_split[1]))[1]
+                
+                all_prf_lst.append(adj_dens_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
+                orb_prf_lst.append(adj_dens_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
+                inf_prf_lst.append(adj_dens_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
+            compare_dens_prfs_nu(plt_nu_splits,all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="")
+        else:
+            all_prf_lst = adj_dens_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos)
+            orb_prf_lst = adj_dens_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos)
+            inf_prf_lst = adj_dens_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos)
+     
+            compare_dens_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="")
+        
         
     if missclass or full_dist:       
         p_corr_labels=y.compute().values.flatten()

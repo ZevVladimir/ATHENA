@@ -50,11 +50,15 @@ def calculate_distance(halo_x, halo_y, halo_z, particle_x, particle_y, particle_
     return distance, coord_diff #kpc/h
 
 #calculates density within sphere of given radius with given mass and calculating volume at each particle's radius
-def calculate_density(masses, radius, r200m):
-    density = np.ones(shape=(masses.shape[0],radius.shape[0]))
-    for i in range(masses.shape[0]):
-        density[i] = masses[i] / ((4/3) * np.pi * np.power(radius*r200m[i],3))
-    return density
+def calculate_density(masses, bins, r200m):
+    rho = np.zeros_like(masses)
+    V = (bins[None, :] * r200m[:, None])**3 * 4.0 * np.pi / 3.0
+    dV = V[:, 1:] - V[:, :-1]
+    dM = masses[:, 1:] - masses[:, :-1]
+    rho[:, 0] = masses[:, 0] / V[:, 0]
+    rho[:, 1:] = dM / dV
+
+    return rho
 
 #returns indices where density goes below overdensity value (200 * rho_c)
 def check_where_r200(my_density, rho_m):
@@ -216,7 +220,7 @@ def adj_dens_prf(calc_prf, act_prf, min_disp_halos, nu_fltr = None):
             calc_prf[:,i] = np.nan
             act_prf[:,i] = np.nan
         
-    return calc_prf, act_prf        
+    return [calc_prf, act_prf]        
 
 def create_stack_mass_prf(splits, radii, halo_first, halo_n, mass, orbit_assn, prf_bins, use_mp = True, all_z = []):
     calc_mass_prf_orb_lst = []
