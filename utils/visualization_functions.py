@@ -80,11 +80,6 @@ def rv_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = None):
     ax.legend(frameon=False)
     
     return ax.plot(hubble_vel[:,0], hubble_vel[:,1], color = "purple", alpha = 0.5, linestyle = "dashed", label = r"Hubble Flow")
-  
-def split_orb_inf(data, labels):
-    infall = data[np.where(labels == 0)[0]]
-    orbit = data[np.where(labels == 1)[0]]
-    return infall, orbit
 
 def graph_feature_importance(feature_names, feature_importance, title, plot, save, save_location):
     mpl.rcParams.update({'font.size': 8})
