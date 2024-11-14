@@ -312,3 +312,12 @@ def split_orb_inf(data, labels):
     infall = data[np.where(labels == 0)[0]]
     orbit = data[np.where(labels == 1)[0]]
     return infall, orbit
+
+def parse_ranges(ranges_str):
+    ranges = []
+    for part in ranges_str.split(','):
+        start, end = map(float, part.split('-'))
+        ranges.append((start, end))
+    return ranges
+def create_nu_string(nu_list):
+    return '_'.join('-'.join(map(str, tup)) for tup in nu_list)

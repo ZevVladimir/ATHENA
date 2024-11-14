@@ -58,7 +58,7 @@ def rho_orb_dens_dist(r: float, r_h: float, alpha: float, a: float) -> float:
         Normalized density distribution
     """
     distr = rho_orb_dist(r/r_h, alpha, a)
-    distr /= 4. * np.pi * r_h ** 3 * \
+    distr /= 4. * np.pi * r_h ** 3 * \w
         quad(lambda x, alpha, a: x**2 * rho_orb_dist(x, alpha, a),
              a=0, b=np.inf, args=(alpha, a))[0]
     return distr

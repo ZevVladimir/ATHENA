@@ -128,17 +128,17 @@ if __name__ == "__main__":
     if use_weights:
         model_dir += "wght" + str(weight_rad) + "_" + str(min_weight)
         
-    model_name =  model_dir + model_comb_name
-        
-    model_save_loc = path_to_xgboost + model_comb_name + "/" + model_dir + "/"
+    # model_name =  model_dir + model_comb_name
     
+    model_save_loc = path_to_xgboost + model_comb_name + "/" + model_dir + "/"
+
     try:
         bst = xgb.Booster()
-        bst.load_model(model_save_loc + model_name + ".json")
+        bst.load_model(model_save_loc + model_dir + ".json")
         bst.set_param({"device": "cuda:0"})
         print("Loaded Model Trained on:",model_sims)
     except:
-        print("Couldn't load Booster Located at: " + model_save_loc + model_name + ".json")
+        print("Couldn't load Booster Located at: " + model_save_loc + model_dir + ".json")
         
     try:
         with open(model_save_loc + "model_info.pickle", "rb") as pickle_file:

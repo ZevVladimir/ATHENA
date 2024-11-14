@@ -9,6 +9,9 @@ This code can be run with only the config.init file and the exec.py file (this d
 ### XGBoost Training
 We make use of XGBoost [5] as our ML model. Currently, not all parameters are available to be tuned in config.ini but for general purposes all capabilities are there. You train the model on the dataset created before and various plots are created for the analysis of the models performance and are outputted under that model's folder in xgboost_results/. You then can adjust the curr_sparta_file parameter to test the model on another dataset (that you have created).
 
+## Dependencies
+I make use of a customized shap fork that is also publicly available. This is done to just allow for ease of adjusting different fontsizes as well as adjusting certain features in the plots that I want hidden or not. This should only impact code run in make_shap_plots.py. 
+
 ## Citations
 [1] Diemer, B. (2017). The splashback radius of halos from particle dynamics. i. the Sparta algorithm. The Astrophysical Journal Supplement Series, 231(1), 5. https://doi.org/10.3847/1538-4365/aa799c 
 [2] Diemer, B. (2020). The splashback radius of halos from particle dynamics. III. halo catalogs, merger trees, and host–subhalo relations. The Astrophysical Journal Supplement Series, 251(2), 17. https://doi.org/10.3847/1538-4365/abbf51 

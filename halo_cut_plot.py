@@ -43,7 +43,7 @@ model_save_loc = path_to_xgboost + model_comb_name + "/" + model_dir + "/"
 dset_name = "Test"
 test_comb_name = get_combined_name(test_sims[0]) 
 
-plot_loc = model_save_loc + dset_name + "_" + test_comb_name + "/plots/"
+plot_loc = model_save_loc + dset_name + "_" + test_comb_name + "/plots/halo_slices/"
 create_directory(plot_loc)
 
 halo_ddf = reform_df(path_to_calc_info + sim + "/" + "Test" + "/halo_info/")
@@ -130,4 +130,4 @@ while len(used_numbers) < 10:
         matched_ids = np.intersect1d(curr_ptl_pids, sparta_tracer_ids, return_indices = True)
         curr_orb_assn[matched_ids[1]] = compare_sparta_assn[matched_ids[2]]
 
-        plot_halo_slice(curr_ptl_pos,curr_orb_assn,use_halo_pos,use_halo_r200m,plot_loc,search_rad=0,title=str(num)+"_")
+        plot_halo_slice(curr_ptl_pos,curr_orb_assn,use_halo_pos,use_halo_r200m,plot_loc,search_rad=4,title=str(num)+"_")
