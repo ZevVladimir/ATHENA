@@ -148,7 +148,7 @@ if __name__ == "__main__":
     if use_weights:
         model_dir += "wght" + str(weight_rad) + "_" + str(min_weight)
         
-    model_name =  model_dir + combined_name
+    # model_name =  model_dir + combined_name
 
     model_save_loc = path_to_xgboost + combined_name + "/" + model_dir + "/"
     gen_plot_save_loc = model_save_loc + "plots/"
@@ -170,9 +170,9 @@ if __name__ == "__main__":
                 }}
     
     # Load previously trained booster or start the training process
-    if os.path.isfile(model_save_loc + model_name + ".json") and retrain < 1:
+    if os.path.isfile(model_save_loc + model_dir + ".json") and retrain < 1:
         bst = xgb.Booster()
-        bst.load_model(model_save_loc + model_name + ".json")
+        bst.load_model(model_save_loc + model_dir + ".json")
         params = model_info.get('Training Info',{}).get('Training Params')
         print("Loaded Booster")
     else:
@@ -238,8 +238,8 @@ if __name__ == "__main__":
             
             train_weights = train_weights.repartition(npartitions=X_train.npartitions)
             
-            model_name += "wght" + str(np.round(opt_weight_rad,3)) + "_" + str(np.round(opt_min_weight,3)) + "_" + str(np.round(opt_weight_exp,3))
             model_dir += "wght" + str(np.round(opt_weight_rad,3)) + "_" + str(np.round(opt_min_weight,3)) + "_" + str(np.round(opt_weight_exp,3))
+            # model_dir += "wght" + str(np.round(opt_weight_rad,3)) + "_" + str(np.round(opt_min_weight,3)) + "_" + str(np.round(opt_weight_exp,3))
             weight_rad_info = {
                 "Used weighting by radius": use_weights,
                 "Optimized weights": opt_wghts,
@@ -261,7 +261,7 @@ if __name__ == "__main__":
             X_train = scld_train_data[feat_cols]
             y_train = scld_train_data[tar_col]
             
-            model_name += "scl_rad" + str(np.round(opt_reduce_rad,3)) + "_" + str(np.round(opt_reduce_perc,3))
+            # model_name += "scl_rad" + str(np.round(opt_reduce_rad,3)) + "_" + str(np.round(opt_reduce_perc,3))
             model_dir += "scl_rad" + str(np.round(opt_reduce_rad,3)) + "_" + str(np.round(opt_reduce_perc,3))
             scale_rad_info = {
             "Used scale_rad": scale_rad,
@@ -318,7 +318,7 @@ if __name__ == "__main__":
                 )
             bst = output["booster"]
             history = output["history"]
-            bst.save_model(model_save_loc + model_name + ".json")
+            bst.save_model(model_save_loc + model_dir + ".json")
             with open(model_save_loc + "model_info.pickle", "wb") as pickle_file:
                 pickle.dump(model_info, pickle_file)
 
@@ -356,7 +356,7 @@ if __name__ == "__main__":
         
         eval_model(model_info, client, bst, use_sims=model_sims, dst_type="Test", X=X_test, y=y_test, halo_ddf=halo_df, combined_name=combined_name, plot_save_loc=plot_loc, dens_prf=dens_prf_plt,missclass=misclass_plt,full_dist=fulldist_plt,per_err=per_err_plt)
    
-    bst.save_model(model_save_loc + model_name + ".json")
+    bst.save_model(model_save_loc + model_dir + ".json")
 
     feature_important = bst.get_score(importance_type='weight')
     keys = list(feature_important.keys())

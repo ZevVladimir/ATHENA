@@ -316,7 +316,7 @@ def split_orb_inf(data, labels):
 def parse_ranges(ranges_str):
     ranges = []
     for part in ranges_str.split(','):
-        start, end = map(int, part.split('-'))
+        start, end = map(float, part.split('-'))
         ranges.append((start, end))
     return ranges
 def create_nu_string(nu_list):
