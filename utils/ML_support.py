@@ -658,8 +658,9 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
             all_prf_lst = adj_dens_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos)
             orb_prf_lst = adj_dens_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos)
             inf_prf_lst = adj_dens_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos)
-     
-            compare_dens_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="")
+
+            compare_dens_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="",use_med=True)
+            compare_dens_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="",use_med=False)
         
         
     if missclass or full_dist:       
