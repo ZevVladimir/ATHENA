@@ -25,7 +25,7 @@ from functools import partial
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, find_closest_z, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, create_nu_string
 from utils.visualization_functions import compare_density_prf, plot_per_err
 from utils.update_vis_fxns import plot_full_ptl_dist, plot_miss_class_dist
-from utils.calculation_functions import create_mass_prf
+from utils.calculation_functions import create_mass_prf, create_stack_mass_prf, adj_dens_prf
 from sparta_tools import sparta # type: ignore
 from colossus.cosmology import cosmology
 
@@ -619,7 +619,16 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
                 config_dict = pickle.load(file)
                 all_z.append(config_dict["p_snap_info"]["red_shift"][()])
                     
-        sparta_mass_prf_all, sparta_mass_prf_1halo,all_masses,bins = load_sprta_mass_prf(sim_splits,all_idxs,use_sims)
+        sparta_mass_prf_all, sparta_mass_prf_orb,all_masses,bins = load_sprta_mass_prf(sim_splits,all_idxs,use_sims)
+        sparta_mass_prf_inf = sparta_mass_prf_all - sparta_mass_prf_orb
+        
+        calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus = create_stack_mass_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, use_mp=True, all_z=all_z)
+        
+        tot_num_halos = halo_n.shape[0]
+        min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
+        for fltr in
+        adj_dens_prf(calc_mass_prf_all,sparta_mass_prf_all,min_disp_halos,)
+        
         compare_density_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, act_mass_prf_all=sparta_mass_prf_all, act_mass_prf_orb=sparta_mass_prf_1halo, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, title="", save_location=plot_save_loc, use_mp=True, split_by_nu=True, all_z=all_z)
     
     if missclass or full_dist:       
