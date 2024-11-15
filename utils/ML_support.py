@@ -574,7 +574,7 @@ def load_sprta_mass_prf(sim_splits,all_idxs,use_sims):
         use_halo_ids = halos_id[use_idxs]
         
         sparta_output = sparta.load(filename=path_to_SPARTA_data + sparta_name + "/" + sparta_search_name + ".hdf5", halo_ids=use_halo_ids, log_level=0)
-        new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta resort the indices
+        new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta re-sort the indices
         
         mass_prf_all_list.append(sparta_output['anl_prf']['M_all'][new_idxs,p_sparta_snap,:])
         mass_prf_1halo_list.append(sparta_output['anl_prf']['M_1halo'][new_idxs,p_sparta_snap,:])
@@ -624,23 +624,34 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
                 config_dict = pickle.load(file)
                 all_z.append(config_dict["p_snap_info"]["red_shift"][()])
                 h = config_dict["p_snap_info"]["h"][()]
-                    
-        sparta_mass_prf_all, sparta_mass_prf_orb,all_masses,bins = load_sprta_mass_prf(sim_splits,all_idxs,use_sims)
-        sparta_mass_prf_inf = sparta_mass_prf_all - sparta_mass_prf_orb
+        
+        tot_num_halos = halo_n.shape[0]
+        min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
+        
+        act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sprta_mass_prf(sim_splits,all_idxs,use_sims)
+        act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
         
         calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, use_mp=True, all_z=all_z)
-        
+
+        # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
+        small_halo_fltr = np.isnan(calc_r200m)
+        act_mass_prf_all[small_halo_fltr,:] = np.nan
+        act_mass_prf_orb[small_halo_fltr,:] = np.nan
+        act_mass_prf_inf[small_halo_fltr,:] = np.nan
+
+        # check_calc_all = [calc_mass_prf_all,act_mass_prf_all]
+        # check_calc_orb = [calc_mass_prf_orb,act_mass_prf_orb]
+        # check_calc_inf = [calc_mass_prf_inf,act_mass_prf_inf]
+        # compare_dens_prfs(check_calc_all,check_calc_orb,check_calc_inf,bins[1:],lin_rticks,plot_save_loc,title="mass_",use_med=True)
+        # compare_dens_prfs(check_calc_all,check_calc_orb,check_calc_inf,bins[1:],lin_rticks,plot_save_loc,title="mass_",use_med=False)
         # Calculate the density by divide the mass of each bin by the volume of that bin's radius
         calc_dens_prf_all = calculate_density(calc_mass_prf_all*h, bins[1:],calc_r200m*h)
         calc_dens_prf_orb = calculate_density(calc_mass_prf_orb*h, bins[1:],calc_r200m*h)
         calc_dens_prf_inf = calculate_density(calc_mass_prf_inf*h, bins[1:],calc_r200m*h)
         
-        act_dens_prf_all = calculate_density(sparta_mass_prf_all*h, bins[1:],calc_r200m*h)
-        act_dens_prf_orb = calculate_density(sparta_mass_prf_orb*h, bins[1:],calc_r200m*h)
-        act_dens_prf_inf = calculate_density(sparta_mass_prf_inf*h, bins[1:],calc_r200m*h)
-        
-        tot_num_halos = halo_n.shape[0]
-        min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
+        act_dens_prf_all = calculate_density(act_mass_prf_all*h, bins[1:],calc_r200m*h)
+        act_dens_prf_orb = calculate_density(act_mass_prf_orb*h, bins[1:],calc_r200m*h)
+        act_dens_prf_inf = calculate_density(act_mass_prf_inf*h, bins[1:],calc_r200m*h)
 
         if split_nu:
             all_prf_lst = []
