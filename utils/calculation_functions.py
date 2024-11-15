@@ -174,12 +174,13 @@ def create_mass_prf(radii, orbit_assn, prf_bins, mass):
     calc_mass_prf_all = np.zeros(num_prf_bins)
 
     # Can adjust this to cut out halos that don't have enough particles within R200m
-    min_ptl = 0
+    min_ptl = 200
     ptl_in_r200m = np.where(radii <= 1)[0].size
     if ptl_in_r200m < min_ptl:
         calc_mass_prf_orb[:]=np.nan
         calc_mass_prf_inf[:]=np.nan
         calc_mass_prf_all[:]=np.nan
+        m200m = np.nan
     else:
         # determine which radii correspond to orbiting and which to infalling
         orbit_radii = radii[np.where(orbit_assn == 1)[0]]
@@ -272,6 +273,9 @@ def create_stack_mass_prf(splits, radii, halo_first, halo_n, mass, orbit_assn, p
         calc_mass_prf_all_lst.append(curr_calc_mass_prf_all)
 
         calc_nu_lst.append(peakHeight(np.array(calc_m200m),all_z[i]))
+        print("num 0 R200m:",np.where(M_to_R(np.array(calc_m200m),all_z[i],"200m") == 0)[0].shape)
+        print(m200m[M_to_R(np.array(calc_m200m),all_z[i],"200m")])
+        
         calc_r200m_lst.append(M_to_R(np.array(calc_m200m),all_z[i],"200m"))
 
     calc_mass_prf_orb = np.vstack(calc_mass_prf_orb_lst)
