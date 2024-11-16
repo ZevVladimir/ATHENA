@@ -210,7 +210,7 @@ def comb_prf(prf, num_halo, dtype):
 
     return prf
 
-def adj_dens_prf(calc_prf, act_prf, min_disp_halos, nu_fltr = None):
+def filter_prf(calc_prf, act_prf, min_disp_halos, nu_fltr = None):
     if nu_fltr is not None:
         calc_prf = calc_prf[nu_fltr,:]
         act_prf = act_prf[nu_fltr,:]
@@ -246,7 +246,7 @@ def create_stack_mass_prf(splits, radii, halo_first, halo_n, mass, orbit_assn, p
                                                 repeat(prf_bins),repeat(mass[i])),
                                             chunksize=100))
             p.close()
-            p.join()        
+            p.join()       
 
         else:
             calc_mass_prf_orb = []
@@ -264,14 +264,16 @@ def create_stack_mass_prf(splits, radii, halo_first, halo_n, mass, orbit_assn, p
                 
         # For each profile combine all halos for each bin
         # calc_mass_prf_xxx has shape (num_halo, num_bins)
-            
+        # curr_calc_mass_prf_all = comb_prf(calc_mass_prf_all, curr_num_halos, np.float32)
+        # print(curr_num_halos)
+        # print(curr_calc_mass_prf_all.shape)
+        # print(np.isnan(curr_calc_mass_prf_all).all(axis=1).sum())
+        # print(np.isnan(calc_m200m).sum())
         calc_mass_prf_orb_lst.append(comb_prf(calc_mass_prf_orb, curr_num_halos, np.float32))
         calc_mass_prf_inf_lst.append(comb_prf(calc_mass_prf_inf, curr_num_halos, np.float32))
         calc_mass_prf_all_lst.append(comb_prf(calc_mass_prf_all, curr_num_halos, np.float32))
 
         calc_nu_lst.append(peakHeight(np.array(calc_m200m),all_z[i]))
-        print("num 0 R200m:",np.where(M_to_R(np.array(calc_m200m),all_z[i],"200m") == 0)[0].shape)
-        
         calc_r200m_lst.append(M_to_R(np.array(calc_m200m),all_z[i],"200m"))
 
     calc_mass_prf_orb = np.vstack(calc_mass_prf_orb_lst)

@@ -5,6 +5,7 @@ from utils.data_and_loading_functions import split_orb_inf, timed
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Circle
 from matplotlib.legend_handler import HandlerTuple
+
 plt.rcParams['mathtext.fontset'] = 'dejavuserif'
 plt.rcParams['font.family'] = 'serif'
 
@@ -692,7 +693,7 @@ def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,save_loc,search_rad=0,tit
 
 # Profiles should be a list [calc_prf,act_prf]
 # You can either use the median plots with use_med=True or the average with use_med=False
-def compare_dens_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title, use_med=True):    
+def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title, use_med=True):    
     if use_med:
         prf_func = np.nanmedian
     else:
@@ -764,17 +765,18 @@ def compare_dens_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_locat
     ax_1.set_xticks(tick_locs,strng_ticks)  
     ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
     if use_med:
-        fig.savefig(save_location + title + "med_dens_prfl_rat.png",bbox_inches='tight')
+        fig.savefig(save_location + title + "med_prfl_rat.png",bbox_inches='tight')
     else:
-        fig.savefig(save_location + title + "avg_dens_prfl_rat.png",bbox_inches='tight')
+        fig.savefig(save_location + title + "avg_prfl_rat.png",bbox_inches='tight')
     
 # Profiles should be a list of lists where each list consists of [calc_prf,act_prf] for each nu split
 # You can either use the median plots with use_med=True or the average with use_med=False
-def compare_dens_prfs_nu(plt_nu_splits, all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title, use_med=True):    
+def compare_prfs_nu(plt_nu_splits, all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title, use_med=True):    
     if use_med:
         prf_func = np.nanmedian
     else:
         prf_func = np.nanmean
+    
     # Parameters to tune sizes of plots and fonts
     widths = [1,1,1]
     heights = [1,0.5]
@@ -829,7 +831,7 @@ def compare_dens_prfs_nu(plt_nu_splits, all_prfs, orb_prfs, inf_prfs, bins, lin_
         all_ax_1.fill_between(bins, np.nanpercentile(ratio_all_prf, q=15.9, axis=0),np.nanpercentile(ratio_all_prf, q=84.1, axis=0), color=all_colors[i], alpha=fill_alpha)
         orb_ax_1.fill_between(bins, np.nanpercentile(ratio_orb_prf, q=15.9, axis=0),np.nanpercentile(ratio_orb_prf, q=84.1, axis=0), color=orb_colors[i], alpha=fill_alpha)
         inf_ax_1.fill_between(bins, np.nanpercentile(ratio_inf_prf, q=15.9, axis=0),np.nanpercentile(ratio_inf_prf, q=84.1, axis=0), color=inf_colors[i], alpha=fill_alpha)
-            
+                
         
     all_ax_0.set_ylabel(r"$\rho (M_\odot \mathrm{kpc}^{-3})$", fontsize=axisfntsize)
     all_ax_0.set_xscale("log")
@@ -859,7 +861,7 @@ def compare_dens_prfs_nu(plt_nu_splits, all_prfs, orb_prfs, inf_prfs, bins, lin_
     inf_ax_0.tick_params(axis='y', which='both', labelleft=False) 
     inf_ax_0.legend()
     inf_ax_0.text(0.01,0.03, "Infalling Particles", ha="left", va="bottom", transform=inf_ax_0.transAxes, fontsize=axisfntsize, bbox={"facecolor":'white',"alpha":0.9,})
-    
+
     fig.legend([(invis_calc, invis_act),all_lb,orb_lb,inf_lb], ['Predicted, Actual','All','Orbiting','Infalling'], numpoints=1,handlelength=3,loc='upper left',bbox_to_anchor=(0.05, 0.97),handler_map={tuple: HandlerTuple(ndivide=None)},frameon=False,fontsize=legendfntsize)
 
     all_ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
@@ -893,6 +895,6 @@ def compare_dens_prfs_nu(plt_nu_splits, all_prfs, orb_prfs, inf_prfs, bins, lin_
     inf_ax_1.set_xticks(tick_locs,strng_ticks)  
     inf_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize, labelleft=False)
     if use_med:
-        fig.savefig(save_location + title + "med_dens_prfl_rat.png",bbox_inches='tight')
+        fig.savefig(save_location + title + "med_prfl_rat_nu.png",bbox_inches='tight')
     else:
-        fig.savefig(save_location + title + "avg_dens_prfl_rat.png",bbox_inches='tight')
+        fig.savefig(save_location + title + "avg_prfl_rat_nu.png",bbox_inches='tight')

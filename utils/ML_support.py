@@ -13,6 +13,7 @@ import re
 import matplotlib.pyplot as plt
 import pandas as pd
 from colossus.lss import peaks
+import warnings
 
 from dask.distributed import Client
 import time
@@ -25,8 +26,8 @@ from functools import partial
 
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, find_closest_z, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, create_nu_string
 from utils.visualization_functions import plot_per_err
-from utils.update_vis_fxns import plot_full_ptl_dist, plot_miss_class_dist, compare_dens_prfs_nu, compare_dens_prfs
-from utils.calculation_functions import create_mass_prf, create_stack_mass_prf, adj_dens_prf, calculate_density
+from utils.update_vis_fxns import plot_full_ptl_dist, plot_miss_class_dist, compare_prfs_nu, compare_prfs
+from utils.calculation_functions import create_mass_prf, create_stack_mass_prf, filter_prf, calculate_density
 from sparta_tools import sparta # type: ignore
 from colossus.cosmology import cosmology
 
@@ -611,15 +612,23 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
         all_z = []
         # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
         sim_splits = np.where(halo_first == 0)[0]
+
         # if there are multiple simulations, to correctly index the dataset we need to update the starting values for the 
         # stacked simulations such that they correspond to the larger dataset and not one specific simulation
-        for i,sim in enumerate(use_sims):
-            if len(use_sims) > 1:
-                if i < len(use_sims) - 1:
+        if len(use_sims) > 1:
+            for i,sim in enumerate(use_sims):
+                # The first sim remains the same
+                if i == 0:
+                    continue
+                # Else if it isn't the final sim 
+                elif i < len(use_sims) - 1:
                     halo_first[sim_splits[i]:sim_splits[i+1]] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
+                # Else if the final sim
                 else:
                     halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
-                
+        
+        # Get the redshifts for each simulation's primary snapshot
+        for i,sim in enumerate(use_sims):
             with open(path_to_calc_info + sim + "/config.pickle", "rb") as file:
                 config_dict = pickle.load(file)
                 all_z.append(config_dict["p_snap_info"]["red_shift"][()])
@@ -642,8 +651,8 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
         # check_calc_all = [calc_mass_prf_all,act_mass_prf_all]
         # check_calc_orb = [calc_mass_prf_orb,act_mass_prf_orb]
         # check_calc_inf = [calc_mass_prf_inf,act_mass_prf_inf]
-        # compare_dens_prfs(check_calc_all,check_calc_orb,check_calc_inf,bins[1:],lin_rticks,plot_save_loc,title="mass_",use_med=True)
-        # compare_dens_prfs(check_calc_all,check_calc_orb,check_calc_inf,bins[1:],lin_rticks,plot_save_loc,title="mass_",use_med=False)
+        # compare_prfs(check_calc_all,check_calc_orb,check_calc_inf,bins[1:],lin_rticks,plot_save_loc,title="mass_",use_med=True)
+        # compare_prfs(check_calc_all,check_calc_orb,check_calc_inf,bins[1:],lin_rticks,plot_save_loc,title="mass_",use_med=False)
         # Calculate the density by divide the mass of each bin by the volume of that bin's radius
         calc_dens_prf_all = calculate_density(calc_mass_prf_all*h, bins[1:],calc_r200m*h)
         calc_dens_prf_orb = calculate_density(calc_mass_prf_orb*h, bins[1:],calc_r200m*h)
@@ -659,19 +668,22 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
             inf_prf_lst = []
             for i,nu_split in enumerate(plt_nu_splits):
                 # Take the second element of the where to filter by the halos (?)
-                fltr = np.where((calc_nus > nu_split[0]) & (calc_nus < nu_split[1]))[1]
+                fltr = np.where((calc_nus > nu_split[0]) & (calc_nus < nu_split[1]))[0]
                 
-                all_prf_lst.append(adj_dens_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
-                orb_prf_lst.append(adj_dens_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
-                inf_prf_lst.append(adj_dens_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
-            compare_dens_prfs_nu(plt_nu_splits,all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="")
+                all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
+                orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
+                inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
+            compare_prfs_nu(plt_nu_splits,all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_")
         else:
-            all_prf_lst = adj_dens_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos)
-            orb_prf_lst = adj_dens_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos)
-            inf_prf_lst = adj_dens_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos)
-
-            compare_dens_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="",use_med=True)
-            compare_dens_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="",use_med=False)
+            all_prf_lst = filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos)
+            orb_prf_lst = filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos)
+            inf_prf_lst = filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos)
+            
+            # Ignore warnigns about taking mean/median of empty slices and division by 0 that are expected with how the profiles are handled
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_",use_med=True)
+                compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_",use_med=False)
         
         
     if missclass or full_dist:       
