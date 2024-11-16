@@ -5,6 +5,7 @@ from utils.data_and_loading_functions import split_orb_inf, timed
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Circle
 from matplotlib.legend_handler import HandlerTuple
+
 plt.rcParams['mathtext.fontset'] = 'dejavuserif'
 plt.rcParams['font.family'] = 'serif'
 
@@ -775,6 +776,7 @@ def compare_prfs_nu(plt_nu_splits, all_prfs, orb_prfs, inf_prfs, bins, lin_rtick
         prf_func = np.nanmedian
     else:
         prf_func = np.nanmean
+    
     # Parameters to tune sizes of plots and fonts
     widths = [1,1,1]
     heights = [1,0.5]
@@ -829,7 +831,7 @@ def compare_prfs_nu(plt_nu_splits, all_prfs, orb_prfs, inf_prfs, bins, lin_rtick
         all_ax_1.fill_between(bins, np.nanpercentile(ratio_all_prf, q=15.9, axis=0),np.nanpercentile(ratio_all_prf, q=84.1, axis=0), color=all_colors[i], alpha=fill_alpha)
         orb_ax_1.fill_between(bins, np.nanpercentile(ratio_orb_prf, q=15.9, axis=0),np.nanpercentile(ratio_orb_prf, q=84.1, axis=0), color=orb_colors[i], alpha=fill_alpha)
         inf_ax_1.fill_between(bins, np.nanpercentile(ratio_inf_prf, q=15.9, axis=0),np.nanpercentile(ratio_inf_prf, q=84.1, axis=0), color=inf_colors[i], alpha=fill_alpha)
-            
+                
         
     all_ax_0.set_ylabel(r"$\rho (M_\odot \mathrm{kpc}^{-3})$", fontsize=axisfntsize)
     all_ax_0.set_xscale("log")
