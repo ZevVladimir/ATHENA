@@ -50,13 +50,24 @@ def calculate_distance(halo_x, halo_y, halo_z, particle_x, particle_y, particle_
     return distance, coord_diff #kpc/h
 
 #calculates density within sphere of given radius with given mass and calculating volume at each particle's radius
-def calculate_density(masses, bins, r200m):
+def calculate_density(masses, bins, r200m, sim_splits, rho_m):
     rho = np.zeros_like(masses)
     V = (bins[None, :] * r200m[:, None])**3 * 4.0 * np.pi / 3.0
     dV = V[:, 1:] - V[:, :-1]
     dM = masses[:, 1:] - masses[:, :-1]
     rho[:, 0] = masses[:, 0] / V[:, 0]
     rho[:, 1:] = dM / dV
+
+    if len(sim_splits) == 1:
+        rho = rho / rho_m
+    else:
+        for i in range(len(sim_splits)):
+            if i == 0:
+                rho[:sim_splits[i]] = rho[:sim_splits[i]] / rho_m[i]
+            elif i == len(sim_splits) - 1:
+                rho[sim_splits[i]:] = rho[sim_splits[i]:] / rho_m[i]
+            else:
+                rho[sim_splits[i]:sim_splits[i+1]] = rho[sim_splits[i]:sim_splits[i+1]] / rho_m[i]
 
     return rho
 
@@ -264,11 +275,7 @@ def create_stack_mass_prf(splits, radii, halo_first, halo_n, mass, orbit_assn, p
                 
         # For each profile combine all halos for each bin
         # calc_mass_prf_xxx has shape (num_halo, num_bins)
-        # curr_calc_mass_prf_all = comb_prf(calc_mass_prf_all, curr_num_halos, np.float32)
-        # print(curr_num_halos)
-        # print(curr_calc_mass_prf_all.shape)
-        # print(np.isnan(curr_calc_mass_prf_all).all(axis=1).sum())
-        # print(np.isnan(calc_m200m).sum())
+
         calc_mass_prf_orb_lst.append(comb_prf(calc_mass_prf_orb, curr_num_halos, np.float32))
         calc_mass_prf_inf_lst.append(comb_prf(calc_mass_prf_inf, curr_num_halos, np.float32))
         calc_mass_prf_all_lst.append(comb_prf(calc_mass_prf_all, curr_num_halos, np.float32))

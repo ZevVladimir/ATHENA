@@ -13,6 +13,7 @@ import re
 import matplotlib.pyplot as plt
 import pandas as pd
 from colossus.lss import peaks
+from colossus import cosmology
 import warnings
 
 from dask.distributed import Client
@@ -46,7 +47,9 @@ path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
 sim_cosmol = config["MISC"]["sim_cosmol"]
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
+    cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
 else:
+    cosmol = cosmology.setCosmology(sim_cosmol) 
     sim_pat = r"cbol_l(\d+)_n(\d+)"
 match = re.search(sim_pat, curr_sparta_file)
 if match:
@@ -93,11 +96,6 @@ lin_tvticks = json.loads(config.get("XGBOOST","lin_tvticks"))
 log_tvticks = json.loads(config.get("XGBOOST","log_tvticks"))
 lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
 log_rticks = json.loads(config.get("XGBOOST","log_rticks"))
-
-if sim_cosmol == "planck13-nbody":
-    cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
-else:
-    cosmol = cosmology.setCosmology(sim_cosmol) 
 
 if use_gpu:
     from dask_cuda import LocalCUDACluster
@@ -610,6 +608,7 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
         all_idxs = halo_ddf["Halo_indices"].values
 
         all_z = []
+        all_rhom = []
         # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
         sim_splits = np.where(halo_first == 0)[0]
 
@@ -631,7 +630,9 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
         for i,sim in enumerate(use_sims):
             with open(path_to_calc_info + sim + "/config.pickle", "rb") as file:
                 config_dict = pickle.load(file)
-                all_z.append(config_dict["p_snap_info"]["red_shift"][()])
+                curr_z = config_dict["p_snap_info"]["red_shift"][()]
+                all_z.append(curr_z)
+                all_rhom.append(cosmol.rho_m(curr_z))
                 h = config_dict["p_snap_info"]["h"][()]
         
         tot_num_halos = halo_n.shape[0]
@@ -648,19 +649,14 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
         act_mass_prf_orb[small_halo_fltr,:] = np.nan
         act_mass_prf_inf[small_halo_fltr,:] = np.nan
 
-        # check_calc_all = [calc_mass_prf_all,act_mass_prf_all]
-        # check_calc_orb = [calc_mass_prf_orb,act_mass_prf_orb]
-        # check_calc_inf = [calc_mass_prf_inf,act_mass_prf_inf]
-        # compare_prfs(check_calc_all,check_calc_orb,check_calc_inf,bins[1:],lin_rticks,plot_save_loc,title="mass_",use_med=True)
-        # compare_prfs(check_calc_all,check_calc_orb,check_calc_inf,bins[1:],lin_rticks,plot_save_loc,title="mass_",use_med=False)
         # Calculate the density by divide the mass of each bin by the volume of that bin's radius
-        calc_dens_prf_all = calculate_density(calc_mass_prf_all*h, bins[1:],calc_r200m*h)
-        calc_dens_prf_orb = calculate_density(calc_mass_prf_orb*h, bins[1:],calc_r200m*h)
-        calc_dens_prf_inf = calculate_density(calc_mass_prf_inf*h, bins[1:],calc_r200m*h)
+        calc_dens_prf_all = calculate_density(calc_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+        calc_dens_prf_orb = calculate_density(calc_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+        calc_dens_prf_inf = calculate_density(calc_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
         
-        act_dens_prf_all = calculate_density(act_mass_prf_all*h, bins[1:],calc_r200m*h)
-        act_dens_prf_orb = calculate_density(act_mass_prf_orb*h, bins[1:],calc_r200m*h)
-        act_dens_prf_inf = calculate_density(act_mass_prf_inf*h, bins[1:],calc_r200m*h)
+        act_dens_prf_all = calculate_density(act_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+        act_dens_prf_orb = calculate_density(act_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+        act_dens_prf_inf = calculate_density(act_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
 
         if split_nu:
             all_prf_lst = []
