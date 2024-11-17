@@ -739,10 +739,10 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
     ax_1.plot(bins, prf_func(ratio_inf_prf,axis=0), 'g')
     
     ax_1.fill_between(bins, np.nanpercentile(ratio_all_prf, q=15.9, axis=0),np.nanpercentile(ratio_all_prf, q=84.1, axis=0), color='r', alpha=fill_alpha)
-    ax_1.fill_between(bins, np.nanpercentile(ratio_orb_prf, q=15.9, axis=0),np.nanpercentile(ratio_orb_prf, q=84.1, axis=0), color='g', alpha=fill_alpha)
-    ax_1.fill_between(bins, np.nanpercentile(ratio_inf_prf, q=15.9, axis=0),np.nanpercentile(ratio_inf_prf, q=84.1, axis=0), color='b', alpha=fill_alpha) 
+    ax_1.fill_between(bins, np.nanpercentile(ratio_orb_prf, q=15.9, axis=0),np.nanpercentile(ratio_orb_prf, q=84.1, axis=0), color='b', alpha=fill_alpha)
+    ax_1.fill_between(bins, np.nanpercentile(ratio_inf_prf, q=15.9, axis=0),np.nanpercentile(ratio_inf_prf, q=84.1, axis=0), color='g', alpha=fill_alpha) 
         
-    ax_0.set_ylabel(r"$\rho (M_\odot \mathrm{kpc}^{-3})$", fontsize=axisfntsize)
+    ax_0.set_ylabel(r"$\rho / \rho_m$", fontsize=axisfntsize)
     ax_0.set_xscale("log")
     ax_0.set_yscale("log")
     ax_0.set_xlim(0.05,np.max(lin_rticks))
@@ -833,7 +833,7 @@ def compare_prfs_nu(plt_nu_splits, all_prfs, orb_prfs, inf_prfs, bins, lin_rtick
         inf_ax_1.fill_between(bins, np.nanpercentile(ratio_inf_prf, q=15.9, axis=0),np.nanpercentile(ratio_inf_prf, q=84.1, axis=0), color=inf_colors[i], alpha=fill_alpha)
                 
         
-    all_ax_0.set_ylabel(r"$\rho (M_\odot \mathrm{kpc}^{-3})$", fontsize=axisfntsize)
+    all_ax_0.set_ylabel(r"$\rho / \rho_m$", fontsize=axisfntsize)
     all_ax_0.set_xscale("log")
     all_ax_0.set_yscale("log")
     all_ax_0.set_xlim(0.05,np.max(lin_rticks))

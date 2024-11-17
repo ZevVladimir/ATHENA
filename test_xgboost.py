@@ -174,7 +174,7 @@ if __name__ == "__main__":
                 y = data[target_column]
 
                 eval_model(model_info, client, bst, use_sims=curr_test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, combined_name=test_comb_name, plot_save_loc=plot_loc,dens_prf=dens_prf_plt,missclass=misclass_plt,\
-                    full_dist=fulldist_plt,per_err=per_err_plt, split_nu=False)
+                    full_dist=fulldist_plt,per_err=per_err_plt, split_nu=True)
                 del data #otherwise garbage collection doesn't work
                 del X
                 del y
