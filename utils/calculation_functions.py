@@ -50,7 +50,7 @@ def calculate_distance(halo_x, halo_y, halo_z, particle_x, particle_y, particle_
     return distance, coord_diff #kpc/h
 
 #calculates density within sphere of given radius with given mass and calculating volume at each particle's radius
-def calculate_density(masses, bins, r200m, sim_splits, rho_m):
+def calculate_density(masses, bins, r200m, sim_splits, rho_m = None):
     rho = np.zeros_like(masses)
     V = (bins[None, :] * r200m[:, None])**3 * 4.0 * np.pi / 3.0
     dV = V[:, 1:] - V[:, :-1]
@@ -58,16 +58,17 @@ def calculate_density(masses, bins, r200m, sim_splits, rho_m):
     rho[:, 0] = masses[:, 0] / V[:, 0]
     rho[:, 1:] = dM / dV
 
-    if len(sim_splits) == 1:
-        rho = rho / rho_m
-    else:
-        for i in range(len(sim_splits)):
-            if i == 0:
-                rho[:sim_splits[i]] = rho[:sim_splits[i]] / rho_m[i]
-            elif i == len(sim_splits) - 1:
-                rho[sim_splits[i]:] = rho[sim_splits[i]:] / rho_m[i]
-            else:
-                rho[sim_splits[i]:sim_splits[i+1]] = rho[sim_splits[i]:sim_splits[i+1]] / rho_m[i]
+    if rho_m != None:
+        if len(sim_splits) == 1:
+            rho = rho / rho_m
+        else:
+            for i in range(len(sim_splits)):
+                if i == 0:
+                    rho[:sim_splits[i]] = rho[:sim_splits[i]] / rho_m[i]
+                elif i == len(sim_splits) - 1:
+                    rho[sim_splits[i]:] = rho[sim_splits[i]:] / rho_m[i]
+                else:
+                    rho[sim_splits[i]:sim_splits[i+1]] = rho[sim_splits[i]:sim_splits[i+1]] / rho_m[i]
 
     return rho
 
@@ -222,15 +223,16 @@ def comb_prf(prf, num_halo, dtype):
     return prf
 
 def filter_prf(calc_prf, act_prf, min_disp_halos, nu_fltr = None):
-    if nu_fltr is not None:
-        calc_prf = calc_prf[nu_fltr,:]
-        act_prf = act_prf[nu_fltr,:]
     # for each bin checking how many halos have particles there
     # if there are less than half the total number of halos then just treat that bin as having 0
     for i in range(calc_prf.shape[1]):
         if np.where(calc_prf[:,i]>0)[0].shape[0] < min_disp_halos:
             calc_prf[:,i] = np.nan
             act_prf[:,i] = np.nan
+            
+    if nu_fltr is not None:
+        calc_prf = calc_prf[nu_fltr,:]
+        act_prf = act_prf[nu_fltr,:]
         
     return calc_prf, act_prf        
 

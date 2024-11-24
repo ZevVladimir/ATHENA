@@ -529,9 +529,10 @@ def load_data(client, sims, dset_name, limit_files = False, scale_rad=False, use
     else:
         return all_dask_dfs,act_scale_pos_weight
 
-def load_sprta_mass_prf(sim_splits,all_idxs,use_sims):                
+def load_sprta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):                
     mass_prf_all_list = []
     mass_prf_1halo_list = []
+    all_r200m_list = []
     all_masses = []
     
     for i,sim in enumerate(use_sims):
@@ -577,15 +578,22 @@ def load_sprta_mass_prf(sim_splits,all_idxs,use_sims):
         
         mass_prf_all_list.append(sparta_output['anl_prf']['M_all'][new_idxs,p_sparta_snap,:])
         mass_prf_1halo_list.append(sparta_output['anl_prf']['M_1halo'][new_idxs,p_sparta_snap,:])
+
+        all_r200m_list.append(sparta_output['halos']['R200m'][:,p_sparta_snap])
+
         all_masses.append(ptl_mass)
 
     mass_prf_all = np.vstack(mass_prf_all_list)
     mass_prf_1halo = np.vstack(mass_prf_1halo_list)
+    all_r200m = np.concatenate(all_r200m_list)
     
     bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
     bins = np.insert(bins, 0, 0)
 
-    return mass_prf_all,mass_prf_1halo,all_masses,bins
+    if ret_r200m:
+        return mass_prf_all,mass_prf_1halo,all_masses,bins,all_r200m
+    else:
+        return mass_prf_all,mass_prf_1halo,all_masses,bins
 
 def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, combined_name, plot_save_loc, dens_prf = False,missclass=False,full_dist=False,per_err=False,split_nu=False): 
     with timed("Predictions"):
