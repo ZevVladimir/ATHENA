@@ -53,20 +53,33 @@ if __name__ == '__main__':
         feature_columns = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
         target_column = ["Orbit_infall"]
 
-        model_comb_name = get_combined_name(model_sims)
+        model_comb_name = get_combined_name(model_sims) 
+        scale_rad=False
+        use_weights=False
+        if reduce_rad > 0 and reduce_perc > 0:
+            scale_rad = True
+        if weight_rad > 0 and min_weight > 0:
+            use_weights=True    
+
         model_dir = model_type + "_" + model_comb_name + "nu" + nu_string 
 
-        model_name =  model_dir + model_comb_name
-                
+        if scale_rad:
+            model_dir += "scl_rad" + str(reduce_rad) + "_" + str(reduce_perc)
+        if use_weights:
+            model_dir += "wght" + str(weight_rad) + "_" + str(min_weight)
+            
+        # model_name =  model_dir + model_comb_name
+
         model_save_loc = path_to_xgboost + model_comb_name + "/" + model_dir + "/"
+
         gen_plot_save_loc = model_save_loc + "plots/"
 
         try:
             bst = xgb.Booster()
-            bst.load_model(model_save_loc + model_name + ".json")
+            bst.load_model(model_save_loc + model_dir + ".json")
             print("Loaded Model Trained on:",model_sims)
         except:
-            print("Couldn't load Booster Located at: " + model_save_loc + model_name + ".json")
+            print("Couldn't load Booster Located at: " + model_save_loc + model_dir + ".json")
 
         for curr_test_sims in test_sims:
             test_comb_name = get_combined_name(curr_test_sims) 
@@ -208,41 +221,15 @@ if __name__ == '__main__':
         plt.sca(ax4)
         shap.plots.beeswarm(bad_orb_missclass_shap,plot_size=(fig_width/2,fig_height/2),show=False,order=order,hide_features=True)
         
+        ax1.text(-15,0.25,"Orbiting Particles\nCorrectly Labeled",bbox={"facecolor":'white',"alpha":0.9,},fontsize=20)
+        ax3.text(-15,0.25,"Orbiting Particles\nIncorrectly Labeled",bbox={"facecolor":'white',"alpha":0.9,},fontsize=20)
+        
         # Set it so the xlims for both beeswarms are the same
         xlim2 = ax2.get_xlim()
         xlim4 = ax4.get_xlim()
         new_xlim = (min(xlim2[0], xlim4[0]), max(xlim2[1], xlim4[1]))
         ax2.set_xlim(new_xlim)
         ax4.set_xlim(new_xlim)
-        
-        # labels = {
-        # 'MAIN_EFFECT': "SHAP main effect value for\n%s",
-        # 'INTERACTION_VALUE': "SHAP interaction value",
-        # 'INTERACTION_EFFECT': "SHAP interaction value for\n%s and %s",
-        # 'VALUE': "SHAP value (impact on model output)",
-        # 'GLOBAL_VALUE': "mean(|SHAP value|) (average impact on model output magnitude)",
-        # 'VALUE_FOR': "SHAP value for\n%s",
-        # 'PLOT_FOR': "SHAP plot for %s",
-        # 'FEATURE': "Feature %s",
-        # 'FEATURE_VALUE': "Feature value",
-        # 'FEATURE_VALUE_LOW': "Low",
-        # 'FEATURE_VALUE_HIGH': "High",
-        # 'JOINT_VALUE': "Joint SHAP value",
-        # 'MODEL_OUTPUT': "Model output value"
-        # }
-        
-        # color = colors.red_blue
-        # color = convert_color(color)
-
-        # color_bar_label=labels["FEATURE_VALUE"]
-        # m = cm.ScalarMappable(cmap=color)
-        # m.set_array([0, 1])
-        # cb = plt.colorbar(m, cax=plt.subplot(gs[:,-1]), ticks=[0, 1], aspect=80)
-        # cb.set_ticklabels([labels['FEATURE_VALUE_LOW'], labels['FEATURE_VALUE_HIGH']])
-        # cb.set_label(color_bar_label, size=12, labelpad=0)
-        # cb.ax.tick_params(labelsize=11, length=0)
-        # cb.set_alpha(1)
-        # cb.outline.set_visible(False)
         
         fig.savefig(plot_loc + "vr_r_orb_middle_decision.png")
 
