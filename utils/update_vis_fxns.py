@@ -834,7 +834,7 @@ def compare_prfs_nu(plt_nu_splits, all_prfs, orb_prfs, inf_prfs, bins, lin_rtick
         
         all_plt_lines.append(all_lb)
         all_plt_lbls.append(str(nu_split[0]) + r"$< \nu <$" + str(nu_split[1]))
-        orb_plt_lines.append(inf_lb)
+        orb_plt_lines.append(orb_lb)
         orb_plt_lbls.append(str(nu_split[0]) + r"$< \nu <$" + str(nu_split[1]))
         inf_plt_lines.append(inf_lb)
         inf_plt_lbls.append(str(nu_split[0]) + r"$< \nu <$" + str(nu_split[1]))

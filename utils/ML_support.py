@@ -670,13 +670,17 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
             all_prf_lst = []
             orb_prf_lst = []
             inf_prf_lst = []
-            for i,nu_split in enumerate(plt_nu_splits):
+            cpy_plt_nu_splits = plt_nu_splits.copy()
+            for i,nu_split in enumerate(cpy_plt_nu_splits):
                 # Take the second element of the where to filter by the halos (?)
                 fltr = np.where((calc_nus > nu_split[0]) & (calc_nus < nu_split[1]))[0]
-                
-                all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
-                orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
-                inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
+                if fltr.shape[0] > 25:
+                    all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
+                    orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
+                    inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
+                else:
+                    plt_nu_splits.remove(nu_split)
+            print(plt_nu_splits)
             compare_prfs_nu(plt_nu_splits,all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_")
         else:
             all_prf_lst = filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos)
