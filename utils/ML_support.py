@@ -993,26 +993,28 @@ def filter_ddf(X, y = None, preds = None, fltr_dic = None, col_names = None, max
                     else:
                         full_filter &= condition
 
-            X = X[full_filter]
             
-        nrows = X.shape[0].compute()
+        X_fltr = X[full_filter]
+        nrows = X_fltr.shape[0].compute()
         if nrows > max_size and max_size > 0:
             sample = max_size / nrows
         else:
             sample = 1.0
             
         if sample > 0 and sample < 1:
-            X = X.sample(frac=sample,random_state=rand_seed)
+            X_fltr = X_fltr.sample(frac=sample,random_state=rand_seed)
         
         if col_names != None:
-            X.columns = col_names
+            X_fltr.columns = col_names
             
-        return X, full_filter
+        # Return the filtered array and the indices of the original array that remain
+        return X_fltr.compute(), X_fltr.index.values.compute()
     
 # Can set max_size to 0 to include all the particles
 def shap_with_filter(explainer, X, y, preds, fltr_dic = None, col_names = None, max_size=500):
-    X,fltr = filter_ddf(X, y, preds, fltr_dic = fltr_dic, col_names = col_names, max_size=max_size)
     X_comp = X.compute()
-    return explainer(X_comp), explainer.shap_values(X_comp)[fltr], X
+    X_fltr,fltr = filter_ddf(X, y, preds, fltr_dic = fltr_dic, col_names = col_names, max_size=max_size)
+    
+    return explainer(X_comp), explainer.shap_values(X_comp)[fltr], X_fltr
     
     

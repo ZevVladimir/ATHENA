@@ -183,13 +183,24 @@ if __name__ == '__main__':
                 'act':1,
                 }
         }
-
-        no_second_shap,no_second_shap_values, no_second_X = shap_with_filter(explainer,X_df,y_df,preds,fltr_dic=no_second_dict,col_names=new_columns,max_size=10000)
+        
+        all_explainer = explainer(X_df.compute())
+        all_shap_values = explainer.shap_values(X_df.compute())
+        
+        no_second_X, no_second_fltr = filter_ddf(X_df,y_df,preds,fltr_dic=no_second_dict,col_names=new_columns,max_size=10000)
+        no_second_shap = all_explainer[no_second_fltr]
+        no_second_shap_values = all_shap_values[no_second_fltr]
         # good_orb_in_shap,good_orb_in_shap_values = shap_with_filter(explainer,orb_in_dict,X_df,y_df,preds,new_columns)
         # good_orb_out_shap,good_orb_out_shap_values = shap_with_filter(explainer,orb_out_dict,X_df,y_df,preds,new_columns)
         # test_shap, test_vals, test_X = shap_with_filter(explainer,test_dict,X_df,y_df,preds,new_columns)
-        bad_orb_missclass_shap,bad_orb_missclass_shap_values, bad_orb_missclass_X = shap_with_filter(explainer,X_df,y_df,preds,fltr_dic = orb_bad_misclass_dict,col_names=new_columns)
-        bad_orb_corr_shap,bad_orb_corr_shap_values, bad_orb_corr_X = shap_with_filter(explainer,X_df,y_df,preds,fltr_dic=orb_bad_corr_dict,col_names=new_columns)
+        
+        bad_orb_missclass_X,bad_orb_missclass_fltr = filter_ddf(X_df,y_df,preds,fltr_dic = orb_bad_misclass_dict,col_names=new_columns)
+        bad_orb_missclass_shap = all_explainer[bad_orb_missclass_fltr]
+        bad_orb_missclass_shap_values = all_shap_values[bad_orb_missclass_fltr]
+        
+        bad_orb_corr_X,bad_orb_corr_fltr = filter_ddf(X_df,y_df,preds,fltr_dic=orb_bad_corr_dict,col_names=new_columns)
+        bad_orb_corr_shap = all_explainer[bad_orb_corr_fltr]
+        bad_orb_corr_shap_values = all_shap_values[bad_orb_corr_fltr]
         # all_shap,all_shap_values, all_X = shap_with_filter(explainer,X=X_df,y=y_df,preds=preds,col_names=new_columns)
         # in_btwn_shap,in_btwn_shap_values = shap_with_filter(explainer,in_btwn_dict,X_df,y_df,preds,new_columns,sample=0.0001)
 

@@ -928,6 +928,6 @@ def compare_prfs_nu(plt_nu_splits, all_prfs, orb_prfs, inf_prfs, bins, lin_rtick
     inf_ax_1.set_xticks(tick_locs,strng_ticks)  
     inf_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize, labelleft=False)
     if use_med:
-        fig.savefig(save_location + title + "med_prfl_rat_nu.png",bbox_inches='tight')
+        fig.savefig(save_location + title + "med_prfl_rat_nu.png",bbox_inches='tight',dpi=300)
     else:
-        fig.savefig(save_location + title + "avg_prfl_rat_nu.png",bbox_inches='tight')
+        fig.savefig(save_location + title + "avg_prfl_rat_nu.png",bbox_inches='tight',dpi=300)
