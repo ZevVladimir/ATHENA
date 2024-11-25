@@ -1007,12 +1007,12 @@ def filter_ddf(X, y = None, preds = None, fltr_dic = None, col_names = None, max
         if col_names != None:
             X.columns = col_names
             
-        return X
+        return X, full_filter
     
 # Can set max_size to 0 to include all the particles
 def shap_with_filter(explainer, X, y, preds, fltr_dic = None, col_names = None, max_size=500):
-    X = filter_ddf(X, y, preds, fltr_dic = fltr_dic, col_names = col_names, max_size=max_size)
-    X = X.compute()
-    return explainer(X), explainer.shap_values(X), X
+    X,fltr = filter_ddf(X, y, preds, fltr_dic = fltr_dic, col_names = col_names, max_size=max_size)
+    X_comp = X.compute()
+    return explainer(X_comp), explainer.shap_values(X_comp)[fltr], X
     
     
