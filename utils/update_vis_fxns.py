@@ -61,29 +61,24 @@ def gen_ticks(bin_edges,spacing=6):
     return tick_loc, ticks
 
 # TODO add a configuration dictionary that can be passed instead
-def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xticks=False, hide_yticks=False, xticks = None,yticks = None,xtick_color="black",ytick_color="black",xlinthrsh = None, ylinthrsh = None, xlim=None,ylim=None, axisfontsize=28, number = None, return_img=False, kwargs=None):
+def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xtick_labels=False, hide_ytick_labels=False, xticks = None,yticks = None,xtick_color="white",ytick_color="white",xlinthrsh = None, ylinthrsh = None, xlim=None,ylim=None, axisfontsize=28, number = None, return_img=False, kwargs=None):
     if kwargs is None:
         kwargs = {}
     
     ret_img=ax.imshow(img["hist"].T, interpolation="nearest", **kwargs)
-    ax.tick_params(axis="both",which="major",length=8,width=4)
-    ax.tick_params(axis="both",which="minor",length=6,width=3.5)
+    ax.tick_params(axis="both",which="major",length=8,width=3,direction="in")
+    ax.tick_params(axis="both",which="minor",length=6,width=2,direction="in")
     xticks_loc = []
     yticks_loc = []
     
     if xticks is not None:
         for tick in xticks:
             xticks_loc.append(get_bin_loc(img["x_edge"],tick))
-        if not hide_xticks:
-            ax.set_xticks(xticks_loc,xticks)
-            ax.tick_params(axis="x",direction="in")
+        ax.set_xticks(xticks_loc,xticks)
     if yticks is not None:
         for tick in yticks:
             yticks_loc.append(get_bin_loc(img["y_edge"],tick))
-    
-        if not hide_yticks:
-            ax.set_yticks(yticks_loc,yticks)
-            ax.tick_params(axis="y",direction="in")
+        ax.set_yticks(yticks_loc,yticks)
             
     if xlim is not None:
         min_xloc = get_bin_loc(img["x_edge"],xlim[0])
@@ -123,17 +118,11 @@ def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xticks=
         ax.set_xlabel(x_label,fontsize=axisfontsize)
     if y_label != "":
         ax.set_ylabel(y_label,fontsize=axisfontsize)
-    if hide_xticks:
-        ax.tick_params(axis='x', which='both',labelbottom=False)
-    else:
-        ax.tick_params(axis='x', which='major', labelsize=20,colors=xtick_color,labelcolor="black")
-        ax.tick_params(axis='x', which='minor', labelsize=18,colors=xtick_color,labelcolor="black")
-         
-    if hide_yticks:
-        ax.tick_params(axis='y', which='both',labelleft=False)
-    else:
-        ax.tick_params(axis='y', which='major', labelsize=20,colors=ytick_color,labelcolor="black")
-        ax.tick_params(axis='y', which='minor', labelsize=18,colors=ytick_color,labelcolor="black")
+
+    ax.tick_params(axis='x', which='major', labelsize=20,colors=xtick_color,labelbottom=not hide_xtick_labels,labelcolor="black",direction="in")
+    ax.tick_params(axis='x', which='minor', labelsize=18,colors=xtick_color,labelbottom=not hide_xtick_labels,labelcolor="black",direction="in")
+    ax.tick_params(axis='y', which='major', labelsize=20,colors=ytick_color,labelleft=not hide_ytick_labels,labelcolor="black",direction="in")
+    ax.tick_params(axis='y', which='minor', labelsize=18,colors=ytick_color,labelleft=not hide_ytick_labels,labelcolor="black",direction="in")
            
     if return_img:
         return ret_img
@@ -228,8 +217,7 @@ def normalize_hists(hist,tot_nptl,min_ptl):
     return scaled_hist
 
 def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_dict, num_bins, save_loc):
-    with timed("Finished Full Ptl Dist Plot"):
-        print("Starting Full Ptl Dist Plot")
+    with timed("Full Ptl Dist Plot"):
         
         linthrsh = split_scale_dict["linthrsh"]
         log_nbin = split_scale_dict["log_nbin"]
@@ -312,20 +300,20 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         fig = plt.figure(constrained_layout=True, figsize=(35,25))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
         
-        imshow_plot(fig.add_subplot(gs[1,0]),all_p_r_p_rv,y_label="$v_r/v_{200m}$",text="All Particles",title="Current Snapshot",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D1",xtick_color="white",kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[1,1]),all_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="D2",kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[1,2]),all_p_rv_p_tv,hide_xticks=True,hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D3",ytick_color="white",kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[1,3]),all_c_r_c_rv,y_label="$v_r/v_{200m}$",title="Past Snapshot",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D4",xtick_color="white",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[1,0]),all_p_r_p_rv,y_label="$v_r/v_{200m}$",text="All Particles",title="Current Snapshot",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D1",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[1,1]),all_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="D2",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[1,2]),all_p_rv_p_tv,hide_xtick_labels=True,hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D3",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[1,3]),all_c_r_c_rv,y_label="$v_r/v_{200m}$",title="Past Snapshot",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D4",kwargs=plot_kwargs)
         
-        imshow_plot(fig.add_subplot(gs[2,0]),inf_p_r_p_rv,y_label="$v_r/v_{200m}$",text="Infalling Particles",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D5",xtick_color="white",kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[2,1]),inf_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="D6",kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[2,2]),inf_p_rv_p_tv,hide_xticks=True,hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D7",xtick_color="white",kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[2,3]),inf_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D8",xtick_color="white",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[2,0]),inf_p_r_p_rv,y_label="$v_r/v_{200m}$",text="Infalling Particles",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D5",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[2,1]),inf_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="D6",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[2,2]),inf_p_rv_p_tv,hide_xtick_labels=True,hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D7",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[2,3]),inf_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D8",kwargs=plot_kwargs)
                     
-        imshow_plot(fig.add_subplot(gs[3,0]),orb_p_r_p_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Orbiting Particles",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D9",xtick_color="white",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,0]),orb_p_r_p_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Orbiting Particles",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D9",kwargs=plot_kwargs)
         imshow_plot(fig.add_subplot(gs[3,1]),orb_p_r_p_tv,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="D10",kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[3,2]),orb_p_rv_p_tv,x_label="$v_r/v_{200m}$",hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D11",ytick_color="white",kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[3,3]),orb_c_r_c_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D12",xtick_color="white",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,2]),orb_p_rv_p_tv,x_label="$v_r/v_{200m}$",hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D11",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,3]),orb_c_r_c_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D12",kwargs=plot_kwargs)
 
         color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=scale_min_ptl, vmax=max_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[1:,-1]))
         color_bar.set_label(r"$dN / N dx dy$",fontsize=26)
@@ -336,8 +324,7 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         plt.close()
 
 def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_dict, num_bins, save_loc, model_info,dataset_name):
-    with timed("Finished Miss Class Dist Plot"):
-        print("Starting Miss Class Dist Plot")
+    with timed("Miss Class Dist Plot"):
 
         linthrsh = split_scale_dict["linthrsh"]
         log_nbin = split_scale_dict["log_nbin"]
@@ -483,20 +470,20 @@ def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv,
         fig = plt.figure(constrained_layout=True,figsize=(35,25))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
 
-        imshow_plot(fig.add_subplot(gs[1,0]),scale_inc_all_p_r_p_rv,y_label="$v_r/v_{200m}$",hide_xticks=True,text="All Misclassified",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="S1",xtick_color="white",kwargs=scale_miss_class_args, title="Current Snapshot")
-        imshow_plot(fig.add_subplot(gs[1,1]),scale_inc_all_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="S2",kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[1,2]),scale_inc_all_p_rv_p_tv,hide_xticks=True,hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="S3",xtick_color="white",ytick_color="white",kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[1,3]),scale_inc_all_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="S4",xtick_color="white",kwargs=scale_miss_class_args, title="Past Snapshot")
+        imshow_plot(fig.add_subplot(gs[1,0]),scale_inc_all_p_r_p_rv,y_label="$v_r/v_{200m}$",hide_xtick_labels=True,text="All Misclassified",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="S1",kwargs=scale_miss_class_args, title="Current Snapshot")
+        imshow_plot(fig.add_subplot(gs[1,1]),scale_inc_all_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="S2",kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[1,2]),scale_inc_all_p_rv_p_tv,hide_xtick_labels=True,hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="S3",kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[1,3]),scale_inc_all_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="S4",kwargs=scale_miss_class_args, title="Past Snapshot")
 
-        imshow_plot(fig.add_subplot(gs[2,0]),scale_inc_inf_p_r_p_rv,hide_xticks=True,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="S5",xtick_color="white",kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[2,1]),scale_inc_inf_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="S6",kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[2,2]),scale_inc_inf_p_rv_p_tv,hide_xticks=True,hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="S7",ytick_color="white",kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[2,3]),scale_inc_inf_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="S8",xtick_color="white",kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[2,0]),scale_inc_inf_p_r_p_rv,hide_xtick_labels=True,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="S5",kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[2,1]),scale_inc_inf_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="S6",kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[2,2]),scale_inc_inf_p_rv_p_tv,hide_xtick_labels=True,hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="S7",kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[2,3]),scale_inc_inf_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="S8",kwargs=scale_miss_class_args)
         
-        imshow_plot(fig.add_subplot(gs[3,0]),scale_inc_orb_p_r_p_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="S9",xtick_color="white",kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[3,1]),scale_inc_orb_p_r_p_tv,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="S10",ytick_color="white",kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[3,2]),scale_inc_orb_p_rv_p_tv,x_label="$v_r/v_{200m}$",hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="S11",xtick_color="white",kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[3,3]),scale_inc_orb_c_r_c_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="S12",xtick_color="white",kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[3,0]),scale_inc_orb_p_r_p_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="S9",kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[3,1]),scale_inc_orb_p_r_p_tv,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="S10",kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[3,2]),scale_inc_orb_p_rv_p_tv,x_label="$v_r/v_{200m}$",hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="S11",kwargs=scale_miss_class_args)
+        imshow_plot(fig.add_subplot(gs[3,3]),scale_inc_orb_c_r_c_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="S12",kwargs=scale_miss_class_args)
         
         color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=inc_min_ptl, vmax=1),cmap=magma_cmap), cax=plt.subplot(gs[1:,-1]))
         color_bar.set_label(r"$N_{\mathrm{bin, inc}} / N_{\mathrm{bin, tot}}$",fontsize=26)
@@ -570,8 +557,8 @@ def plot_log_vel(phys_vel,radii,labels,save_loc,add_line=[None,None],show_v200m=
     ax3 = fig.add_subplot(gs[0,2])
     
     imshow_plot(ax1,all,x_label="$r/R_{200}$",xticks=rticks,yticks=pv_ticks,y_label="$log_{10}(v_{phys}/v_{200m})$",ylim=[-3,2],title="All Particles",xtick_color="white",axisfontsize=22,kwargs=lin_plot_kwargs)
-    imshow_plot(ax2,inf,x_label="$r/R_{200}$",xticks=rticks,hide_yticks=True,ylim=[-3,2],title="Infalling Particles",xtick_color="white",axisfontsize=22,kwargs=lin_plot_kwargs)
-    imshow_plot(ax3,orb,x_label="$r/R_{200}$",xticks=rticks,hide_yticks=True,ylim=[-3,2],title="Orbiting Particles",xtick_color="white",axisfontsize=22,kwargs=lin_plot_kwargs)
+    imshow_plot(ax2,inf,x_label="$r/R_{200}$",xticks=rticks,hide_ytick_labels=True,ylim=[-3,2],title="Infalling Particles",xtick_color="white",axisfontsize=22,kwargs=lin_plot_kwargs)
+    imshow_plot(ax3,orb,x_label="$r/R_{200}$",xticks=rticks,hide_ytick_labels=True,ylim=[-3,2],title="Orbiting Particles",xtick_color="white",axisfontsize=22,kwargs=lin_plot_kwargs)
 
     if v200m > 0 and show_v200m:
         ax1.hlines(np.log10(v200m),xmin=r_range[0],xmax=r_range[1],colors="black")
@@ -771,7 +758,7 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
     
 # Profiles should be a list of lists where each list consists of [calc_prf,act_prf] for each nu split
 # You can either use the median plots with use_med=True or the average with use_med=False
-def compare_prfs_nu(plt_nu_splits, all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title, use_med=True):    
+def compare_prfs_nu(plt_nu_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title, use_med=True):    
     if use_med:
         prf_func = np.nanmedian
     else:
@@ -801,9 +788,9 @@ def compare_prfs_nu(plt_nu_splits, all_prfs, orb_prfs, inf_prfs, bins, lin_rtick
     orb_cmap = plt.cm.Blues
     inf_cmap = plt.cm.Greens
     
-    all_colors = [all_cmap(i) for i in np.linspace(0.3, 1, len(plt_nu_splits))]
-    orb_colors = [orb_cmap(i) for i in np.linspace(0.3, 1, len(plt_nu_splits))]
-    inf_colors = [inf_cmap(i) for i in np.linspace(0.3, 1, len(plt_nu_splits))]
+    all_colors = [all_cmap(i) for i in np.linspace(0.3, 1, n_lines)]
+    orb_colors = [orb_cmap(i) for i in np.linspace(0.3, 1, n_lines)]
+    inf_colors = [inf_cmap(i) for i in np.linspace(0.3, 1, n_lines)]
     
     invis_calc_all, = all_ax_0.plot([0], [0], color=all_cmap(0.75), linestyle='-')
     invis_act_all, = all_ax_0.plot([0], [0], color=all_cmap(0.75), linestyle='--')
