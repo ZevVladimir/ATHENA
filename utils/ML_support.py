@@ -670,14 +670,18 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
             all_prf_lst = []
             orb_prf_lst = []
             inf_prf_lst = []
-            for i,nu_split in enumerate(plt_nu_splits):
+            cpy_plt_nu_splits = plt_nu_splits.copy()
+            for i,nu_split in enumerate(cpy_plt_nu_splits):
                 # Take the second element of the where to filter by the halos (?)
                 fltr = np.where((calc_nus > nu_split[0]) & (calc_nus < nu_split[1]))[0]
-                
-                all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
-                orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
-                inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
-            compare_prfs_nu(plt_nu_splits,all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_")
+                if fltr.shape[0] > 25:
+                    all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
+                    orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
+                    inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
+                else:
+                    plt_nu_splits.remove(nu_split)
+
+            compare_prfs_nu(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_")
         else:
             all_prf_lst = filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos)
             orb_prf_lst = filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos)
@@ -989,26 +993,28 @@ def filter_ddf(X, y = None, preds = None, fltr_dic = None, col_names = None, max
                     else:
                         full_filter &= condition
 
-            X = X[full_filter]
             
-        nrows = X.shape[0].compute()
+        X_fltr = X[full_filter]
+        nrows = X_fltr.shape[0].compute()
         if nrows > max_size and max_size > 0:
             sample = max_size / nrows
         else:
             sample = 1.0
             
         if sample > 0 and sample < 1:
-            X = X.sample(frac=sample,random_state=rand_seed)
+            X_fltr = X_fltr.sample(frac=sample,random_state=rand_seed)
         
         if col_names != None:
-            X.columns = col_names
+            X_fltr.columns = col_names
             
-        return X
+        # Return the filtered array and the indices of the original array that remain
+        return X_fltr.compute(), X_fltr.index.values.compute()
     
 # Can set max_size to 0 to include all the particles
 def shap_with_filter(explainer, X, y, preds, fltr_dic = None, col_names = None, max_size=500):
-    X = filter_ddf(X, y, preds, fltr_dic = fltr_dic, col_names = col_names, max_size=max_size)
-    X = X.compute()
-    return explainer(X), explainer.shap_values(X), X
+    X_comp = X.compute()
+    X_fltr,fltr = filter_ddf(X, y, preds, fltr_dic = fltr_dic, col_names = col_names, max_size=max_size)
+    
+    return explainer(X_comp), explainer.shap_values(X_comp)[fltr], X_fltr
     
     

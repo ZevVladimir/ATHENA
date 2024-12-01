@@ -53,20 +53,33 @@ if __name__ == '__main__':
         feature_columns = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
         target_column = ["Orbit_infall"]
 
-        model_comb_name = get_combined_name(model_sims)
+        model_comb_name = get_combined_name(model_sims) 
+        scale_rad=False
+        use_weights=False
+        if reduce_rad > 0 and reduce_perc > 0:
+            scale_rad = True
+        if weight_rad > 0 and min_weight > 0:
+            use_weights=True    
+
         model_dir = model_type + "_" + model_comb_name + "nu" + nu_string 
 
-        model_name =  model_dir + model_comb_name
-                
+        if scale_rad:
+            model_dir += "scl_rad" + str(reduce_rad) + "_" + str(reduce_perc)
+        if use_weights:
+            model_dir += "wght" + str(weight_rad) + "_" + str(min_weight)
+            
+        # model_name =  model_dir + model_comb_name
+
         model_save_loc = path_to_xgboost + model_comb_name + "/" + model_dir + "/"
+
         gen_plot_save_loc = model_save_loc + "plots/"
 
         try:
             bst = xgb.Booster()
-            bst.load_model(model_save_loc + model_name + ".json")
+            bst.load_model(model_save_loc + model_dir + ".json")
             print("Loaded Model Trained on:",model_sims)
         except:
-            print("Couldn't load Booster Located at: " + model_save_loc + model_name + ".json")
+            print("Couldn't load Booster Located at: " + model_save_loc + model_dir + ".json")
 
         for curr_test_sims in test_sims:
             test_comb_name = get_combined_name(curr_test_sims) 
@@ -170,13 +183,24 @@ if __name__ == '__main__':
                 'act':1,
                 }
         }
-
-        no_second_shap,no_second_shap_values, no_second_X = shap_with_filter(explainer,X_df,y_df,preds,fltr_dic=no_second_dict,col_names=new_columns,max_size=10000)
+        
+        all_explainer = explainer(X_df.compute())
+        all_shap_values = explainer.shap_values(X_df.compute())
+        
+        no_second_X, no_second_fltr = filter_ddf(X_df,y_df,preds,fltr_dic=no_second_dict,col_names=new_columns,max_size=10000)
+        no_second_shap = all_explainer[no_second_fltr]
+        no_second_shap_values = all_shap_values[no_second_fltr]
         # good_orb_in_shap,good_orb_in_shap_values = shap_with_filter(explainer,orb_in_dict,X_df,y_df,preds,new_columns)
         # good_orb_out_shap,good_orb_out_shap_values = shap_with_filter(explainer,orb_out_dict,X_df,y_df,preds,new_columns)
         # test_shap, test_vals, test_X = shap_with_filter(explainer,test_dict,X_df,y_df,preds,new_columns)
-        bad_orb_missclass_shap,bad_orb_missclass_shap_values, bad_orb_missclass_X = shap_with_filter(explainer,X_df,y_df,preds,fltr_dic = orb_bad_misclass_dict,col_names=new_columns)
-        bad_orb_corr_shap,bad_orb_corr_shap_values, bad_orb_corr_X = shap_with_filter(explainer,X_df,y_df,preds,fltr_dic=orb_bad_corr_dict,col_names=new_columns)
+        
+        bad_orb_missclass_X,bad_orb_missclass_fltr = filter_ddf(X_df,y_df,preds,fltr_dic = orb_bad_misclass_dict,col_names=new_columns)
+        bad_orb_missclass_shap = all_explainer[bad_orb_missclass_fltr]
+        bad_orb_missclass_shap_values = all_shap_values[bad_orb_missclass_fltr]
+        
+        bad_orb_corr_X,bad_orb_corr_fltr = filter_ddf(X_df,y_df,preds,fltr_dic=orb_bad_corr_dict,col_names=new_columns)
+        bad_orb_corr_shap = all_explainer[bad_orb_corr_fltr]
+        bad_orb_corr_shap_values = all_shap_values[bad_orb_corr_fltr]
         # all_shap,all_shap_values, all_X = shap_with_filter(explainer,X=X_df,y=y_df,preds=preds,col_names=new_columns)
         # in_btwn_shap,in_btwn_shap_values = shap_with_filter(explainer,in_btwn_dict,X_df,y_df,preds,new_columns,sample=0.0001)
 
@@ -208,41 +232,15 @@ if __name__ == '__main__':
         plt.sca(ax4)
         shap.plots.beeswarm(bad_orb_missclass_shap,plot_size=(fig_width/2,fig_height/2),show=False,order=order,hide_features=True)
         
+        ax1.text(-15,0.25,"Orbiting Particles\nCorrectly Labeled",bbox={"facecolor":'white',"alpha":0.9,},fontsize=20)
+        ax3.text(-15,0.25,"Orbiting Particles\nIncorrectly Labeled",bbox={"facecolor":'white',"alpha":0.9,},fontsize=20)
+        
         # Set it so the xlims for both beeswarms are the same
         xlim2 = ax2.get_xlim()
         xlim4 = ax4.get_xlim()
         new_xlim = (min(xlim2[0], xlim4[0]), max(xlim2[1], xlim4[1]))
         ax2.set_xlim(new_xlim)
         ax4.set_xlim(new_xlim)
-        
-        # labels = {
-        # 'MAIN_EFFECT': "SHAP main effect value for\n%s",
-        # 'INTERACTION_VALUE': "SHAP interaction value",
-        # 'INTERACTION_EFFECT': "SHAP interaction value for\n%s and %s",
-        # 'VALUE': "SHAP value (impact on model output)",
-        # 'GLOBAL_VALUE': "mean(|SHAP value|) (average impact on model output magnitude)",
-        # 'VALUE_FOR': "SHAP value for\n%s",
-        # 'PLOT_FOR': "SHAP plot for %s",
-        # 'FEATURE': "Feature %s",
-        # 'FEATURE_VALUE': "Feature value",
-        # 'FEATURE_VALUE_LOW': "Low",
-        # 'FEATURE_VALUE_HIGH': "High",
-        # 'JOINT_VALUE': "Joint SHAP value",
-        # 'MODEL_OUTPUT': "Model output value"
-        # }
-        
-        # color = colors.red_blue
-        # color = convert_color(color)
-
-        # color_bar_label=labels["FEATURE_VALUE"]
-        # m = cm.ScalarMappable(cmap=color)
-        # m.set_array([0, 1])
-        # cb = plt.colorbar(m, cax=plt.subplot(gs[:,-1]), ticks=[0, 1], aspect=80)
-        # cb.set_ticklabels([labels['FEATURE_VALUE_LOW'], labels['FEATURE_VALUE_HIGH']])
-        # cb.set_label(color_bar_label, size=12, labelpad=0)
-        # cb.ax.tick_params(labelsize=11, length=0)
-        # cb.set_alpha(1)
-        # cb.outline.set_visible(False)
         
         fig.savefig(plot_loc + "vr_r_orb_middle_decision.png")
 
