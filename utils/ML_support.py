@@ -27,7 +27,7 @@ from functools import partial
 
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, find_closest_z, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, create_nu_string
 from utils.visualization_functions import plot_per_err
-from utils.update_vis_fxns import plot_full_ptl_dist, plot_miss_class_dist, compare_prfs_nu, compare_prfs
+from utils.update_vis_fxns import plot_full_ptl_dist, plot_miss_class_dist, compare_prfs_nu, compare_prfs, inf_orb_frac
 from utils.calculation_functions import create_mass_prf, create_stack_mass_prf, filter_prf, calculate_density
 from sparta_tools import sparta # type: ignore
 from colossus.cosmology import cosmology
@@ -720,7 +720,7 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
             curr_sim_name += "_"
         curr_sim_name += dst_type
         plot_miss_class_dist(p_corr_labels=p_corr_labels,p_ml_labels=p_ml_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,split_scale_dict=split_scale_dict,num_bins=num_bins,save_loc=plot_save_loc,model_info=model_info,dataset_name=curr_sim_name)
-            
+    inf_orb_frac(p_corr_labels=p_corr_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,split_scale_dict=split_scale_dict,num_bins=num_bins,save_loc=plot_save_loc)
     if per_err:
         with h5py.File(path_to_hdf5_file,"r") as f:
             dic_sim = {}

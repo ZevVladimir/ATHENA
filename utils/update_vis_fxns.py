@@ -107,7 +107,7 @@ def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xticks=
     if xlinthrsh is not None:
         xlinthrsh_loc = get_bin_loc(img["x_edge"],xlinthrsh)
         ax.axvline(x=xlinthrsh_loc, color='grey', linestyle='--', alpha=1)
-        if np.any(np.array(yticks, dtype=np.float32) < 0):
+        if np.any(np.array(xticks, dtype=np.float32) < 0):
             neg_xlinthrsh_loc = get_bin_loc(img["x_edge"],-xlinthrsh)
             x_zero_loc = get_bin_loc(img["x_edge"],0)
             ax.axvline(x=neg_xlinthrsh_loc, color='grey', linestyle='--', alpha=1)
@@ -197,16 +197,20 @@ def histogram(x,y,use_bins,hist_range,min_ptl,set_ptl,split_xscale_dict=None,spl
     
     return fin_hist
 
-def scale_hists(inc_hist, act_hist, act_min, inc_min):
+# Scales hist_1 by hist_2. Adjustments can be made: if hist_1 doesn't have any particles in a box and hist_2 has more than act_min
+# there set it to inc_min. And if hist_1 has particles in a box, the scaled hist is below inc_min, and hist_2 is larger than act_min
+# again set that box to inc_min 
+def scale_hists(hist_1, hist_2, make_adj = True, act_min=10, inc_min=1e-4):
     scaled_hist = {
-        "x_edge":act_hist["x_edge"],
-        "y_edge":act_hist["y_edge"]
+        "x_edge":hist_2["x_edge"],
+        "y_edge":hist_2["y_edge"]
     }
-    scaled_hist["hist"] = np.divide(inc_hist["hist"],act_hist["hist"],out=np.zeros_like(inc_hist["hist"]), where=act_hist["hist"]!=0)
+    scaled_hist["hist"] = np.divide(hist_1["hist"],hist_2["hist"],out=np.zeros_like(hist_1["hist"]), where=hist_2["hist"]!=0)
     
-    scaled_hist["hist"] = np.where((inc_hist["hist"] < 1) & (act_hist["hist"] >= act_min), inc_min, scaled_hist["hist"])
-    # Where there are miss classified particles but they won't show up on the image, set them to the min
-    scaled_hist["hist"] = np.where((inc_hist["hist"] >= 1) & (scaled_hist["hist"] < inc_min) & (act_hist["hist"] >= act_min), inc_min, scaled_hist["hist"])
+    if make_adj:
+        scaled_hist["hist"] = np.where((hist_1["hist"] < 1) & (hist_2["hist"] >= act_min), inc_min, scaled_hist["hist"])
+        # Where there are miss classified particles but they won't show up on the image, set them to the min
+        scaled_hist["hist"] = np.where((hist_1["hist"] >= 1) & (scaled_hist["hist"] < inc_min) & (hist_2["hist"] >= act_min), inc_min, scaled_hist["hist"])
     
     return scaled_hist
 
@@ -328,7 +332,7 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         imshow_plot(fig.add_subplot(gs[3,3]),orb_c_r_c_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D12",kwargs=plot_kwargs)
 
         color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=scale_min_ptl, vmax=max_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[1:,-1]))
-        color_bar.set_label(r"$dN / N dx dy$",fontsize=26)
+        color_bar.set_label(r"$dN N^{-1} dx^{-1} dy^{-1}$",fontsize=26)
         color_bar.ax.tick_params(which="major",direction="in",labelsize=22,length=10,width=3)
         color_bar.ax.tick_params(which="minor",direction="in",labelsize=22,length=5,width=1.5)
         
@@ -898,3 +902,78 @@ def compare_prfs_nu(plt_nu_splits, all_prfs, orb_prfs, inf_prfs, bins, lin_rtick
         fig.savefig(save_location + title + "med_prfl_rat_nu.png",bbox_inches='tight')
     else:
         fig.savefig(save_location + title + "avg_prfl_rat_nu.png",bbox_inches='tight')
+        
+def inf_orb_frac(p_corr_labels,p_r,p_rv,p_tv,c_r,c_rv,split_scale_dict,num_bins,save_loc):
+    linthrsh = split_scale_dict["linthrsh"]
+    
+    p_r_range = [np.min(p_r),np.max(p_r)]
+    p_rv_range = [np.min(p_rv),np.max(p_rv)]
+    p_tv_range = [np.min(p_tv),np.max(p_tv)]
+    
+    act_min_ptl = 10
+    set_ptl = 0
+    scale_min_ptl = 0
+    
+    inf_p_r, orb_p_r = split_orb_inf(p_r,p_corr_labels)
+    inf_p_rv, orb_p_rv = split_orb_inf(p_rv,p_corr_labels)
+    inf_p_tv, orb_p_tv = split_orb_inf(p_tv,p_corr_labels)
+    inf_c_r, orb_c_r = split_orb_inf(c_r,p_corr_labels)
+    inf_c_rv, orb_c_rv = split_orb_inf(c_rv,p_corr_labels)
+    
+    
+    # Use the binning from all particles for the orbiting and infalling plots and the secondary snap to keep it consistent
+    hist_inf_p_r_p_rv = histogram(inf_p_r,inf_p_rv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+    hist_inf_p_r_p_tv = histogram(inf_p_r,inf_p_tv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+    hist_inf_p_rv_p_tv = histogram(inf_p_rv,inf_p_tv,use_bins=[num_bins,num_bins],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
+    hist_inf_c_r_c_rv = histogram(inf_c_r,inf_c_rv,use_bins=[hist_inf_p_r_p_rv["x_edge"],hist_inf_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+    hist_orb_p_r_p_rv = histogram(orb_p_r,orb_p_rv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+    hist_orb_p_r_p_tv = histogram(orb_p_r,orb_p_tv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+    hist_orb_p_rv_p_tv = histogram(orb_p_rv,orb_p_tv,use_bins=[num_bins,num_bins],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
+    hist_orb_c_r_c_rv = histogram(orb_c_r,orb_c_rv,use_bins=[hist_orb_p_r_p_rv["x_edge"],hist_orb_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+
+    hist_frac_p_r_p_rv = scale_hists(hist_inf_p_r_p_rv["hist"], hist_orb_p_r_p_rv["hist"])
+    hist_frac_p_r_p_tv = scale_hists(hist_inf_p_r_p_tv["hist"], hist_orb_p_r_p_tv["hist"])
+    hist_frac_p_rv_p_tv = scale_hists(hist_inf_p_rv_p_tv["hist"], hist_orb_p_rv_p_tv["hist"])
+    hist_frac_c_r_c_rv = scale_hists(hist_inf_c_r_c_rv["hist"], hist_orb_c_r_c_rv["hist"])
+    
+    max_ptl = np.max(np.array([np.max(hist_frac_p_r_p_rv["hist"]),np.max(hist_frac_p_r_p_tv["hist"]),np.max(hist_frac_p_rv_p_tv["hist"]),np.max(hist_frac_c_r_c_rv["hist"])]))
+        
+    cividis_cmap = plt.get_cmap("cividis")
+    cividis_cmap.set_under(color='black')
+    cividis_cmap.set_bad(color='black') 
+    
+    plot_kwargs = {
+            "vmin":scale_min_ptl,
+            "vmax":max_ptl,
+            "norm":"log",
+            "origin":"lower",
+            "aspect":"auto",
+            "cmap":cividis_cmap,
+    }
+    
+    r_ticks = split_scale_dict["lin_rticks"] + split_scale_dict["log_rticks"]
+    
+    rv_ticks = split_scale_dict["lin_rvticks"] + split_scale_dict["log_rvticks"]
+    rv_ticks = rv_ticks + [-x for x in rv_ticks if x != 0]
+    rv_ticks.sort()
+
+    tv_ticks = split_scale_dict["lin_tvticks"] + split_scale_dict["log_tvticks"]       
+    
+    widths = [4,4,4,4,.5]
+    heights = [0.15,4] # have extra row up top so there is space for the title
+    
+    fig = plt.figure(constrained_layout=True, figsize=(35,25))
+    gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
+    
+    imshow_plot(fig.add_subplot(gs[1,0]),hist_frac_p_r_p_rv,y_label="$v_r/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D1",kwargs=plot_kwargs)
+    imshow_plot(fig.add_subplot(gs[1,1]),hist_frac_p_r_p_tv,y_label="$v_t/v_{200m}$", hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="D2",kwargs=plot_kwargs)
+    imshow_plot(fig.add_subplot(gs[1,2]),hist_frac_p_rv_p_tv,hide_xticks=True,hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D3",kwargs=plot_kwargs)
+    imshow_plot(fig.add_subplot(gs[1,3]),hist_frac_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D4",kwargs=plot_kwargs)
+ 
+    color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=scale_min_ptl, vmax=max_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[1:,-1]))
+    color_bar.set_label(r"$N_{inf}/N_{orb}$",fontsize=26)
+    color_bar.ax.tick_params(which="major",direction="in",labelsize=22,length=10,width=3)
+    color_bar.ax.tick_params(which="minor",direction="in",labelsize=22,length=5,width=1.5)
+    
+    fig.savefig(save_loc + "inf_orb_frac.png")
+    plt.close()
