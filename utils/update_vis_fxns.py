@@ -951,10 +951,10 @@ def inf_orb_frac(p_corr_labels,p_r,p_rv,p_tv,c_r,c_rv,split_scale_dict,num_bins,
     hist_orb_p_rv_p_tv = histogram(orb_p_rv,orb_p_tv,use_bins=[num_bins,num_bins],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
     hist_orb_c_r_c_rv = histogram(orb_c_r,orb_c_rv,use_bins=[hist_orb_p_r_p_rv["x_edge"],hist_orb_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
 
-    hist_frac_p_r_p_rv = scale_hists(hist_inf_p_r_p_rv["hist"], hist_orb_p_r_p_rv["hist"])
-    hist_frac_p_r_p_tv = scale_hists(hist_inf_p_r_p_tv["hist"], hist_orb_p_r_p_tv["hist"])
-    hist_frac_p_rv_p_tv = scale_hists(hist_inf_p_rv_p_tv["hist"], hist_orb_p_rv_p_tv["hist"])
-    hist_frac_c_r_c_rv = scale_hists(hist_inf_c_r_c_rv["hist"], hist_orb_c_r_c_rv["hist"])
+    hist_frac_p_r_p_rv = scale_hists(hist_inf_p_r_p_rv, hist_orb_p_r_p_rv)
+    hist_frac_p_r_p_tv = scale_hists(hist_inf_p_r_p_tv, hist_orb_p_r_p_tv)
+    hist_frac_p_rv_p_tv = scale_hists(hist_inf_p_rv_p_tv, hist_orb_p_rv_p_tv)
+    hist_frac_c_r_c_rv = scale_hists(hist_inf_c_r_c_rv, hist_orb_c_r_c_rv)
     
     max_ptl = np.max(np.array([np.max(hist_frac_p_r_p_rv["hist"]),np.max(hist_frac_p_r_p_tv["hist"]),np.max(hist_frac_p_rv_p_tv["hist"]),np.max(hist_frac_c_r_c_rv["hist"])]))
         
@@ -985,10 +985,10 @@ def inf_orb_frac(p_corr_labels,p_r,p_rv,p_tv,c_r,c_rv,split_scale_dict,num_bins,
     fig = plt.figure(constrained_layout=True, figsize=(35,25))
     gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
     
-    imshow_plot(fig.add_subplot(gs[1,0]),hist_frac_p_r_p_rv,y_label="$v_r/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D1",kwargs=plot_kwargs)
-    imshow_plot(fig.add_subplot(gs[1,1]),hist_frac_p_r_p_tv,y_label="$v_t/v_{200m}$", hide_xticks=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="D2",kwargs=plot_kwargs)
-    imshow_plot(fig.add_subplot(gs[1,2]),hist_frac_p_rv_p_tv,hide_xticks=True,hide_yticks=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D3",kwargs=plot_kwargs)
-    imshow_plot(fig.add_subplot(gs[1,3]),hist_frac_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xticks=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D4",kwargs=plot_kwargs)
+    imshow_plot(fig.add_subplot(gs[1,0]),hist_frac_p_r_p_rv,y_label="$v_r/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
+    imshow_plot(fig.add_subplot(gs[1,1]),hist_frac_p_r_p_tv,y_label="$v_t/v_{200m}$", hide_xtick_labels=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
+    imshow_plot(fig.add_subplot(gs[1,2]),hist_frac_p_rv_p_tv,hide_xtick_labels=True,hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,kwargs=plot_kwargs)
+    imshow_plot(fig.add_subplot(gs[1,3]),hist_frac_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
  
     color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=scale_min_ptl, vmax=max_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[1:,-1]))
     color_bar.set_label(r"$N_{inf}/N_{orb}$",fontsize=26)
