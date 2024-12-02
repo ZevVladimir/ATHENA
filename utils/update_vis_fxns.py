@@ -932,7 +932,7 @@ def inf_orb_frac(p_corr_labels,p_r,p_rv,p_tv,c_r,c_rv,split_scale_dict,num_bins,
     
     act_min_ptl = 10
     set_ptl = 0
-    scale_min_ptl = 0
+    scale_min_ptl = 1e-4
     
     inf_p_r, orb_p_r = split_orb_inf(p_r,p_corr_labels)
     inf_p_rv, orb_p_rv = split_orb_inf(p_rv,p_corr_labels)
@@ -979,18 +979,18 @@ def inf_orb_frac(p_corr_labels,p_r,p_rv,p_tv,c_r,c_rv,split_scale_dict,num_bins,
 
     tv_ticks = split_scale_dict["lin_tvticks"] + split_scale_dict["log_tvticks"]       
     
-    widths = [4,4,4,4,.5]
-    heights = [0.15,4] # have extra row up top so there is space for the title
+    widths = [4,4,4,4,.2]
+    heights = [4]
     
-    fig = plt.figure(constrained_layout=True, figsize=(35,25))
+    fig = plt.figure(constrained_layout=True, figsize=(45,10))
     gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
     
-    imshow_plot(fig.add_subplot(gs[1,0]),hist_frac_p_r_p_rv,y_label="$v_r/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
-    imshow_plot(fig.add_subplot(gs[1,1]),hist_frac_p_r_p_tv,y_label="$v_t/v_{200m}$", hide_xtick_labels=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
-    imshow_plot(fig.add_subplot(gs[1,2]),hist_frac_p_rv_p_tv,hide_xtick_labels=True,hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,kwargs=plot_kwargs)
-    imshow_plot(fig.add_subplot(gs[1,3]),hist_frac_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
+    imshow_plot(fig.add_subplot(gs[0,0]),hist_frac_p_r_p_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
+    imshow_plot(fig.add_subplot(gs[0,1]),hist_frac_p_r_p_tv,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
+    imshow_plot(fig.add_subplot(gs[0,2]),hist_frac_p_rv_p_tv,x_label="$v_r/V_{200m}$",hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,kwargs=plot_kwargs)
+    imshow_plot(fig.add_subplot(gs[0,3]),hist_frac_c_r_c_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
  
-    color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=scale_min_ptl, vmax=max_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[1:,-1]))
+    color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=scale_min_ptl, vmax=max_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[:,-1]))
     color_bar.set_label(r"$N_{inf}/N_{orb}$",fontsize=26)
     color_bar.ax.tick_params(which="major",direction="in",labelsize=22,length=10,width=3)
     color_bar.ax.tick_params(which="minor",direction="in",labelsize=22,length=5,width=1.5)

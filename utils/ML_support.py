@@ -595,7 +595,7 @@ def load_sprta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
     else:
         return mass_prf_all,mass_prf_1halo,all_masses,bins
 
-def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, combined_name, plot_save_loc, dens_prf = False,missclass=False,full_dist=False,per_err=False,split_nu=False): 
+def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, combined_name, plot_save_loc, dens_prf = False,missclass=False,full_dist=False,io_frac=False,per_err=False,split_nu=False): 
     with timed("Predictions"):
         print(f"Starting predictions for {y.size.compute():.3e} particles")
         preds = make_preds(client, model, X, report_name="Report", print_report=False)
@@ -694,7 +694,7 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
                 compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_",use_med=False)
         
         
-    if missclass or full_dist:       
+    if missclass or full_dist or io_frac:       
         p_corr_labels=y.compute().values.flatten()
         p_ml_labels=preds.values
         p_r=X["p_Scaled_radii"].values.compute()
@@ -724,7 +724,8 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
             curr_sim_name += "_"
         curr_sim_name += dst_type
         plot_miss_class_dist(p_corr_labels=p_corr_labels,p_ml_labels=p_ml_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,split_scale_dict=split_scale_dict,num_bins=num_bins,save_loc=plot_save_loc,model_info=model_info,dataset_name=curr_sim_name)
-    inf_orb_frac(p_corr_labels=p_corr_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,split_scale_dict=split_scale_dict,num_bins=num_bins,save_loc=plot_save_loc)
+    if io_frac:
+        inf_orb_frac(p_corr_labels=p_corr_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,split_scale_dict=split_scale_dict,num_bins=num_bins,save_loc=plot_save_loc)
     if per_err:
         with h5py.File(path_to_hdf5_file,"r") as f:
             dic_sim = {}
