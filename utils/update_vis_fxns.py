@@ -256,6 +256,13 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         orb_p_rv_p_tv = histogram(orb_p_rv,orb_p_tv,use_bins=[all_p_rv_p_tv["x_edge"],all_p_rv_p_tv["y_edge"]],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
         orb_c_r_c_rv = histogram(orb_c_r,orb_c_rv,use_bins=[all_p_r_p_rv["x_edge"],all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
         
+        hist_frac_p_r_p_rv = scale_hists(inf_p_r_p_rv, orb_p_r_p_rv)
+        hist_frac_p_r_p_tv = scale_hists(inf_p_r_p_tv, orb_p_r_p_tv)
+        hist_frac_p_rv_p_tv = scale_hists(inf_p_rv_p_tv, orb_p_rv_p_tv)
+        hist_frac_c_r_c_rv = scale_hists(inf_c_r_c_rv, orb_c_r_c_rv)
+        
+        max_frac_ptl = np.max(np.array([np.max(hist_frac_p_r_p_rv["hist"]),np.max(hist_frac_p_r_p_tv["hist"]),np.max(hist_frac_p_rv_p_tv["hist"]),np.max(hist_frac_c_r_c_rv["hist"])]))
+            
         tot_nptl = p_r.shape[0]
         
         # normalize the number of particles so that there are no lines.
@@ -281,6 +288,10 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         cividis_cmap.set_under(color='black')
         cividis_cmap.set_bad(color='black') 
         
+        viridis_cmap = plt.get_cmap("viridis_r")
+        viridis_cmap.set_under(color='black')
+        viridis_cmap.set_bad(color='black') 
+        
         plot_kwargs = {
                 "vmin":scale_min_ptl,
                 "vmax":max_ptl,
@@ -288,6 +299,15 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
                 "origin":"lower",
                 "aspect":"auto",
                 "cmap":cividis_cmap,
+        }
+        
+        frac_plot_kwargs = {
+                "vmin":scale_min_ptl,
+                "vmax":max_frac_ptl,
+                "norm":"log",
+                "origin":"lower",
+                "aspect":"auto",
+                "cmap":viridis_cmap,
         }
         
         r_ticks = split_scale_dict["lin_rticks"] + split_scale_dict["log_rticks"]
@@ -299,9 +319,9 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         tv_ticks = split_scale_dict["lin_tvticks"] + split_scale_dict["log_tvticks"]       
         
         widths = [4,4,4,4,.5]
-        heights = [0.15,4,4,4] # have extra row up top so there is space for the title
+        heights = [0.15,4,4,4,4] # have extra row up top so there is space for the title
         
-        fig = plt.figure(constrained_layout=True, figsize=(35,25))
+        fig = plt.figure(constrained_layout=True, figsize=(35,30))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
         
         imshow_plot(fig.add_subplot(gs[1,0]),all_p_r_p_rv,y_label="$v_r/v_{200m}$",text="All Particles",title="Current Snapshot",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D1",kwargs=plot_kwargs)
@@ -314,16 +334,27 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         imshow_plot(fig.add_subplot(gs[2,2]),inf_p_rv_p_tv,hide_xtick_labels=True,hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D7",kwargs=plot_kwargs)
         imshow_plot(fig.add_subplot(gs[2,3]),inf_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D8",kwargs=plot_kwargs)
                     
-        imshow_plot(fig.add_subplot(gs[3,0]),orb_p_r_p_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Orbiting Particles",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D9",kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[3,1]),orb_p_r_p_tv,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="D10",kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[3,2]),orb_p_rv_p_tv,x_label="$v_r/v_{200m}$",hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D11",kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[3,3]),orb_c_r_c_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D12",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,0]),orb_p_r_p_rv,y_label="$v_r/v_{200m}$",text="Orbiting Particles",hide_xtick_labels=True,yticks=rv_ticks,ylinthrsh=linthrsh,number="D9",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,1]),orb_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xtick_labels=True,yticks=tv_ticks,ylinthrsh=linthrsh,number="D10",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,2]),orb_p_rv_p_tv,hide_ytick_labels=True,hide_xtick_labels=True,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D11",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,3]),orb_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xtick_labels=True,yticks=rv_ticks,ylinthrsh=linthrsh,number="D12",kwargs=plot_kwargs)
 
-        color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=scale_min_ptl, vmax=max_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[1:,-1]))
+        imshow_plot(fig.add_subplot(gs[4,0]),hist_frac_p_r_p_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text=r"$N_{infalling} / N_{orbiting}$", xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D13",kwargs=frac_plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[4,1]),hist_frac_p_r_p_tv,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="D14",kwargs=frac_plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[4,2]),hist_frac_p_rv_p_tv,x_label="$v_r/V_{200m}$",hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D15",kwargs=frac_plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[4,3]),hist_frac_c_r_c_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D16",kwargs=frac_plot_kwargs)
+    
+        
+        color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=scale_min_ptl, vmax=max_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[1:-1,-1]))
         color_bar.set_label(r"$dN N^{-1} dx^{-1} dy^{-1}$",fontsize=26)
         color_bar.ax.tick_params(which="major",direction="in",labelsize=22,length=10,width=3)
         color_bar.ax.tick_params(which="minor",direction="in",labelsize=22,length=5,width=1.5)
         
+        color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=scale_min_ptl, vmax=max_frac_ptl),cmap=viridis_cmap), cax=plt.subplot(gs[-1,-1]))
+        color_bar.set_label(r"$N_{inf}/N_{orb}$",fontsize=26)
+        color_bar.ax.tick_params(which="major",direction="in",labelsize=22,length=10,width=3)
+        color_bar.ax.tick_params(which="minor",direction="in",labelsize=22,length=5,width=1.5)
+            
         fig.savefig(save_loc + "ptl_distr.png")
         plt.close()
 
