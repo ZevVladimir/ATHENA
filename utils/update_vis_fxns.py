@@ -318,31 +318,31 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
 
         tv_ticks = split_scale_dict["lin_tvticks"] + split_scale_dict["log_tvticks"]       
         
-        widths = [4,4,4,4,.5]
+        widths = [4,4,.5]
         heights = [0.15,4,4,4,4] # have extra row up top so there is space for the title
         
-        fig = plt.figure(constrained_layout=True, figsize=(35,30))
+        fig = plt.figure(constrained_layout=True, figsize=(20,30))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
         
         imshow_plot(fig.add_subplot(gs[1,0]),all_p_r_p_rv,y_label="$v_r/v_{200m}$",text="All Particles",title="Current Snapshot",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D1",kwargs=plot_kwargs)
         imshow_plot(fig.add_subplot(gs[1,1]),all_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="D2",kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[1,2]),all_p_rv_p_tv,hide_xtick_labels=True,hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D3",kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[1,3]),all_c_r_c_rv,y_label="$v_r/v_{200m}$",title="Past Snapshot",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D4",kwargs=plot_kwargs)
+        # imshow_plot(fig.add_subplot(gs[1,2]),all_p_rv_p_tv,hide_xtick_labels=True,hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D3",kwargs=plot_kwargs)
+        # imshow_plot(fig.add_subplot(gs[1,3]),all_c_r_c_rv,y_label="$v_r/v_{200m}$",title="Past Snapshot",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D4",kwargs=plot_kwargs)
         
         imshow_plot(fig.add_subplot(gs[2,0]),inf_p_r_p_rv,y_label="$v_r/v_{200m}$",text="Infalling Particles",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D5",kwargs=plot_kwargs)
         imshow_plot(fig.add_subplot(gs[2,1]),inf_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="D6",kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[2,2]),inf_p_rv_p_tv,hide_xtick_labels=True,hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D7",kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[2,3]),inf_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D8",kwargs=plot_kwargs)
+        # imshow_plot(fig.add_subplot(gs[2,2]),inf_p_rv_p_tv,hide_xtick_labels=True,hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D7",kwargs=plot_kwargs)
+        # imshow_plot(fig.add_subplot(gs[2,3]),inf_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D8",kwargs=plot_kwargs)
                     
         imshow_plot(fig.add_subplot(gs[3,0]),orb_p_r_p_rv,y_label="$v_r/v_{200m}$",text="Orbiting Particles",hide_xtick_labels=True,yticks=rv_ticks,ylinthrsh=linthrsh,number="D9",kwargs=plot_kwargs)
         imshow_plot(fig.add_subplot(gs[3,1]),orb_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xtick_labels=True,yticks=tv_ticks,ylinthrsh=linthrsh,number="D10",kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[3,2]),orb_p_rv_p_tv,hide_ytick_labels=True,hide_xtick_labels=True,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D11",kwargs=plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[3,3]),orb_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xtick_labels=True,yticks=rv_ticks,ylinthrsh=linthrsh,number="D12",kwargs=plot_kwargs)
+        # imshow_plot(fig.add_subplot(gs[3,2]),orb_p_rv_p_tv,hide_ytick_labels=True,hide_xtick_labels=True,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D11",kwargs=plot_kwargs)
+        # imshow_plot(fig.add_subplot(gs[3,3]),orb_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xtick_labels=True,yticks=rv_ticks,ylinthrsh=linthrsh,number="D12",kwargs=plot_kwargs)
 
         imshow_plot(fig.add_subplot(gs[4,0]),hist_frac_p_r_p_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text=r"$N_{infalling} / N_{orbiting}$", xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D13",kwargs=frac_plot_kwargs)
         imshow_plot(fig.add_subplot(gs[4,1]),hist_frac_p_r_p_tv,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="D14",kwargs=frac_plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[4,2]),hist_frac_p_rv_p_tv,x_label="$v_r/V_{200m}$",hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D15",kwargs=frac_plot_kwargs)
-        imshow_plot(fig.add_subplot(gs[4,3]),hist_frac_c_r_c_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D16",kwargs=frac_plot_kwargs)
+        # imshow_plot(fig.add_subplot(gs[4,2]),hist_frac_p_rv_p_tv,x_label="$v_r/V_{200m}$",hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D15",kwargs=frac_plot_kwargs)
+        # imshow_plot(fig.add_subplot(gs[4,3]),hist_frac_c_r_c_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D16",kwargs=frac_plot_kwargs)
     
         
         color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=scale_min_ptl, vmax=max_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[1:-1,-1]))
@@ -668,9 +668,9 @@ def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,save_loc,search_rad=0,tit
         search_circle_1 = Circle((0,0),radius=search_rad*halo_r200m,edgecolor="yellow",facecolor='none',linestyle="--",fill=False,label="Search radius: 4R200m")
         search_circle_2 = Circle((0,0),radius=search_rad*halo_r200m,edgecolor="yellow",facecolor='none',linestyle="--",fill=False,label="Search radius: 4R200m")
     
-    r200m_circle_0 = Circle((0,0),radius=halo_r200m,edgecolor="white",facecolor='none',linestyle="--",fill=False,label="R200m")
-    r200m_circle_1 = Circle((0,0),radius=halo_r200m,edgecolor="white",facecolor='none',linestyle="--",fill=False,label="R200m")
-    r200m_circle_2 = Circle((0,0),radius=halo_r200m,edgecolor="white",facecolor='none',linestyle="--",fill=False,label="R200m")
+    r200m_circle_0 = Circle((0,0),radius=halo_r200m,edgecolor="white",facecolor='none',linestyle="--",linewidth=4,fill=False,label="R200m")
+    r200m_circle_1 = Circle((0,0),radius=halo_r200m,edgecolor="white",facecolor='none',linestyle="--",linewidth=4,fill=False,label="R200m")
+    r200m_circle_2 = Circle((0,0),radius=halo_r200m,edgecolor="white",facecolor='none',linestyle="--",linewidth=4,fill=False,label="R200m")
             
     axisfontsize = 22
     titlefontsize = 24
@@ -685,23 +685,23 @@ def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,save_loc,search_rad=0,tit
     ax[0].set_xlabel(r"$x [h^{-1}kpc]$",fontsize=axisfontsize)
     ax[0].set_ylabel(r"$y [h^{-1}kpc]$",fontsize=axisfontsize)
     ax[0].set_title("All Particles",fontsize=titlefontsize)
-    ax[0].tick_params(axis='x', which='major', labelsize=tickfontsize)
-    ax[0].tick_params(axis='y', which='major', labelsize=tickfontsize)
+    ax[0].tick_params(axis='x', which='major', labelsize=tickfontsize, direction="in", colors="white",labelcolor="black",length=6,width=3)
+    ax[0].tick_params(axis='y', which='major', labelsize=tickfontsize, direction="in", colors="white",labelcolor="black",length=6,width=3)
     
     ax[1].hist2d(ptl_pos[np.where(labels==1)[0],0],ptl_pos[np.where(labels==1)[0],1],bins=nbins,vmax=max_ptl,range=[[-xlim,xlim],[-ylim,ylim]],norm="log",cmap=cividis_cmap)
     ax[1].add_patch(r200m_circle_1)
     ax[1].set_xlabel(r"$x [h^{-1}kpc]$",fontsize=axisfontsize)
     ax[1].set_title("Orbiting Particles",fontsize=titlefontsize)
-    ax[1].tick_params(axis='x', which='major', labelsize=tickfontsize)
-    ax[1].tick_params(axis='y', which='both',left=False,labelleft=False)
+    ax[1].tick_params(axis='x', which='major', labelsize=tickfontsize, direction="in", colors="white",labelcolor="black",length=6,width=3)
+    ax[1].tick_params(axis='y', which='both',left=False,labelleft=False, direction="in", colors="white",labelcolor="black",length=6,width=3)
     # ax[1].legend(fontsize=legendfontsize)
     
     ax[2].hist2d(ptl_pos[np.where(labels==0)[0],0],ptl_pos[np.where(labels==0)[0],1],bins=nbins,vmax=max_ptl,range=[[-xlim,xlim],[-ylim,ylim]],norm="log",cmap=cividis_cmap)
     ax[2].add_patch(r200m_circle_2)
     ax[2].set_xlabel(r"$x [h^{-1}kpc]$",fontsize=axisfontsize)
     ax[2].set_title("Infalling Particles",fontsize=titlefontsize)
-    ax[2].tick_params(axis='x', which='major', labelsize=tickfontsize)
-    ax[2].tick_params(axis='y', which='both',left=False,labelleft=False)
+    ax[2].tick_params(axis='x', which='major', labelsize=tickfontsize, direction="in", colors="white",labelcolor="black",length=6,width=3)
+    ax[2].tick_params(axis='y', which='both',left=False,labelleft=False, direction="in", colors="white",labelcolor="black",length=6,width=3)
     # ax[2].legend(fontsize=legendfontsize)
     
     if search_rad > 0:
