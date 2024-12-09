@@ -1,20 +1,121 @@
-# MLOIS or Machine Learning the Orbit Infall Split
+# Current State as of 05//2024
 
-This is a project with Dr. Benedikt Diemer that will use data from the nbody simulations run by Dr. Diemer and then processed with SPARTA [1][2][3]. The goal is to construct and compare several machine learning models in order to develop one that can accurately predict if a particle is either currently orbiting a dark matter halo or is infalling into one. This will be used to help better define the radius of a dark matter halo.
+## Data Requirements
+You need the particle data from a GADGET simulation and the .hdf5 output file from SPARTA. We used the Erebos suite of simulations for our work.
 
-## Current State as of 05//2024
-### Dataset Creation
-This code can be run with only the config.init file and the exec.py file (this differs for on Zaratan with implementation upcoming since jobs are submitted separately with different requirements). Within the config.ini you choose which output from SPARTA you want to analyize and then various parameters related to this analysis. This is what calc_ptl_props.py and create_train_dataset.py is based off of. calc_ptl_props.py goes through all the host halos from SPARTA and searches around their center and finds all the particles within a certain radius. For each of these particles their radius, radial velocity, and tangential velocity relative to the halo are determined. For all particles they are then assigned a classification of infalling versus orbiting based on SPARTA's pericenter determination. This process is then repeated for a secondary snap and compiled into an .hdf5 file for all host halos. This output is then used by create_train_dataset.py to organize it into a form easily used by the ML model.
+## Python Dependencies
+- I make use of a customized shap fork that is also publicly available. This is done to just allow for ease of adjusting different fontsizes as well as adjusting certain features in the plots that I want hidden or not. This should only impact code run in make_shap_plots.py. 
+- https://docs.rapids.ai/install/ 
+- Use the requirements.txt
+- pygadgetreader: https://github.com/jveitchmichaelis/pygadgetreader
+- SPARTA: https://bdiemer.bitbucket.io/sparta/ 
 
-### XGBoost Training
-We make use of XGBoost [5] as our ML model. Currently, not all parameters are available to be tuned in config.ini but for general purposes all capabilities are there. You train the model on the dataset created before and various plots are created for the analysis of the models performance and are outputted under that model's folder in xgboost_results/. You then can adjust the curr_sparta_file parameter to test the model on another dataset (that you have created).
+## Running the code
 
-## Dependencies
-I make use of a customized shap fork that is also publicly available. This is done to just allow for ease of adjusting different fontsizes as well as adjusting certain features in the plots that I want hidden or not. This should only impact code run in make_shap_plots.py. 
+### The config file
+This is the heart of the code and (most) parameters that you would want to adjust are present here.
+
+#### Paths
+
+- path_to_MLOIS: the path to this code
+- path_to_pickle: the path to where pickled data is stored to enable faster runs after the inital one
+- path_to_calc_info: where the outputs of calc_ptl_props.py go
+- path_to_xgboost: where the outputs of the XGBoost model training and testing goes
+- path_to_pygadgetreader: where you installed pygadgetreader
+- path_to_sparta: where you installed sparta
+- path_to_snaps: where the particle data is stored
+- path_to_SPARTA_data: where the SPARTA output file is stored
+
+#### MISC
+- curr_sparta_file: The full name of the SPARTA output file that is being used. Format should be [simulation type used (ex cbol)]_l[size of sim]_n[number of particles]_[search radius multiple]R200m_[mutiple of V200m SPARTA cutoff]v200m
+- snap_dir_format: what format the particle data snapshot directories are saved as. Ones I used are either {:04d} or {:03d}
+- snap_format: Same as above but for the individial snapshot files
+- random_seed: Seed used for random elements of the code
+- on_zaratan: If running on zaratan runs things differently but this is very dependent on machine and subject to change
+- use_gpu: Whether GPUs should be used for XGBoost stuff
+- sim_cosmol: what cosmology should be used. This is used to set colossus cosmology and so anything default in there or planck13_nbody is accepted
+
+#### SEARCH
+- reset: SET LEVELS for calc_ptl_props.py (no impact on train_xgboost.py) **0**: no reset will just run from the beginning or continue from where the .last run left off. **1**: Removes the calculated information (ptl_info and halo_info) and redoes all the calculations. **2**: Same as 1 and removes the the particle trees and the number of particles per halo. **3**: Same as 2 and removes all pickled data about the halos and particles from SPARTA/the simulation
+- prim_only: Whether to only use the primary snapshot or to also calculate the past snapshot
+- t_dyn_step: How many dynamical time steps ago the past shot should be
+- p_red_shift: Finds the closest snapshot to this redshift for the primary snapshot
+- search_rad: How far from each halo (in multiples of R200m) to search for particles
+- total_num_snaps: How many snapshots of simulation data are there
+- num_save_ptl_params: How many things are being saved about the particles shouldn't be adjusted unless you've made changes to calc_ptl_props.py. If for calc_ptl_props 7: halo_first, halo_n, HPIDS, Orbit/Infall, Radius, Rad Vel, Tang Vel. If for morb_cat 6: Halo_ID, Halo_pos, Halo_vel, M_orb, M200m, R200m
+- hdf5_mem_size: How big each output hdf5 file should be
+- chunk_size: Chunk size for multiprocessing
+
+#### XGBOOST
+- retrain: RETRAIN LEVELS for train_xgboost.py. **0**: no retraining will just predict with current model (if there is one otherwise will train a new one) on test dataset. **1**: will retrain model but use old parameters (if they exist). **2**: will retrain model with new parameters
+- feature_columns: Which features should be included for XGBoost
+- target_column: Which features should be the target column
+- file_lim: How many files per simulation should be used in training
+- model_sims: Which simulations should be used in the model training
+- test_halos_ratio: What percentage of halos should be used for testing as a decimal
+- test_sims: Which simulations should be tested on 
+- model_type: Name of model 
+- eval_datasets: Whether to evaluate on the Training, Testing, or Full dataset
+
+#### TRAIN DATASET ADJUSTMENT PARAMS
+For each adjustment set any (or all) of the params to 0 for these adjustments to not be performed
+
+The following two parameters adjust the number of particles used in the training. This is done by dividing the radii into log bins, setting a maximum particle
+number based off the total number of particles within a radii and then limiting every following bin to that maximum number of particles.
+ 
+- reduce_rad: takes any radius (>0) and will set the amount of particles within that radii as the maximum number of particles per following radius bin
+- reduce_perc: takes a decimal and will scale the maximum amount 
+
+
+You can also determine a radius after which orbiting particles will start to be weighted less on an exponential curve (less important the further out). Weighting is of form: weights = e^((ln(min_weight)/(max_rad-weight_rad)) * (rad - weight_rad))
+- weight_rad: determines the radius at which this weighting starts (all particles with smaller radii have weights of 1)
+- min_weight: determines the lowest weight at the furthest radius.
+- weight_exp: Exponent value for weighting if needed in that equation
+
+
+Perform hyperparameter tuning on the weighting of the dataset. Overwrites the weight_rad/min_weight parameter
+- opt_wghts: Optimize weights
+- opt_scale_rad: Optimize scaling down of dataset
+
+
+- nu_splits: Splits in the form of [low level 1]-[high level 1], [low level N]-[high level N] for which mass ranges are used for training
+- plt_nu_splits: Splits in the form of [low level 1]-[high level 1], [low level N]-[high level N] for which mass ranges are used for pltoting density profiles
+
+- hpo: Perform hyperparameter optimization. NOTE: Mark as TRUE even if the hpo model has already been trained
+- hpo_loss: Options are: all: accuracy on all particles, orb: accuracy on only orbiting particles, inf: accuracy on only infalling particles (not recommended all does basically the same), mprf_all: accuracy on infalling + orbiting mass profiles, mprf_orb: accuracy on only orbiting mass profile
+- training_rad: the radius that the training dataset will be created up to. Note: the testing dataset will use all data
+- rad_splits: not implemented now
+- frac_train_data: What fraction of training data to use. Similar to file_lim and probably worse
+
+
+- dens_prf_plt: Make density profile plots
+- fulldist_plt: Make full particle distribution plots
+- misclass_plt: Make misclassication plots
+- io_frac_plt: Make infalling/orbiting fraction plot
+- per_err_plt: Make percent error plot
+
+
+- linthrsh: For the missclass and fulldist plots where both linear and log scales are used can set the threshold for linear (from -thrsh to thrsh) and then the number of linear bins and log bins
+- lin_nbin: Number of linear bins (if any)
+- log_nbin: Number of log bins (if any). NOTE: THIS SHOULD BE DIVISIBLE BY 2 IF THERE ARE NEG and POS LOG BINS
+
+List the ticks that will be displayed. The location for imshow plots is automatically calculated. Radial velocity (rv) ticks are mirrored for negative values. Leave blank if using auto generated ticks
+- lin_rvticks: linear radial velocity
+- log_rvticks: log radial velocity
+- lin_tvticks: linear tangential velocity
+- log_tvticks: log tangential velocity
+- lin_rticks: linear radius
+- log_rticks: log radius
+
+### The Code itself
+#### calc_ptl_props.py
+This is the code that takes the simulation particle data and the SPARTA HDF5 output and turns that into the dataset that will be used for training and testing of the XGBoost model.
+
+#### train_xgboost.py
+This trains the XGBoost model based off config parameters and requires calc_ptl_props.py to have been run before to generate the datasets needed. This outputs the trained XGBoost model as well as a config file and a readable dictionary that contains information about the parameters and the misclassification rates
+
+#### test_xgboost.py
+This tests the model on the dataset you decide in the config by making the plots you choose in the config and outputs them under the model and then under the tested dataset 
 
 ## Citations
-[1] Diemer, B. (2017). The splashback radius of halos from particle dynamics. i. the Sparta algorithm. The Astrophysical Journal Supplement Series, 231(1), 5. https://doi.org/10.3847/1538-4365/aa799c 
-[2] Diemer, B. (2020). The splashback radius of halos from particle dynamics. III. halo catalogs, merger trees, and host–subhalo relations. The Astrophysical Journal Supplement Series, 251(2), 17. https://doi.org/10.3847/1538-4365/abbf51 
-[3] Diemer, B. (2022). A dynamics-based density profile for dark haloes – I. Algorithm and basic results. Monthly Notices of the Royal Astronomical Society, 513(1), 573–594. https://doi.org/10.1093/mnras/stac878 
-[4] Thompson R., 2014, pyGadgetReader: GADGET snapshot reader for python (ascl:1411.001)
-[5] Chen, T., Guestrin, C. (2016). XGBoost. Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining. https://doi.org/10.1145/2939672.2939785 
+
