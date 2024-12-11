@@ -208,19 +208,19 @@ if __name__ == '__main__':
         no_sec_explnr, no_sec_shap, no_sec_X = shap_with_filter(explainer,X_df,y_df,preds,fltr_dic=no_second_dict,col_names=new_columns,max_size=5000)
         
     with timed("Make SHAP plots"):
-        fig = plt.figure(constrained_layout=True,figsize=(15,10))
+        fig = plt.figure(constrained_layout=True,figsize=(6,4))
         ax = fig.add_subplot()
         plt.sca(ax)
         ax_all_ptl = shap.plots.beeswarm(all_ptl_explnr,plot_size=(20,10),show=False,order=order)
-        ax.set_title("Sample of All Particles",fontsize=32)
+        ax.set_title("Sample of All Particles",fontsize=28)
         fig.savefig(plot_loc + "all_ptl_beeswarm.png")
         print("finished all ptl")
         
-        fig = plt.figure(constrained_layout=True,figsize=(15,10))
+        fig = plt.figure(constrained_layout=True,figsize=(6,4))
         ax = fig.add_subplot()
         plt.sca(ax)
         ax_all_ptl = shap.plots.beeswarm(no_sec_explnr,plot_size=(20,10),show=False,order=order)
-        ax.set_title("Sample of Particles with no Past Snapshot",fontsize=32)
+        ax.set_title("Sample of Particles with no Past Snapshot",fontsize=28)
         fig.savefig(plot_loc + "no_secondary_beeswarm.png")
         print("finished no secondary")
          
