@@ -61,7 +61,7 @@ def gen_ticks(bin_edges,spacing=6):
     return tick_loc, ticks
 
 # TODO add a configuration dictionary that can be passed instead
-def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xtick_labels=False, hide_ytick_labels=False, xticks = None,yticks = None,xtick_color="white",ytick_color="white",xlinthrsh = None, ylinthrsh = None, xlim=None,ylim=None, axisfontsize=22, number = None, return_img=False, kwargs=None):
+def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xtick_labels=False, hide_ytick_labels=False, xticks = None,yticks = None,xtick_color="white",ytick_color="white",xlinthrsh = None, ylinthrsh = None, xlim=None,ylim=None, axisfontsize=26, number = None, return_img=False, kwargs=None):
     if kwargs is None:
         kwargs = {}
     
@@ -113,7 +113,7 @@ def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xtick_l
     if number is not None:
         ax.text(0.02,0.93,number,ha="left",va="bottom",transform=ax.transAxes,fontsize=axisfontsize,bbox={"facecolor":'white',"alpha":0.9,})
     if title != "":
-        ax.set_title(title,fontsize=24)
+        ax.set_title(title,fontsize=28)
     if x_label != "":
         ax.set_xlabel(x_label,fontsize=axisfontsize)
     if y_label != "":
@@ -256,10 +256,10 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         orb_p_rv_p_tv = histogram(orb_p_rv,orb_p_tv,use_bins=[all_p_rv_p_tv["x_edge"],all_p_rv_p_tv["y_edge"]],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
         orb_c_r_c_rv = histogram(orb_c_r,orb_c_rv,use_bins=[all_p_r_p_rv["x_edge"],all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
         
-        hist_frac_p_r_p_rv = scale_hists(inf_p_r_p_rv, orb_p_r_p_rv)
-        hist_frac_p_r_p_tv = scale_hists(inf_p_r_p_tv, orb_p_r_p_tv)
-        hist_frac_p_rv_p_tv = scale_hists(inf_p_rv_p_tv, orb_p_rv_p_tv)
-        hist_frac_c_r_c_rv = scale_hists(inf_c_r_c_rv, orb_c_r_c_rv)
+        hist_frac_p_r_p_rv = scale_hists(inf_p_r_p_rv, orb_p_r_p_rv, make_adj=False)
+        hist_frac_p_r_p_tv = scale_hists(inf_p_r_p_tv, orb_p_r_p_tv, make_adj=False)
+        hist_frac_p_rv_p_tv = scale_hists(inf_p_rv_p_tv, orb_p_rv_p_tv, make_adj=False)
+        hist_frac_c_r_c_rv = scale_hists(inf_c_r_c_rv, orb_c_r_c_rv, make_adj=False)
         
         hist_frac_p_r_p_rv["hist"] = np.log10(hist_frac_p_r_p_rv["hist"])
         hist_frac_p_r_p_tv["hist"] = np.log10(hist_frac_p_r_p_tv["hist"])
@@ -324,10 +324,10 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
 
         tv_ticks = split_scale_dict["lin_tvticks"] + split_scale_dict["log_tvticks"]       
         
-        widths = [4,4,.5]
+        widths = [4,4,4,4,.5]
         heights = [0.15,4,4,4,4] # have extra row up top so there is space for the title
         
-        fig = plt.figure(constrained_layout=True, figsize=(7,16))
+        fig = plt.figure(constrained_layout=True, figsize=(28,22))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
         
         imshow_plot(fig.add_subplot(gs[1,0]),all_p_r_p_rv,y_label="$v_r/v_{200m}$",text="All Particles",title="Current Snapshot",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D1",kwargs=plot_kwargs)
@@ -352,14 +352,14 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
     
         
         color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=scale_min_ptl, vmax=max_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[1:-1,-1]))
-        color_bar.set_label(r"$dN N^{-1} dx^{-1} dy^{-1}$",fontsize=22)
-        color_bar.ax.tick_params(which="major",direction="in",labelsize=18,length=10,width=3)
-        color_bar.ax.tick_params(which="minor",direction="in",labelsize=18,length=5,width=1.5)
+        color_bar.set_label(r"$dN N^{-1} dx^{-1} dy^{-1}$",fontsize=18)
+        color_bar.ax.tick_params(which="major",direction="in",labelsize=14,length=5,width=3)
+        color_bar.ax.tick_params(which="minor",direction="in",labelsize=14,length=2.5,width=1.5)
         
-        color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_frac_ptl, vmax=max_frac_ptl),cmap=rdbu_cmap), cax=plt.subplot(gs[-1,-1]))
-        color_bar.set_label(r"$\log_{10}{N_{inf}/N_{orb}}$",fontsize=22)
-        color_bar.ax.tick_params(which="major",direction="in",labelsize=18,length=10,width=3)
-        color_bar.ax.tick_params(which="minor",direction="in",labelsize=18,length=5,width=1.5)
+        color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(vmin=min_frac_ptl, vmax=max_frac_ptl),cmap=rdbu_cmap), cax=plt.subplot(gs[-1,-1]))
+        color_bar.set_label(r"$\log_{10}{N_{inf}/N_{orb}}$",fontsize=18)
+        color_bar.ax.tick_params(which="major",direction="in",labelsize=14,length=5,width=3)
+        color_bar.ax.tick_params(which="minor",direction="in",labelsize=14,length=2.5,width=1.5)
             
         fig.savefig(save_loc + "ptl_distr.png")
         plt.close()
@@ -508,7 +508,7 @@ def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv,
         widths = [4,4,4,4,.5]
         heights = [0.12,4,4,4]
         
-        fig = plt.figure(constrained_layout=True,figsize=(7,12))
+        fig = plt.figure(constrained_layout=True,figsize=(28,16))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
 
         imshow_plot(fig.add_subplot(gs[1,0]),scale_inc_all_p_r_p_rv,y_label="$v_r/v_{200m}$",hide_xtick_labels=True,text="All Misclassified",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="S1",kwargs=scale_miss_class_args, title="Current Snapshot")
@@ -537,12 +537,11 @@ def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv,
 def plot_perr_err():
     return
 
-def plot_log_vel(phys_vel,radii,labels,save_loc,add_line=[None,None],show_v200m=False,v200m=1.5):
+def plot_log_vel(log_phys_vel,radii,labels,save_loc,add_line=[None,None],show_v200m=False,v200m=1.5):
     if v200m == -1:
         title = "no_cut"
     else:
         title = str(v200m) + "v200m"
-    log_phys_vel = np.log10(phys_vel)
     
     orb_loc = np.where(labels == 1)[0]
     inf_loc = np.where(labels == 0)[0]
@@ -675,19 +674,19 @@ def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,save_loc,search_rad=0,tit
         search_circle_1 = Circle((0,0),radius=search_rad*halo_r200m,edgecolor="yellow",facecolor='none',linestyle="--",fill=False,label="Search radius: 4R200m")
         search_circle_2 = Circle((0,0),radius=search_rad*halo_r200m,edgecolor="yellow",facecolor='none',linestyle="--",fill=False,label="Search radius: 4R200m")
     
-    r200m_circle_0 = Circle((0,0),radius=halo_r200m,edgecolor="white",facecolor='none',linestyle="--",linewidth=4,fill=False,label="R200m")
-    r200m_circle_1 = Circle((0,0),radius=halo_r200m,edgecolor="white",facecolor='none',linestyle="--",linewidth=4,fill=False,label="R200m")
-    r200m_circle_2 = Circle((0,0),radius=halo_r200m,edgecolor="white",facecolor='none',linestyle="--",linewidth=4,fill=False,label="R200m")
+    r200m_circle_0 = Circle((0,0),radius=halo_r200m,edgecolor="white",facecolor='none',linestyle="--",linewidth=1,fill=False,label="R200m")
+    r200m_circle_1 = Circle((0,0),radius=halo_r200m,edgecolor="white",facecolor='none',linestyle="--",linewidth=1,fill=False,label="R200m")
+    r200m_circle_2 = Circle((0,0),radius=halo_r200m,edgecolor="white",facecolor='none',linestyle="--",linewidth=1,fill=False,label="R200m")
             
-    axisfontsize = 20
-    titlefontsize = 22
-    legendfontsize = 16
-    tickfontsize = 14
+    axisfontsize = 10
+    titlefontsize = 12
+    legendfontsize = 8
+    tickfontsize = 8
     
     widths = [4,4,4,.5]
     heights = [0.12]
     
-    fig = plt.figure(constrained_layout=True,figsize=(6,2))
+    fig = plt.figure(constrained_layout=True,figsize=(12,4))
     gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
     
     all_ax = fig.add_subplot(gs[0])
@@ -699,16 +698,16 @@ def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,save_loc,search_rad=0,tit
     all_ax.set_xlabel(r"$x [h^{-1}kpc]$",fontsize=axisfontsize)
     all_ax.set_ylabel(r"$y [h^{-1}kpc]$",fontsize=axisfontsize)
     all_ax.set_title("All Particles",fontsize=titlefontsize)
-    all_ax.tick_params(axis='x', which='major', labelsize=tickfontsize, direction="in", colors="white",labelcolor="black",length=6,width=3)
-    all_ax.tick_params(axis='y', which='major', labelsize=tickfontsize, direction="in", colors="white",labelcolor="black",length=6,width=3)
+    all_ax.tick_params(axis='x', which='major', labelsize=tickfontsize, direction="in", colors="white",labelcolor="black",length=3,width=1.5)
+    all_ax.tick_params(axis='y', which='major', labelsize=tickfontsize, direction="in", colors="white",labelcolor="black",length=3,width=1.5)
     all_ax.set_aspect('equal')
     
     orb_ax.hist2d(ptl_pos[np.where(labels==1)[0],0],ptl_pos[np.where(labels==1)[0],1],bins=nbins,vmax=max_ptl,range=[[-xlim,xlim],[-ylim,ylim]],norm="log",cmap=cividis_cmap)
     orb_ax.add_patch(r200m_circle_1)
     orb_ax.set_xlabel(r"$x [h^{-1}kpc]$",fontsize=axisfontsize)
     orb_ax.set_title("Orbiting Particles",fontsize=titlefontsize)
-    orb_ax.tick_params(axis='x', which='major', labelsize=tickfontsize, direction="in", colors="white",labelcolor="black",length=6,width=3)
-    orb_ax.tick_params(axis='y', which='both',left=False,labelleft=False, direction="in", colors="white",labelcolor="black",length=6,width=3)
+    orb_ax.tick_params(axis='x', which='major', labelsize=tickfontsize, direction="in", colors="white",labelcolor="black",length=3,width=1.5)
+    orb_ax.tick_params(axis='y', which='both',left=False,labelleft=False, direction="in", colors="white",labelcolor="black",length=3,width=1.5)
     # ax[1].legend(fontsize=legendfontsize)
     orb_ax.set_aspect('equal')
 
@@ -716,21 +715,21 @@ def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,save_loc,search_rad=0,tit
     inf_ax.add_patch(r200m_circle_2)
     inf_ax.set_xlabel(r"$x [h^{-1}kpc]$",fontsize=axisfontsize)
     inf_ax.set_title("Infalling Particles",fontsize=titlefontsize)
-    inf_ax.tick_params(axis='x', which='major', labelsize=tickfontsize, direction="in", colors="white",labelcolor="black",length=6,width=3)
-    inf_ax.tick_params(axis='y', which='both',left=False,labelleft=False, direction="in", colors="white",labelcolor="black",length=6,width=3)
+    inf_ax.tick_params(axis='x', which='major', labelsize=tickfontsize, direction="in", colors="white",labelcolor="black",length=3,width=1.5)
+    inf_ax.tick_params(axis='y', which='both',left=False,labelleft=False, direction="in", colors="white",labelcolor="black",length=3,width=1.5)
     # ax[2].legend(fontsize=legendfontsize)
     inf_ax.set_aspect('equal')
     
     if search_rad > 0:
-        ax[0].add_patch(search_circle_0)
-        ax[1].add_patch(search_circle_1)
-        ax[2].add_patch(search_circle_2) 
+        all_ax.add_patch(search_circle_0)
+        orb_ax.add_patch(search_circle_1)
+        inf_ax.add_patch(search_circle_2) 
     
     all_ax.legend(fontsize=legendfontsize)
-    color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl, cmap=cividis_cmap)), cax=plt.subplot(gs[-1]))
-    color_bar.set_label(r"$N_{ptl}$",fontsize=20)
-    color_bar.ax.tick_params(which="major",direction="in",labelsize=18,length=10,width=3)
-    color_bar.ax.tick_params(which="minor",direction="in",labelsize=18,length=5,width=1.5)
+    color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl), cmap=cividis_cmap), cax=plt.subplot(gs[-1]))
+    color_bar.set_label(r"$N_{ptl}$",fontsize=10)
+    color_bar.ax.tick_params(which="major",direction="in",labelsize=8,length=5,width=1.5)
+    color_bar.ax.tick_params(which="minor",direction="in",labelsize=8,length=2.5,width=0.75)
     
     fig.savefig(save_loc+title+"halo_dist.png")
 

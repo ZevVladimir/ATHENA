@@ -87,7 +87,7 @@ ptls_pid, ptls_vel, ptls_pos = load_or_pickle_ptl_data(curr_sparta_file, str(p_s
 
 random.seed(365)
 used_numbers = set()
-while len(used_numbers) < 10:
+while len(used_numbers) < 25:
     with timed("Halo Slice Plot"):
         num = random.randint(0, all_idxs.shape[0])
         if num not in used_numbers:
