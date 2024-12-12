@@ -61,7 +61,9 @@ def gen_ticks(bin_edges,spacing=6):
     return tick_loc, ticks
 
 # TODO add a configuration dictionary that can be passed instead
-def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xtick_labels=False, hide_ytick_labels=False, xticks = None,yticks = None,xtick_color="white",ytick_color="white",xlinthrsh = None, ylinthrsh = None, xlim=None,ylim=None, axisfontsize=26, number = None, return_img=False, kwargs=None):
+def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xtick_labels=False, hide_ytick_labels=False,\
+    xticks = None,yticks = None,xtick_color="white",ytick_color="white",xlinthrsh = None, ylinthrsh = None, xlim=None,ylim=None,\
+        axisfontsize=28, number = None, return_img=False, kwargs=None):
     if kwargs is None:
         kwargs = {}
     
@@ -109,11 +111,11 @@ def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xtick_l
             ax.axvline(x=x_zero_loc, color='#e6e6fa', linestyle='-.', alpha=1)
 
     if text != "":
-        ax.text(0.01,0.03, text, ha="left", va="bottom", transform=ax.transAxes, fontsize=axisfontsize, bbox={"facecolor":'white',"alpha":0.9,})
+        ax.text(0.01,0.03, text, ha="left", va="bottom", transform=ax.transAxes, fontsize=axisfontsize-2, bbox={"facecolor":'white',"alpha":0.9,})
     if number is not None:
-        ax.text(0.02,0.93,number,ha="left",va="bottom",transform=ax.transAxes,fontsize=axisfontsize,bbox={"facecolor":'white',"alpha":0.9,})
+        ax.text(0.02,0.93,number,ha="left",va="bottom",transform=ax.transAxes,fontsize=axisfontsize-4,bbox={"facecolor":'white',"alpha":0.9,})
     if title != "":
-        ax.set_title(title,fontsize=28)
+        ax.set_title(title,fontsize=axisfontsize+2)
     if x_label != "":
         ax.set_xlabel(x_label,fontsize=axisfontsize)
     if y_label != "":
@@ -220,6 +222,24 @@ def normalize_hists(hist,tot_nptl,min_ptl):
 
     return scaled_hist
 
+def adjust_frac_hist(hist_data, inf_data, orb_data, max_value, min_value):
+    hist = hist_data["hist"]
+    inf_data = inf_data["hist"]
+    orb_data = orb_data["hist"]
+
+    # Create masks
+    both_zero_mask = (inf_data == 0) & (orb_data == 0)
+    only_infalling_mask = (inf_data > 0) & (orb_data == 0)
+    only_orbiting_mask = (inf_data == 0) & (orb_data > 0)
+
+    # Apply adjustments
+    hist[both_zero_mask] = np.nan  # Set to NaN where both are zero
+    hist[only_infalling_mask] = max_value  # Set to max for only infalling
+    hist[only_orbiting_mask] = min_value  # Set to min for only orbiting
+
+    hist_data["hist"] = hist
+    return hist_data
+
 def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_dict, num_bins, save_loc):
     with timed("Full Ptl Dist Plot"):
         
@@ -261,6 +281,11 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         hist_frac_p_rv_p_tv = scale_hists(inf_p_rv_p_tv, orb_p_rv_p_tv, make_adj=False)
         hist_frac_c_r_c_rv = scale_hists(inf_c_r_c_rv, orb_c_r_c_rv, make_adj=False)
         
+        hist_frac_p_r_p_rv["hist"][np.where(hist_frac_p_r_p_rv["hist"] == 0)] = 1e-4
+        hist_frac_p_r_p_tv["hist"][np.where(hist_frac_p_r_p_tv["hist"] == 0)] = 1e-4
+        hist_frac_p_rv_p_tv["hist"][np.where(hist_frac_p_rv_p_tv["hist"] == 0)] = 1e-4
+        hist_frac_c_r_c_rv["hist"][np.where(hist_frac_c_r_c_rv["hist"] == 0)] = 1e-4
+        
         hist_frac_p_r_p_rv["hist"] = np.log10(hist_frac_p_r_p_rv["hist"])
         hist_frac_p_r_p_tv["hist"] = np.log10(hist_frac_p_r_p_tv["hist"])
         hist_frac_p_rv_p_tv["hist"] = np.log10(hist_frac_p_rv_p_tv["hist"])
@@ -268,6 +293,12 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         
         max_frac_ptl = np.max(np.array([np.max(hist_frac_p_r_p_rv["hist"]),np.max(hist_frac_p_r_p_tv["hist"]),np.max(hist_frac_p_rv_p_tv["hist"]),np.max(hist_frac_c_r_c_rv["hist"])]))
         min_frac_ptl = np.min(np.array([np.min(hist_frac_p_r_p_rv["hist"]),np.min(hist_frac_p_r_p_tv["hist"]),np.min(hist_frac_p_rv_p_tv["hist"]),np.min(hist_frac_c_r_c_rv["hist"])]))
+        
+        hist_frac_p_r_p_rv = adjust_frac_hist(hist_frac_p_r_p_rv, inf_p_r_p_rv, orb_p_r_p_rv, max_frac_ptl, min_frac_ptl)
+        hist_frac_p_r_p_tv = adjust_frac_hist(hist_frac_p_r_p_tv, inf_p_r_p_tv, orb_p_r_p_tv, max_frac_ptl, min_frac_ptl)
+        hist_frac_p_rv_p_tv = adjust_frac_hist(hist_frac_p_rv_p_tv, inf_p_rv_p_tv, orb_p_rv_p_tv, max_frac_ptl, min_frac_ptl)
+        hist_frac_c_r_c_rv = adjust_frac_hist(hist_frac_c_r_c_rv, inf_c_r_c_rv, orb_c_r_c_rv, max_frac_ptl, min_frac_ptl)
+        print(hist_frac_p_r_p_rv["x_edge"])
         
         tot_nptl = p_r.shape[0]
         

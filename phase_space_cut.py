@@ -210,17 +210,11 @@ if __name__ == "__main__":
         print(opt_params)
         orb_loc = np.where(labels == 1)[0]
         inf_loc = np.where(labels == 0)[0]
-        print(log_phys_vel)
-        print(radii)
-        print(labels)
-        print(inf_loc)
         
         slope, intercept = opt_params
         line_y = slope * radii + intercept
         line_preds = np.zeros(radii.size) 
         line_preds[log_phys_vel <= line_y] = 1
-        
-        # plot_log_vel(log_phys_vel,radii,labels,plot_loc,add_line=opt_params)
         
         halo_first = halo_df["Halo_first"].values
         halo_n = halo_df["Halo_n"].values
@@ -292,3 +286,4 @@ if __name__ == "__main__":
                 plt_nu_splits.remove(nu_split)
 
         compare_prfs_nu(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title="ps_cut_dens_")
+        plot_log_vel(log_phys_vel,radii,labels,plot_loc,add_line=opt_params)
