@@ -20,7 +20,7 @@ import multiprocessing as mp
 from scipy.optimize import minimize
 
 from utils.ML_support import *
-from utils.update_vis_fxns import plot_log_vel
+from utils.update_vis_fxns import plot_log_vel, compare_prfs_nu
 from utils.data_and_loading_functions import create_directory, timed
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -99,9 +99,8 @@ def find_optimal_params(log_phys_vel, radii, labels):
         line_preds[log_phys_vel <= line_y] = 1
 
         # Calculate misclassifications
-        labels_np = labels["Orbit_infall"].values
-        num_inc_inf = np.where((line_preds == 1) & (labels_np == 0))[0].shape[0]
-        num_inc_orb = np.where((line_preds == 0) & (labels_np == 1))[0].shape[0]
+        num_inc_inf = np.where((line_preds == 1) & (labels == 0))[0].shape[0]
+        num_inc_orb = np.where((line_preds == 0) & (labels == 1))[0].shape[0]
 
         # Total number of misclassified particles
         tot_num_inc = num_inc_orb + num_inc_inf
@@ -180,7 +179,7 @@ if __name__ == "__main__":
         #TODO check that the right sims and datasets are chosen
         print("Testing on:", curr_test_sims)
         for dset_name in eval_datasets:
-            with timed("Model Evaluation on " + dset_name + " dataset"):             
+            with timed("Loading data: " + dset_name + " dataset"):             
                 plot_loc = model_save_loc + dset_name + "_" + test_comb_name + "/plots/"
                 create_directory(plot_loc)
                 
@@ -202,11 +201,94 @@ if __name__ == "__main__":
                 y_df = data[target_column]
                 
        
-        phys_vel = X_df["p_Radial_vel"]**2 + X_df["p_Tangential_vel"]**2
+        phys_vel = np.sqrt(X_df["p_Radial_vel"]**2 + X_df["p_Tangential_vel"]**2)
         log_phys_vel = np.log10(phys_vel)
         log_phys_vel = log_phys_vel.compute()
         radii = X_df["p_Scaled_radii"].compute()
-        labels = y_df.compute()
+        labels = y_df.compute().values.flatten()
         opt_params = find_optimal_params(log_phys_vel,radii,labels)
+        print(opt_params)
+        orb_loc = np.where(labels == 1)[0]
+        inf_loc = np.where(labels == 0)[0]
+        print(log_phys_vel)
+        print(radii)
+        print(labels)
+        print(inf_loc)
         
-        plot_log_vel(log_phys_vel,radii,labels,plot_loc,add_line=opt_params)
+        slope, intercept = opt_params
+        line_y = slope * radii + intercept
+        line_preds = np.zeros(radii.size) 
+        line_preds[log_phys_vel <= line_y] = 1
+        
+        # plot_log_vel(log_phys_vel,radii,labels,plot_loc,add_line=opt_params)
+        
+        halo_first = halo_df["Halo_first"].values
+        halo_n = halo_df["Halo_n"].values
+        all_idxs = halo_df["Halo_indices"].values
+
+        all_z = []
+        all_rhom = []
+        # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
+        sim_splits = np.where(halo_first == 0)[0]
+
+        # if there are multiple simulations, to correctly index the dataset we need to update the starting values for the 
+        # stacked simulations such that they correspond to the larger dataset and not one specific simulation
+        if len(curr_test_sims) > 1:
+            for i,sim in enumerate(curr_test_sims):
+                # The first sim remains the same
+                if i == 0:
+                    continue
+                # Else if it isn't the final sim 
+                elif i < len(curr_test_sims) - 1:
+                    halo_first[sim_splits[i]:sim_splits[i+1]] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
+                # Else if the final sim
+                else:
+                    halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
+        
+        # Get the redshifts for each simulation's primary snapshot
+        for i,sim in enumerate(curr_test_sims):
+            with open(path_to_calc_info + sim + "/config.pickle", "rb") as file:
+                config_dict = pickle.load(file)
+                curr_z = config_dict["p_snap_info"]["red_shift"][()]
+                all_z.append(curr_z)
+                all_rhom.append(cosmol.rho_m(curr_z))
+                h = config_dict["p_snap_info"]["h"][()]
+        
+        tot_num_halos = halo_n.shape[0]
+        min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
+        
+        act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sprta_mass_prf(sim_splits,all_idxs,curr_test_sims)
+        act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
+        
+        calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=X_df["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=line_preds, prf_bins=bins, use_mp=True, all_z=all_z)
+
+        # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
+        small_halo_fltr = np.isnan(calc_r200m)
+        act_mass_prf_all[small_halo_fltr,:] = np.nan
+        act_mass_prf_orb[small_halo_fltr,:] = np.nan
+        act_mass_prf_inf[small_halo_fltr,:] = np.nan
+
+        # Calculate the density by divide the mass of each bin by the volume of that bin's radius
+        calc_dens_prf_all = calculate_density(calc_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+        calc_dens_prf_orb = calculate_density(calc_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+        calc_dens_prf_inf = calculate_density(calc_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+        
+        act_dens_prf_all = calculate_density(act_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+        act_dens_prf_orb = calculate_density(act_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+        act_dens_prf_inf = calculate_density(act_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+
+        all_prf_lst = []
+        orb_prf_lst = []
+        inf_prf_lst = []
+        cpy_plt_nu_splits = plt_nu_splits.copy()
+        for i,nu_split in enumerate(cpy_plt_nu_splits):
+            # Take the second element of the where to filter by the halos (?)
+            fltr = np.where((calc_nus > nu_split[0]) & (calc_nus < nu_split[1]))[0]
+            if fltr.shape[0] > 25:
+                all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
+                orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
+                inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
+            else:
+                plt_nu_splits.remove(nu_split)
+
+        compare_prfs_nu(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title="ps_cut_dens_")
