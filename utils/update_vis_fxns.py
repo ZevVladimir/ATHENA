@@ -341,7 +341,6 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         frac_plot_kwargs = {
                 "vmin":min_frac_ptl,
                 "vmax":max_frac_ptl,
-                "norm":"log",
                 "origin":"lower",
                 "aspect":"auto",
                 "cmap":rdbu_cmap,
