@@ -121,10 +121,10 @@ def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xtick_l
     if y_label != "":
         ax.set_ylabel(y_label,fontsize=axisfontsize)
 
-    ax.tick_params(axis='x', which='major', labelsize=16,colors=xtick_color,labelbottom=not hide_xtick_labels,labelcolor="black",direction="in")
-    ax.tick_params(axis='x', which='minor', labelsize=14,colors=xtick_color,labelbottom=not hide_xtick_labels,labelcolor="black",direction="in")
-    ax.tick_params(axis='y', which='major', labelsize=16,colors=ytick_color,labelleft=not hide_ytick_labels,labelcolor="black",direction="in")
-    ax.tick_params(axis='y', which='minor', labelsize=14,colors=ytick_color,labelleft=not hide_ytick_labels,labelcolor="black",direction="in")
+    ax.tick_params(axis='x', which='major', labelsize=20,colors=xtick_color,labelbottom=not hide_xtick_labels,labelcolor="black",direction="in")
+    ax.tick_params(axis='x', which='minor', labelsize=18,colors=xtick_color,labelbottom=not hide_xtick_labels,labelcolor="black",direction="in")
+    ax.tick_params(axis='y', which='major', labelsize=20,colors=ytick_color,labelleft=not hide_ytick_labels,labelcolor="black",direction="in")
+    ax.tick_params(axis='y', which='minor', labelsize=18,colors=ytick_color,labelleft=not hide_ytick_labels,labelcolor="black",direction="in")
            
     if return_img:
         return ret_img
@@ -382,14 +382,14 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
     
         
         color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=scale_min_ptl, vmax=max_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[1:-1,-1]))
-        color_bar.set_label(r"$dN N^{-1} dx^{-1} dy^{-1}$",fontsize=18)
-        color_bar.ax.tick_params(which="major",direction="in",labelsize=14,length=5,width=3)
-        color_bar.ax.tick_params(which="minor",direction="in",labelsize=14,length=2.5,width=1.5)
+        color_bar.set_label(r"$dN N^{-1} dx^{-1} dy^{-1}$",fontsize=22)
+        color_bar.ax.tick_params(which="major",direction="in",labelsize=18,length=5,width=3)
+        color_bar.ax.tick_params(which="minor",direction="in",labelsize=18,length=2.5,width=1.5)
         
         color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(vmin=min_frac_ptl, vmax=max_frac_ptl),cmap=rdbu_cmap), cax=plt.subplot(gs[-1,-1]))
-        color_bar.set_label(r"$\log_{10}{N_{inf}/N_{orb}}$",fontsize=18)
-        color_bar.ax.tick_params(which="major",direction="in",labelsize=14,length=5,width=3)
-        color_bar.ax.tick_params(which="minor",direction="in",labelsize=14,length=2.5,width=1.5)
+        color_bar.set_label(r"$\log_{10}{N_{inf}/N_{orb}}$",fontsize=22)
+        color_bar.ax.tick_params(which="major",direction="in",labelsize=18,length=5,width=3)
+        color_bar.ax.tick_params(which="minor",direction="in",labelsize=18,length=2.5,width=1.5)
             
         fig.savefig(save_loc + "ptl_distr.png")
         plt.close()
@@ -626,10 +626,10 @@ def plot_log_vel(log_phys_vel,radii,labels,save_loc,add_line=[None,None],show_v2
     ax2 = fig.add_subplot(gs[0,1])
     ax3 = fig.add_subplot(gs[0,2])
     
-    imshow_plot(ax1,all,x_label="$r/R_{200}$",xticks=rticks,yticks=pv_ticks,y_label="$log_{10}(v_{phys}/v_{200m})$",ylim=[-3,2],title="All Particles",xtick_color="white",axisfontsize=22,kwargs=lin_plot_kwargs)
-    imshow_plot(ax2,inf,x_label="$r/R_{200}$",xticks=rticks,hide_ytick_labels=True,ylim=[-3,2],title="Infalling Particles",xtick_color="white",axisfontsize=22,kwargs=lin_plot_kwargs)
-    imshow_plot(ax3,orb,x_label="$r/R_{200}$",xticks=rticks,hide_ytick_labels=True,ylim=[-3,2],title="Orbiting Particles",xtick_color="white",axisfontsize=22,kwargs=lin_plot_kwargs)
-
+    imshow_plot(ax1,all,x_label="$r/R_{200}$",xticks=rticks,yticks=pv_ticks,y_label="$log_{10}(v_{phys}/v_{200m})$",ylim=[-2,2],title="All Particles",xtick_color="white",axisfontsize=28,kwargs=lin_plot_kwargs)
+    imshow_plot(ax2,inf,x_label="$r/R_{200}$",xticks=rticks,hide_ytick_labels=True,ylim=[-2,2],title="Infalling Particles",xtick_color="white",axisfontsize=28,kwargs=lin_plot_kwargs)
+    imshow_plot(ax3,orb,x_label="$r/R_{200}$",xticks=rticks,hide_ytick_labels=True,ylim=[-2,2],title="Orbiting Particles",xtick_color="white",axisfontsize=28,kwargs=lin_plot_kwargs)
+    
     if v200m > 0 and show_v200m:
         ax1.hlines(np.log10(v200m),xmin=r_range[0],xmax=r_range[1],colors="black")
         ax2.hlines(np.log10(v200m),xmin=r_range[0],xmax=r_range[1],colors="black")
@@ -639,11 +639,12 @@ def plot_log_vel(log_phys_vel,radii,labels,save_loc,add_line=[None,None],show_v2
     line_xloc = []
     line_yloc = []
     if add_line[0] is not None:
-        line_xloc.append(get_bin_loc(all["x_edge"],radii.iloc[0]))
-        line_xloc.append(get_bin_loc(all["x_edge"],radii.iloc[-1]))
-        line_yloc.append(get_bin_loc(all["y_edge"],add_line[0] * radii.iloc[0] + add_line[1]))
-        line_yloc.append(get_bin_loc(all["y_edge"],add_line[0] * radii.iloc[-1] + add_line[1]))
-        ax1.plot(line_xloc, line_yloc,color="white",label=f"m={add_line[0]}\nb={add_line[1]}")    
+        line_xloc.append(get_bin_loc(all["x_edge"],radii[0]))
+        line_xloc.append(get_bin_loc(all["x_edge"],radii[-1]))
+        line_yloc.append(get_bin_loc(all["y_edge"],add_line[0] * radii[0] + add_line[1]))
+        line_yloc.append(get_bin_loc(all["y_edge"],add_line[0] * radii[-1] + add_line[1]))
+        line_label = fr"$\log_{{10}}(v_{{\text{{phys}}}} / v_{{200m}}) = {add_line[0]:.2f} r/R_{{200}} + {add_line[1]:.2f}$"
+        ax1.plot(line_xloc, line_yloc,color="white",label = line_label)    
         ax2.plot(line_xloc, line_yloc,color="white")    
         ax3.plot(line_xloc, line_yloc,color="white")    
         
@@ -661,13 +662,11 @@ def plot_log_vel(log_phys_vel,radii,labels,save_loc,add_line=[None,None],show_v2
     line_y = add_line[0] * radii + add_line[1]
     line_preds = np.zeros(radii.size) 
     line_preds[log_phys_vel <= line_y] = 1
-
-    labels_np = labels["Orbit_infall"].values
     
-    num_inc_inf = np.where((line_preds == 1) & (labels_np == 0))[0].shape[0]
-    num_inc_orb = np.where((line_preds == 0) & (labels_np == 1))[0].shape[0]
-    num_inf = np.where(labels_np == 0)[0].shape[0]
-    num_orb = np.where(labels_np == 1)[0].shape[0]
+    num_inc_inf = np.where((line_preds == 1) & (labels == 0))[0].shape[0]
+    num_inc_orb = np.where((line_preds == 0) & (labels == 1))[0].shape[0]
+    num_inf = np.where(labels == 0)[0].shape[0]
+    num_orb = np.where(labels == 1)[0].shape[0]
     tot_num_inc = num_inc_orb + num_inc_inf
     tot_num_ptl = num_orb + num_inf
 

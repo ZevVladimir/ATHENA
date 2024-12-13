@@ -214,15 +214,20 @@ if __name__ == "__main__":
             print(opt_params)
             
         radii = X_df["p_Scaled_radii"].compute()
+        radial_vel = X_df["p_Radial_vel"].compute()
         labels = y_df.compute().values.flatten()
+        log_phys_vel = log_phys_vel.compute()
         
         slope, intercept = opt_params
         line_y = slope * radii + intercept
         line_preds = np.zeros(radii.size)
 
-        line_preds[X_df["p_Radial_vel"].compute() > 0] = 1  # Case 1: p_Radial_vel > 0
-        on_left_side = log_phys_vel < line_y  # Determine particles on the left side of the line
-        line_preds[(X_df["p_Radial_vel"].compute() <= 0) & on_left_side] = 1  # Case 2: Left side and p_Radial_vel <= 0
+        # Orbiting if radial velocity is positive
+        # Also orbiting if negative radial velocity but on the left of the line
+        # Everything else is infalling
+        line_preds[radial_vel > 0] = 1  
+        on_left_side = log_phys_vel < line_y  
+        line_preds[(radial_vel <= 0) & on_left_side] = 1  
         
         
         halo_first = halo_df["Halo_first"].values
