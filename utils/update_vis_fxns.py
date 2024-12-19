@@ -70,6 +70,7 @@ def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xtick_l
     ret_img=ax.imshow(img["hist"].T, interpolation="nearest", **kwargs)
     ax.tick_params(axis="both",which="major",length=8,width=3,direction="in")
     ax.tick_params(axis="both",which="minor",length=6,width=2,direction="in")
+    ax.set_aspect('equal')
     xticks_loc = []
     yticks_loc = []
     
@@ -113,7 +114,7 @@ def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xtick_l
     if text != "":
         ax.text(0.01,0.03, text, ha="left", va="bottom", transform=ax.transAxes, fontsize=axisfontsize-2, bbox={"facecolor":'white',"alpha":0.9,})
     if number is not None:
-        ax.text(0.02,0.93,number,ha="left",va="bottom",transform=ax.transAxes,fontsize=axisfontsize-4,bbox={"facecolor":'white',"alpha":0.9,})
+        ax.text(0.02,0.90,number,ha="left",va="bottom",transform=ax.transAxes,fontsize=axisfontsize-4,bbox={"facecolor":'white',"alpha":0.9,})
     if title != "":
         ax.set_title(title,fontsize=axisfontsize+2)
     if x_label != "":
@@ -121,10 +122,10 @@ def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xtick_l
     if y_label != "":
         ax.set_ylabel(y_label,fontsize=axisfontsize)
 
-    ax.tick_params(axis='x', which='major', labelsize=20,colors=xtick_color,labelbottom=not hide_xtick_labels,labelcolor="black",direction="in")
-    ax.tick_params(axis='x', which='minor', labelsize=18,colors=xtick_color,labelbottom=not hide_xtick_labels,labelcolor="black",direction="in")
-    ax.tick_params(axis='y', which='major', labelsize=20,colors=ytick_color,labelleft=not hide_ytick_labels,labelcolor="black",direction="in")
-    ax.tick_params(axis='y', which='minor', labelsize=18,colors=ytick_color,labelleft=not hide_ytick_labels,labelcolor="black",direction="in")
+    ax.tick_params(axis='x', which='major', labelsize=22,colors=xtick_color,labelbottom=not hide_xtick_labels,labelcolor="black",direction="in")
+    ax.tick_params(axis='x', which='minor', labelsize=20,colors=xtick_color,labelbottom=not hide_xtick_labels,labelcolor="black",direction="in")
+    ax.tick_params(axis='y', which='major', labelsize=22,colors=ytick_color,labelleft=not hide_ytick_labels,labelcolor="black",direction="in")
+    ax.tick_params(axis='y', which='minor', labelsize=22,colors=ytick_color,labelleft=not hide_ytick_labels,labelcolor="black",direction="in")
            
     if return_img:
         return ret_img
@@ -291,14 +292,16 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         hist_frac_p_rv_p_tv["hist"] = np.log10(hist_frac_p_rv_p_tv["hist"])
         hist_frac_c_r_c_rv["hist"] = np.log10(hist_frac_c_r_c_rv["hist"])
         
-        max_frac_ptl = np.max(np.array([np.max(hist_frac_p_r_p_rv["hist"]),np.max(hist_frac_p_r_p_tv["hist"]),np.max(hist_frac_p_rv_p_tv["hist"]),np.max(hist_frac_c_r_c_rv["hist"])]))
-        min_frac_ptl = np.min(np.array([np.min(hist_frac_p_r_p_rv["hist"]),np.min(hist_frac_p_r_p_tv["hist"]),np.min(hist_frac_p_rv_p_tv["hist"]),np.min(hist_frac_c_r_c_rv["hist"])]))
+        # max_frac_ptl = np.max(np.array([np.max(hist_frac_p_r_p_rv["hist"]),np.max(hist_frac_p_r_p_tv["hist"]),np.max(hist_frac_p_rv_p_tv["hist"]),np.max(hist_frac_c_r_c_rv["hist"])]))
+        # min_frac_ptl = np.min(np.array([np.min(hist_frac_p_r_p_rv["hist"]),np.min(hist_frac_p_r_p_tv["hist"]),np.min(hist_frac_p_rv_p_tv["hist"]),np.min(hist_frac_c_r_c_rv["hist"])]))
+        max_frac_ptl = 3.5
+        min_frac_ptl = -3.5
+        
         
         hist_frac_p_r_p_rv = adjust_frac_hist(hist_frac_p_r_p_rv, inf_p_r_p_rv, orb_p_r_p_rv, max_frac_ptl, min_frac_ptl)
         hist_frac_p_r_p_tv = adjust_frac_hist(hist_frac_p_r_p_tv, inf_p_r_p_tv, orb_p_r_p_tv, max_frac_ptl, min_frac_ptl)
         hist_frac_p_rv_p_tv = adjust_frac_hist(hist_frac_p_rv_p_tv, inf_p_rv_p_tv, orb_p_rv_p_tv, max_frac_ptl, min_frac_ptl)
         hist_frac_c_r_c_rv = adjust_frac_hist(hist_frac_c_r_c_rv, inf_c_r_c_rv, orb_c_r_c_rv, max_frac_ptl, min_frac_ptl)
-        print(hist_frac_p_r_p_rv["x_edge"])
         
         tot_nptl = p_r.shape[0]
         
@@ -357,7 +360,7 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         widths = [4,4,4,4,.5]
         heights = [0.15,4,4,4,4] # have extra row up top so there is space for the title
         
-        fig = plt.figure(constrained_layout=True, figsize=(28,22))
+        fig = plt.figure(constrained_layout=True, figsize=(26,22))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
         
         imshow_plot(fig.add_subplot(gs[1,0]),all_p_r_p_rv,y_label="$v_r/v_{200m}$",text="All Particles",title="Current Snapshot",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D1",kwargs=plot_kwargs)
@@ -784,9 +787,9 @@ def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,save_loc,search_rad=0,tit
     min_ptl = 1e-4
     
     if search_rad > 0:
-        search_circle_0 = Circle((0,0),radius=search_rad*halo_r200m,edgecolor="yellow",facecolor='none',linestyle="--",fill=False,label="Search radius: 4R200m")
-        search_circle_1 = Circle((0,0),radius=search_rad*halo_r200m,edgecolor="yellow",facecolor='none',linestyle="--",fill=False,label="Search radius: 4R200m")
-        search_circle_2 = Circle((0,0),radius=search_rad*halo_r200m,edgecolor="yellow",facecolor='none',linestyle="--",fill=False,label="Search radius: 4R200m")
+        search_circle_0 = Circle((0,0),radius=search_rad*halo_r200m,edgecolor="green",facecolor='none',linestyle="--",fill=False,label="Search radius: 4R200m")
+        search_circle_1 = Circle((0,0),radius=search_rad*halo_r200m,edgecolor="green",facecolor='none',linestyle="--",fill=False,label="Search radius: 4R200m")
+        search_circle_2 = Circle((0,0),radius=search_rad*halo_r200m,edgecolor="green",facecolor='none',linestyle="--",fill=False,label="Search radius: 4R200m")
     
     r200m_circle_0 = Circle((0,0),radius=halo_r200m,edgecolor="black",facecolor='none',linestyle="--",linewidth=1,fill=False,label="R200m")
     r200m_circle_1 = Circle((0,0),radius=halo_r200m,edgecolor="black",facecolor='none',linestyle="--",linewidth=1,fill=False,label="R200m")
@@ -845,7 +848,7 @@ def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,save_loc,search_rad=0,tit
     color_bar.ax.tick_params(which="major",direction="in",labelsize=8,length=5,width=1.5)
     color_bar.ax.tick_params(which="minor",direction="in",labelsize=8,length=2.5,width=0.75)
     
-    fig.savefig(save_loc+title+"halo_dist.png")
+    fig.savefig(save_loc+title+"halo_dist.png",dpi=300)
 
     
 
@@ -918,8 +921,12 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
     tick_locs = lin_rticks
     if 0 in lin_rticks:
         tick_locs.remove(0)
+    #TODO remove this and have it so ticks are specific to which plot is being made
+    if 0.1 not in tick_locs:
+        tick_locs.append(0.1)
+        tick_locs = sorted(tick_locs)
     strng_ticks = list(map(str, tick_locs))
-    
+
     ax_1.set_xticks(tick_locs,strng_ticks)  
     ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
     if use_med:
@@ -1075,6 +1082,11 @@ def compare_prfs_nu(plt_nu_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
     tick_locs = lin_rticks
     if 0 in lin_rticks:
         tick_locs.remove(0)
+    #TODO remove this and have it so ticks are specific to which plot is being made
+    if 0.1 not in tick_locs:
+        tick_locs.append(0.1)
+        tick_locs = sorted(tick_locs)
+    strng_ticks = list(map(str, tick_locs))
     strng_ticks = list(map(str, tick_locs))
     
     all_ax_1.set_xticks(tick_locs,strng_ticks)  

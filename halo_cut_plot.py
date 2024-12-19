@@ -91,7 +91,6 @@ while len(used_numbers) < 25:
     with timed("Halo Slice Plot"):
         num = random.randint(0, all_idxs.shape[0])
         if num not in used_numbers:
-            used_numbers.add(num)
             use_idx = all_idxs[num]
 
         use_halo_pos = halos_pos[use_idx]
@@ -105,6 +104,11 @@ while len(used_numbers) < 25:
         curr_ptl_pids = ptls_pid[ptl_indices]
 
         num_new_ptls = curr_ptl_pos.shape[0]
+        
+        if num_new_ptls > 500:
+            used_numbers.add(num)
+        else:
+            continue
 
         sparta_output = sparta.load(filename = path_to_hdf5_file, halo_ids=use_halo_id, log_level=0)
 

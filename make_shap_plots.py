@@ -208,21 +208,33 @@ if __name__ == '__main__':
         no_sec_explnr, no_sec_shap, no_sec_X = shap_with_filter(explainer,X_df,y_df,preds,fltr_dic=no_second_dict,col_names=new_columns,max_size=5000)
         
     with timed("Make SHAP plots"):
-        fig = plt.figure(constrained_layout=True,figsize=(6,4))
-        ax = fig.add_subplot()
-        plt.sca(ax)
-        ax_all_ptl = shap.plots.beeswarm(all_ptl_explnr,plot_size=(20,10),show=False,order=order)
-        ax.set_title("Sample of All Particles",fontsize=28)
-        fig.savefig(plot_loc + "all_ptl_beeswarm.png")
-        print("finished all ptl")
+        widths = [4,4]
+        heights = [4]
         
-        fig = plt.figure(constrained_layout=True,figsize=(6,4))
-        ax = fig.add_subplot()
-        plt.sca(ax)
-        ax_all_ptl = shap.plots.beeswarm(no_sec_explnr,plot_size=(20,10),show=False,order=order)
-        ax.set_title("Sample of Particles with no Past Snapshot",fontsize=28)
-        fig.savefig(plot_loc + "no_secondary_beeswarm.png")
-        print("finished no secondary")
+        fig = plt.figure(constrained_layout=True)
+        gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
+
+        ax1 = fig.add_subplot(gs[0])
+        ax2 = fig.add_subplot(gs[1])
+        plt.sca(ax1)
+        ax_all_ptl = shap.plots.beeswarm(all_ptl_explnr,plot_size=(20,10),show=False,order=order,color_bar=False)
+        ax1.set_title("Sample: All Particles",fontsize=26)
+
+        plt.sca(ax2)
+        ax_no_sec = shap.plots.beeswarm(no_sec_explnr,plot_size=(20,10),show=False,order=order,hide_features=True)
+        ax2.set_title("Sample: Particles with no Past Snapshot",fontsize=26)
+        
+        # Set the xlim to be the max/min of both axes
+        xlims_ax1 = ax1.get_xlim()
+        xlims_ax2 = ax2.get_xlim()
+
+        combined_xlim = (min(xlims_ax1[0], xlims_ax2[0]), max(xlims_ax1[1], xlims_ax2[1]))
+        
+        ax1.set_xlim(combined_xlim)
+        ax2.set_xlim(combined_xlim)
+        
+        fig.savefig(plot_loc + "comb_shap.png")
+        print("finished combiend shap plot")
          
 
         # widths = [4,4]
