@@ -213,10 +213,13 @@ if __name__ == "__main__":
             opt_params = find_optimal_params(fltr_log_phys_vel,fltr_radii,fltr_labels)
             print(opt_params)
             
-        radii = X_df["p_Scaled_radii"].compute()
-        radial_vel = X_df["p_Radial_vel"].compute()
+        radii = X_df["p_Scaled_radii"].compute().values.flatten()
+        radial_vel = X_df["p_Radial_vel"].compute().values.flatten()
         labels = y_df.compute().values.flatten()
-        log_phys_vel = log_phys_vel.compute()
+        log_phys_vel = log_phys_vel.compute().values.flatten()
+        
+        with timed("Plot cut"):
+            plot_log_vel(log_phys_vel,radii,labels,plot_loc,add_line=opt_params)
         
         slope, intercept = opt_params
         line_y = slope * radii + intercept
