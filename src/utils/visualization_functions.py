@@ -4,7 +4,7 @@ import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import re
 mpl.use('agg')
-from utils.calculation_functions import calculate_distance
+from utils.calculation_functions import calc_radius
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from sklearn.metrics import classification_report
 from colossus.lss.peaks import peakHeight

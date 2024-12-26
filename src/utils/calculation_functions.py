@@ -9,7 +9,7 @@ from colossus.halo.mass_so import M_to_R
 G = constants.G # kpc km^2 / M_⊙ / s^2
 
 #calculate distance of particle from halo
-def calculate_distance(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_particles, box_size):
+def calc_radius(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_particles, box_size):
     x_dist = particle_x - halo_x
     y_dist = particle_y - halo_y
     z_dist = particle_z - halo_z
@@ -292,3 +292,79 @@ def create_stack_mass_prf(splits, radii, halo_first, halo_n, mass, orbit_assn, p
     calc_r200m = np.concatenate(calc_r200m_lst)    
     
     return calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m.flatten()
+
+def calc_halo_mem(n_ptl):
+    # rad, rad_vel, tang_vel each 4bytes and two snaps
+    # HIPIDS is 8 bytes 
+    # orbit/infall is one byte
+    n_bytes = (6 * 4 + 1 + 8) * n_ptl
+    
+    return n_bytes
+
+# For a halo calculate the radius, radial velocity, tangential velocity for each particle, determine the particle's classification and assigne each particle a unique particle id-halo index id (HIPID)
+def calc_halo_params(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_pos, curr_ptl_vel, 
+                 halo_pos, halo_vel, halo_r200m, sparta_last_pericenter_snap=None, sparta_n_pericenter=None, sparta_tracer_ids=None,
+                 sparta_n_is_lower_limit=None):
+    snap = snap_dict["snap"]
+    red_shift = snap_dict["red_shift"]
+    scale_factor = snap_dict["scale_factor"]
+    hubble_const = snap_dict["hubble_const"]
+    box_size = snap_dict["box_size"] 
+    little_h = snap_dict["h"]   
+    
+    halo_pos = halo_pos * 10**3 * scale_factor # Convert to kpc/h
+    
+    num_new_ptls = curr_ptl_pids.shape[0]
+
+    # Generate unique ids for each particle id and halo idx combination. This is used to match particles within halos across snapshots
+    curr_ptl_pids = curr_ptl_pids.astype(np.int64) # otherwise ne.evaluate doesn't work
+    fnd_HIPIDs = ne.evaluate("0.5 * (curr_ptl_pids + curr_halo_idx) * (curr_ptl_pids + curr_halo_idx + 1) + curr_halo_idx")
+    
+    # Calculate the radii of each particle based on the distance formula
+    ptl_rad, coord_dist = calc_radius(halo_pos[0], halo_pos[1], halo_pos[2], curr_ptl_pos[:,0], curr_ptl_pos[:,1], curr_ptl_pos[:,2], num_new_ptls, box_size)         
+    
+    # Only find orbiting(1)/infalling(0) classification for the primary snapshot
+    if comp_snap == False:         
+        compare_sparta_assn = np.zeros((sparta_tracer_ids.shape[0]))
+        curr_orb_assn = np.zeros((num_new_ptls))
+        
+        # Anywhere sparta_last_pericenter is greater than the current snap then that is in the future so set to 0
+        future_peri = np.where(sparta_last_pericenter_snap > snap)[0]
+        adj_sparta_n_pericenter = sparta_n_pericenter
+        adj_sparta_n_pericenter[future_peri] = 0
+        adj_sparta_n_is_lower_limit = sparta_n_is_lower_limit
+        adj_sparta_n_is_lower_limit[future_peri] = 0
+        
+        # If a particle has a pericenter or if the lower limit is 1 then it is orbiting
+        compare_sparta_assn[np.where((adj_sparta_n_pericenter >= 1) | (adj_sparta_n_is_lower_limit == 1))[0]] = 1
+        
+        # Compare the ids between SPARTA and the found particle ids and match the SPARTA results
+        matched_ids = np.intersect1d(curr_ptl_pids, sparta_tracer_ids, return_indices = True)
+        curr_orb_assn[matched_ids[1]] = compare_sparta_assn[matched_ids[2]]
+
+    # calculate peculiar, radial, and tangential velocity
+    pec_vel = calc_pec_vel(curr_ptl_vel, halo_vel)
+    fnd_rad_vel, curr_v200m, phys_vel, phys_vel_comp, rhat = calc_rad_vel(pec_vel, ptl_rad, coord_dist, halo_r200m, red_shift, hubble_const, little_h)
+    fnd_tang_vel = calc_tang_vel(fnd_rad_vel, phys_vel_comp, rhat)
+    
+    # Scale radius by R200m, and velocities by V200m
+    scaled_radii = ptl_rad / halo_r200m
+    scaled_rad_vel = fnd_rad_vel / curr_v200m
+    scaled_tang_vel = fnd_tang_vel / curr_v200m
+    scaled_phys_vel = phys_vel / curr_v200m
+    
+    # Sort the radii so they go from smallest to largest, sort the other parameters in the same way
+    scaled_radii_inds = scaled_radii.argsort()
+    scaled_radii = scaled_radii[scaled_radii_inds]
+    fnd_HIPIDs = fnd_HIPIDs[scaled_radii_inds]
+    scaled_rad_vel = scaled_rad_vel[scaled_radii_inds]
+    scaled_tang_vel = scaled_tang_vel[scaled_radii_inds]
+    scaled_phys_vel = scaled_phys_vel[scaled_radii_inds]
+
+    if comp_snap == False:
+        curr_orb_assn = curr_orb_assn[scaled_radii_inds]
+
+    if comp_snap == False:
+        return fnd_HIPIDs, curr_orb_assn, scaled_rad_vel, scaled_tang_vel, scaled_radii, scaled_phys_vel
+    else:
+        return fnd_HIPIDs, scaled_rad_vel, scaled_tang_vel, scaled_radii
