@@ -18,7 +18,7 @@ from colossus.cosmology import cosmology
 import multiprocessing as mp
 
 from utils.ML_support import *
-from utils.data_and_loading_functions import create_directory, timed
+from utils.data_and_loading_functions import create_directory, timed, save_pickle
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
@@ -179,7 +179,7 @@ if __name__ == "__main__":
                 del data #otherwise garbage collection doesn't work
                 del X
                 del y
-                
-        with open(model_save_loc + "model_info.pickle", "wb") as pickle_file:
-            pickle.dump(model_info, pickle_file) 
+        
+        save_pickle(model_info,model_save_loc + "model_info.pickle")
+
     client.close()

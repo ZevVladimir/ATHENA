@@ -15,7 +15,7 @@ import psutil
 from sparta_tools import sparta
 import json
 
-from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir
+from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir, save_pickle
 from utils.calculation_functions import *
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -360,16 +360,18 @@ with timed("Startup"):
 
     # load particle information for primary snap
     with timed("p_snap ptl load"):
-        p_ptls_pid, p_ptls_vel, p_ptls_pos = load_or_pickle_ptl_data(curr_sparta_file, str(p_snap), p_snap_path, p_scale_factor)
+        p_ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(p_snap), p_snap_path) * 10**3 * p_scale_factor # kpc/h
+        p_ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(p_snap), p_snap_path) # km/s
+        p_ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(p_snap), p_snap_path)
 
     # Load halo information for primary snap
     with timed("p_snap SPARTA load"):
-        p_halos_pos, p_halos_r200m, p_halos_id, p_halos_status, p_halos_last_snap, p_parent_id, ptl_mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
+        p_halos_pos, p_halos_r200m, p_halos_id, p_halos_status, p_halos_last_snap, p_parent_id, ptl_mass = load_SPARTA_data(SPARTA_hdf5_path,curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
 
     # Calculate how many snaps back to go for the desired number of dynamical time separations
     with timed("c_snap load"):
         t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], p_red_shift)
-        c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_ptls_pid, c_ptls_vel, c_ptls_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_loc=snap_loc)
+        c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_ptls_pid, c_ptls_vel, c_ptls_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap = get_comp_snap(SPARTA_hdf5_path,t_dyn=t_dyn, t_dyn_step=t_dyn_step, cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_loc=snap_loc)
         c_box_size = sim_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
 
     c_snap_dict = {
@@ -396,16 +398,14 @@ with timed("Startup"):
                 p_ptl_tree = pickle.load(pickle_file)
     elif pickle_data:
         p_ptl_tree = cKDTree(data = p_ptls_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size) # construct search trees for primary snap
-        with open(save_location + "p_ptl_tree.pickle", "wb") as pickle_file:
-            pickle.dump(p_ptl_tree, pickle_file)
+        save_pickle(p_ptl_tree,save_location + "p_ptl_tree.pickle",)
             
     if os.path.isfile(save_location + "c_ptl_tree.pickle") and reset_lvl < 2:
             with open(save_location + "c_ptl_tree.pickle", "rb") as pickle_file:
                 c_ptl_tree = pickle.load(pickle_file)
     elif pickle_data:
         c_ptl_tree = cKDTree(data = c_ptls_pos, leafsize = 3, balanced_tree = False, boxsize = c_box_size)
-        with open(save_location + "c_ptl_tree.pickle", "wb") as pickle_file:
-            pickle.dump(c_ptl_tree, pickle_file)
+        save_pickle(c_ptl_tree,save_location + "c_ptl_tree.pickle",)
 
 
     if os.path.isfile(save_location + "num_ptls.pickle") and os.path.isfile(save_location + "match_halo_idxs.pickle") and reset_lvl < 2:
@@ -433,10 +433,8 @@ with timed("Startup"):
                 match_halo_idxs = match_halo_idxs[res_mask]
             
             if pickle_data:
-                with open(save_location + "num_ptls.pickle", "wb") as pickle_file:
-                    pickle.dump(num_ptls, pickle_file)
-                with open(save_location + "match_halo_idxs.pickle", "wb") as pickle_file:
-                    pickle.dump(match_halo_idxs, pickle_file)
+                save_pickle(num_ptls,save_location + "num_ptls.pickle")
+                save_pickle(match_halo_idxs,save_location + "match_halo_idxs.pickle")
         p.close()
         p.join() 
         
@@ -486,8 +484,7 @@ with timed("Startup"):
         "c_snap_info": c_snap_dict,
     }
 
-    with open((save_location + "config.pickle"), 'wb') as f:
-        pickle.dump(config_params,f)
+    save_pickle(config_params,save_location + "config.pickle")
         
     create_directory(save_location + "Train/halo_info/")
     create_directory(save_location + "Train/ptl_info/")

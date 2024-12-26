@@ -197,12 +197,14 @@ if __name__ == "__main__":
     all_red_shifts = dic_sim['snap_z']
     p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
 
-    halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_or_pickle_SPARTA_data(sparta_search_name, p_scale_factor, p_snap, p_sparta_snap)
+    halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_SPARTA_data(sparta_search_name, p_scale_factor, p_snap, p_sparta_snap)
 
     snap_loc = path_to_snaps + sparta_name + "/"
-    p_snapshot_path = snap_loc + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
-    ptls_pid, ptls_vel, ptls_pos = load_or_pickle_ptl_data(curr_sparta_file, str(p_snap), p_snapshot_path, p_scale_factor)
-            
+    p_snap_path = snap_loc + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
+
+    ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(p_snap), p_snap_path) * 10**3 * p_scale_factor # kpc/h
+    ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(p_snap), p_snap_path) # km/s
+    ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(p_snap), p_snap_path)       
 
     halo_files = []
     halo_dfs = []

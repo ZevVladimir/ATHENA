@@ -20,7 +20,7 @@ import subprocess
 from colossus.cosmology import cosmology
 
 
-from utils.data_and_loading_functions import create_directory, timed
+from utils.data_and_loading_functions import create_directory, timed, save_pickle
 from utils.visualization_functions import *
 from utils.ML_support import *
 
@@ -319,8 +319,7 @@ if __name__ == "__main__":
             bst = output["booster"]
             history = output["history"]
             bst.save_model(model_save_loc + model_dir + ".json")
-            with open(model_save_loc + "model_info.pickle", "wb") as pickle_file:
-                pickle.dump(model_info, pickle_file)
+            save_pickle(model_info,model_save_loc + "model_info.pickle")
 
             plt.figure(figsize=(10,7))
             plt.plot(history["train"]["logloss"], label="Training loss")

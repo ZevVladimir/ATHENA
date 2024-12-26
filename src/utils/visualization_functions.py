@@ -22,7 +22,7 @@ from plotly.subplots import make_subplots
 from matplotlib.legend_handler import HandlerLine2D, HandlerTuple
 import json
 
-from utils.data_and_loading_functions import check_pickle_exist_gadget, create_directory, find_closest_z, load_or_pickle_ptl_data, timed, parse_ranges,create_nu_string
+from utils.data_and_loading_functions import load_ptl_param, create_directory, find_closest_z, timed, parse_ranges,create_nu_string
 
 
 plt.rcParams['mathtext.fontset'] = 'dejavuserif'
