@@ -227,7 +227,8 @@ def halo_loop(indices, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos, p_ptls_vel, f
         all_m_orb = all_m_orb.astype(np.float32)
         all_halo_m200m = all_halo_m200m.astype(np.float32)
         all_halo_r200m = all_halo_r200m.astype(np.float32)
-
+        
+        #TODO change this to use pandas dataframes
         if find_subhalos:
             if os.path.isfile(save_location + "catologue_" + curr_sparta_file + ".hdf5") and i == 0:
                 os.remove(save_location + "catologue_" + curr_sparta_file + ".hdf5")

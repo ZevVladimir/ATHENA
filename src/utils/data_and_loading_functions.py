@@ -143,49 +143,7 @@ def load_SPARTA_data(SPARTA_hdf5_path, sparta_name, scale_factor, snap, sparta_s
         data["ptl_mass"],
     )
 
-def split_dataset_by_mass(halo_first, halo_n, path_to_dataset, curr_dataset):
-    with h5py.File((path_to_dataset), 'r') as all_ptl_properties:
-        first_prop = True
-        for key in all_ptl_properties.keys():
-            # only want the data important for the training now in the training dataset
-            # dataset now has form HIPIDS, Orbit_Infall, Scaled Radii x num snaps, Rad Vel x num snaps, Tang Vel x num snaps
-            if key != "Halo_first" and key != "Halo_n":
-                if all_ptl_properties[key].ndim > 1:
-                    for row in range(all_ptl_properties[key].ndim):
-                        if first_prop:
-                            curr_dataset = np.array(all_ptl_properties[key][halo_first:halo_first+halo_n,row])
-                            first_prop = False
-                        else:
-                            curr_dataset = np.column_stack((curr_dataset,all_ptl_properties[key][halo_first:halo_first+halo_n,row])) 
-                else:
-                    if first_prop:
-                        curr_dataset = np.array(all_ptl_properties[key][halo_first:halo_first+halo_n])
-                        first_prop = False
-                    else:
-                        curr_dataset = np.column_stack((curr_dataset,all_ptl_properties[key][halo_first:halo_first+halo_n]))
-    return curr_dataset
-
-def save_dict_to_hdf5(hdf5_group, dictionary):
-    for key, value in dictionary.items():
-        if isinstance(value, dict):  # Check if the value is a dictionary
-            subgroup = hdf5_group.create_group(key)  # Create a subgroup
-            save_dict_to_hdf5(subgroup, value)  # Recursively save the subdictionary
-        else:
-            hdf5_group.create_dataset(key, data=value)  
-
-def save_to_hdf5(hdf5_file, data_name, dataset, chunk, max_shape):
-    if isinstance(dataset, dict):
-        hdf5_group = hdf5_file.create_group(data_name)
-        # recursively deal with dictionaries
-        save_dict_to_hdf5(hdf5_group, dataset)   
-    else: 
-        if data_name not in list(hdf5_file.keys()):
-            hdf5_file.create_dataset(data_name, data = dataset, chunks = chunk, maxshape = max_shape, dtype=dataset.dtype)
-        # with a new file adding on additional data to the datasets
-        elif data_name in list(hdf5_file.keys()):
-            hdf5_file[data_name].resize((hdf5_file[data_name].shape[0] + dataset.shape[0]), axis = 0)
-            hdf5_file[data_name][-dataset.shape[0]:] = dataset   
-        
+# Splits the particle data by a fraction of halos. This prevents a halo getting split up into different sets.
 def split_data_by_halo(client,frac, halo_props, ptl_data, return_halo=False):
     #TODO implement functionality for multiple sims
     halo_first = halo_props["Halo_first"]
@@ -217,6 +175,7 @@ def split_data_by_halo(client,frac, halo_props, ptl_data, return_halo=False):
     else:
         return ptl_1, ptl_2
     
+# Search through all the particle snapshot directories and find which has the closest redshift to the one being searched for
 def find_closest_z(value,snap_loc,snap_dir_format,snap_format):
     all_z = np.ones(total_num_snaps) * -1000
     for i in range(total_num_snaps):
@@ -227,6 +186,7 @@ def find_closest_z(value,snap_loc,snap_dir_format,snap_format):
     idx = (np.abs(all_z - value)).argmin()
     return idx, all_z[idx]
 
+# Search through all the particle snapshot directories to find which has the closest time to the one being searched for
 def find_closest_snap(value, cosmology, snap_loc, snap_dir_format, snap_format):
     all_times = np.ones(total_num_snaps) * -1000
     for i in range(total_num_snaps):
@@ -236,12 +196,14 @@ def find_closest_snap(value, cosmology, snap_loc, snap_dir_format, snap_format):
     idx = (np.abs(all_times - value)).argmin()
     return idx
 
-def conv_halo_id_spid(my_halo_ids, sdata, snapshot):
+# Goes through SPARTA's output and makes sure the halo ids from before match these
+def conv_halo_id_spid(my_halo_ids, sparta_output, snapshot):
     sparta_idx = np.zeros(my_halo_ids.shape[0], dtype = np.int32)
     for i, my_id in enumerate(my_halo_ids):
-        sparta_idx[i] = int(np.where(my_id == sdata['halos']['id'][:,snapshot])[0])
+        sparta_idx[i] = int(np.where(my_id == sparta_output['halos']['id'][:,snapshot])[0])
     return sparta_idx
 
+# Finds which snapshot corresponds to the amount of dynamical times ago and then gets all the information for that snapshot
 def get_comp_snap(SPARTA_hdf5_path, t_dyn, t_dyn_step, cosmol, p_red_shift, all_red_shifts, snap_dir_format, snap_format, snap_loc):
     # calculate one dynamical time ago and set that as the comparison snap
     curr_time = cosmol.age(p_red_shift)
@@ -253,7 +215,8 @@ def get_comp_snap(SPARTA_hdf5_path, t_dyn, t_dyn_step, cosmol, p_red_shift, all_
         
     # get constants from pygadgetreader
     c_red_shift = readheader(snap_path, 'redshift')
-    c_sparta_snap = np.abs(snap_path - c_red_shift).argmin()
+    c_sparta_snap = np.abs(all_red_shifts - c_red_shift).argmin()
+    
     if debug_gen:
         print("\nComplementary Snapshot:\nParticle snapshot number:", c_snap, "SPARTA snapshot number:",c_sparta_snap)
         print("Particle redshift:", c_red_shift, "SPARTA redshift:",all_red_shifts[c_sparta_snap],"\n")
@@ -261,9 +224,6 @@ def get_comp_snap(SPARTA_hdf5_path, t_dyn, t_dyn_step, cosmol, p_red_shift, all_
     c_scale_factor = 1/(1+c_red_shift)
     c_rho_m = cosmol.rho_m(c_red_shift)
     c_hubble_constant = cosmol.Hz(c_red_shift) * 0.001 # convert to units km/s/kpc
-    # c_box_size = readheader(snap_path, 'boxsize') #units Mpc/h comoving
-    # c_box_size = c_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
-    # c_box_size = c_box_size + 0.001 # NEED TO MAKE WORK FOR PARTICLES ON THE VERY EDGE
     
     if reset_lvl == 3:
         clean_dir(pickled_path + str(c_snap) + "_" + curr_sparta_file + "/")
@@ -277,11 +237,13 @@ def get_comp_snap(SPARTA_hdf5_path, t_dyn, t_dyn_step, cosmol, p_red_shift, all_
 
     return c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_ptls_pid, c_ptls_vel, c_ptls_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap
 
+# Split data into the infalling and orbiting components
 def split_orb_inf(data, labels):
     infall = data[np.where(labels == 0)[0]]
     orbit = data[np.where(labels == 1)[0]]
     return infall, orbit
 
+# Turn a string of inptuted ranges (ex: 1-3,5-6,7-10) and turns them into a list of the range tuples (ex: [(1,3),(5,6),(7,10)])
 def parse_ranges(ranges_str):
     ranges = []
     for part in ranges_str.split(','):
@@ -289,5 +251,6 @@ def parse_ranges(ranges_str):
         ranges.append((start, end))
     return ranges
 
+# Turn a string of inputted ranges into one more suitable for file names with '_'
 def create_nu_string(nu_list):
     return '_'.join('-'.join(map(str, tup)) for tup in nu_list)

@@ -3,12 +3,13 @@ from colossus.halo import mass_so
 from colossus.utils import constants
 import multiprocessing as mp
 from itertools import repeat
+import numexpr as ne
 from colossus.lss.peaks import peakHeight
 from colossus.halo.mass_so import M_to_R
 
 G = constants.G # kpc km^2 / M_⊙ / s^2
 
-#calculate distance of particle from halo
+# Calculate radii of particles relative to a halo and the difference in each coordinate for particles and halos for use in calculating rhat
 def calc_radius(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_particles, box_size):
     x_dist = particle_x - halo_x
     y_dist = particle_y - halo_y
@@ -17,8 +18,7 @@ def calc_radius(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_
     coord_diff = np.zeros((new_particles, 3))
     half_box_size = box_size/2
     
-    #handles periodic boundary conditions by checking if you were to add or subtract a boxsize would it then be within half a box size of the halo
-    #do this for x, y, and z coords
+    # Handles periodic boundary conditions by checking if you were to add or subtract a boxsize would it then be within half a box size of the halo
     x_within_plus = np.where((x_dist + box_size) < half_box_size)
     x_within_minus = np.where((x_dist - box_size) > -half_box_size)
     
@@ -43,13 +43,14 @@ def calc_radius(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_
     
     coord_diff[:,2] = particle_z - halo_z
 
-    #calculate distance with standard sqrt((x_1-x_2)^2 + (y_1 - y_2)^2 + (z_1 - z_2)^2)
+    # Calculate radii with standard distance formula
     distance = np.zeros((new_particles,1))
     distance = np.sqrt(np.square((halo_x - particle_x)) + np.square((halo_y - particle_y)) + np.square((halo_z - particle_z)))
     
     return distance, coord_diff #kpc/h
 
-#calculates density within sphere of given radius with given mass and calculating volume at each particle's radius
+# Calculates density within sphere of given radius with given mass and calculating volume at each particle's radius
+# Also can scale by rho_m if supplied
 def calculate_density(masses, bins, r200m, sim_splits, rho_m = None):
     rho = np.zeros_like(masses)
     V = (bins[None, :] * r200m[:, None])**3 * 4.0 * np.pi / 3.0
@@ -72,16 +73,13 @@ def calculate_density(masses, bins, r200m, sim_splits, rho_m = None):
 
     return rho
 
-#returns indices where density goes below overdensity value (200 * rho_c)
-def check_where_r200(my_density, rho_m):
-    return np.where(my_density < (200 * rho_m))
-
+# Calculate the peculiar velocity which is the particle velocity minus the corresponding halo velocity
 def calc_pec_vel(particle_vel, halo_vel):   
-    # Peculiar velocity is particle velocity minus the corresponding halo velocity
     peculiar_velocities = particle_vel - halo_vel   
 
     return peculiar_velocities # km/s
 
+# Calculate the direction of the radii
 def calc_rhat(x_comp, y_comp, z_comp):
     rhat = np.zeros((x_comp.size, 3), dtype = np.float32)
     # Get the magnitude for each particle
@@ -94,10 +92,12 @@ def calc_rhat(x_comp, y_comp, z_comp):
     
     return rhat
 
+# Calculate V200m, although this is generalizable to any mass/radius definition
 def calc_v200m(mass, radius):
     # calculate the v200m for a halo based on its mass and radius
     return np.sqrt((G * mass)/radius) #km/s
 
+# Calculate the radial velocities of particles
 def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200m, red_shift, hubble_constant, little_h):
     
     # Get the corresponding components, distances, and halo v200m for every particle
@@ -128,14 +128,16 @@ def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200m, red_shift, 
     # scale all the radial velocities by v200m of the halo
     return radial_vel, curr_v200m, phys_vel, phys_vel_comp, rhat
 
+# Calculate the tangential velocity of particles (does require radial velocity and physical velocity)
 def calc_tang_vel(rv, phys_v_comp, rhat):
     rv_comp = rhat * rv[:, np.newaxis] 
     tv_comp = phys_v_comp - rv_comp
     tv = np.linalg.norm(tv_comp, axis=1)
     return tv
 
+# Calculate the dynamical time based on 200m 
 def calc_t_dyn(halo_r200m, red_shift):
-    halo_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200c")
+    halo_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200m")
     curr_v200m = calc_v200m(halo_m200m, halo_r200m)
     t_dyn = (2*halo_r200m)/curr_v200m
 

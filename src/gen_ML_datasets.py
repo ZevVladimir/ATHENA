@@ -1,4 +1,3 @@
-import numexpr as ne
 import numpy as np
 from scipy.spatial import cKDTree
 from colossus.cosmology import cosmology

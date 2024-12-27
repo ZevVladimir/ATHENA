@@ -20,18 +20,9 @@ import subprocess
 from colossus.cosmology import cosmology
 
 
-from utils.data_and_loading_functions import create_directory, timed, save_pickle
+from utils.data_and_loading_functions import create_directory, timed, save_pickle, parse_ranges, create_nu_string
 from utils.visualization_functions import *
 from utils.ML_support import *
-
-def parse_ranges(ranges_str):
-    ranges = []
-    for part in ranges_str.split(','):
-        start, end = map(int, part.split('-'))
-        ranges.append((start, end))
-    return ranges
-def create_nu_string(nu_list):
-    return '_'.join('-'.join(map(str, tup)) for tup in nu_list)
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
