@@ -1,6 +1,5 @@
 import numpy as np
 import os
-import sys
 import pickle
 from dask import array as da
 import dask.dataframe as dd
@@ -17,8 +16,6 @@ from colossus import cosmology
 import warnings
 
 from dask.distributed import Client
-import time
-import multiprocessing as mp
 
 from skopt import gp_minimize
 from skopt.space import Real
@@ -41,10 +38,14 @@ rand_seed = config.getint("MISC","random_seed")
 on_zaratan = config.getboolean("MISC","on_zaratan")
 use_gpu = config.getboolean("MISC","use_gpu")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
-path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
-path_to_snaps = config["PATHS"]["path_to_snaps"]
-path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
 sim_cosmol = config["MISC"]["sim_cosmol"]
+
+MLOIS_path = config["PATHS"]["MLOIS_path"]
+snap_path = config["PATHS"]["snap_path"]
+SPARTA_output_path = config["PATHS"]["SPARTA_output_path"]
+pickled_path = config["PATHS"]["pickled_path"]
+ML_dset_path = config["PATHS"]["ML_dset_path"]
+
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
     cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
@@ -54,22 +55,12 @@ else:
 match = re.search(sim_pat, curr_sparta_file)
 if match:
     sparta_name = match.group(0)
-path_to_hdf5_file = path_to_SPARTA_data + sparta_name + "/" + curr_sparta_file + ".hdf5"
-path_to_pickle = config["PATHS"]["path_to_pickle"]
-path_to_calc_info = config["PATHS"]["path_to_calc_info"]
-path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
-path_to_sparta = config["PATHS"]["path_to_sparta"]
-path_to_xgboost = config["PATHS"]["path_to_xgboost"]
-model_sims = json.loads(config.get("XGBOOST","model_sims"))
+SPARTA_hdf5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
 
-global p_red_shift
 p_red_shift = config.getfloat("SEARCH","p_red_shift")
-search_rad = config.getfloat("SEARCH","search_rad")
 
+model_sims = json.loads(config.get("XGBOOST","model_sims"))
 file_lim = config.getint("XGBOOST","file_lim")
-model_type = config["XGBOOST"]["model_type"]
-train_rad = config.getint("XGBOOST","training_rad")
-
 
 reduce_rad = config.getfloat("XGBOOST","reduce_rad")
 reduce_perc = config.getfloat("XGBOOST", "reduce_perc")
@@ -80,12 +71,8 @@ weight_exp = config.getfloat("XGBOOST","weight_exp")
 
 hpo_loss = config.get("XGBOOST","hpo_loss")
 nu_splits = config["XGBOOST"]["nu_splits"]
-nu_splits = parse_ranges(nu_splits)
-nu_string = create_nu_string(nu_splits)
-
 plt_nu_splits = config["XGBOOST"]["plt_nu_splits"]
-plt_nu_splits = parse_ranges(plt_nu_splits)
-plt_nu_string = create_nu_string(plt_nu_splits)
+plt_nu_splits = parse_ranges(nu_splits)
 
 linthrsh = config.getfloat("XGBOOST","linthrsh")
 lin_nbin = config.getint("XGBOOST","lin_nbin")
@@ -99,20 +86,8 @@ log_rticks = json.loads(config.get("XGBOOST","log_rticks"))
 
 if use_gpu:
     from dask_cuda import LocalCUDACluster
-    from cuml.metrics.accuracy import accuracy_score #TODO fix cupy installation??
-    from sklearn.metrics import make_scorer
-    import dask_ml.model_selection as dcv
     import cudf
     import dask_cudf as dc
-elif not use_gpu and on_zaratan:
-    from dask_mpi import initialize
-    from mpi4py import MPI
-    from distributed.scheduler import logger
-    import socket
-    #from dask_jobqueue import SLURMCluster
-elif not on_zaratan:
-    from dask_cuda import LocalCUDACluster
-    
     
 def get_CUDA_cluster():
     cluster = LocalCUDACluster(
@@ -289,7 +264,7 @@ def sort_files(folder_path,limit_files=False):
 def sim_info_for_nus(sim,config_params):
     sparta_name, sparta_search_name = split_calc_name(sim)
             
-    with h5py.File(path_to_SPARTA_data + sparta_name + "/" +  sparta_search_name + ".hdf5","r") as f:
+    with h5py.File(SPARTA_output_path + sparta_name + "/" +  sparta_search_name + ".hdf5","r") as f:
         dic_sim = {}
         grp_sim = f['simulation']
         for f in grp_sim.attrs:
@@ -301,7 +276,7 @@ def sim_info_for_nus(sim,config_params):
     p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
     use_z = all_red_shifts[p_sparta_snap]
     p_snap_loc = transform_string(sim)
-    with open(path_to_pickle + p_snap_loc + "/ptl_mass.pickle", "rb") as pickle_file:
+    with open(pickled_path + p_snap_loc + "/ptl_mass.pickle", "rb") as pickle_file:
         ptl_mass = pickle.load(pickle_file)
     
     return ptl_mass, use_z
@@ -461,13 +436,13 @@ def load_data(client, sims, dset_name, limit_files = False, scale_rad=False, use
     all_weights = []
     
     for sim in sims:
-        files_loc = path_to_calc_info + sim + "/" + dset_name
-        with open(path_to_calc_info + sim + "/config.pickle","rb") as f:
+        files_loc = ML_dset_path + sim + "/" + dset_name
+        with open(ML_dset_path + sim + "/config.pickle","rb") as f:
             config_params = pickle.load(f)
         
         if dset_name == "Full":
             with timed("Reformed " + "Train" + " Dataset: " + sim):    
-                files_loc = path_to_calc_info + sim + "/" + "Train"
+                files_loc = ML_dset_path + sim + "/" + "Train"
                 if scale_rad and use_weights:
                     ptl_ddf,sim_scal_pos_weight, weights, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files)  
                 elif scale_rad and not use_weights:
@@ -482,7 +457,7 @@ def load_data(client, sims, dset_name, limit_files = False, scale_rad=False, use
             if use_weights:
                 all_weights.append(weights)
             with timed("Reformed " + "Test" + " Dataset: " + sim):
-                files_loc = path_to_calc_info + sim + "/" + "Test"
+                files_loc = ML_dset_path + sim + "/" + "Test"
                 if scale_rad and use_weights:
                     ptl_ddf,sim_scal_pos_weight, weights, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files)  
                 elif scale_rad and not use_weights:
@@ -550,16 +525,16 @@ def load_sprta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         if match:
             curr_snap_list = [match.group(1), match.group(2)] 
         
-        with open(path_to_calc_info + sim + "/config.pickle", "rb") as file:
+        with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
             config_dict = pickle.load(file)
             
             curr_z = config_dict["p_snap_info"]["red_shift"][()]
             curr_snap_dir_format = config_dict["snap_dir_format"]
             curr_snap_format = config_dict["snap_format"]
-            new_p_snap, curr_z = find_closest_z(curr_z,path_to_snaps + sparta_name + "/",curr_snap_dir_format,curr_snap_format)
+            new_p_snap, curr_z = find_closest_z(curr_z,snap_path + sparta_name + "/",curr_snap_dir_format,curr_snap_format)
             p_scale_factor = 1/(1+curr_z)
             
-        with h5py.File(path_to_SPARTA_data + sparta_name + "/" + sparta_search_name + ".hdf5","r") as f:
+        with h5py.File(SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5","r") as f:
             dic_sim = {}
             grp_sim = f['simulation']
 
@@ -573,7 +548,7 @@ def load_sprta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
 
         use_halo_ids = halos_id[use_idxs]
         
-        sparta_output = sparta.load(filename=path_to_SPARTA_data + sparta_name + "/" + sparta_search_name + ".hdf5", halo_ids=use_halo_ids, log_level=0)
+        sparta_output = sparta.load(filename=SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5", halo_ids=use_halo_ids, log_level=0)
         new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta re-sort the indices
         
         mass_prf_all_list.append(sparta_output['anl_prf']['M_all'][new_idxs,p_sparta_snap,:])
@@ -636,7 +611,7 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
         
         # Get the redshifts for each simulation's primary snapshot
         for i,sim in enumerate(use_sims):
-            with open(path_to_calc_info + sim + "/config.pickle", "rb") as file:
+            with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
                 config_dict = pickle.load(file)
                 curr_z = config_dict["p_snap_info"]["red_shift"][()]
                 all_z.append(curr_z)
@@ -727,7 +702,7 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
     if io_frac:
         inf_orb_frac(p_corr_labels=p_corr_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,split_scale_dict=split_scale_dict,num_bins=num_bins,save_loc=plot_save_loc)
     if per_err:
-        with h5py.File(path_to_hdf5_file,"r") as f:
+        with h5py.File(SPARTA_hdf5_path,"r") as f:
             dic_sim = {}
             grp_sim = f['config']['anl_prf']
             for f in grp_sim.attrs:
@@ -737,17 +712,10 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
         # plot_per_err(bins,X["p_Radial_vel"].values.compute(),y.compute().values.flatten(),preds.values,plot_save_loc, "$v_r/v_{200m}$","rad_vel")
         # plot_per_err(bins,X["p_Tangential_vel"].values.compute(),y.compute().values.flatten(),preds.values,plot_save_loc, "$v_t/v_{200m}$","tang_vel")
 
-def print_tree(bst,tree_num):# if there are multiple simulations, to correctly index the dataset we need to update the starting values for the 
-    # stacked simulations such that they correspond to the larger dataset and not one specific simulation
-    if len(use_sims) != 1:
-        for i in range(1,len(use_sims)):
-            if i < len(use_sims) - 1:
-                halo_first[sim_splits[i]:sim_splits[i+1]] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
-            else:
-                halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
+def plot_tree(bst,tree_num,save_loc):
     fig, ax = plt.subplots(figsize=(400, 10))
-    xgb.plot_tree(bst, num_trees=tree_num, ax=ax)
-    plt.savefig(path_to_MLOIS + "Random_figs/tree_plot.png")
+    xgb.plot_tree(bst, num_trees=tree_num, ax=ax,rankdir='LR')
+    fig.savefig(save_loc + "/tree_plot.png")
        
 def dens_prf_loss(halo_ddf,use_sims,radii,labels,use_orb_prf,use_inf_prf):
     halo_first = halo_ddf["Halo_first"].values
@@ -847,7 +815,7 @@ def weight_objective(params,client,model_params,ptl_ddf,halo_ddf,use_sims,feat_c
         accuracy = -1 * accuracy_score(y_val[only_orb], y_pred.iloc[only_orb].values)
     elif hpo_loss == "inf":
         only_inf = np.where(y_val == 0)[0]
-        accuracy = -1 * accuracy_score(y[only_inf], y_pred.iloc[only_inf].values)
+        accuracy = -1 * accuracy_score(y_val[only_inf], y_pred.iloc[only_inf].values)
     elif hpo_loss == "mprf_all":
         val_radii = X_val["p_Scaled_radii"].values.compute()
         accuracy = dens_prf_loss(val_halos,use_sims,val_radii,y_pred,use_orb_prf=True,use_inf_prf=True)

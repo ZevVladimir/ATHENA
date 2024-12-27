@@ -1,63 +1,39 @@
-from dask import array as da
 from dask.distributed import Client
 import dask.dataframe as dd
-
 
 import xgboost as xgb
 from xgboost import dask as dxgb
     
-from sklearn.metrics import classification_report
+import json
 import pickle
 import os
-import sys
 import numpy as np
 import matplotlib.pyplot as plt
-import h5py
-import json
-import re
 import pandas as pd
-import subprocess
-from colossus.cosmology import cosmology
-
+import multiprocessing as mp
 
 from utils.data_and_loading_functions import create_directory, timed, save_pickle, parse_ranges, create_nu_string
-from utils.visualization_functions import *
-from utils.ML_support import *
+from utils.ML_support import get_CUDA_cluster, get_combined_name, load_data, reform_df, optimize_weights, optimize_scale_rad, weight_by_rad, scale_by_rad, eval_model
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
-rand_seed = config.getint("MISC","random_seed")
-on_zaratan = config.getboolean("MISC","on_zaratan")
-curr_sparta_file = config["MISC"]["curr_sparta_file"]
-sim_cosmol = config["MISC"]["sim_cosmol"]
 
-path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
-path_to_snaps = config["PATHS"]["path_to_snaps"]
-path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
-if sim_cosmol == "planck13-nbody":
-    sim_pat = r"cpla_l(\d+)_n(\d+)"
-else:
-    sim_pat = r"cbol_l(\d+)_n(\d+)"
-match = re.search(sim_pat, curr_sparta_file)
-if match:
-    sparta_name = match.group(0)
-path_to_hdf5_file = path_to_SPARTA_data + sparta_name + "/" + curr_sparta_file + ".hdf5"
-path_to_pickle = config["PATHS"]["path_to_pickle"]
-path_to_calc_info = config["PATHS"]["path_to_calc_info"]
-path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
-path_to_sparta = config["PATHS"]["path_to_sparta"]
-path_to_xgboost = config["PATHS"]["path_to_xgboost"]
+on_zaratan = config.getboolean("MISC","on_zaratan")
+use_gpu = config.getboolean("MISC","use_gpu")
+curr_sparta_file = config["MISC"]["curr_sparta_file"]
+
+MLOIS_path = config["PATHS"]["MLOIS_path"]
+ML_dset_path = config["PATHS"]["ML_dset_path"]
+path_to_models = config["PATHS"]["path_to_models"]
 
 model_sims = json.loads(config.get("XGBOOST","model_sims"))
+dask_task_cpus = config.getint("XGBOOST","dask_task_cpus")
 
 model_type = config["XGBOOST"]["model_type"]
-do_hpo = config.getboolean("XGBOOST","hpo")
 frac_training_data = config.getfloat("XGBOOST","frac_train_data")
-eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
-train_rad = config.getint("XGBOOST","training_rad")
 nu_splits = config["XGBOOST"]["nu_splits"]
 retrain = config.getint("XGBOOST","retrain")
 
@@ -77,41 +53,31 @@ per_err_plt = config.getboolean("XGBOOST","per_err_plt")
 nu_splits = parse_ranges(nu_splits)
 nu_string = create_nu_string(nu_splits)
 
-if sim_cosmol == "planck13-nbody":
-    cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
-else:
-    cosmol = cosmology.setCosmology(sim_cosmol) 
-
 if on_zaratan:
     from dask_mpi import initialize
-    from mpi4py import MPI
     from distributed.scheduler import logger
     import socket
-    #from dask_jobqueue import SLURMCluster
-else:
-    from dask_cuda import LocalCUDACluster
-    from cuml.metrics.accuracy import accuracy_score #TODO fix cupy installation??
-    from sklearn.metrics import make_scorer
-    import dask_ml.model_selection as dcv
+elif not on_zaratan and not use_gpu:
+    from dask.distributed import LocalCluster
 ###############################################################################################################
-sys.path.insert(0, path_to_pygadgetreader)
-sys.path.insert(0, path_to_sparta)
-from pygadgetreader import readsnap, readheader # type: ignore
-from sparta_tools import sparta # type: ignore
 
 if __name__ == "__main__":
     feat_cols = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
     tar_col = ["Orbit_infall"]
     
-    if on_zaratan:
-        if 'SLURM_CPUS_PER_TASK' in os.environ:
-            cpus_per_task = int(os.environ['SLURM_CPUS_PER_TASK'])
-        else:
-            print("SLURM_CPUS_PER_TASK is not defined.")
+    if use_gpu:
+        mp.set_start_method("spawn")
+
+    if on_zaratan:            
         if use_gpu:
             initialize(local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
         else:
+            if 'SLURM_CPUS_PER_TASK' in os.environ:
+                cpus_per_task = int(os.environ['SLURM_CPUS_PER_TASK'])
+            else:
+                print("SLURM_CPUS_PER_TASK is not defined.")
             initialize(nthreads = cpus_per_task, local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
+
         print("Initialized")
         client = Client()
         host = client.run_on_scheduler(socket.gethostname)
@@ -120,8 +86,19 @@ if __name__ == "__main__":
 
         logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}")
     else:
-        client = get_CUDA_cluster()
+        if use_gpu:
+            client = get_CUDA_cluster()
+        else:
+            tot_ncpus = mp.cpu_count()
+            n_workers = int(np.floor(tot_ncpus / dask_task_cpus))
+            cluster = LocalCluster(
+                n_workers=n_workers,
+                threads_per_worker=dask_task_cpus,
+                memory_limit='5GB'  
+            )
+            client = Client(cluster)
     
+    # Adjust name based off what things are being done to the model. This keeps each model unique
     scale_rad=False
     use_weights=False
     
@@ -138,12 +115,11 @@ if __name__ == "__main__":
         model_dir += "scl_rad" + str(reduce_rad) + "_" + str(reduce_perc)
     if use_weights:
         model_dir += "wght" + str(weight_rad) + "_" + str(min_weight)
-        
-    # model_name =  model_dir + combined_name
 
-    model_save_loc = path_to_xgboost + combined_name + "/" + model_dir + "/"
+    model_save_loc = path_to_models + combined_name + "/" + model_dir + "/"
     gen_plot_save_loc = model_save_loc + "plots/"
      
+    # See if there is already a parameter file for the model
     if os.path.isfile(model_save_loc + "model_info.pickle") and retrain < 2:
         with open(model_save_loc + "model_info.pickle", "rb") as pickle_file:
             model_info = pickle.load(pickle_file)
@@ -182,7 +158,7 @@ if __name__ == "__main__":
             "Minimum weight assign": min_weight
         }
             
-        #TODO add if statements for if scale rad or weight rad 
+        # Do desired adjustments to data if selected, otherwise just load the data normally
         if scale_rad and use_weights:
             train_data,scale_pos_weight,train_weights,bin_edges = load_data(client,model_sims,"Train",scale_rad=scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
         elif scale_rad and not use_weights:
@@ -192,10 +168,12 @@ if __name__ == "__main__":
         else:
             train_data,scale_pos_weight = load_data(client,model_sims,"Train",scale_rad=scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
 
-        print("scale_pos_weight:",scale_pos_weight)
+        print("Calculated Scale Position Weight:",scale_pos_weight)
+        
         X_train = train_data[feat_cols]
         y_train = train_data[tar_col]
 
+        # Perform optimization on either option for adjustment of the data if desired
         if opt_wghts or opt_scale_rad:
             params = {
                     "verbosity": 0,
@@ -211,10 +189,11 @@ if __name__ == "__main__":
 
             halo_dfs = []
             for sim in model_sims:
-                halo_dfs.append(reform_df(path_to_calc_info + sim + "/Train/halo_info/"))
+                halo_dfs.append(reform_df(ML_dset_path + sim + "/Train/halo_info/"))
 
             halo_df = pd.concat(halo_dfs)
 
+        # Optimize the weighting of particles
         if opt_wghts:  
             use_weights = True          
             opt_weight_rad, opt_min_weight, opt_weight_exp = optimize_weights(client,params,train_data,halo_df,model_sims,feat_cols,tar_col)
@@ -230,7 +209,6 @@ if __name__ == "__main__":
             train_weights = train_weights.repartition(npartitions=X_train.npartitions)
             
             model_dir += "wght" + str(np.round(opt_weight_rad,3)) + "_" + str(np.round(opt_min_weight,3)) + "_" + str(np.round(opt_weight_exp,3))
-            # model_dir += "wght" + str(np.round(opt_weight_rad,3)) + "_" + str(np.round(opt_min_weight,3)) + "_" + str(np.round(opt_weight_exp,3))
             weight_rad_info = {
                 "Used weighting by radius": use_weights,
                 "Optimized weights": opt_wghts,
@@ -239,6 +217,7 @@ if __name__ == "__main__":
                 "Weight exponent": opt_weight_exp
             }
         
+        # Optimize the scaling of the number of particles at each radius 
         if opt_scale_rad:
             scale_rad = True
             num_bins=100
@@ -266,17 +245,11 @@ if __name__ == "__main__":
             "Weighting by Radii": weight_rad_info,
         }
         
-        model_save_loc = path_to_xgboost + combined_name + "/" + model_dir + "/"
-        gen_plot_save_loc = model_save_loc + "plots/"
         create_directory(model_save_loc)
         create_directory(gen_plot_save_loc)
         
-        plot_orb_inf_dist(50, train_data["p_Scaled_radii"].values.compute(), train_data["Orbit_infall"].values.compute(), gen_plot_save_loc)
-        
+        # Construct the DaskDMatrix used for training (if using different weights input those as well)
         if use_weights:
-            fig,ax = plt.subplots(1)
-            ax.hist(train_weights.values.compute())
-            fig.savefig(path_to_MLOIS + "Random_figs/weight_dist.png")
             dtrain = xgb.dask.DaskDMatrix(client, X_train, y_train, weight=train_weights)
         else:
             dtrain = xgb.dask.DaskDMatrix(client, X_train, y_train)
@@ -296,6 +269,8 @@ if __name__ == "__main__":
             model_info['Training Info']={
                 'Fraction of Training Data Used': frac_training_data,
                 'Training Params': params}
+        
+        # Train and save the model
         with timed("Trained Model"):
             print("Starting train using params:", params)
             output = dxgb.train(
@@ -303,7 +278,6 @@ if __name__ == "__main__":
                 params,
                 dtrain,
                 num_boost_round=100,
-                # evals=[(dtrain, "train"),(dtest, "test")],
                 evals=[(dtrain, "train")],
                 early_stopping_rounds=10,      
                 )
@@ -311,32 +285,19 @@ if __name__ == "__main__":
             history = output["history"]
             bst.save_model(model_save_loc + model_dir + ".json")
             save_pickle(model_info,model_save_loc + "model_info.pickle")
-
-            plt.figure(figsize=(10,7))
-            plt.plot(history["train"]["logloss"], label="Training loss")
-            plt.xlabel("Number of trees")
-            plt.ylabel("Loss")
-            plt.legend()
-            plt.savefig(gen_plot_save_loc + "training_loss_graph.png") 
         
             del dtrain
-            # del dtest
-    if not on_zaratan:
-        xgb.plot_tree(bst, num_trees=10, rankdir='LR')
-        fig = plt.gcf()
-        fig.set_size_inches(150, 100)
-
-        fig.savefig(gen_plot_save_loc + "ex_tree.png",bbox_inches="tight")
-        
+    
+    # Evaluate the model on the corresponding testing dataset to what the model was trained on
     with timed("Model Evaluation"):
         plot_loc = model_save_loc + "Test_" + combined_name + "/plots/"
         create_directory(plot_loc)
         
         halo_files = []
-
         halo_dfs = []
+        
         for sim in model_sims:
-            halo_dfs.append(reform_df(path_to_calc_info + sim + "/Test/halo_info/"))
+            halo_dfs.append(reform_df(ML_dset_path + sim + "/Test/halo_info/"))
 
         halo_df = pd.concat(halo_dfs)
         
@@ -346,18 +307,8 @@ if __name__ == "__main__":
         
         eval_model(model_info, client, bst, use_sims=model_sims, dst_type="Test", X=X_test, y=y_test, halo_ddf=halo_df, combined_name=combined_name, plot_save_loc=plot_loc, dens_prf=dens_prf_plt,missclass=misclass_plt,full_dist=fulldist_plt,per_err=per_err_plt)
    
+    # Save the updated model and model info file
     bst.save_model(model_save_loc + model_dir + ".json")
-
-    feature_important = bst.get_score(importance_type='weight')
-    keys = list(feature_important.keys())
-    values = list(feature_important.values())
-    pos = np.arange(len(keys))
-
-    fig, ax = plt.subplots(1, figsize=(15,10))
-    ax.barh(pos,values)
-    ax.set_yticks(pos, keys)
-    fig.savefig(gen_plot_save_loc + "feature_importance.png")
+    save_pickle(model_info,model_save_loc + "model_info.pickle")
     
-    with open(model_save_loc + "model_info.pickle", "wb") as pickle_file:
-        pickle.dump(model_info, pickle_file) 
     client.close()

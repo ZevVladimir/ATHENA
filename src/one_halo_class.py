@@ -28,9 +28,9 @@ config.read(os.getcwd() + "/config.ini")
 on_zaratan = config.getboolean("MISC","on_zaratan")
 use_gpu = config.getboolean("MISC","use_gpu")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
-path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
-path_to_snaps = config["PATHS"]["path_to_snaps"]
-path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
+MLOIS_path = config["PATHS"]["path_to_MLOIS"]
+snap_path = config["PATHS"]["path_to_snaps"]
+SPARTA_output_path = config["PATHS"]["path_to_SPARTA_data"]
 sim_cosmol = config["MISC"]["sim_cosmol"]
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
@@ -39,12 +39,12 @@ else:
 match = re.search(sim_pat, curr_sparta_file)
 if match:
     sparta_name = match.group(0)
-path_to_hdf5_file = path_to_SPARTA_data + sparta_name + "/" + curr_sparta_file + ".hdf5"
+path_to_hdf5_file = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
 path_to_pickle = config["PATHS"]["path_to_pickle"]
-path_to_calc_info = config["PATHS"]["path_to_calc_info"]
+ML_dset_path = config["PATHS"]["path_to_calc_info"]
 path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
 path_to_sparta = config["PATHS"]["path_to_sparta"]
-path_to_xgboost = config["PATHS"]["path_to_xgboost"]
+path_to_models = config["PATHS"]["path_to_xgboost"]
 
 sim_cosmol = config["MISC"]["sim_cosmol"]
 t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
@@ -132,7 +132,7 @@ if __name__ == "__main__":
         
     # model_name =  model_dir + model_comb_name
     
-    model_save_loc = path_to_xgboost + model_comb_name + "/" + model_dir + "/"
+    model_save_loc = path_to_models + model_comb_name + "/" + model_dir + "/"
 
     try:
         bst = xgb.Booster()
@@ -157,17 +157,17 @@ if __name__ == "__main__":
 
     model_dir = model_type + "_" + model_comb_name + "nu" + nu_string 
 
-    model_save_loc = path_to_xgboost + model_comb_name + "/" + model_dir + "/"
+    model_save_loc = path_to_models + model_comb_name + "/" + model_dir + "/"
     dset_name = "Test"
     test_comb_name = get_combined_name(test_sims[0]) 
 
     plot_loc = model_save_loc + dset_name + "_" + test_comb_name + "/plots/"
     create_directory(plot_loc)
 
-    halo_ddf = reform_df(path_to_calc_info + sim + "/" + "Test" + "/halo_info/")
+    halo_ddf = reform_df(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
     all_idxs = halo_ddf["Halo_indices"].values
 
-    with open(path_to_calc_info + sim + "/p_ptl_tree.pickle", "rb") as pickle_file:
+    with open(ML_dset_path + sim + "/p_ptl_tree.pickle", "rb") as pickle_file:
         tree = pickle.load(pickle_file)
             
     sparta_name, sparta_search_name = split_calc_name(sim)
@@ -178,16 +178,16 @@ if __name__ == "__main__":
         curr_snap_list = [match.group(1), match.group(2)]   
         p_snap = int(curr_snap_list[0])
 
-    with open(path_to_calc_info + sim + "/config.pickle", "rb") as file:
+    with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
         config_dict = pickle.load(file)
         
         curr_z = config_dict["p_snap_info"]["red_shift"][()]
         curr_snap_dir_format = config_dict["snap_dir_format"]
         curr_snap_format = config_dict["snap_format"]
-        new_p_snap, curr_z = find_closest_z(curr_z,path_to_snaps + sparta_name + "/",curr_snap_dir_format,curr_snap_format)
+        new_p_snap, curr_z = find_closest_z(curr_z,snap_path + sparta_name + "/",curr_snap_dir_format,curr_snap_format)
         p_scale_factor = 1/(1+curr_z)
         
-    with h5py.File(path_to_SPARTA_data + sparta_name + "/" + sparta_search_name + ".hdf5","r") as f:
+    with h5py.File(SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5","r") as f:
         dic_sim = {}
         grp_sim = f['simulation']
 
@@ -199,7 +199,7 @@ if __name__ == "__main__":
 
     halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_SPARTA_data(sparta_search_name, p_scale_factor, p_snap, p_sparta_snap)
 
-    snap_loc = path_to_snaps + sparta_name + "/"
+    snap_loc = snap_path + sparta_name + "/"
     p_snap_path = snap_loc + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
 
     ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(p_snap), p_snap_path) * 10**3 * p_scale_factor # kpc/h
@@ -209,10 +209,10 @@ if __name__ == "__main__":
     halo_files = []
     halo_dfs = []
     if dset_name == "Full":    
-        halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + "Train" + "/halo_info/"))
-        halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + "Test" + "/halo_info/"))
+        halo_dfs.append(reform_df(ML_dset_path + sim + "/" + "Train" + "/halo_info/"))
+        halo_dfs.append(reform_df(ML_dset_path + sim + "/" + "Test" + "/halo_info/"))
     else:
-        halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + dset_name + "/halo_info/"))
+        halo_dfs.append(reform_df(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
 
     halo_df = pd.concat(halo_dfs)
     
