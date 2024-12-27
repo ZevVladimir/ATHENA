@@ -164,7 +164,7 @@ if __name__ == "__main__":
     plot_loc = model_save_loc + dset_name + "_" + test_comb_name + "/plots/"
     create_directory(plot_loc)
 
-    halo_ddf = reform_df(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
+    halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
     all_idxs = halo_ddf["Halo_indices"].values
 
     with open(ML_dset_path + sim + "/p_ptl_tree.pickle", "rb") as pickle_file:
@@ -209,10 +209,10 @@ if __name__ == "__main__":
     halo_files = []
     halo_dfs = []
     if dset_name == "Full":    
-        halo_dfs.append(reform_df(ML_dset_path + sim + "/" + "Train" + "/halo_info/"))
-        halo_dfs.append(reform_df(ML_dset_path + sim + "/" + "Test" + "/halo_info/"))
+        halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + "Train" + "/halo_info/"))
+        halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/"))
     else:
-        halo_dfs.append(reform_df(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
+        halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
 
     halo_df = pd.concat(halo_dfs)
     
@@ -267,7 +267,7 @@ if __name__ == "__main__":
     # Compare the ids between SPARTA and the found prtl ids and match the SPARTA results
     matched_ids = np.intersect1d(curr_ptl_pids, sparta_tracer_ids, return_indices = True)
     curr_orb_assn[matched_ids[1]] = compare_sparta_assn[matched_ids[2]]
-    preds = make_preds(client, bst, X, report_name="Report", print_report=False)
+    preds = make_preds(client, bst, X)
     preds = preds.iloc[halo_first[large_loc]:halo_first[large_loc] + halo_n[large_loc]]
 
     plot_halo_slice_class(curr_ptl_pos,preds,curr_orb_assn,use_halo_pos,use_halo_r200m,plot_loc)

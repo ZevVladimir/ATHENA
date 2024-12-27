@@ -1,11 +1,11 @@
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from utils.data_and_loading_functions import split_orb_inf, timed
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Circle
 from matplotlib.legend_handler import HandlerTuple
-from mpl_toolkits.mplot3d import Axes3D
+
+from .data_and_loading_functions import split_orb_inf, timed
 
 plt.rcParams['mathtext.fontset'] = 'dejavuserif'
 plt.rcParams['font.family'] = 'serif'

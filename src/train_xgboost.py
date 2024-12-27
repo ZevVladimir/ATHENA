@@ -13,7 +13,7 @@ import pandas as pd
 import multiprocessing as mp
 
 from utils.data_and_loading_functions import create_directory, timed, save_pickle, parse_ranges, create_nu_string
-from utils.ML_support import get_CUDA_cluster, get_combined_name, load_data, reform_df, optimize_weights, optimize_scale_rad, weight_by_rad, scale_by_rad, eval_model
+from utils.ML_support import get_CUDA_cluster, get_combined_name, load_data, reform_dataset_dfs, optimize_weights, optimize_scale_rad, weight_by_rad, scale_by_rad, eval_model
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -189,7 +189,7 @@ if __name__ == "__main__":
 
             halo_dfs = []
             for sim in model_sims:
-                halo_dfs.append(reform_df(ML_dset_path + sim + "/Train/halo_info/"))
+                halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/Train/halo_info/"))
 
             halo_df = pd.concat(halo_dfs)
 
@@ -297,7 +297,7 @@ if __name__ == "__main__":
         halo_dfs = []
         
         for sim in model_sims:
-            halo_dfs.append(reform_df(ML_dset_path + sim + "/Test/halo_info/"))
+            halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/Test/halo_info/"))
 
         halo_df = pd.concat(halo_dfs)
         

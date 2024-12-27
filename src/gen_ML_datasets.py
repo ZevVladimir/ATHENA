@@ -12,7 +12,6 @@ import re
 import pandas as pd
 import psutil
 from sparta_tools import sparta
-import json
 
 from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir, save_pickle
 from utils.calculation_functions import *

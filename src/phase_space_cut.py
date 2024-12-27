@@ -187,11 +187,11 @@ if __name__ == "__main__":
                 halo_dfs = []
                 if dset_name == "Full":    
                     for sim in curr_test_sims:
-                        halo_dfs.append(reform_df(ML_dset_path + sim + "/" + "Train" + "/halo_info/"))
-                        halo_dfs.append(reform_df(ML_dset_path + sim + "/" + "Test" + "/halo_info/"))
+                        halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + "Train" + "/halo_info/"))
+                        halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/"))
                 else:
                     for sim in curr_test_sims:
-                        halo_dfs.append(reform_df(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
+                        halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
 
                 halo_df = pd.concat(halo_dfs)
                 

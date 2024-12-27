@@ -91,7 +91,7 @@ if __name__ == '__main__':
                 X_df = data[feature_columns]
                 y_df = data[target_column]
                 
-        preds = make_preds(client, bst, X_df, dask = True, report_name="Report", print_report=False)
+        preds = make_preds(client, bst, X_df, dask = True)
         X_df = X_df.to_backend('pandas')
         y_df = y_df.to_backend('pandas')
 

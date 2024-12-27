@@ -7,7 +7,7 @@ import json
 import multiprocessing as mp
 import pandas as pd
 
-from utils.ML_support import get_CUDA_cluster, get_combined_name, parse_ranges, create_nu_string, reform_df, load_data, eval_model
+from utils.ML_support import get_CUDA_cluster, get_combined_name, parse_ranges, create_nu_string, reform_dataset_dfs, load_data, eval_model
 from utils.data_and_loading_functions import create_directory, timed, save_pickle
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -142,11 +142,11 @@ if __name__ == "__main__":
                 halo_dfs = []
                 if dset_name == "Full":    
                     for sim in curr_test_sims:
-                        halo_dfs.append(reform_df(ML_dset_path + sim + "/" + "Train" + "/halo_info/"))
-                        halo_dfs.append(reform_df(ML_dset_path + sim + "/" + "Test" + "/halo_info/"))
+                        halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + "Train" + "/halo_info/"))
+                        halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/"))
                 else:
                     for sim in curr_test_sims:
-                        halo_dfs.append(reform_df(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
+                        halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
 
                 halo_df = pd.concat(halo_dfs)
                 

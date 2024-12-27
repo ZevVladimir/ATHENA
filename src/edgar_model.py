@@ -15,7 +15,7 @@ import multiprocessing as mp
 
 from utils.data_and_loading_functions import timed, parse_ranges, create_nu_string, create_directory
 from utils.calculation_functions import calculate_density
-from utils.ML_support import get_CUDA_cluster, get_combined_name, reform_df, load_data, load_sprta_mass_prf
+from utils.ML_support import get_CUDA_cluster, get_combined_name, reform_dataset_dfs, load_data, load_sprta_mass_prf
 from sparta_tools import sparta # type: ignore
 from colossus.cosmology import cosmology
 
@@ -307,11 +307,11 @@ if __name__ == '__main__':
                 halo_dfs = []
                 if dset_name == "Full":    
                     for sim in curr_test_sims:
-                        halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + "Train" + "/halo_info/"))
-                        halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + "Test" + "/halo_info/"))
+                        halo_dfs.append(reform_dataset_dfs(path_to_calc_info + sim + "/" + "Train" + "/halo_info/"))
+                        halo_dfs.append(reform_dataset_dfs(path_to_calc_info + sim + "/" + "Test" + "/halo_info/"))
                 else:
                     for sim in curr_test_sims:
-                        halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + dset_name + "/halo_info/"))
+                        halo_dfs.append(reform_dataset_dfs(path_to_calc_info + sim + "/" + dset_name + "/halo_info/"))
 
                 halo_df = pd.concat(halo_dfs)
                 

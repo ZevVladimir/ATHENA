@@ -9,7 +9,7 @@ import seaborn as sns
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from utils.data_and_loading_functions import create_directory, parse_ranges,create_nu_string
+from .data_and_loading_functions import create_directory
 
 plt.rcParams['mathtext.fontset'] = 'dejavuserif'
 plt.rcParams['font.family'] = 'serif'

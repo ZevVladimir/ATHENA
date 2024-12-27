@@ -46,7 +46,7 @@ test_comb_name = get_combined_name(test_sims[0])
 plot_loc = model_save_loc + dset_name + "_" + test_comb_name + "/plots/halo_slices/"
 create_directory(plot_loc)
 
-halo_ddf = reform_df(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
+halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
 all_idxs = halo_ddf["Halo_indices"].values
 
 with open(ML_dset_path + sim + "/p_ptl_tree.pickle", "rb") as pickle_file:
