@@ -101,7 +101,7 @@ def det_halo_splits(mem_arr, mem_lim):
     return split_idxs
 
 # Perform a search around a halo to know how many particles are present. This determines sizing of files and memory usage            
-def initial_search(halo_pos, halo_r200m, comp_snap, find_mass = False, mass = 0.0, fnd_ptl_idxs = False):
+def initial_search(halo_pos, halo_r200m, comp_snap, search_lim, find_mass = False, mass = 0.0, fnd_ptl_idxs = False):
     # Choose which snapshot's tree to use
     if comp_snap:
         tree = c_ptl_tree
@@ -110,7 +110,7 @@ def initial_search(halo_pos, halo_r200m, comp_snap, find_mass = False, mass = 0.
 
     # Weed out any halos that do not have a radius
     if halo_r200m > 0:
-        idxs = tree.query_ball_point(halo_pos, r = search_rad * halo_r200m)
+        idxs = tree.query_ball_point(halo_pos, r = search_lim * halo_r200m)
         idxs = np.array(idxs)
         # how many particles are around the halo
         n_ptls = idxs.shape[0]
@@ -157,7 +157,7 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
 
             # Search around each halo again but now also get the indices of which particles belong to the halo
             with mp.Pool(processes=num_processes) as p:
-                p_use_num_ptls, p_curr_ptl_indices = zip(*p.starmap(initial_search, zip(p_use_halos_pos, p_use_halos_r200m, repeat(False), repeat(False), repeat(ptl_mass), repeat(True)), chunksize=curr_chunk_size))
+                p_use_num_ptls, p_curr_ptl_indices = zip(*p.starmap(initial_search, zip(p_use_halos_pos, p_use_halos_r200m, repeat(False), repeat(search_rad), repeat(False), repeat(ptl_mass), repeat(True)), chunksize=curr_chunk_size))
             p.close()
             p.join() 
             
@@ -221,7 +221,7 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
                 c_use_halos_r200m = sparta_output['halos']['R200m'][:,c_sparta_snap] 
 
                 with mp.Pool(processes=num_processes) as p:
-                    c_use_num_ptls, c_curr_ptl_indices = zip(*p.starmap(initial_search, zip(c_use_halos_pos, c_use_halos_r200m,repeat(False),repeat(False),repeat(ptl_mass),repeat(True)), chunksize=curr_chunk_size))
+                    c_use_num_ptls, c_curr_ptl_indices = zip(*p.starmap(initial_search, zip(c_use_halos_pos, c_use_halos_r200m,repeat(False),repeat(search_rad),repeat(False),repeat(ptl_mass),repeat(True)), chunksize=curr_chunk_size))
                 p.close()
                 p.join() 
 
@@ -359,9 +359,9 @@ with timed("Startup"):
 
     # load particle information for primary snap
     with timed("p_snap ptl load"):
-        p_ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(p_snap), p_snap_path) * 10**3 * p_scale_factor # kpc/h
+        p_ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(p_snap), p_snap_path)
         p_ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(p_snap), p_snap_path) # km/s
-        p_ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(p_snap), p_snap_path)
+        p_ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(p_snap), p_snap_path) * 10**3 * p_scale_factor # kpc/h
 
     # Load halo information for primary snap
     with timed("p_snap SPARTA load"):
@@ -421,15 +421,18 @@ with timed("Startup"):
         
         # Get the number of particles per halo in the primary snapshot
         with mp.Pool(processes=num_processes) as p:               
-            num_ptls = p.starmap(initial_search, zip(p_halos_pos[match_halo_idxs], p_halos_r200m[match_halo_idxs],repeat(False),repeat(False),repeat(ptl_mass),repeat(False)), chunksize=curr_chunk_size)
+            # First search within r200m to filter out too small halos (we chose 200 particles as a minimum)
+            num_ptls_r200m = p.starmap(initial_search, zip(p_halos_pos[match_halo_idxs], p_halos_r200m[match_halo_idxs],repeat(False),repeat(1.0),repeat(False),repeat(ptl_mass),repeat(False)), chunksize=curr_chunk_size)
+            num_ptls_r200m = np.array(num_ptls_r200m)
+            res_mask = np.where(num_ptls_r200m >= 200)[0]
             
-            # We want to remove any halos that have less than 200 particles as they are too noisy
-            num_ptls = np.array(num_ptls)
-            res_mask = np.where(num_ptls >= 200)[0]
-
             if res_mask.size > 0:
-                num_ptls = num_ptls[res_mask]
                 match_halo_idxs = match_halo_idxs[res_mask]
+                
+            # Then do the real search at the user specified radius
+            num_ptls = p.starmap(initial_search, zip(p_halos_pos[match_halo_idxs], p_halos_r200m[match_halo_idxs],repeat(False),repeat(search_rad),repeat(False),repeat(ptl_mass),repeat(False)), chunksize=curr_chunk_size)
+            
+            num_ptls = np.array(num_ptls)
             
             if pickle_data:
                 save_pickle(num_ptls,save_location + "num_ptls.pickle")

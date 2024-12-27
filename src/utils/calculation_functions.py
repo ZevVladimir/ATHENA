@@ -9,6 +9,15 @@ from colossus.halo.mass_so import M_to_R
 
 G = constants.G # kpc km^2 / M_⊙ / s^2
 
+# How much memory a halo takes up. Needs to be adjusted if outputted parameters are changed
+def calc_halo_mem(n_ptl):
+    # rad, rad_vel, tang_vel each 4bytes and two snaps
+    # HIPIDS is 8 bytes 
+    # orbit/infall is one byte
+    n_bytes = (6 * 4 + 1 + 8) * n_ptl
+    
+    return n_bytes
+
 # Calculate radii of particles relative to a halo and the difference in each coordinate for particles and halos for use in calculating rhat
 def calc_radius(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_particles, box_size):
     x_dist = particle_x - halo_x
@@ -143,7 +152,22 @@ def calc_t_dyn(halo_r200m, red_shift):
 
     return t_dyn
 
-def update_density_prf(calc_prf, radii, idx, start_bin, end_bin, mass):
+# Get the difference in the number of particles present in a mass profile and a dataset
+# This can be useful to create a simple plot of which bins in a generated density profile do not match
+def diff_n_prf(diff_n_ptl, radii, idx, start_bin, end_bin, mass, act_prf):
+    radii_within_range = np.where((radii >= start_bin) & (radii < end_bin))[0]
+    
+    # If it isn't the first bin simple find the difference between this and the last bin in the profile and then sutbraction
+    if radii_within_range.size != 0 and idx != 0:
+        diff_n_ptl[idx] = np.round((act_prf[idx] - act_prf[idx-1])/mass) - radii_within_range.size
+    # If this is the first bin simply subtract the number in the profile and the number in this radial bin
+    elif idx == 0:
+        diff_n_ptl[idx] = np.round(act_prf[idx]/mass) - radii_within_range.size
+        
+    return diff_n_ptl
+
+# Get the mass of the next bin of a profile
+def update_mass_prf(calc_prf, radii, idx, start_bin, end_bin, mass):
     radii_within_range = np.where((radii >= start_bin) & (radii < end_bin))[0]
     
     # If there are particles in this bin and its not the first bin
@@ -165,20 +189,7 @@ def update_density_prf(calc_prf, radii, idx, start_bin, end_bin, mass):
     
     return calc_prf
 
-def diff_n_prf(diff_n_ptl, radii, idx, start_bin, end_bin, mass, act_prf):
-    radii_within_range = np.where((radii >= start_bin) & (radii < end_bin))[0]
-    
-    if radii_within_range.size != 0 and idx != 0:
-        diff_n_ptl[idx] = np.round((act_prf[idx] - act_prf[idx-1])/mass) - radii_within_range.size
-    elif radii_within_range.size != 0 and idx == 0:
-        diff_n_ptl[idx] = np.round(act_prf[idx]/mass) - radii_within_range.size
-    elif radii_within_range.size == 0 and idx != 0:
-        diff_n_ptl[idx] = np.round((act_prf[idx] - act_prf[idx-1])/mass) - radii_within_range.size
-    else:
-        diff_n_ptl[idx] = np.round((act_prf[idx])/mass)
-        
-    return diff_n_ptl
-
+# Create a mass profile from particle information
 def create_mass_prf(radii, orbit_assn, prf_bins, mass):  
     # Create bins for the density profile calculation
     num_prf_bins = prf_bins.shape[0] - 1
@@ -188,6 +199,7 @@ def create_mass_prf(radii, orbit_assn, prf_bins, mass):
     calc_mass_prf_all = np.zeros(num_prf_bins)
 
     # Can adjust this to cut out halos that don't have enough particles within R200m
+    # Anything at 200 or less (shouldn't) doesn't do anything as these halos should already be filtered out when generating the datasets
     min_ptl = 200
     ptl_in_r200m = np.where(radii <= 1)[0].size
     if ptl_in_r200m < min_ptl:
@@ -205,14 +217,15 @@ def create_mass_prf(radii, orbit_assn, prf_bins, mass):
             start_bin = prf_bins[i]
             end_bin = prf_bins[i+1]          
 
-            calc_mass_prf_all  = update_density_prf(calc_mass_prf_all, radii, i, start_bin, end_bin, mass)    
-            calc_mass_prf_orb = update_density_prf(calc_mass_prf_orb, orbit_radii, i, start_bin, end_bin, mass)      
-            calc_mass_prf_inf = update_density_prf(calc_mass_prf_inf, infall_radii, i, start_bin, end_bin, mass)      
+            calc_mass_prf_all  = update_mass_prf(calc_mass_prf_all, radii, i, start_bin, end_bin, mass)    
+            calc_mass_prf_orb = update_mass_prf(calc_mass_prf_orb, orbit_radii, i, start_bin, end_bin, mass)      
+            calc_mass_prf_inf = update_mass_prf(calc_mass_prf_inf, infall_radii, i, start_bin, end_bin, mass)      
     
         m200m = ptl_in_r200m * mass
     
     return calc_mass_prf_all,calc_mass_prf_orb, calc_mass_prf_inf, m200m
 
+# Used to combine the profiles that are output from multiprocessing
 def comb_prf(prf, num_halo, dtype):
     if num_halo > 1:
         prf = np.stack(prf, axis=0)
@@ -224,9 +237,10 @@ def comb_prf(prf, num_halo, dtype):
 
     return prf
 
+# Apply two filters:
+# 1. For each bin checking how many halos have particles in that bin and if there are less than the desired number of halos then treat that bin as having no halos (Reduces noise in density profile plots)
+# 2. (If desired) will filter by the supplied nu (peak height) range
 def filter_prf(calc_prf, act_prf, min_disp_halos, nu_fltr = None):
-    # for each bin checking how many halos have particles there
-    # if there are less than half the total number of halos then just treat that bin as having 0
     for i in range(calc_prf.shape[1]):
         if np.where(calc_prf[:,i]>0)[0].shape[0] < min_disp_halos:
             calc_prf[:,i] = np.nan
@@ -238,6 +252,7 @@ def filter_prf(calc_prf, act_prf, min_disp_halos, nu_fltr = None):
         
     return calc_prf, act_prf        
 
+# Creates a stacked mass profile for an entire dataset by generating mass profiles for each halo and combining them
 def create_stack_mass_prf(splits, radii, halo_first, halo_n, mass, orbit_assn, prf_bins, use_mp = True, all_z = []):
     calc_mass_prf_orb_lst = []
     calc_mass_prf_inf_lst = []
@@ -294,14 +309,6 @@ def create_stack_mass_prf(splits, radii, halo_first, halo_n, mass, orbit_assn, p
     calc_r200m = np.concatenate(calc_r200m_lst)    
     
     return calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m.flatten()
-
-def calc_halo_mem(n_ptl):
-    # rad, rad_vel, tang_vel each 4bytes and two snaps
-    # HIPIDS is 8 bytes 
-    # orbit/infall is one byte
-    n_bytes = (6 * 4 + 1 + 8) * n_ptl
-    
-    return n_bytes
 
 # For a halo calculate the radius, radial velocity, tangential velocity for each particle, determine the particle's classification and assigne each particle a unique particle id-halo index id (HIPID)
 def calc_halo_params(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_pos, curr_ptl_vel, 
