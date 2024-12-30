@@ -48,8 +48,8 @@ opt_scale_rad = config.getboolean("XGBOOST","opt_scale_rad")
 dens_prf_plt = config.getboolean("XGBOOST","dens_prf_plt")
 misclass_plt = config.getboolean("XGBOOST","misclass_plt")
 fulldist_plt = config.getboolean("XGBOOST","fulldist_plt")
-per_err_plt = config.getboolean("XGBOOST","per_err_plt")
 
+dens_prf_nu_split = config.getboolean("XGBOOST","dens_prf_nu_split")
 nu_splits = parse_ranges(nu_splits)
 nu_string = create_nu_string(nu_splits)
 
@@ -305,7 +305,7 @@ if __name__ == "__main__":
         X_test = test_data[feat_cols]
         y_test = test_data[tar_col]
         
-        eval_model(model_info, client, bst, use_sims=model_sims, dst_type="Test", X=X_test, y=y_test, halo_ddf=halo_df, combined_name=combined_name, plot_save_loc=plot_loc, dens_prf=dens_prf_plt,missclass=misclass_plt,full_dist=fulldist_plt,per_err=per_err_plt)
+        eval_model(model_info, client, bst, use_sims=model_sims, dst_type="Test", X=X_test, y=y_test, halo_ddf=halo_df, plot_save_loc=plot_loc, dens_prf=dens_prf_plt,missclass=misclass_plt,full_dist=fulldist_plt,split_nu=dens_prf_nu_split)
    
     # Save the updated model and model info file
     bst.save_model(model_save_loc + model_dir + ".json")

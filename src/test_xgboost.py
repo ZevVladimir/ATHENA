@@ -39,7 +39,7 @@ dens_prf_plt = config.getboolean("XGBOOST","dens_prf_plt")
 misclass_plt = config.getboolean("XGBOOST","misclass_plt")
 fulldist_plt = config.getboolean("XGBOOST","fulldist_plt")
 io_frac_plt = config.getboolean("XGBOOST","io_frac_plt")
-per_err_plt = config.getboolean("XGBOOST","per_err_plt")
+dens_prf_nu_split = config.getboolean("XGBOOST","dens_prf_nu_split")
 
 nu_splits = config["XGBOOST"]["nu_splits"]
 nu_splits = parse_ranges(nu_splits)
@@ -156,8 +156,8 @@ if __name__ == "__main__":
                 X = data[feature_columns]
                 y = data[target_column]
 
-                eval_model(model_info, client, bst, use_sims=curr_test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, combined_name=test_comb_name, plot_save_loc=plot_loc,dens_prf=dens_prf_plt,missclass=misclass_plt,\
-                    full_dist=fulldist_plt,io_frac=io_frac_plt,per_err=per_err_plt, split_nu=True)
+                eval_model(model_info, client, bst, use_sims=curr_test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, plot_save_loc=plot_loc,dens_prf=dens_prf_plt,missclass=misclass_plt,\
+                    full_dist=fulldist_plt,io_frac=io_frac_plt,split_nu=dens_prf_nu_split)
                 del data 
                 del X
                 del y

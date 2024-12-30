@@ -417,6 +417,7 @@ def load_data(client, sims, dset_name, bin_edges = None, limit_files = False, sc
     else:
         return all_dask_dfs,act_scale_pos_weight
 
+# Reconstruct SPARTA's mass profiles and stack them together for a list of sims
 def load_sprta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):                
     mass_prf_all_list = []
     mass_prf_1halo_list = []
@@ -483,7 +484,8 @@ def load_sprta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
     else:
         return mass_prf_all,mass_prf_1halo,all_masses,bins
 
-def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, combined_name, plot_save_loc, dens_prf = False,missclass=False,full_dist=False,io_frac=False,per_err=False,split_nu=False): 
+# Evaluate an input model by generating plots of comparisons between the model's predictions and SPARTA
+def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, plot_save_loc, dens_prf = False,missclass=False,full_dist=False,io_frac=False,split_nu=False): 
     with timed("Predictions"):
         print(f"Starting predictions for {y.size.compute():.3e} particles")
         preds = make_preds(client, model, X)
@@ -497,6 +499,7 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
 
     num_bins = 30
 
+    # Generate a comparative density profile
     if dens_prf:
         halo_first = halo_ddf["Halo_first"].values
         halo_n = halo_ddf["Halo_n"].values
@@ -533,9 +536,11 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
         tot_num_halos = halo_n.shape[0]
         min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
         
+        # Get SPARTA's mass profiles
         act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sprta_mass_prf(sim_splits,all_idxs,use_sims)
         act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
         
+        # Create mass profiles from the model's predictions
         calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, use_mp=True, all_z=all_z)
 
         # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
@@ -553,6 +558,7 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
         act_dens_prf_orb = calculate_density(act_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
         act_dens_prf_inf = calculate_density(act_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
 
+        # If we want the density profiles to only consist of halos of a specific peak height (nu) bin 
         if split_nu:
             all_prf_lst = []
             orb_prf_lst = []
@@ -579,8 +585,8 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
                 warnings.simplefilter("ignore", category=RuntimeWarning)
                 compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_",use_med=True)
                 compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_",use_med=False)
-        
-        
+    
+    # Both the missclassification and distribution and infalling orbiting ratio plots are 2D histograms and the model parameters and allow for linear-log split scaling
     if missclass or full_dist or io_frac:       
         p_corr_labels=y.compute().values.flatten()
         p_ml_labels=preds.values
@@ -602,33 +608,24 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
             "log_rticks":log_rticks,
         }
     
+    # All parameter Distribution in 2D histograms
     if full_dist:
         plot_full_ptl_dist(p_corr_labels=p_corr_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,split_scale_dict=split_scale_dict,num_bins=num_bins,save_loc=plot_save_loc)
+    # All parameter Distribution of misclassifications of the model in 2D histograms
     if missclass:
+        # Dataset name is used to save to model info the misclassification rates
         curr_sim_name = ""
         for sim in use_sims:
             curr_sim_name += sim
             curr_sim_name += "_"
         curr_sim_name += dst_type
         plot_miss_class_dist(p_corr_labels=p_corr_labels,p_ml_labels=p_ml_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,split_scale_dict=split_scale_dict,num_bins=num_bins,save_loc=plot_save_loc,model_info=model_info,dataset_name=curr_sim_name)
+    # All parameter Distribution of the ratio between the number of infalling and number of orbiting particlesin 2D histograms
     if io_frac:
         inf_orb_frac(p_corr_labels=p_corr_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,split_scale_dict=split_scale_dict,num_bins=num_bins,save_loc=plot_save_loc)
-    if per_err:
-        with h5py.File(SPARTA_hdf5_path,"r") as f:
-            dic_sim = {}
-            grp_sim = f['config']['anl_prf']
-            for f in grp_sim.attrs:
-                dic_sim[f] = grp_sim.attrs[f]
-            bins = dic_sim["r_bins_lin"]
-        plot_per_err(bins,X["p_Scaled_radii"].values.compute(),y.compute().values.flatten(),preds.values,plot_save_loc, "$r/r_{200m}$","rad")
-        # plot_per_err(bins,X["p_Radial_vel"].values.compute(),y.compute().values.flatten(),preds.values,plot_save_loc, "$v_r/v_{200m}$","rad_vel")
-        # plot_per_err(bins,X["p_Tangential_vel"].values.compute(),y.compute().values.flatten(),preds.values,plot_save_loc, "$v_t/v_{200m}$","tang_vel")
-
-def plot_tree(bst,tree_num,save_loc):
-    fig, ax = plt.subplots(figsize=(400, 10))
-    xgb.plot_tree(bst, num_trees=tree_num, ax=ax,rankdir='LR')
-    fig.savefig(save_loc + "/tree_plot.png")
        
+# Loss function based off how close the reproduced density profile is to the actual profile
+# Can use either only the orbiting profile, only the infalling one, or both
 def dens_prf_loss(halo_ddf,use_sims,radii,labels,use_orb_prf,use_inf_prf):
     halo_first = halo_ddf["Halo_first"].values
     halo_n = halo_ddf["Halo_n"].values
@@ -678,6 +675,7 @@ def dens_prf_loss(halo_ddf,use_sims,radii,labels,use_orb_prf,use_inf_prf):
         print(inf_loss)
         return inf_loss
 
+# Objective function for the optimization of a model that is adjusting the weighting of particles based on radius
 def weight_objective(params,client,model_params,ptl_ddf,halo_ddf,use_sims,feat_cols,tar_col):
     train_dst,val_dst,train_halos,val_halos = split_data_by_halo(0.6,halo_ddf,ptl_ddf,return_halo=True)
 
@@ -740,6 +738,7 @@ def weight_objective(params,client,model_params,ptl_ddf,halo_ddf,use_sims,feat_c
 
     return accuracy
 
+# Objective function for the optimization of a model that is adjusting the number of particles beyond a certain radius based on a percetnage of particles within that radius
 def scal_rad_objective(params,client,model_params,ptl_ddf,halo_ddf,use_sims,feat_cols,tar_col):
     train_dst,val_dst,train_halos,val_halos = split_data_by_halo(client,0.5,halo_ddf,ptl_ddf,return_halo=True)
     
@@ -784,6 +783,7 @@ def scal_rad_objective(params,client,model_params,ptl_ddf,halo_ddf,use_sims,feat
     
     return -accuracy
 
+# Prints which iteration of optimization and the current parameters
 def print_iteration(res):
     iteration = len(res.x_iters)
     print(f"Iteration {iteration}: Current params: {res.x_iters[-1]}, Current score: {res.func_vals[-1]}")

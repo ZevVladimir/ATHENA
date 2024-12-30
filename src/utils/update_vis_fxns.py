@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Circle
 from matplotlib.legend_handler import HandlerTuple
+import xgboost as xgb
 
 from .data_and_loading_functions import split_orb_inf, timed
 
@@ -1229,3 +1230,9 @@ def inf_orb_frac(p_corr_labels,p_r,p_rv,p_tv,c_r,c_rv,split_scale_dict,num_bins,
     
     fig.savefig(save_loc + "inf_orb_frac.png")
     plt.close()
+    
+def plot_tree(bst,tree_num,save_loc):
+    fig, ax = plt.subplots(figsize=(400, 10))
+    xgb.plot_tree(bst, num_trees=tree_num, ax=ax,rankdir='LR')
+    fig.savefig(save_loc + "/tree_plot.png")
+    
