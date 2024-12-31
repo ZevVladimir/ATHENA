@@ -819,93 +819,108 @@ def plot_halo_3d_class(ptl_pos, preds, labels, halo_pos, halo_r200m, save_loc, s
     save_path = save_loc + title + "_3d_classif_halo_dist.png"
     fig.savefig(save_path,dpi=300)
 
-def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,save_loc,search_rad=0,title=""):
+
+
+def plot_halo_slice(ptl_pos, labels, halo_pos, halo_r200m, save_loc, search_rad=0, title=""):
     cividis_cmap = plt.get_cmap("cividis")
     cividis_cmap.set_under(color='white')
-    cividis_cmap.set_bad(color='white') 
-    
-    ptl_pos[:,0] = ptl_pos[:,0] - halo_pos[0]
-    ptl_pos[:,1] = ptl_pos[:,1] - halo_pos[1]
-    
+    cividis_cmap.set_bad(color='white')
+
+    # Shift particle positions to be relative to halo center
+    ptl_pos[:, 0] -= halo_pos[0]
+    ptl_pos[:, 1] -= halo_pos[1]
+
+    # Determine plot limits
     if search_rad > 0:
-        lim = (search_rad * halo_r200m) + 0.05 * (search_rad * halo_r200m)
-        xlim = lim
-        ylim = lim
+        lim = search_rad * halo_r200m * 1.05
+        xlim, ylim = lim, lim
     else:
-        xlim = np.max(np.abs(ptl_pos[:,0]))
-        ylim = np.max(np.abs(ptl_pos[:,1]))
-        
+        xlim = np.max(np.abs(ptl_pos[:, 0]))
+        ylim = np.max(np.abs(ptl_pos[:, 1]))
+
     nbins = 250
 
-    hist,_,_ = np.histogram2d(ptl_pos[:,0],ptl_pos[:,1],bins=nbins,range=[[-xlim,xlim],[-ylim,ylim]])
-    max_ptl = np.max(hist)
-    min_ptl = np.min(hist[hist > 0])
+    # Calculate 2D histograms
+    all_hist, xedges, yedges = np.histogram2d(
+        ptl_pos[:, 0], ptl_pos[:, 1], bins=nbins, range=[[-xlim, xlim], [-ylim, ylim]]
+    )
+    orb_hist, _, _ = np.histogram2d(
+        ptl_pos[labels == 1, 0], ptl_pos[labels == 1, 1], bins=nbins, range=[[-xlim, xlim], [-ylim, ylim]]
+    )
+    inf_hist, _, _ = np.histogram2d(
+        ptl_pos[labels == 0, 0], ptl_pos[labels == 0, 1], bins=nbins, range=[[-xlim, xlim], [-ylim, ylim]]
+    )
 
-    if search_rad > 0:
-        search_circle_0 = Circle((0,0),radius=search_rad*halo_r200m,edgecolor="green",facecolor='none',linestyle="--",fill=False,label="Search radius: 4R200m")
-        search_circle_1 = Circle((0,0),radius=search_rad*halo_r200m,edgecolor="green",facecolor='none',linestyle="--",fill=False,label="Search radius: 4R200m")
-        search_circle_2 = Circle((0,0),radius=search_rad*halo_r200m,edgecolor="green",facecolor='none',linestyle="--",fill=False,label="Search radius: 4R200m")
-    
-    r200m_circle_0 = Circle((0,0),radius=halo_r200m,edgecolor="black",facecolor='none',linestyle="--",linewidth=1,fill=False,label="R200m")
-    r200m_circle_1 = Circle((0,0),radius=halo_r200m,edgecolor="black",facecolor='none',linestyle="--",linewidth=1,fill=False,label="R200m")
-    r200m_circle_2 = Circle((0,0),radius=halo_r200m,edgecolor="black",facecolor='none',linestyle="--",linewidth=1,fill=False,label="R200m")
-            
+    # Normalize histograms by bin area
+    dx = np.diff(xedges)[0]
+    dy = np.diff(yedges)[0]
+    bin_area = dx * dy
+    all_hist = all_hist / bin_area
+    orb_hist = orb_hist / bin_area
+    inf_hist = inf_hist / bin_area
+
+    # Set up circles for visual aids
+    search_circle_1 = Circle((0, 0), radius=search_rad * halo_r200m, edgecolor="green", facecolor='none', linestyle="--", fill=False)
+    search_circle_2 = Circle((0, 0), radius=search_rad * halo_r200m, edgecolor="green", facecolor='none', linestyle="--", fill=False)
+    search_circle_3 = Circle((0, 0), radius=search_rad * halo_r200m, edgecolor="green", facecolor='none', linestyle="--", fill=False)
+    r200m_circle_1 = Circle((0, 0), radius=halo_r200m, edgecolor="black", facecolor='none', linestyle="--", linewidth=1, fill=False)
+    r200m_circle_2 = Circle((0, 0), radius=halo_r200m, edgecolor="black", facecolor='none', linestyle="--", linewidth=1, fill=False)
+    r200m_circle_3 = Circle((0, 0), radius=halo_r200m, edgecolor="black", facecolor='none', linestyle="--", linewidth=1, fill=False)
+
+    # Set up plot parameters
     axisfontsize = 10
     titlefontsize = 12
     legendfontsize = 8
     tickfontsize = 8
-    
-    widths = [4,4,4,.5]
-    heights = [0.12]
-    
-    fig = plt.figure(constrained_layout=True,figsize=(9,3))
-    gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
-    
-    all_ax = fig.add_subplot(gs[0])
-    orb_ax = fig.add_subplot(gs[1])
-    inf_ax = fig.add_subplot(gs[2])
-    
-    norm = mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl)
-    
-    all_ax.hist2d(ptl_pos[:,0],ptl_pos[:,1],bins=nbins,range=[[-xlim,xlim],[-ylim,ylim]],norm=norm,cmap=cividis_cmap)
-    all_ax.add_patch(r200m_circle_0)
-    all_ax.set_xlabel(r"$x [h^{-1}kpc]$",fontsize=axisfontsize)
-    all_ax.set_ylabel(r"$y [h^{-1}kpc]$",fontsize=axisfontsize)
-    all_ax.set_title("All Particles",fontsize=titlefontsize)
-    all_ax.tick_params(axis='x', which='major', labelsize=tickfontsize, direction="in", colors="black",labelcolor="black",length=3,width=1.5)
-    all_ax.tick_params(axis='y', which='major', labelsize=tickfontsize, direction="in", colors="black",labelcolor="black",length=3,width=1.5)
-    all_ax.set_aspect('equal')
-    
-    orb_ax.hist2d(ptl_pos[np.where(labels==1)[0],0],ptl_pos[np.where(labels==1)[0],1],bins=nbins,range=[[-xlim,xlim],[-ylim,ylim]],norm=norm,cmap=cividis_cmap)
-    orb_ax.add_patch(r200m_circle_1)
-    orb_ax.set_xlabel(r"$x [h^{-1}kpc]$",fontsize=axisfontsize)
-    orb_ax.set_title("Orbiting Particles",fontsize=titlefontsize)
-    orb_ax.tick_params(axis='x', which='major', labelsize=tickfontsize, direction="in", colors="black",labelcolor="black",length=3,width=1.5)
-    orb_ax.tick_params(axis='y', which='both',left=False,labelleft=False, direction="in", colors="black",labelcolor="black",length=3,width=1.5)
-    # ax[1].legend(fontsize=legendfontsize)
-    orb_ax.set_aspect('equal')
 
-    inf_ax.hist2d(ptl_pos[np.where(labels==0)[0],0],ptl_pos[np.where(labels==0)[0],1],bins=nbins,range=[[-xlim,xlim],[-ylim,ylim]],norm=norm,cmap=cividis_cmap)
-    inf_ax.add_patch(r200m_circle_2)
-    inf_ax.set_xlabel(r"$x [h^{-1}kpc]$",fontsize=axisfontsize)
-    inf_ax.set_title("Infalling Particles",fontsize=titlefontsize)
-    inf_ax.tick_params(axis='x', which='major', labelsize=tickfontsize, direction="in", colors="black",labelcolor="black",length=3,width=1.5)
-    inf_ax.tick_params(axis='y', which='both',left=False,labelleft=False, direction="in", colors="black",labelcolor="black",length=3,width=1.5)
-    # ax[2].legend(fontsize=legendfontsize)
-    inf_ax.set_aspect('equal')
-    
+    # Create figure and subplots
+    fig, axs = plt.subplots(1, 3, figsize=(12, 4), constrained_layout=True)
+    norm = mpl.colors.LogNorm(vmin=np.min(all_hist[all_hist > 0]), vmax=np.max(all_hist))
+
+    # Plot all particles
+    im_all = axs[0].imshow(
+        all_hist.T, origin='lower', extent=[-xlim, xlim, -ylim, ylim], cmap=cividis_cmap, norm=norm
+    )
+    axs[0].add_patch(r200m_circle_1)
     if search_rad > 0:
-        all_ax.add_patch(search_circle_0)
-        orb_ax.add_patch(search_circle_1)
-        inf_ax.add_patch(search_circle_2) 
+        axs[0].add_patch(search_circle_1)
+    axs[0].set_title("All Particles", fontsize=titlefontsize)
+    axs[0].set_xlabel(r"$x [h^{-1}kpc]$", fontsize=axisfontsize)
+    axs[0].set_ylabel(r"$y [h^{-1}kpc]$", fontsize=axisfontsize)
 
-    all_ax.legend(fontsize=legendfontsize)
-    color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cividis_cmap), cax=plt.subplot(gs[-1]))
-    color_bar.set_label(r"$N_{ptl}$",fontsize=10)
-    color_bar.ax.tick_params(which="major",direction="in",labelsize=8,length=5,width=1.5)
-    color_bar.ax.tick_params(which="minor",direction="in",labelsize=8,length=2.5,width=0.75)
-    
-    fig.savefig(save_loc+title+"halo_dist.png",dpi=500)
+    # Plot orbiting particles
+    im_orb = axs[1].imshow(
+        orb_hist.T, origin='lower', extent=[-xlim, xlim, -ylim, ylim], cmap=cividis_cmap, norm=norm
+    )
+    axs[1].add_patch(r200m_circle_2)
+    if search_rad > 0:
+        axs[1].add_patch(search_circle_2)
+    axs[1].set_title("Orbiting Particles", fontsize=titlefontsize)
+    axs[1].set_xlabel(r"$x [h^{-1}kpc]$", fontsize=axisfontsize)
+
+    # Plot infalling particles
+    im_inf = axs[2].imshow(
+        inf_hist.T, origin='lower', extent=[-xlim, xlim, -ylim, ylim], cmap=cividis_cmap, norm=norm
+    )
+    axs[2].add_patch(r200m_circle_3)
+    if search_rad > 0:
+        axs[2].add_patch(search_circle_3)
+    axs[2].set_title("Infalling Particles", fontsize=titlefontsize)
+    axs[2].set_xlabel(r"$x [h^{-1}kpc]$", fontsize=axisfontsize)
+
+    # Adjust tick parameters and set aspect ratio
+    for ax in axs:
+        ax.tick_params(axis='both', which='major', labelsize=tickfontsize, direction="in", length=3, width=1.5)
+        ax.set_aspect('equal')
+
+    # Add colorbar
+    cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cividis_cmap), ax=axs, orientation='vertical', fraction=0.02, pad=0.04)
+    cbar.set_label(r"$N_{ptl} / dx / dy$", fontsize=10)
+    cbar.ax.tick_params(which="major", direction="in", labelsize=8, length=5, width=1.5)
+
+    # Save the figure
+    plt.savefig(f"{save_loc}{title}_halo_dist.png", dpi=500)
+    plt.close(fig)
 
 # Profiles should be a list [calc_prf,act_prf]
 # You can either use the median plots with use_med=True or the average with use_med=False
