@@ -836,11 +836,11 @@ def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,save_loc,search_rad=0,tit
         ylim = np.max(np.abs(ptl_pos[:,1]))
         
     nbins = 250
-    
-    hist = np.histogram2d(ptl_pos[:,0],ptl_pos[:,1],bins=nbins,range=[[-xlim,xlim],[-ylim,ylim]])
-    max_ptl = np.max(hist[0])
-    min_ptl = 1e-4
-    
+
+    hist,_,_ = np.histogram2d(ptl_pos[:,0],ptl_pos[:,1],bins=nbins,range=[[-xlim,xlim],[-ylim,ylim]])
+    max_ptl = np.max(hist)
+    min_ptl = np.min(hist[hist > 0])
+
     if search_rad > 0:
         search_circle_0 = Circle((0,0),radius=search_rad*halo_r200m,edgecolor="green",facecolor='none',linestyle="--",fill=False,label="Search radius: 4R200m")
         search_circle_1 = Circle((0,0),radius=search_rad*halo_r200m,edgecolor="green",facecolor='none',linestyle="--",fill=False,label="Search radius: 4R200m")
@@ -865,7 +865,9 @@ def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,save_loc,search_rad=0,tit
     orb_ax = fig.add_subplot(gs[1])
     inf_ax = fig.add_subplot(gs[2])
     
-    all_ax.hist2d(ptl_pos[:,0],ptl_pos[:,1],bins=nbins,vmax=max_ptl,range=[[-xlim,xlim],[-ylim,ylim]],norm="log",cmap=cividis_cmap)
+    norm = mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl)
+    
+    all_ax.hist2d(ptl_pos[:,0],ptl_pos[:,1],bins=nbins,range=[[-xlim,xlim],[-ylim,ylim]],norm=norm,cmap=cividis_cmap)
     all_ax.add_patch(r200m_circle_0)
     all_ax.set_xlabel(r"$x [h^{-1}kpc]$",fontsize=axisfontsize)
     all_ax.set_ylabel(r"$y [h^{-1}kpc]$",fontsize=axisfontsize)
@@ -874,7 +876,7 @@ def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,save_loc,search_rad=0,tit
     all_ax.tick_params(axis='y', which='major', labelsize=tickfontsize, direction="in", colors="black",labelcolor="black",length=3,width=1.5)
     all_ax.set_aspect('equal')
     
-    orb_ax.hist2d(ptl_pos[np.where(labels==1)[0],0],ptl_pos[np.where(labels==1)[0],1],bins=nbins,vmax=max_ptl,range=[[-xlim,xlim],[-ylim,ylim]],norm="log",cmap=cividis_cmap)
+    orb_ax.hist2d(ptl_pos[np.where(labels==1)[0],0],ptl_pos[np.where(labels==1)[0],1],bins=nbins,range=[[-xlim,xlim],[-ylim,ylim]],norm=norm,cmap=cividis_cmap)
     orb_ax.add_patch(r200m_circle_1)
     orb_ax.set_xlabel(r"$x [h^{-1}kpc]$",fontsize=axisfontsize)
     orb_ax.set_title("Orbiting Particles",fontsize=titlefontsize)
@@ -883,7 +885,7 @@ def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,save_loc,search_rad=0,tit
     # ax[1].legend(fontsize=legendfontsize)
     orb_ax.set_aspect('equal')
 
-    inf_ax.hist2d(ptl_pos[np.where(labels==0)[0],0],ptl_pos[np.where(labels==0)[0],1],bins=nbins,vmax=max_ptl,range=[[-xlim,xlim],[-ylim,ylim]],norm="log",cmap=cividis_cmap)
+    inf_ax.hist2d(ptl_pos[np.where(labels==0)[0],0],ptl_pos[np.where(labels==0)[0],1],bins=nbins,range=[[-xlim,xlim],[-ylim,ylim]],norm=norm,cmap=cividis_cmap)
     inf_ax.add_patch(r200m_circle_2)
     inf_ax.set_xlabel(r"$x [h^{-1}kpc]$",fontsize=axisfontsize)
     inf_ax.set_title("Infalling Particles",fontsize=titlefontsize)
@@ -896,16 +898,15 @@ def plot_halo_slice(ptl_pos,labels,halo_pos,halo_r200m,save_loc,search_rad=0,tit
         all_ax.add_patch(search_circle_0)
         orb_ax.add_patch(search_circle_1)
         inf_ax.add_patch(search_circle_2) 
-    
+
     all_ax.legend(fontsize=legendfontsize)
-    color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=min_ptl, vmax=max_ptl), cmap=cividis_cmap), cax=plt.subplot(gs[-1]))
+    color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cividis_cmap), cax=plt.subplot(gs[-1]))
     color_bar.set_label(r"$N_{ptl}$",fontsize=10)
     color_bar.ax.tick_params(which="major",direction="in",labelsize=8,length=5,width=1.5)
     color_bar.ax.tick_params(which="minor",direction="in",labelsize=8,length=2.5,width=0.75)
     
     fig.savefig(save_loc+title+"halo_dist.png",dpi=500)
 
-    
 # Profiles should be a list [calc_prf,act_prf]
 # You can either use the median plots with use_med=True or the average with use_med=False
 def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title, use_med=True):    

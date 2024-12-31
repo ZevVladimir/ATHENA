@@ -14,7 +14,7 @@ import psutil
 from sparta_tools import sparta
 
 from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir, save_pickle
-from utils.calculation_functions import *
+from utils.calculation_functions import calc_halo_params,calc_t_dyn,calc_halo_mem
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser

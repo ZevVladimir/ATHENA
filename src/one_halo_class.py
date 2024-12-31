@@ -1,36 +1,35 @@
 from dask import array as da
 from dask.distributed import Client
-from dask_cuda import LocalCUDACluster
-
 from contextlib import contextmanager
 
 import xgboost as xgb
-from xgboost import dask as dxgb
-from xgboost.dask import DaskDMatrix
-from sklearn.metrics import classification_report
 import pickle
 import os
-import sys
 import numpy as np
 import json
 import re
-from colossus.cosmology import cosmology
+import pandas as pd
 import multiprocessing as mp
+import h5py
+from sparta_tools import sparta
 
-from utils.ML_support import *
-from utils.data_and_loading_functions import *
+from utils.ML_support import get_CUDA_cluster,get_combined_name,reform_dataset_dfs,split_calc_name,load_data,make_preds
+from utils.data_and_loading_functions import parse_ranges,create_nu_string,create_directory,find_closest_z,load_SPARTA_data,load_ptl_param
 from utils.update_vis_fxns import plot_halo_slice_class, plot_halo_3d_class
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
+
+snap_path = config["PATHS"]["snap_path"]
+SPARTA_output_path = config["PATHS"]["SPARTA_output_path"]
+
 on_zaratan = config.getboolean("MISC","on_zaratan")
 use_gpu = config.getboolean("MISC","use_gpu")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
-MLOIS_path = config["PATHS"]["path_to_MLOIS"]
-snap_path = config["PATHS"]["path_to_snaps"]
-SPARTA_output_path = config["PATHS"]["path_to_SPARTA_data"]
+snap_dir_format = config["MISC"]["snap_dir_format"]
+snap_format = config["MISC"]["snap_format"]
 sim_cosmol = config["MISC"]["sim_cosmol"]
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
@@ -39,53 +38,30 @@ else:
 match = re.search(sim_pat, curr_sparta_file)
 if match:
     sparta_name = match.group(0)
-path_to_hdf5_file = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
-path_to_pickle = config["PATHS"]["path_to_pickle"]
-ML_dset_path = config["PATHS"]["path_to_calc_info"]
-path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
-path_to_sparta = config["PATHS"]["path_to_sparta"]
-path_to_models = config["PATHS"]["path_to_xgboost"]
+SPARTA_hdf5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
 
-sim_cosmol = config["MISC"]["sim_cosmol"]
-t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
-p_red_shift = config.getfloat("SEARCH","p_red_shift")
-radii_splits = config.get("XGBOOST","rad_splits").split(',')
+ML_dset_path = config["PATHS"]["ML_dset_path"]
+path_to_models = config["PATHS"]["path_to_models"]
+
 search_rad = config.getfloat("SEARCH","search_rad")
-total_num_snaps = config.getint("SEARCH","total_num_snaps")
-test_halos_ratio = config.getfloat("XGBOOST","test_halos_ratio")
-curr_chunk_size = config.getint("SEARCH","chunk_size")
-num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
-do_hpo = config.getboolean("XGBOOST","hpo")
-# size float32 is 4 bytes
-chunk_size = int(np.floor(1e9 / (num_save_ptl_params * 4)))
-frac_training_data = 1
 model_sims = json.loads(config.get("XGBOOST","model_sims"))
 model_type = config["XGBOOST"]["model_type"]
 test_sims = json.loads(config.get("XGBOOST","test_sims"))
-eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
 
-dens_prf_plt = config.getboolean("XGBOOST","dens_prf_plt")
-misclass_plt = config.getboolean("XGBOOST","misclass_plt")
-fulldist_plt = config.getboolean("XGBOOST","fulldist_plt")
-io_frac_plt = config.getboolean("XGBOOST","io_frac_plt")
-per_err_plt = config.getboolean("XGBOOST","per_err_plt")
+nu_splits = config["XGBOOST"]["nu_splits"]
+nu_splits = parse_ranges(nu_splits)
+nu_string = create_nu_string(nu_splits)
 
-if sim_cosmol == "planck13-nbody":
-    cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
-else:
-    cosmol = cosmology.setCosmology(sim_cosmol) 
+reduce_rad = config.getfloat("XGBOOST","reduce_rad")
+reduce_perc = config.getfloat("XGBOOST", "reduce_perc")
 
-if use_gpu:
-    from cuml.metrics.accuracy import accuracy_score #TODO fix cupy installation??
-    from sklearn.metrics import make_scorer
-    import dask_ml.model_selection as dcv
-    import cudf
-elif not use_gpu and on_zaratan:
+weight_rad = config.getfloat("XGBOOST","weight_rad")
+min_weight = config.getfloat("XGBOOST","min_weight")
+
+if not use_gpu and on_zaratan:
     from dask_mpi import initialize
-    from mpi4py import MPI
     from distributed.scheduler import logger
     import socket
-    #from dask_jobqueue import SLURMCluster
 
 ###############################################################################################################
 
@@ -197,7 +173,7 @@ if __name__ == "__main__":
     all_red_shifts = dic_sim['snap_z']
     p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
 
-    halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_SPARTA_data(sparta_search_name, p_scale_factor, p_snap, p_sparta_snap)
+    halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_SPARTA_data(SPARTA_hdf5_path,sparta_search_name, p_scale_factor, p_snap, p_sparta_snap)
 
     snap_loc = snap_path + sparta_name + "/"
     p_snap_path = snap_loc + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
@@ -236,15 +212,13 @@ if __name__ == "__main__":
 
     ptl_indices = tree.query_ball_point(use_halo_pos, r = search_rad * use_halo_r200m)
     ptl_indices = np.array(ptl_indices)
-    # print(ptls_pos)
-    # print(use_halo_pos)
-    # print(use_halo_r200m)
+
     curr_ptl_pos = ptls_pos[ptl_indices]
     curr_ptl_pids = ptls_pid[ptl_indices]
 
     num_new_ptls = curr_ptl_pos.shape[0]
 
-    sparta_output = sparta.load(filename = path_to_hdf5_file, halo_ids=use_halo_id, log_level=0)
+    sparta_output = sparta.load(filename = SPARTA_hdf5_path, halo_ids=use_halo_id, log_level=0)
 
     sparta_last_pericenter_snap = sparta_output['tcr_ptl']['res_oct']['last_pericenter_snap']
     sparta_n_pericenter = sparta_output['tcr_ptl']['res_oct']['n_pericenter']
