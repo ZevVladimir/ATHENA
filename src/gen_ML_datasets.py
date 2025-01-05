@@ -263,6 +263,8 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
                 # Match the PIDs from primary snap to the secondary snap
                 # If they don't have a match set those as np.nan for xgboost 
                 match_hipid_idx = np.intersect1d(p_all_HIPIDs, c_all_HIPIDs, return_indices=True)
+                print(match_hipid_idx)
+                print(match_hipid_idx[1].shape)
                 save_scale_radii[:,0] = p_all_scal_rad
                 save_scale_radii[match_hipid_idx[1],1] = c_all_scal_rad[match_hipid_idx[2]]
                 save_rad_vel[:,0] = p_all_rad_vel

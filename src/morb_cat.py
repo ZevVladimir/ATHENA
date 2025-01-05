@@ -106,7 +106,7 @@ def search_halos(snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_pids, curr_
     
     m_orb = np.where(curr_orb_assn == 1)[0].shape[0] * mass  
     
-    halo_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200c")       
+    halo_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200m")       
     halo_id = p_halos_id[curr_halo_idx]
     
     curr_orb_pid = curr_ptl_pids[np.where(curr_orb_assn == 1)[0]]

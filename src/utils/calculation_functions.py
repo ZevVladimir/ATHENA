@@ -34,7 +34,7 @@ def calc_radius(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_
     particle_x[x_within_plus] = particle_x[x_within_plus] + box_size
     particle_x[x_within_minus] = particle_x[x_within_minus] - box_size
     
-    coord_diff[:,0] = particle_x - halo_x
+    coord_diff[:,0] = halo_x - particle_x
     
     y_within_plus = np.where((y_dist + box_size) < half_box_size)
     y_within_minus = np.where((y_dist - box_size) > -half_box_size)
@@ -42,7 +42,7 @@ def calc_radius(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_
     particle_y[y_within_plus] = particle_y[y_within_plus] + box_size
     particle_y[y_within_minus] = particle_y[y_within_minus] - box_size
     
-    coord_diff[:,1] = particle_y - halo_y
+    coord_diff[:,1] = halo_y - particle_y
     
     z_within_plus = np.where((z_dist + box_size) < half_box_size)
     z_within_minus = np.where((z_dist - box_size) > -half_box_size)
@@ -50,7 +50,7 @@ def calc_radius(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_
     particle_z[z_within_plus] = particle_z[z_within_plus] + box_size
     particle_z[z_within_minus] = particle_z[z_within_minus] - box_size
     
-    coord_diff[:,2] = particle_z - halo_z
+    coord_diff[:,2] = halo_z - particle_z 
 
     # Calculate radii with standard distance formula
     distance = np.zeros((new_particles,1))
@@ -111,7 +111,7 @@ def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200m, red_shift, 
     
     # Get the corresponding components, distances, and halo v200m for every particle
     v_hubble = np.zeros(particle_dist.size, dtype = np.float32)
-    corr_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200c") 
+    corr_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200m") 
     curr_v200m = calc_v200m(corr_m200m, halo_r200m)
         
     # calculate the unit vector of the halo to the particle  

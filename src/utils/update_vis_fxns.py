@@ -256,7 +256,8 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         act_min_ptl = 10
         set_ptl = 0
         scale_min_ptl = 1e-4
-        
+
+        print(np.where(np.isnan(c_r)==False))
         inf_p_r, orb_p_r = split_orb_inf(p_r,p_corr_labels)
         inf_p_rv, orb_p_rv = split_orb_inf(p_rv,p_corr_labels)
         inf_p_tv, orb_p_tv = split_orb_inf(p_tv,p_corr_labels)
@@ -818,8 +819,6 @@ def plot_halo_3d_class(ptl_pos, preds, labels, halo_pos, halo_r200m, save_loc, s
     # Save the figure
     save_path = save_loc + title + "_3d_classif_halo_dist.png"
     fig.savefig(save_path,dpi=300)
-
-
 
 def plot_halo_slice(ptl_pos, labels, halo_pos, halo_r200m, save_loc, search_rad=0, title=""):
     cividis_cmap = plt.get_cmap("cividis")
