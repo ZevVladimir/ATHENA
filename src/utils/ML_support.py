@@ -22,7 +22,7 @@ from skopt.space import Real
 from sklearn.metrics import accuracy_score
 from functools import partial
 
-from .data_and_loading_functions import load_or_pickle_SPARTA_data, find_closest_z, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, create_nu_string
+from .data_and_loading_functions import load_SPARTA_data, find_closest_z, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, create_nu_string
 from .update_vis_fxns import plot_full_ptl_dist, plot_miss_class_dist, compare_prfs_nu, compare_prfs, inf_orb_frac
 from .calculation_functions import create_mass_prf, create_stack_mass_prf, filter_prf, calculate_density
 from sparta_tools import sparta 
@@ -259,14 +259,18 @@ def sim_mass_p_z(sim,config_params):
         for f in grp_sim.attrs:
             dic_sim[f] = grp_sim.attrs[f]
     
+    p_snap = config_params["p_snap_info"]["snap"]
     p_red_shift = config_params["p_red_shift"]
     
     all_red_shifts = dic_sim['snap_z']
     p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
     use_z = all_red_shifts[p_sparta_snap]
     p_snap_loc = get_pickle_path_for_sim(sim)
-    with open(pickled_path + p_snap_loc + "/ptl_mass.pickle", "rb") as pickle_file:
-        ptl_mass = pickle.load(pickle_file)
+    
+    param_paths = [["simulation","particle_mass"]]
+            
+    sparta_params, sparta_param_names = load_SPARTA_data(param_paths, curr_sparta_file, p_snap)
+    ptl_mass = sparta_params[sparta_param_names[0]]
     
     return ptl_mass, use_z
 
@@ -457,9 +461,12 @@ def load_sprta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         all_red_shifts = dic_sim['snap_z']
         p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
         
-        halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_or_pickle_SPARTA_data(sparta_search_name, p_scale_factor, curr_snap_list[0], p_sparta_snap)
-
-        use_halo_ids = halos_id[use_idxs]
+        param_paths = [["halos","id"],["simulation","particle_mass"]]
+        sparta_params, sparta_param_names = load_SPARTA_data(param_paths, sparta_search_name, curr_snap_list[0])
+        halos_ids = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
+        ptl_mass = sparta_params[sparta_param_names[1]]
+ 
+        use_halo_ids = halos_ids[use_idxs]
         
         sparta_output = sparta.load(filename=SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5", halo_ids=use_halo_ids, log_level=0)
         new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta re-sort the indices

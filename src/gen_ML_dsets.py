@@ -13,7 +13,7 @@ import psutil
 import json
 from sparta_tools import sparta 
 
-from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir
+from utils.data_and_loading_functions import load_SPARTA_data, load_or_pickle_ptl_data, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir
 from utils.calculation_functions import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -434,9 +434,17 @@ with timed("Startup"):
         p_ptls_pid, p_ptls_vel, p_ptls_pos = load_or_pickle_ptl_data(curr_sparta_file, str(p_snap), p_snapshot_path, p_scale_factor)
 
     with timed("p_snap SPARTA load"):
-        global mass
-        p_halos_pos, p_halos_r200m, p_halos_id, p_halos_status, p_halos_last_snap, p_parent_id, mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
+        param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"],["simulation","particle_mass"]]
+            
+        p_sparta_params, p_sparta_param_names = load_SPARTA_data(param_paths, curr_sparta_file, p_snap)
 
+        p_halos_pos = p_sparta_params[p_sparta_param_names[0]][:,p_sparta_snap,:] * 10**3 * p_scale_factor # convert to kpc/h
+        p_halos_r200m = p_sparta_params[p_sparta_param_names[1]][:,p_sparta_snap]
+        p_halos_ids = p_sparta_params[p_sparta_param_names[2]][:,p_sparta_snap]
+        p_halos_status = p_sparta_params[p_sparta_param_names[3]][:,p_sparta_snap]
+        p_halos_last_snap = p_sparta_params[p_sparta_param_names[4]][:]
+        mass = p_sparta_params[p_sparta_param_names[5]]
+        
     with timed("c_snap load"):
         t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], p_red_shift)
         c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_ptls_pid, c_ptls_vel, c_ptls_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_loc=snap_loc)
@@ -591,7 +599,7 @@ with timed("Finished Calc"):
     halo_idx = 0
     
     for i in range(train_num_iter):
-        halo_idx, ptl_idx = halo_loop(halo_idx=halo_idx,ptl_idx=ptl_idx,curr_iter=i,num_iter=train_num_iter,rst_pnt=train_start_pnt,indices=train_idxs, halo_splits=train_halo_splits, dst_name="Train", tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
+        halo_idx, ptl_idx = halo_loop(halo_idx=halo_idx,ptl_idx=ptl_idx,curr_iter=i,num_iter=train_num_iter,rst_pnt=train_start_pnt,indices=train_idxs, halo_splits=train_halo_splits, dst_name="Train", tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_ids, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
     
     test_num_iter = len(test_halo_splits)
     test_prnt_halo_splits = test_halo_splits.copy()
@@ -601,4 +609,4 @@ with timed("Finished Calc"):
     ptl_idx = 0
     halo_idx = 0
     for i in range(test_num_iter):
-        halo_idx, ptl_idx = halo_loop(halo_idx=halo_idx,ptl_idx=ptl_idx,curr_iter=i,num_iter=test_num_iter,rst_pnt=test_start_pnt,indices=test_idxs, halo_splits=test_halo_splits, dst_name="Test", tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_id, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)
+        halo_idx, ptl_idx = halo_loop(halo_idx=halo_idx,ptl_idx=ptl_idx,curr_iter=i,num_iter=test_num_iter,rst_pnt=test_start_pnt,indices=test_idxs, halo_splits=test_halo_splits, dst_name="Test", tot_num_ptls=tot_num_ptls, p_halo_ids=p_halos_ids, p_dict=p_snap_dict, p_ptls_pid=p_ptls_pid, p_ptls_pos=p_ptls_pos, p_ptls_vel=p_ptls_vel, c_dict=c_snap_dict, c_ptls_pid=c_ptls_pid, c_ptls_pos=c_ptls_pos, c_ptls_vel=c_ptls_vel)

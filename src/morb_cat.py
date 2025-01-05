@@ -23,7 +23,6 @@ path_to_snaps = config["PATHS"]["path_to_snaps"]
 path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
 path_to_hdf5_file = path_to_SPARTA_data + curr_sparta_file + ".hdf5"
 path_to_calc_info = config["PATHS"]["path_to_calc_info"]
-path_to_sparta = config["PATHS"]["path_to_sparta"]
 create_directory(path_to_calc_info)
 snap_format = config["MISC"]["snap_format"]
 p_red_shift = config.getfloat("SEARCH","p_red_shift")
@@ -34,8 +33,6 @@ num_processes = mp.cpu_count()
 curr_chunk_size = config.getint("SEARCH","chunk_size")
 num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
 ##################################################################################################################
-import sys
-sys.path.insert(0, path_to_sparta)
 from sparta_tools import sparta
 ##################################################################################################################
 @contextmanager

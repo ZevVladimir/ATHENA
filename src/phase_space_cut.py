@@ -44,8 +44,6 @@ if match:
 path_to_hdf5_file = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
 path_to_pickle = config["PATHS"]["path_to_pickle"]
 ML_dset_path = config["PATHS"]["path_to_calc_info"]
-path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
-path_to_sparta = config["PATHS"]["path_to_sparta"]
 path_to_models = config["PATHS"]["path_to_xgboost"]
 
 sim_cosmol = config["MISC"]["sim_cosmol"]
