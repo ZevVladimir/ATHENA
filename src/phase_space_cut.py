@@ -30,9 +30,9 @@ config.read(os.getcwd() + "/config.ini")
 on_zaratan = config.getboolean("MISC","on_zaratan")
 use_gpu = config.getboolean("MISC","use_gpu")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
-path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
-path_to_snaps = config["PATHS"]["path_to_snaps"]
-path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
+MLOIS_path = config["PATHS"]["path_to_MLOIS"]
+snap_path = config["PATHS"]["path_to_snaps"]
+SPARTA_output_path = config["PATHS"]["path_to_SPARTA_data"]
 sim_cosmol = config["MISC"]["sim_cosmol"]
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
@@ -41,12 +41,12 @@ else:
 match = re.search(sim_pat, curr_sparta_file)
 if match:
     sparta_name = match.group(0)
-path_to_hdf5_file = path_to_SPARTA_data + sparta_name + "/" + curr_sparta_file + ".hdf5"
+path_to_hdf5_file = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
 path_to_pickle = config["PATHS"]["path_to_pickle"]
-path_to_calc_info = config["PATHS"]["path_to_calc_info"]
+ML_dset_path = config["PATHS"]["path_to_calc_info"]
 path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
 path_to_sparta = config["PATHS"]["path_to_sparta"]
-path_to_xgboost = config["PATHS"]["path_to_xgboost"]
+path_to_models = config["PATHS"]["path_to_xgboost"]
 
 sim_cosmol = config["MISC"]["sim_cosmol"]
 t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
@@ -157,7 +157,7 @@ if __name__ == "__main__":
         
     # model_name =  model_dir + model_comb_name
     
-    model_save_loc = path_to_xgboost + model_comb_name + "/" + model_dir + "/"
+    model_save_loc = path_to_models + model_comb_name + "/" + model_dir + "/"
 
     try:
         bst = xgb.Booster()
@@ -187,11 +187,11 @@ if __name__ == "__main__":
                 halo_dfs = []
                 if dset_name == "Full":    
                     for sim in curr_test_sims:
-                        halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + "Train" + "/halo_info/"))
-                        halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + "Test" + "/halo_info/"))
+                        halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + "Train" + "/halo_info/"))
+                        halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/"))
                 else:
                     for sim in curr_test_sims:
-                        halo_dfs.append(reform_df(path_to_calc_info + sim + "/" + dset_name + "/halo_info/"))
+                        halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
 
                 halo_df = pd.concat(halo_dfs)
                 
@@ -260,7 +260,7 @@ if __name__ == "__main__":
             
             # Get the redshifts for each simulation's primary snapshot
             for i,sim in enumerate(curr_test_sims):
-                with open(path_to_calc_info + sim + "/config.pickle", "rb") as file:
+                with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
                     config_dict = pickle.load(file)
                     curr_z = config_dict["p_snap_info"]["red_shift"][()]
                     all_z.append(curr_z)

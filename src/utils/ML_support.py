@@ -1,12 +1,13 @@
-import numpy as np
-import os
-import sys
-import pickle
 from dask import array as da
 import dask.dataframe as dd
 from dask import delayed
+from dask.distributed import Client
 import xgboost as xgb
 from xgboost import dask as dxgb
+
+import numpy as np
+import os
+import pickle
 import json
 import h5py
 import re
@@ -16,20 +17,15 @@ from colossus.lss import peaks
 from colossus import cosmology
 import warnings
 
-from dask.distributed import Client
-import time
-import multiprocessing as mp
-
 from skopt import gp_minimize
 from skopt.space import Real
 from sklearn.metrics import accuracy_score
 from functools import partial
 
-from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, find_closest_z, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, create_nu_string
-from utils.visualization_functions import plot_per_err
-from utils.update_vis_fxns import plot_full_ptl_dist, plot_miss_class_dist, compare_prfs_nu, compare_prfs, inf_orb_frac
-from utils.calculation_functions import create_mass_prf, create_stack_mass_prf, filter_prf, calculate_density
-from sparta_tools import sparta # type: ignore
+from .data_and_loading_functions import load_SPARTA_data, find_closest_z, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, create_nu_string
+from .update_vis_fxns import plot_full_ptl_dist, plot_miss_class_dist, compare_prfs_nu, compare_prfs, inf_orb_frac
+from .calculation_functions import create_mass_prf, create_stack_mass_prf, filter_prf, calculate_density
+from sparta_tools import sparta 
 from colossus.cosmology import cosmology
 
 ##################################################################################################################
@@ -38,13 +34,15 @@ import configparser
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
 rand_seed = config.getint("MISC","random_seed")
-on_zaratan = config.getboolean("MISC","on_zaratan")
 use_gpu = config.getboolean("MISC","use_gpu")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
-path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
-path_to_snaps = config["PATHS"]["path_to_snaps"]
-path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
 sim_cosmol = config["MISC"]["sim_cosmol"]
+
+snap_path = config["PATHS"]["snap_path"]
+SPARTA_output_path = config["PATHS"]["SPARTA_output_path"]
+pickled_path = config["PATHS"]["pickled_path"]
+ML_dset_path = config["PATHS"]["ML_dset_path"]
+
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
     cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
@@ -54,22 +52,11 @@ else:
 match = re.search(sim_pat, curr_sparta_file)
 if match:
     sparta_name = match.group(0)
-path_to_hdf5_file = path_to_SPARTA_data + sparta_name + "/" + curr_sparta_file + ".hdf5"
-path_to_pickle = config["PATHS"]["path_to_pickle"]
-path_to_calc_info = config["PATHS"]["path_to_calc_info"]
-path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
-path_to_sparta = config["PATHS"]["path_to_sparta"]
-path_to_xgboost = config["PATHS"]["path_to_xgboost"]
-model_sims = json.loads(config.get("XGBOOST","model_sims"))
+SPARTA_hdf5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
 
-global p_red_shift
 p_red_shift = config.getfloat("SEARCH","p_red_shift")
-search_rad = config.getfloat("SEARCH","search_rad")
 
 file_lim = config.getint("XGBOOST","file_lim")
-model_type = config["XGBOOST"]["model_type"]
-train_rad = config.getint("XGBOOST","training_rad")
-
 
 reduce_rad = config.getfloat("XGBOOST","reduce_rad")
 reduce_perc = config.getfloat("XGBOOST", "reduce_perc")
@@ -80,12 +67,8 @@ weight_exp = config.getfloat("XGBOOST","weight_exp")
 
 hpo_loss = config.get("XGBOOST","hpo_loss")
 nu_splits = config["XGBOOST"]["nu_splits"]
-nu_splits = parse_ranges(nu_splits)
-nu_string = create_nu_string(nu_splits)
-
 plt_nu_splits = config["XGBOOST"]["plt_nu_splits"]
-plt_nu_splits = parse_ranges(plt_nu_splits)
-plt_nu_string = create_nu_string(plt_nu_splits)
+plt_nu_splits = parse_ranges(nu_splits)
 
 linthrsh = config.getfloat("XGBOOST","linthrsh")
 lin_nbin = config.getint("XGBOOST","lin_nbin")
@@ -99,21 +82,10 @@ log_rticks = json.loads(config.get("XGBOOST","log_rticks"))
 
 if use_gpu:
     from dask_cuda import LocalCUDACluster
-    from cuml.metrics.accuracy import accuracy_score #TODO fix cupy installation??
-    from sklearn.metrics import make_scorer
-    import dask_ml.model_selection as dcv
     import cudf
     import dask_cudf as dc
-elif not use_gpu and on_zaratan:
-    from dask_mpi import initialize
-    from mpi4py import MPI
-    from distributed.scheduler import logger
-    import socket
-    #from dask_jobqueue import SLURMCluster
-elif not on_zaratan:
-    from dask_cuda import LocalCUDACluster
-    
-    
+
+# Instantiate a dask cluster with GPUs
 def get_CUDA_cluster():
     cluster = LocalCUDACluster(
                                device_memory_limit='10GB',
@@ -121,7 +93,8 @@ def get_CUDA_cluster():
     client = Client(cluster)
     return client
 
-def make_preds(client, bst, X, dask = False, threshold = 0.5, report_name="Classification Report", print_report=False):
+# Make predictions using the model. Requires the inputs to be a dask dataframe. Can either return the predictions still as a dask dataframe or as a numpy array
+def make_preds(client, bst, X, dask = False, threshold = 0.5):
     if dask:
         preds = dxgb.predict(client,bst,X)
         preds = preds.map_partitions(lambda df: (df >= threshold).astype(int))
@@ -132,6 +105,8 @@ def make_preds(client, bst, X, dask = False, threshold = 0.5, report_name="Class
     
     return preds
 
+# This function prints out all the model information such as the training simulations, training parameters, and results
+# The results are split by simulation that the model was tested on and reports the misclassification rate on each population
 def print_model_prop(model_dict, indent=''):
     # If using from command line and passing path to the pickled dictionary instead of dict load the dict from the file path
     if isinstance(model_dict, str):
@@ -148,26 +123,8 @@ def print_model_prop(model_dict, indent=''):
             print(f"{indent}{key}: {', '.join(map(str, value))}")
         else:
             print(f"{indent}{key}: {value}")
-            
-def create_dmatrix(client, X_cpu, y_cpu, features, chunk_size, frac_use_data = 1, calc_scale_pos_weight = False):    
-    scale_pos_weight = np.where(y_cpu == 0)[0].size / np.where(y_cpu == 1)[0].size
-    
-    num_features = X_cpu.shape[1]
-    
-    num_use_data = int(np.floor(X_cpu.shape[0] * frac_use_data))
-    print("Tot num of particles:", X_cpu.shape[0], "Num use particles:", num_use_data)
-    X = da.from_array(X_cpu,chunks=(chunk_size,num_features))
-    y = da.from_array(y_cpu,chunks=(chunk_size))
-        
-    print("X Number of total bytes:", X.nbytes, "X Number of Gigabytes:", (X.nbytes)/(10**9))
-    print("y Number of total bytes:", y.nbytes, "y Number of Gigabytes:", (y.nbytes)/(10**9))
-    
-    dqmatrix = xgb.dask.DaskDMatrix(client, X, y, feature_names=features)
-    
-    if calc_scale_pos_weight:
-        return dqmatrix, X, y_cpu, scale_pos_weight 
-    return dqmatrix, X, y_cpu
 
+# From the input simulation name extract the simulation name (ex: cbol_l0063_n0256) and the SPARTA hdf5 output name (ex: cbol_l0063_n0256_4r200m_1-5v200m)
 def split_calc_name(sim):
     sim_pat = r"cbol_l(\d+)_n(\d+)"
     match = re.search(sim_pat, sim)
@@ -176,7 +133,7 @@ def split_calc_name(sim):
         match = re.search(sim_pat,sim)
         
     if match:
-        sparta_name = match.group(0)
+        sim_name = match.group(0)
            
     sim_search_pat = sim_pat + r"_(\d+)r200m_(\d+)v200m"
     name_match = re.search(sim_search_pat, sim)
@@ -193,9 +150,10 @@ def split_calc_name(sim):
         print("Couldn't read sim name correctly:",sim)
         print(match)
     
-    return sparta_name, search_name
+    return sim_name, search_name
 
-def transform_string(input_str):
+# Convert a simulation's name to where the primary snapshot location is in the pickled data (ex: cbol_l0063_n0256_4r200m_1-5v200m_190to166 -> 190_cbol_l0063_n0256_4r200m_1-5v200m)
+def get_pickle_path_for_sim(input_str):
     # Define the regex pattern to match the string parts
     pattern = r"_([\d]+)to([\d]+)"
     
@@ -214,6 +172,7 @@ def transform_string(input_str):
     
     return new_string
 
+# Use a function to assign weights for XGBoost training for each particle based on their radii
 def weight_by_rad(radii,orb_inf,use_weight_rad=weight_rad,use_min_weight=min_weight,use_weight_exp=weight_exp,weight_inf=False,weight_orb=True):
     weights = np.ones(radii.shape[0])
 
@@ -224,12 +183,13 @@ def weight_by_rad(radii,orb_inf,use_weight_rad=weight_rad,use_min_weight=min_wei
     elif weight_inf:
         mask = (radii > use_weight_rad) & (orb_inf == 0)
     else:
-        print("No weights calculated set weight_inf and/or weight_orb = True")
+        print("No weights calculated. Make sure to set weight_inf and/or weight_orb = True")
         return pd.DataFrame(weights)
     weights[mask] = (np.exp((np.log(use_min_weight)/(np.max(radii)-use_weight_rad)) * (radii[mask]-use_weight_rad)))**use_weight_exp
 
     return pd.DataFrame(weights)
 
+# For each radial bin beyond an inputted radius randomly reduce the number of particles present to a certain percentage of the number of particles within that inptuted radius
 def scale_by_rad(data,bin_edges,use_red_rad=reduce_rad,use_red_perc=reduce_perc):
     radii = data["p_Scaled_radii"].values
     max_ptl = int(np.floor(np.where(radii<use_red_rad)[0].shape[0] * use_red_perc))
@@ -246,23 +206,25 @@ def scale_by_rad(data,bin_edges,use_red_rad=reduce_rad,use_red_perc=reduce_perc)
     
     return filter_data
 
-def cut_by_rad(df, rad_cut):
-    return df[df['p_Scaled_radii'] <= rad_cut]
-
-def split_by_nu(df,nus,halo_first,halo_n):    
+# Returns an inputted dataframe with only the halos that fit within the inputted ranges of nus (peak height)
+#TODO return updated halo_n and halo_first?
+def filter_df_with_nus(df,nus,halo_first,halo_n):    
+    # First masks which halos are within the inputted nu ranges
     mask = pd.Series([False] * nus.shape[0])
     for start, end in nu_splits:
         mask[np.where((nus >= start) & (nus <= end))[0]] = True
     
+    # Then get the indices of all the particles that belong to these halos and combine them into another mask which returns only the wanted particles    
     halo_n = halo_n[mask]
     halo_first = halo_first[mask]
     halo_last = halo_first + halo_n
-
+ 
     use_idxs = np.concatenate([np.arange(start, end) for start, end in zip(halo_first, halo_last)])
 
     return df.iloc[use_idxs]
 
-def reform_df(folder_path):
+# Goes through a folder where a dataset's hdf5 files are stored and reforms them into one pandas dataframe (in order)
+def reform_dataset_dfs(folder_path):
     hdf5_files = []
     for f in os.listdir(folder_path):
         if f.endswith('.h5'):
@@ -276,7 +238,8 @@ def reform_df(folder_path):
         dfs.append(df) 
     return pd.concat(dfs, ignore_index=True)
 
-def sort_files(folder_path,limit_files=False):
+# Sorts a dataset's .h5 files such that they are in ascending numerical order and if desired can return a limited number of them based off the file_lim parameter in the config file
+def sort_and_lim_files(folder_path,limit_files=False):
     hdf5_files = []
     for f in os.listdir(folder_path):
         if f.endswith('.h5'):
@@ -286,10 +249,11 @@ def sort_files(folder_path,limit_files=False):
         hdf5_files = hdf5_files[:file_lim]
     return hdf5_files
     
-def sim_info_for_nus(sim,config_params):
+# Returns a simulation's mass used and the redshift of the primary snapshot
+def sim_mass_p_z(sim,config_params):
     sparta_name, sparta_search_name = split_calc_name(sim)
             
-    with h5py.File(path_to_SPARTA_data + sparta_name + "/" +  sparta_search_name + ".hdf5","r") as f:
+    with h5py.File(SPARTA_output_path + sparta_name + "/" +  sparta_search_name + ".hdf5","r") as f:
         dic_sim = {}
         grp_sim = f['simulation']
         for f in grp_sim.attrs:
@@ -300,14 +264,14 @@ def sim_info_for_nus(sim,config_params):
     all_red_shifts = dic_sim['snap_z']
     p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
     use_z = all_red_shifts[p_sparta_snap]
-    p_snap_loc = transform_string(sim)
-    with open(path_to_pickle + p_snap_loc + "/ptl_mass.pickle", "rb") as pickle_file:
+    p_snap_loc = get_pickle_path_for_sim(sim)
+    with open(pickled_path + p_snap_loc + "/ptl_mass.pickle", "rb") as pickle_file:
         ptl_mass = pickle.load(pickle_file)
     
     return ptl_mass, use_z
 
+# Split a dataframe so that each one is below an inputted maximum memory size
 def split_dataframe(df, max_size, weights=None, use_weights = False):
-    # Split a dataframe so that each one is below a maximum memory size
     total_size = df.memory_usage(index=True).sum()
     num_splits = int(np.ceil(total_size / max_size))
     chunk_size = int(np.ceil(len(df) / num_splits))
@@ -325,14 +289,13 @@ def split_dataframe(df, max_size, weights=None, use_weights = False):
     else:
         return split_dfs
 
-def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,use_weights=False,filter_nu=None,limit_files=False):
-    ptl_files = sort_files(folder_path + "/ptl_info/",limit_files=limit_files)
-    
-    # Function to process each file
+# Function to process a file in a dataset's folder: combines them all, performs any desired filtering, calculates weights if desired, and calculates scaled position weight
+# Also splits the dataframe into smaller dataframes based of inputted maximum memory size
+def process_file(folder_path, file_index, ptl_mass, use_z, bin_edges, max_mem, filter_nu, scale_rad, use_weights):
     @delayed
-    def process_file(ptl_index):
-        ptl_path = folder_path + f"/ptl_info/ptl_{ptl_index}.h5"
-        halo_path = folder_path + f"/halo_info/halo_{ptl_index}.h5"
+    def delayed_task():
+        ptl_path = f"{folder_path}/ptl_info/ptl_{file_index}.h5"
+        halo_path = f"{folder_path}/halo_info/halo_{file_index}.h5"
 
         ptl_df = pd.read_hdf(ptl_path)
         halo_df = pd.read_hdf(halo_path)
@@ -340,25 +303,24 @@ def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,use_wei
         # reset indices for halo_first halo_n indexing
         halo_df["Halo_first"] = halo_df["Halo_first"] - halo_df["Halo_first"][0]
         
-        # find nu values for halos in this chunk
-        ptl_mass, use_z = sim_info_for_nus(sim,config_params)
+        # Calculate peak heights for each halo
         nus = np.array(peaks.peakHeight((halo_df["Halo_n"][:] * ptl_mass), use_z))
         
-        # Filter by nu and by radius
+        # Filter by nu and/or by radius
         if filter_nu:
-            ptl_df = split_by_nu(ptl_df, nus, halo_df["Halo_first"], halo_df["Halo_n"])
+            ptl_df = filter_df_with_nus(ptl_df, nus, halo_df["Halo_first"], halo_df["Halo_n"])
         if scale_rad:
-            num_bins=100
-            bin_edges = np.logspace(np.log10(0.001),np.log10(10),num_bins)
             ptl_df = scale_by_rad(ptl_df,bin_edges)
-        if use_weights:
-            weights = weight_by_rad(ptl_df["p_Scaled_radii"].values,ptl_df["Orbit_infall"].values,weight_inf=False,weight_orb=True)
-        
+            
+        weights = (
+            weight_by_rad(ptl_df["p_Scaled_radii"].values, ptl_df["Orbit_infall"].values, 
+                          weight_inf=False, weight_orb=True) if use_weights else None
+        )
+
         # Calculate scale position weight
         scal_pos_weight = calc_scal_pos_weight(ptl_df)
 
         # If the dataframe is too large split it up
-        max_mem = int(np.floor(config_params["HDF5 Mem Size"] / 2))
         if ptl_df.memory_usage(index=True).sum() > max_mem:
             ptl_dfs = split_dataframe(ptl_df, max_mem)
             if use_weights:
@@ -368,86 +330,46 @@ def reform_datasets(client,config_params,sim,folder_path,scale_rad=False,use_wei
             if use_weights:
                 weights = [weights]
         
-        if scale_rad and use_weights:
-            return ptl_dfs,scal_pos_weight,weights,bin_edges
-        elif scale_rad and not use_weights:
-            return ptl_dfs,scal_pos_weight,bin_edges
-        elif not scale_rad and use_weights:
-            return ptl_dfs,scal_pos_weight,weights
-        else:
-            return ptl_dfs,scal_pos_weight
+        return ptl_dfs,scal_pos_weight,weights
+    return delayed_task()
 
+# Combines the results of the processing of each file in the folder into one dataframe for the data and list for the scale position weights and an array of weights if desired
+def combine_results(results, client, use_weights):
+    # Unpack the results
+    ddfs,scal_pos_weights,dask_weights = [], [], []
+    
+    for res in results:
+        ddfs.extend(res[0])
+        scal_pos_weights.append(res[1]) # We append since scale position weight is just a number
+        if use_weights:
+            dask_weights.extend(res[2])
+            
+    all_ddfs = dd.concat([dd.from_delayed(client.scatter(df)) for df in ddfs])
+    if use_weights:
+        all_weights = dd.concat([dd.from_delayed(client.scatter(w)) for w in dask_weights])
+        return all_ddfs, scal_pos_weights, all_weights
+
+    return all_ddfs, scal_pos_weights
+
+# Combines all the files in a dataset's folder into one dask dataframe and a list for the scale position weights and an array of weights if desired 
+def reform_datasets(client,ptl_mass,use_z,max_mem,bin_edges,folder_path,scale_rad=False,use_weights=False,filter_nu=None,limit_files=False):
+    ptl_files = sort_and_lim_files(folder_path + "/ptl_info/",limit_files=limit_files)
+    
     # Create delayed tasks for each file
-    delayed_results = [process_file(i) for i in range(len(ptl_files))]
+    delayed_results = [
+        process_file(
+            folder_path, file_index, ptl_mass, use_z, bin_edges,
+            max_mem, scale_rad, use_weights, filter_nu
+        )
+        for file_index in range(len(ptl_files))
+    ]
 
     # Compute the results in parallel
     results = client.compute(delayed_results, sync=True)
 
-    # Unpack the results
-    ddfs,sim_scal_pos_weight,dask_weights = [], [], []
-    if scale_rad and use_weights:    
-        for ptl_df, scal_pos_weight, weight, bin_edge in results:
-            scatter_df = client.scatter(ptl_df)
-            dask_df = dd.from_delayed(scatter_df)
-            if use_gpu:
-                dask_df = dask_df.map_partitions(cudf.from_pandas)
-            ddfs.append(dask_df)
-            sim_scal_pos_weight.append(scal_pos_weight)
-            scatter_weight = client.scatter(weight)
-            dask_weight = dd.from_delayed(scatter_weight) 
-            dask_weights.append(dask_weight)
-            bin_edges = bin_edge
-        if use_gpu:
-            all_ddfs = dc.concat(ddfs,axis=0)
-        else:
-            all_ddfs = dd.concat(ddfs)
-        return all_ddfs,sim_scal_pos_weight,dd.concat(dask_weights),bin_edges
-    elif scale_rad and not use_weights:
-        for ptl_df, scal_pos_weight, bin_edge in results:
-            scatter_df = client.scatter(ptl_df)
-            dask_df = dd.from_delayed(scatter_df)
-            if use_gpu:
-                dask_df = dask_df.map_partitions(cudf.from_pandas)
-            ddfs.append(dask_df)
-            sim_scal_pos_weight.append(scal_pos_weight)
-            bin_edges = bin_edge
-        if use_gpu:
-            all_ddfs = dc.concat(ddfs,axis=0)
-        else:
-            all_ddfs = dd.concat(ddfs)
-        return all_ddfs,sim_scal_pos_weight,bin_edges
-    elif not scale_rad and use_weights:
-        for ptl_df, scal_pos_weight, weight in results:
-            scatter_df = client.scatter(ptl_df)
-            dask_df = dd.from_delayed(scatter_df)
-            if use_gpu:
-                dask_df = dask_df.map_partitions(cudf.from_pandas)
-            ddfs.append(dask_df)
-            sim_scal_pos_weight.append(scal_pos_weight)
-            scatter_weight = client.scatter(weight)
-            dask_weight = dd.from_delayed(scatter_weight) 
-            dask_weights.append(dask_weight)
-        if use_gpu:
-            all_ddfs = dc.concat(ddfs,axis=0)
-        else:
-            all_ddfs = dd.concat(ddfs)
-        return all_ddfs,sim_scal_pos_weight,dd.concat(dask_weights)
-    else:
-        for ptl_df, scal_pos_weight in results:
-            scatter_df = client.scatter(ptl_df)
-            dask_df = dd.from_delayed(scatter_df)
-            if use_gpu:
-                dask_df = dask_df.map_partitions(cudf.from_pandas)
-            ddfs.append(dask_df)    
-            sim_scal_pos_weight.append(scal_pos_weight)
-            
-        if use_gpu:
-            all_ddfs = dc.concat(ddfs,axis=0)
-        else:
-            all_ddfs = dd.concat(ddfs)
-            
-        return all_ddfs,sim_scal_pos_weight
-        
+    return combine_results(results, client, use_weights)
+    
+# Calculates the scaled position weight for a dataset. Which is used to weight the model towards the population with less particles (should be the orbiting population)
 def calc_scal_pos_weight(df):
     count_negatives = (df['Orbit_infall'] == 0).sum()
     count_positives = (df['Orbit_infall'] == 1).sum()
@@ -455,80 +377,46 @@ def calc_scal_pos_weight(df):
     scale_pos_weight = count_negatives / count_positives
     return scale_pos_weight
 
-def load_data(client, sims, dset_name, limit_files = False, scale_rad=False, use_weights=False, filter_nu=False):
+# Loads all the data for the inputted list of simulations into one dataframe. Finds the scale position weight for the dataset and any adjusted weighting for it if desired
+def load_data(client, sims, dset_name, bin_edges = None, limit_files = False, scale_rad=False, use_weights=False, filter_nu=False):
     dask_dfs = []
     all_scal_pos_weight = []
     all_weights = []
     
     for sim in sims:
-        files_loc = path_to_calc_info + sim + "/" + dset_name
-        with open(path_to_calc_info + sim + "/config.pickle","rb") as f:
+        with open(ML_dset_path + sim + "/config.pickle","rb") as f:
             config_params = pickle.load(f)
+        # Get mass and redshift for this simulation
+        ptl_mass, use_z = sim_mass_p_z(sim,config_params)
+        max_mem = int(np.floor(config_params["HDF5 Mem Size"] / 2))
         
         if dset_name == "Full":
-            with timed("Reformed " + "Train" + " Dataset: " + sim):    
-                files_loc = path_to_calc_info + sim + "/" + "Train"
-                if scale_rad and use_weights:
-                    ptl_ddf,sim_scal_pos_weight, weights, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files)  
-                elif scale_rad and not use_weights:
-                    ptl_ddf,sim_scal_pos_weight, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files)
-                elif not scale_rad and use_weights:
-                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files) 
-                else:
-                    ptl_ddf,sim_scal_pos_weight = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files)  
-            print("num of partitions:",ptl_ddf.npartitions)
-            all_scal_pos_weight.append(sim_scal_pos_weight)
-            dask_dfs.append(ptl_ddf)
-            if use_weights:
-                all_weights.append(weights)
-            with timed("Reformed " + "Test" + " Dataset: " + sim):
-                files_loc = path_to_calc_info + sim + "/" + "Test"
-                if scale_rad and use_weights:
-                    ptl_ddf,sim_scal_pos_weight, weights, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files)  
-                elif scale_rad and not use_weights:
-                    ptl_ddf,sim_scal_pos_weight, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files)
-                elif not scale_rad and use_weights:
-                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files) 
-                else:
-                    ptl_ddf,sim_scal_pos_weight = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files) 
-            print("num of partitions:",ptl_ddf.npartitions)
-            all_scal_pos_weight.append(sim_scal_pos_weight)
-            dask_dfs.append(ptl_ddf)
-            if use_weights:
-                all_weights.append(weights)
+            datasets = ["Train", "Test"]
         else:
-            with timed("Reformed " + dset_name + " Dataset: " + sim):  
-                if scale_rad and use_weights:
-                    ptl_ddf,sim_scal_pos_weight, weights, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files)  
-                elif scale_rad and not use_weights:
-                    ptl_ddf,sim_scal_pos_weight, bin_edges = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files)
-                elif not scale_rad and use_weights:
-                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files) 
-                else:
-                    ptl_ddf,sim_scal_pos_weight = reform_datasets(client,config_params,sim,files_loc,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files)   
-            print("num of partitions:",ptl_ddf.npartitions)
-            all_scal_pos_weight.append(sim_scal_pos_weight)
-            dask_dfs.append(ptl_ddf)
-            if use_weights:
-                all_weights.append(weights)
+            datasets = [dset_name]
 
+        for dataset in datasets:
+            with timed(f"Reformed {dataset} Dataset: {sim}"): 
+                dataset_path = f"{ML_dset_path}{sim}/{dataset}"
+                if use_weights:
+                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets(client,ptl_mass,use_z,max_mem,bin_edges,dataset_path,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files)  
+                    all_weights.append(weights)
+                else:
+                    ptl_ddf,sim_scal_pos_weight = reform_datasets(client,ptl_mass,use_z,max_mem,bin_edges,dataset_path,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files)  
+                all_scal_pos_weight.append(sim_scal_pos_weight)
+                dask_dfs.append(ptl_ddf)
+                    
     all_scal_pos_weight = np.average(np.concatenate([np.array(sublist).flatten() for sublist in all_scal_pos_weight]))
     act_scale_pos_weight = np.average(all_scal_pos_weight)
+
+    all_dask_dfs = dd.concat(dask_dfs)
     
-    if use_gpu:
-        all_dask_dfs = dc.concat(dask_dfs,axis=0)
-    else:
-        all_dask_dfs = dd.concat(dask_dfs)
-    
-    if scale_rad and use_weights:
-        return all_dask_dfs,act_scale_pos_weight, dd.concat(all_weights), bin_edges
-    elif scale_rad and not use_weights:
-        return all_dask_dfs,act_scale_pos_weight, bin_edges
-    elif not scale_rad and use_weights:
+    if use_weights:
         return all_dask_dfs,act_scale_pos_weight, dd.concat(all_weights)
     else:
         return all_dask_dfs,act_scale_pos_weight
 
+# Reconstruct SPARTA's mass profiles and stack them together for a list of sims
 def load_sprta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):                
     mass_prf_all_list = []
     mass_prf_1halo_list = []
@@ -550,16 +438,16 @@ def load_sprta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         if match:
             curr_snap_list = [match.group(1), match.group(2)] 
         
-        with open(path_to_calc_info + sim + "/config.pickle", "rb") as file:
+        with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
             config_dict = pickle.load(file)
             
             curr_z = config_dict["p_snap_info"]["red_shift"][()]
             curr_snap_dir_format = config_dict["snap_dir_format"]
             curr_snap_format = config_dict["snap_format"]
-            new_p_snap, curr_z = find_closest_z(curr_z,path_to_snaps + sparta_name + "/",curr_snap_dir_format,curr_snap_format)
+            new_p_snap, curr_z = find_closest_z(curr_z,snap_path + sparta_name + "/",curr_snap_dir_format,curr_snap_format)
             p_scale_factor = 1/(1+curr_z)
             
-        with h5py.File(path_to_SPARTA_data + sparta_name + "/" + sparta_search_name + ".hdf5","r") as f:
+        with h5py.File(SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5","r") as f:
             dic_sim = {}
             grp_sim = f['simulation']
 
@@ -569,11 +457,11 @@ def load_sprta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         all_red_shifts = dic_sim['snap_z']
         p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
         
-        halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_or_pickle_SPARTA_data(sparta_search_name, p_scale_factor, curr_snap_list[0], p_sparta_snap)
+        halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_SPARTA_data(SPARTA_hdf5_path,sparta_search_name, p_scale_factor, curr_snap_list[0], p_sparta_snap)
 
         use_halo_ids = halos_id[use_idxs]
         
-        sparta_output = sparta.load(filename=path_to_SPARTA_data + sparta_name + "/" + sparta_search_name + ".hdf5", halo_ids=use_halo_ids, log_level=0)
+        sparta_output = sparta.load(filename=SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5", halo_ids=use_halo_ids, log_level=0)
         new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta re-sort the indices
         
         mass_prf_all_list.append(sparta_output['anl_prf']['M_all'][new_idxs,p_sparta_snap,:])
@@ -595,11 +483,11 @@ def load_sprta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
     else:
         return mass_prf_all,mass_prf_1halo,all_masses,bins
 
-def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, combined_name, plot_save_loc, dens_prf = False,missclass=False,full_dist=False,io_frac=False,per_err=False,split_nu=False): 
+# Evaluate an input model by generating plots of comparisons between the model's predictions and SPARTA
+def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, plot_save_loc, dens_prf = False,missclass=False,full_dist=False,io_frac=False,split_nu=False): 
     with timed("Predictions"):
         print(f"Starting predictions for {y.size.compute():.3e} particles")
-        preds = make_preds(client, model, X, report_name="Report", print_report=False)
-
+        preds = make_preds(client, model, X)
     X = X.compute()
     y = y.compute()
     
@@ -610,6 +498,7 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
 
     num_bins = 30
 
+    # Generate a comparative density profile
     if dens_prf:
         halo_first = halo_ddf["Halo_first"].values
         halo_n = halo_ddf["Halo_n"].values
@@ -636,7 +525,7 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
         
         # Get the redshifts for each simulation's primary snapshot
         for i,sim in enumerate(use_sims):
-            with open(path_to_calc_info + sim + "/config.pickle", "rb") as file:
+            with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
                 config_dict = pickle.load(file)
                 curr_z = config_dict["p_snap_info"]["red_shift"][()]
                 all_z.append(curr_z)
@@ -646,9 +535,11 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
         tot_num_halos = halo_n.shape[0]
         min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
         
+        # Get SPARTA's mass profiles
         act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sprta_mass_prf(sim_splits,all_idxs,use_sims)
         act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
         
+        # Create mass profiles from the model's predictions
         calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, use_mp=True, all_z=all_z)
 
         # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
@@ -666,6 +557,7 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
         act_dens_prf_orb = calculate_density(act_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
         act_dens_prf_inf = calculate_density(act_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
 
+        # If we want the density profiles to only consist of halos of a specific peak height (nu) bin 
         if split_nu:
             all_prf_lst = []
             orb_prf_lst = []
@@ -692,8 +584,8 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
                 warnings.simplefilter("ignore", category=RuntimeWarning)
                 compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_",use_med=True)
                 compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_",use_med=False)
-        
-        
+    
+    # Both the missclassification and distribution and infalling orbiting ratio plots are 2D histograms and the model parameters and allow for linear-log split scaling
     if missclass or full_dist or io_frac:       
         p_corr_labels=y.compute().values.flatten()
         p_ml_labels=preds.values
@@ -715,40 +607,24 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, co
             "log_rticks":log_rticks,
         }
     
+    # All parameter Distribution in 2D histograms
     if full_dist:
         plot_full_ptl_dist(p_corr_labels=p_corr_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,split_scale_dict=split_scale_dict,num_bins=num_bins,save_loc=plot_save_loc)
+    # All parameter Distribution of misclassifications of the model in 2D histograms
     if missclass:
+        # Dataset name is used to save to model info the misclassification rates
         curr_sim_name = ""
         for sim in use_sims:
             curr_sim_name += sim
             curr_sim_name += "_"
         curr_sim_name += dst_type
         plot_miss_class_dist(p_corr_labels=p_corr_labels,p_ml_labels=p_ml_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,split_scale_dict=split_scale_dict,num_bins=num_bins,save_loc=plot_save_loc,model_info=model_info,dataset_name=curr_sim_name)
+    # All parameter Distribution of the ratio between the number of infalling and number of orbiting particlesin 2D histograms
     if io_frac:
         inf_orb_frac(p_corr_labels=p_corr_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,split_scale_dict=split_scale_dict,num_bins=num_bins,save_loc=plot_save_loc)
-    if per_err:
-        with h5py.File(path_to_hdf5_file,"r") as f:
-            dic_sim = {}
-            grp_sim = f['config']['anl_prf']
-            for f in grp_sim.attrs:
-                dic_sim[f] = grp_sim.attrs[f]
-            bins = dic_sim["r_bins_lin"]
-        plot_per_err(bins,X["p_Scaled_radii"].values.compute(),y.compute().values.flatten(),preds.values,plot_save_loc, "$r/r_{200m}$","rad")
-        # plot_per_err(bins,X["p_Radial_vel"].values.compute(),y.compute().values.flatten(),preds.values,plot_save_loc, "$v_r/v_{200m}$","rad_vel")
-        # plot_per_err(bins,X["p_Tangential_vel"].values.compute(),y.compute().values.flatten(),preds.values,plot_save_loc, "$v_t/v_{200m}$","tang_vel")
-
-def print_tree(bst,tree_num):# if there are multiple simulations, to correctly index the dataset we need to update the starting values for the 
-    # stacked simulations such that they correspond to the larger dataset and not one specific simulation
-    if len(use_sims) != 1:
-        for i in range(1,len(use_sims)):
-            if i < len(use_sims) - 1:
-                halo_first[sim_splits[i]:sim_splits[i+1]] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
-            else:
-                halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
-    fig, ax = plt.subplots(figsize=(400, 10))
-    xgb.plot_tree(bst, num_trees=tree_num, ax=ax)
-    plt.savefig(path_to_MLOIS + "Random_figs/tree_plot.png")
        
+# Loss function based off how close the reproduced density profile is to the actual profile
+# Can use either only the orbiting profile, only the infalling one, or both
 def dens_prf_loss(halo_ddf,use_sims,radii,labels,use_orb_prf,use_inf_prf):
     halo_first = halo_ddf["Halo_first"].values
     halo_n = halo_ddf["Halo_n"].values
@@ -798,6 +674,7 @@ def dens_prf_loss(halo_ddf,use_sims,radii,labels,use_orb_prf,use_inf_prf):
         print(inf_loss)
         return inf_loss
 
+# Objective function for the optimization of a model that is adjusting the weighting of particles based on radius
 def weight_objective(params,client,model_params,ptl_ddf,halo_ddf,use_sims,feat_cols,tar_col):
     train_dst,val_dst,train_halos,val_halos = split_data_by_halo(0.6,halo_ddf,ptl_ddf,return_halo=True)
 
@@ -847,7 +724,7 @@ def weight_objective(params,client,model_params,ptl_ddf,halo_ddf,use_sims,feat_c
         accuracy = -1 * accuracy_score(y_val[only_orb], y_pred.iloc[only_orb].values)
     elif hpo_loss == "inf":
         only_inf = np.where(y_val == 0)[0]
-        accuracy = -1 * accuracy_score(y[only_inf], y_pred.iloc[only_inf].values)
+        accuracy = -1 * accuracy_score(y_val[only_inf], y_pred.iloc[only_inf].values)
     elif hpo_loss == "mprf_all":
         val_radii = X_val["p_Scaled_radii"].values.compute()
         accuracy = dens_prf_loss(val_halos,use_sims,val_radii,y_pred,use_orb_prf=True,use_inf_prf=True)
@@ -860,6 +737,7 @@ def weight_objective(params,client,model_params,ptl_ddf,halo_ddf,use_sims,feat_c
 
     return accuracy
 
+# Objective function for the optimization of a model that is adjusting the number of particles beyond a certain radius based on a percetnage of particles within that radius
 def scal_rad_objective(params,client,model_params,ptl_ddf,halo_ddf,use_sims,feat_cols,tar_col):
     train_dst,val_dst,train_halos,val_halos = split_data_by_halo(client,0.5,halo_ddf,ptl_ddf,return_halo=True)
     
@@ -904,6 +782,7 @@ def scal_rad_objective(params,client,model_params,ptl_ddf,halo_ddf,use_sims,feat
     
     return -accuracy
 
+# Prints which iteration of optimization and the current parameters
 def print_iteration(res):
     iteration = len(res.x_iters)
     print(f"Iteration {iteration}: Current params: {res.x_iters[-1]}, Current score: {res.func_vals[-1]}")

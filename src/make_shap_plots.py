@@ -17,7 +17,7 @@ on_zaratan = config.getboolean("MISC","on_zaratan")
 use_gpu = config.getboolean("MISC","use_gpu")
 test_sims = json.loads(config.get("XGBOOST","test_sims"))
 eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
-path_to_calc_info = config["PATHS"]["path_to_calc_info"]
+ML_dset_path = config["PATHS"]["path_to_calc_info"]
 sim_cosmol = config["MISC"]["sim_cosmol"]
 
 if __name__ == '__main__':
@@ -70,7 +70,7 @@ if __name__ == '__main__':
             
         # model_name =  model_dir + model_comb_name
 
-        model_save_loc = path_to_xgboost + model_comb_name + "/" + model_dir + "/"
+        model_save_loc = path_to_models + model_comb_name + "/" + model_dir + "/"
 
         gen_plot_save_loc = model_save_loc + "plots/"
 
@@ -91,7 +91,7 @@ if __name__ == '__main__':
                 X_df = data[feature_columns]
                 y_df = data[target_column]
                 
-        preds = make_preds(client, bst, X_df, dask = True, report_name="Report", print_report=False)
+        preds = make_preds(client, bst, X_df, dask = True)
         X_df = X_df.to_backend('pandas')
         y_df = y_df.to_backend('pandas')
 

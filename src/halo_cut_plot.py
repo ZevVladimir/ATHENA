@@ -1,18 +1,28 @@
-from utils.ML_support import *
-from utils.update_vis_fxns import *
-from utils.data_and_loading_functions import *
 import os
 import json
 import random
 import pickle
 import re
 import configparser
+import h5py
+import numpy as np
+from sparta_tools import sparta
+
+from utils.ML_support import get_combined_name,reform_dataset_dfs,split_calc_name
+from utils.update_vis_fxns import plot_halo_slice
+from utils.data_and_loading_functions import parse_ranges,create_nu_string,create_directory,find_closest_z,load_SPARTA_data,timed,load_ptl_param
+
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
+
+snap_path = config["PATHS"]["snap_path"]
+SPARTA_output_path = config["PATHS"]["SPARTA_output_path"]
+ML_dset_path = config["PATHS"]["ML_dset_path"]
+path_to_models = config["PATHS"]["path_to_models"]
+
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
-path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
-path_to_snaps = config["PATHS"]["path_to_snaps"]
-path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
+snap_dir_format = config["MISC"]["snap_dir_format"]
+snap_format = config["MISC"]["snap_format"]
 sim_cosmol = config["MISC"]["sim_cosmol"]
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
@@ -21,35 +31,34 @@ else:
 match = re.search(sim_pat, curr_sparta_file)
 if match:
     sparta_name = match.group(0)
-path_to_hdf5_file = path_to_SPARTA_data + sparta_name + "/" + curr_sparta_file + ".hdf5"
-path_to_pickle = config["PATHS"]["path_to_pickle"]
-path_to_calc_info = config["PATHS"]["path_to_calc_info"]
-path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
-path_to_sparta = config["PATHS"]["path_to_sparta"]
-path_to_xgboost = config["PATHS"]["path_to_xgboost"]
+SPARTA_hdf5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
+
+search_rad = config.getfloat("SEARCH","search_rad")
 test_sims = json.loads(config.get("XGBOOST","test_sims"))
 model_sims = json.loads(config.get("XGBOOST","model_sims"))
 model_type = config["XGBOOST"]["model_type"]
 nu_splits = config["XGBOOST"]["nu_splits"]
 nu_splits = parse_ranges(nu_splits)
 nu_string = create_nu_string(nu_splits)
+
+
 sim = test_sims[0][0]
 
 model_comb_name = get_combined_name(model_sims) 
 
 model_dir = model_type + "_" + model_comb_name + "nu" + nu_string 
 
-model_save_loc = path_to_xgboost + model_comb_name + "/" + model_dir + "/"
+model_save_loc = path_to_models + model_comb_name + "/" + model_dir + "/"
 dset_name = "Test"
 test_comb_name = get_combined_name(test_sims[0]) 
 
 plot_loc = model_save_loc + dset_name + "_" + test_comb_name + "/plots/halo_slices/"
 create_directory(plot_loc)
 
-halo_ddf = reform_df(path_to_calc_info + sim + "/" + "Test" + "/halo_info/")
+halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
 all_idxs = halo_ddf["Halo_indices"].values
 
-with open(path_to_calc_info + sim + "/p_ptl_tree.pickle", "rb") as pickle_file:
+with open(ML_dset_path + sim + "/p_ptl_tree.pickle", "rb") as pickle_file:
     tree = pickle.load(pickle_file)
         
 sparta_name, sparta_search_name = split_calc_name(sim)
@@ -60,16 +69,16 @@ if match:
     curr_snap_list = [match.group(1), match.group(2)]   
     p_snap = int(curr_snap_list[0])
 
-with open(path_to_calc_info + sim + "/config.pickle", "rb") as file:
+with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
     config_dict = pickle.load(file)
     
     curr_z = config_dict["p_snap_info"]["red_shift"][()]
     curr_snap_dir_format = config_dict["snap_dir_format"]
     curr_snap_format = config_dict["snap_format"]
-    new_p_snap, curr_z = find_closest_z(curr_z,path_to_snaps + sparta_name + "/",curr_snap_dir_format,curr_snap_format)
+    new_p_snap, curr_z = find_closest_z(curr_z,snap_path + sparta_name + "/",curr_snap_dir_format,curr_snap_format)
     p_scale_factor = 1/(1+curr_z)
     
-with h5py.File(path_to_SPARTA_data + sparta_name + "/" + sparta_search_name + ".hdf5","r") as f:
+with h5py.File(SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5","r") as f:
     dic_sim = {}
     grp_sim = f['simulation']
 
@@ -79,11 +88,14 @@ with h5py.File(path_to_SPARTA_data + sparta_name + "/" + sparta_search_name + ".
 all_red_shifts = dic_sim['snap_z']
 p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
 
-halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_or_pickle_SPARTA_data(sparta_search_name, p_scale_factor, p_snap, p_sparta_snap)
+halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_SPARTA_data(SPARTA_hdf5_path,sparta_search_name, p_scale_factor, p_snap, p_sparta_snap)
 
-snap_loc = path_to_snaps + sparta_name + "/"
-p_snapshot_path = snap_loc + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
-ptls_pid, ptls_vel, ptls_pos = load_or_pickle_ptl_data(curr_sparta_file, str(p_snap), p_snapshot_path, p_scale_factor)
+snap_loc = snap_path + sparta_name + "/"
+p_snap_path = snap_loc + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
+
+ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(p_snap), p_snap_path) 
+ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(p_snap), p_snap_path) # km/s
+ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(p_snap), p_snap_path) * 10**3 * p_scale_factor # kpc/h
 
 random.seed(365)
 used_numbers = set()
@@ -110,7 +122,7 @@ while len(used_numbers) < 25:
         else:
             continue
 
-        sparta_output = sparta.load(filename = path_to_hdf5_file, halo_ids=use_halo_id, log_level=0)
+        sparta_output = sparta.load(filename = SPARTA_hdf5_path, halo_ids=use_halo_id, log_level=0)
 
         sparta_last_pericenter_snap = sparta_output['tcr_ptl']['res_oct']['last_pericenter_snap']
         sparta_n_pericenter = sparta_output['tcr_ptl']['res_oct']['n_pericenter']

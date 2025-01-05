@@ -1,29 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-import re
 mpl.use('agg')
-from utils.calculation_functions import calculate_distance
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from sklearn.metrics import classification_report
-from colossus.lss.peaks import peakHeight
 import matplotlib.colors as colors
 import multiprocessing as mp
-from itertools import repeat
-from sparta_tools import sparta # type: ignore
 import os
-from contextlib import contextmanager
-import sys
-from matplotlib.animation import FuncAnimation
 import seaborn as sns
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from matplotlib.legend_handler import HandlerLine2D, HandlerTuple
-import json
 
-from utils.data_and_loading_functions import check_pickle_exist_gadget, create_directory, find_closest_z, load_or_pickle_ptl_data, timed, parse_ranges,create_nu_string
-
+from .data_and_loading_functions import create_directory
 
 plt.rcParams['mathtext.fontset'] = 'dejavuserif'
 plt.rcParams['font.family'] = 'serif'
@@ -34,34 +20,9 @@ num_processes = mp.cpu_count()
 import configparser
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
-curr_sparta_file = config["MISC"]["curr_sparta_file"]
-rand_seed = config.getint("MISC","random_seed")
-on_zaratan = config.getboolean("MISC","on_zaratan")
-path_to_MLOIS = config["PATHS"]["path_to_MLOIS"]
-path_to_snaps = config["PATHS"]["path_to_snaps"]
-path_to_SPARTA_data = config["PATHS"]["path_to_SPARTA_data"]
-sim_cosmol = config["MISC"]["sim_cosmol"]
-if sim_cosmol == "planck13-nbody":
-    sim_pat = r"cpla_l(\d+)_n(\d+)"
-else:
-    sim_pat = r"cbol_l(\d+)_n(\d+)"
-match = re.search(sim_pat, curr_sparta_file)
-if match:
-    sparta_name = match.group(0)
-snap_loc = path_to_snaps + sparta_name + "/"
-path_to_hdf5_file = path_to_SPARTA_data + sparta_name + "/" + curr_sparta_file + ".hdf5"
-path_to_pickle = config["PATHS"]["path_to_pickle"]
-path_to_calc_info = config["PATHS"]["path_to_calc_info"]
-path_to_pygadgetreader = config["PATHS"]["path_to_pygadgetreader"]
-path_to_sparta = config["PATHS"]["path_to_sparta"]
-curr_chunk_size = config.getint("SEARCH","chunk_size")
-lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
-plt_nu_splits = config["XGBOOST"]["plt_nu_splits"]
-plt_nu_splits = parse_ranges(plt_nu_splits)
-plt_nu_string = create_nu_string(plt_nu_splits)
 
-sys.path.insert(1, path_to_pygadgetreader)  
-from pygadgetreader import readsnap, readheader # type: ignore
+curr_sparta_file = config["MISC"]["curr_sparta_file"]
+MLOIS_path = config["PATHS"]["MLOIS_path"]
 
 def rv_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = None):
     if ax == None:
@@ -138,92 +99,6 @@ def plot_data_dist(data, labels, num_bins, save_location, show, save):
         fig.set_size_inches(15, 15)
         fig.savefig(save_location + "data_hist.png")
     plt.close()
-    
-def plot_per_err(bins,parameter,act_labels,pred_labels,save_location,x_label,save_param):
-    all_err_inf = []
-    all_err_orb = []
-    num_wrong_inf = []
-    num_wrong_orb = []
-    scale_wrong_inf = []
-    scale_wrong_orb = []
-    log_num_wrong_inf = []
-    log_num_wrong_orb = []
-
-    for i in range(bins.size - 1):
-        curr_act_inf = np.where((parameter > bins[i])&(parameter < bins[i+1])&(act_labels==0))[0].size
-        curr_act_orb = np.where((parameter > bins[i])&(parameter < bins[i+1])&(act_labels==1))[0].size
-        curr_pred_inf = np.where((parameter > bins[i])&(parameter < bins[i+1])&(pred_labels==0))[0].size
-        curr_pred_orb = np.where((parameter > bins[i])&(parameter < bins[i+1])&(pred_labels==1))[0].size
-        
-        all_err_inf.append(0 if curr_act_inf == 0 else ((curr_pred_inf - curr_act_inf)/curr_act_inf) * 100)
-        all_err_orb.append(0 if curr_act_orb == 0 else ((curr_pred_orb - curr_act_orb)/curr_act_orb) * 100)
-        num_wrong_inf.append(np.where((parameter > bins[i])&(parameter < bins[i+1])&(act_labels==0)&(pred_labels==1))[0].size)
-        num_wrong_orb.append(np.where((parameter > bins[i])&(parameter < bins[i+1])&(act_labels==1)&(pred_labels==0))[0].size)
-        scale_wrong_inf.append(0 if curr_act_inf == 0 else np.where((parameter > bins[i])&(parameter < bins[i+1])&(act_labels==0)&(pred_labels==1))[0].size/curr_act_inf)
-        scale_wrong_orb.append(0 if curr_act_orb == 0 else np.where((parameter > bins[i])&(parameter < bins[i+1])&(act_labels==1)&(pred_labels==0))[0].size/curr_act_orb)
-        
-    
-    cmap = plt.get_cmap("viridis")
-    norm = colors.Normalize(vmin=0,vmax=1)
-    inf_colors = cmap(norm(scale_wrong_inf))
-    orb_colors = cmap(norm(scale_wrong_orb))
-    
-    bin_centers = (bins[:-1] + bins[1:]) / 2
-    
-    cumsum_inf = np.cumsum(num_wrong_inf)
-    cumsum_orb = np.cumsum(num_wrong_orb)
-
-    widths = [4,4,.2]
-    heights = [4,4]
-    bar_width = 0.75
-    num_bins = bins.size - 1
-    index = np.arange(0,num_bins)
-    
-    r200m_loc = np.where(bins > 1)[0][0]
-    
-    fig = plt.figure(figsize=(40,20))
-    gs = fig.add_gridspec(2,3,width_ratios = widths, height_ratios = heights)
-    ax1 = fig.add_subplot(gs[0,0])
-    ax2 = fig.add_subplot(gs[0,1])
-    ax3 = fig.add_subplot(gs[1,0])
-    ax4 = fig.add_subplot(gs[1,1])
-    
-    ax1.bar(index,num_wrong_inf,width=bar_width,align='center',color=inf_colors,log=True)
-    ax1.vlines(r200m_loc,ymin=0,ymax=np.max(num_wrong_inf),colors='r')
-    ax1.set_xlabel(x_label)
-    ax1.set_ylabel("Number of Misclassified")
-    ax1.set_title("Infalling Particles")
-    ax1.set_xticks(index)
-    ax1.set_xticklabels([f'{bins[i]:.3f}-{bins[i + 1]:.3f}' for i in range(num_bins)],rotation=90)
-    
-    ax2.bar(index,num_wrong_orb,width=bar_width,align='center',color=orb_colors,log=True)
-    ax2.vlines(r200m_loc,ymin=0,ymax=np.max(num_wrong_orb),colors='r')
-    ax2.set_xlabel(x_label)
-    ax2.set_ylabel("Number of Misclassified")
-    ax2.set_title("Orbiting Particles")
-    ax2.set_xticks(index)
-    ax2.set_xticklabels([f'{bins[i]:.3f}-{bins[i + 1]:.3f}' for i in range(num_bins)],rotation=90)
-    
-    ax3.plot(index,cumsum_inf,color='r',marker='o')
-    ax3.set_xlabel(x_label)
-    ax3.set_ylabel("Number of Misclassified")
-    ax3.set_ylim(np.min([cumsum_inf[0],cumsum_orb[0]])-1000,np.max([cumsum_inf[-1],cumsum_orb[-1]])+1000)
-    ax3.set_xticks(index)
-    ax3.set_xticklabels([f'{bins[i]:.3f}-{bins[i + 1]:.3f}' for i in range(num_bins)],rotation=90)
-    
-    ax4.plot(index,cumsum_orb,color='r',marker='o')
-    ax4.set_xlabel(x_label)
-    ax4.set_ylabel("Number of Misclassified")
-    ax4.set_ylim(np.min([cumsum_inf[0],cumsum_orb[0]])-1000,np.max([cumsum_inf[-1],cumsum_orb[-1]])+1000)
-    ax4.set_xticks(index)
-    ax4.set_xticklabels([f'{bins[i]:.3f}-{bins[i + 1]:.3f}' for i in range(num_bins)],rotation=90)
-
-    sm = mpl.cm.ScalarMappable(cmap=cmap, norm=norm)
-    sm.set_array([])
-    cbar = plt.colorbar(sm, cax=plt.subplot(gs[0,-1]))
-    cbar.set_label("Number of Misclassified Particles / Number of Actual Particles")
-
-    fig.savefig(save_location + save_param + "_per_err_by_bin.png",bbox_inches="tight")
         
 def feature_dist(features, labels, save_name, plot, save, save_location):
     tot_plts = features.shape[1]
@@ -453,7 +328,7 @@ def halo_plot_3d_vec(ptl_pos, ptl_vel, halo_pos, halo_vel, halo_r200m, labels, c
         yaxis=dict(title='Y position (kpc/h)', range=[halo_pos[1] - 10 * halo_r200m,halo_pos[1] + 10 * halo_r200m]),
         zaxis=dict(title='Z position (kpc/h)', range=[halo_pos[2] - 10 * halo_r200m,halo_pos[2] + 10 * halo_r200m]),
         row=1,col=2)
-    fig.write_html(path_to_MLOIS + "/Random_figs/high_vel_halo_idx_" + str(halo_idx) + ".html")
+    fig.write_html(MLOIS_path + "/Random_figs/high_vel_halo_idx_" + str(halo_idx) + ".html")
     
 def plot_rad_dist(bin_edges,filter_radii,save_path):
     fig,ax = plt.subplots(1,2,figsize=(25,10))

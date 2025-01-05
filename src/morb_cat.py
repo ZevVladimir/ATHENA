@@ -10,7 +10,7 @@ import os
 import multiprocessing as mp
 from itertools import repeat
 import configparser
-from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, save_to_hdf5, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z
+from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, save_to_hdf5, conv_halo_id_spid, save_pickle, create_directory, find_closest_z
 from utils.calculation_functions import *
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -106,7 +106,7 @@ def search_halos(snap_dict, curr_halo_idx, curr_sparta_idx, curr_ptl_pids, curr_
     
     m_orb = np.where(curr_orb_assn == 1)[0].shape[0] * mass  
     
-    halo_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200c")       
+    halo_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200m")       
     halo_id = p_halos_id[curr_halo_idx]
     
     curr_orb_pid = curr_ptl_pids[np.where(curr_orb_assn == 1)[0]]
@@ -227,7 +227,8 @@ def halo_loop(indices, p_halo_ids, p_dict, p_ptls_pid, p_ptls_pos, p_ptls_vel, f
         all_m_orb = all_m_orb.astype(np.float32)
         all_halo_m200m = all_halo_m200m.astype(np.float32)
         all_halo_r200m = all_halo_r200m.astype(np.float32)
-
+        
+        #TODO change this to use pandas dataframes
         if find_subhalos:
             if os.path.isfile(save_location + "catologue_" + curr_sparta_file + ".hdf5") and i == 0:
                 os.remove(save_location + "catologue_" + curr_sparta_file + ".hdf5")
@@ -291,7 +292,7 @@ with timed("p_snap information load"):
     print("corresponding SPARTA snap num:", p_sparta_snap,"sparta redshift:",all_red_shifts[p_sparta_snap])
     
     # Set constants
-    p_snapshot_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
+    p_snap_path = path_to_snaps + "snapdir_" + snap_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
 
     p_scale_factor = 1/(1+p_red_shift)
     p_rho_m = cosmol.rho_m(p_red_shift)
@@ -310,10 +311,12 @@ with timed("p_snap information load"):
 
 # load all information needed for the primary snap
 with timed("p_snap ptl load"):
-    p_ptls_pid, p_ptls_vel, p_ptls_pos = load_or_pickle_ptl_data(curr_sparta_file, str(p_snap), p_snapshot_path, p_scale_factor)
+    p_ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(p_snap), p_snap_path) * 10**3 * p_scale_factor # kpc/h
+    p_ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(p_snap), p_snap_path) # km/s
+    p_ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(p_snap), p_snap_path)
 
 with timed("p_snap SPARTA load"):
-    p_halos_pos, p_halos_r200m, p_halos_id, p_halos_status, p_halos_last_snap, p_parent_id, mass = load_or_pickle_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
+    p_halos_pos, p_halos_r200m, p_halos_id, p_halos_status, p_halos_last_snap, p_parent_id, mass = load_SPARTA_data(curr_sparta_file, p_scale_factor, p_snap, p_sparta_snap)
 
 save_location =  path_to_calc_info + curr_sparta_file + "_" + str(p_snap) + "_" + str(search_rad) + "r200msearch/"
 
@@ -325,8 +328,7 @@ if os.path.isfile(save_location + "p_ptl_tree.pickle"):
             p_ptl_tree = pickle.load(pickle_file)
 else:
     p_ptl_tree = cKDTree(data = p_ptls_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size) # construct search trees for primary snap
-    with open(save_location + "p_ptl_tree.pickle", "wb") as pickle_file:
-        pickle.dump(p_ptl_tree, pickle_file)
+    save_pickle(p_ptl_tree,save_location + "p_ptl_tree.pickle")
 
 # only take halos that are hosts in primary snap and exist past the p_snap and exist in some form at the comparison snap
 match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap))[0]
@@ -343,8 +345,8 @@ with timed("p_snap initial search"):
         with mp.Pool(processes=num_processes) as p:
             # halo position, halo r200m, if comparison snap, want mass?, want indices?
             num_ptls = p.starmap(initial_search, zip(p_halos_pos[match_halo_idxs], p_halos_r200m[match_halo_idxs], repeat(False), repeat(False)), chunksize=curr_chunk_size)
-            with open(save_location + "num_ptls.pickle", "wb") as pickle_file:
-                pickle.dump(num_ptls, pickle_file)
+            save_pickle(num_ptls,save_location + "num_ptls.pickle")
+
         p.close()
         p.join() 
 
