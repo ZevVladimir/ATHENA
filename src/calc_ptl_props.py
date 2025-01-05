@@ -16,8 +16,6 @@ import psutil
 
 from utils.data_and_loading_functions import load_or_pickle_SPARTA_data, load_or_pickle_ptl_data, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir
 from utils.calculation_functions import *
-from utils.visualization_functions import halo_plot_3d_vec, compare_density_prf
-from utils.update_vis_fxns import plot_halo_slice
 from utils.ML_support import *
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -203,17 +201,6 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
         curr_orb_assn = curr_orb_assn[scaled_radii_inds]
 
     global count
-    if create_dens_prf:
-        count += 1
-        with open(path_to_pickle + "190_cbol_l0063_n0256_10r200m/ptl_mass.pickle", "rb") as pickle_file:
-            ptl_mass = pickle.load(pickle_file)
-
-        bins = np.insert(bins, 0, 0)
-        dens_prf_all = np.reshape(dens_prf_all,(1,80))
-        dens_prf_1halo = np.reshape(dens_prf_1halo,(1,80))
-
-        compare_density_prf(np.array([0]),scaled_radii,np.array([0]),np.array([num_new_ptls]),dens_prf_all,dens_prf_1halo,np.array([ptl_mass]),curr_orb_assn,bins,str(curr_halo_idx),"/home/zvladimi/MLOIS/Random_figs/",save_graph=True)    
-    
     if comp_snap == False:
         return fnd_HIPIDs, curr_orb_assn, scaled_rad_vel, scaled_tang_vel, scaled_radii, scaled_phys_vel
     else:

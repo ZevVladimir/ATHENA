@@ -102,7 +102,7 @@ def calc_rad_vel(peculiar_vel, particle_dist, coord_sep, halo_r200m, red_shift, 
     
     # Get the corresponding components, distances, and halo v200m for every particle
     v_hubble = np.zeros(particle_dist.size, dtype = np.float32)
-    corr_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200c") 
+    corr_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200m") 
     curr_v200m = calc_v200m(corr_m200m, halo_r200m)
         
     # calculate the unit vector of the halo to the particle  
@@ -135,7 +135,7 @@ def calc_tang_vel(rv, phys_v_comp, rhat):
     return tv
 
 def calc_t_dyn(halo_r200m, red_shift):
-    halo_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200c")
+    halo_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200m")
     curr_v200m = calc_v200m(halo_m200m, halo_r200m)
     t_dyn = (2*halo_r200m)/curr_v200m
 
