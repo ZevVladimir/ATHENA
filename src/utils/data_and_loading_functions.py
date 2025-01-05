@@ -10,17 +10,21 @@ import dask.dataframe as dd
 from pygadgetreader import readsnap, readheader
 from sparta_tools import sparta
 
-def create_directory(path):
-    os.makedirs(path,exist_ok=True)
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
-curr_sparta_file = config["MISC"]["curr_sparta_file"]
-SPARTA_output_path = config["PATHS"]["SPARTA_output_path"]
 
+SPARTA_output_path = config["PATHS"]["SPARTA_output_path"]
+pickled_path = config["PATHS"]["pickled_path"]
+
+curr_sparta_file = config["MISC"]["curr_sparta_file"]
 sim_cosmol = config["MISC"]["sim_cosmol"]
+
+reset_lvl = config.getint("SEARCH","reset")
+total_num_snaps = config.getint("SEARCH","total_num_snaps")
+##################################################################################################################
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
 else:
@@ -28,22 +32,13 @@ else:
 match = re.search(sim_pat, curr_sparta_file)
 if match:
     sparta_name = match.group(0)
-path_to_hdf5_file = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
-pickled_path = config["PATHS"]["pickled_path"]
 
-snap_dir_format = config["MISC"]["snap_dir_format"]
-snap_format = config["MISC"]["snap_format"]
-
-reset_lvl = config.getint("SEARCH","reset")
-global prim_only
-prim_only = config.getboolean("SEARCH","prim_only")
-t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
-total_num_snaps = config.getint("SEARCH","total_num_snaps")
-test_halos_ratio = config.getfloat("XGBOOST","test_halos_ratio")
-global num_save_ptl_params
-num_save_ptl_params = config.getint("SEARCH","num_save_ptl_params")
+sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
 num_processes = mp.cpu_count()
 ##################################################################################################################
+
+def create_directory(path):
+    os.makedirs(path,exist_ok=True)
 
 @contextmanager
 def timed(txt):
@@ -142,7 +137,7 @@ def load_or_pickle_SPARTA_data(sparta_name, scale_factor, snap, sparta_snap):
         reload_sparta = True
     
     if reload_sparta:
-        sparta_output = sparta.load(filename=path_to_hdf5_file, log_level= 0)
+        sparta_output = sparta.load(filename=sparta_HDF5_path, log_level= 0)
         halos_pos = sparta_output['halos']['position'][:,sparta_snap,:] * 10**3 * scale_factor # convert to kpc/h and physical
         with open(pickled_path + str(snap) + "_" + str(sparta_name) + "/halos_pos.pickle", "wb") as pickle_file:
             pickle.dump(halos_pos, pickle_file)

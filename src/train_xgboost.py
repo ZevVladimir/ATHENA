@@ -8,7 +8,6 @@ import json
 import pickle
 import os
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
 import multiprocessing as mp
 
@@ -23,9 +22,7 @@ config.read(os.getcwd() + "/config.ini")
 
 on_zaratan = config.getboolean("MISC","on_zaratan")
 use_gpu = config.getboolean("MISC","use_gpu")
-curr_sparta_file = config["MISC"]["curr_sparta_file"]
 
-MLOIS_path = config["PATHS"]["MLOIS_path"]
 ML_dset_path = config["PATHS"]["ML_dset_path"]
 path_to_models = config["PATHS"]["path_to_models"]
 
@@ -52,7 +49,7 @@ fulldist_plt = config.getboolean("XGBOOST","fulldist_plt")
 dens_prf_nu_split = config.getboolean("XGBOOST","dens_prf_nu_split")
 nu_splits = parse_ranges(nu_splits)
 nu_string = create_nu_string(nu_splits)
-
+###############################################################################################################
 if on_zaratan:
     from dask_mpi import initialize
     from distributed.scheduler import logger

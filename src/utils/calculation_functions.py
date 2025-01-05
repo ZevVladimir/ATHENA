@@ -34,7 +34,7 @@ def calc_radius(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_
     particle_x[x_within_plus] = particle_x[x_within_plus] + box_size
     particle_x[x_within_minus] = particle_x[x_within_minus] - box_size
     
-    coord_diff[:,0] = halo_x - particle_x
+    coord_diff[:,0] = particle_x - halo_x
     
     y_within_plus = np.where((y_dist + box_size) < half_box_size)
     y_within_minus = np.where((y_dist - box_size) > -half_box_size)
@@ -42,7 +42,7 @@ def calc_radius(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_
     particle_y[y_within_plus] = particle_y[y_within_plus] + box_size
     particle_y[y_within_minus] = particle_y[y_within_minus] - box_size
     
-    coord_diff[:,1] = halo_y - particle_y
+    coord_diff[:,1] = particle_y - halo_y
     
     z_within_plus = np.where((z_dist + box_size) < half_box_size)
     z_within_minus = np.where((z_dist - box_size) > -half_box_size)
@@ -50,11 +50,11 @@ def calc_radius(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_
     particle_z[z_within_plus] = particle_z[z_within_plus] + box_size
     particle_z[z_within_minus] = particle_z[z_within_minus] - box_size
     
-    coord_diff[:,2] = halo_z - particle_z 
+    coord_diff[:,2] = particle_z - halo_z
 
     # Calculate radii with standard distance formula
     distance = np.zeros((new_particles,1))
-    distance = np.sqrt(np.square((halo_x - particle_x)) + np.square((halo_y - particle_y)) + np.square((halo_z - particle_z)))
+    distance = np.sqrt(np.square((coord_diff[:,0])) + np.square((coord_diff[:,1])) + np.square((coord_diff[:,2])))
     
     return distance, coord_diff #kpc/h
 
