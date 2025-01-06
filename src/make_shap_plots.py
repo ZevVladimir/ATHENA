@@ -1,24 +1,58 @@
 import os
-from utils.ML_support import *
+from dask.distributed import Client
 import json
 import configparser
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import xgboost as xgb
+
 from colossus.cosmology import cosmology
 import shap
 import matplotlib.cm as cm
 from  shap.plots import colors
 from shap.plots._utils import convert_color
-from utils.data_and_loading_functions import create_directory
+import multiprocessing as mp
+
+from utils.data_and_loading_functions import create_directory, timed
+from utils.ML_support import get_CUDA_cluster, get_combined_name, parse_ranges, create_nu_string, load_data, make_preds, shap_with_filter
 
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
+
 on_zaratan = config.getboolean("MISC","on_zaratan")
 use_gpu = config.getboolean("MISC","use_gpu")
+sim_cosmol = config["MISC"]["sim_cosmol"]
+
+path_to_models = config["PATHS"]["path_to_models"]
+
+model_sims = json.loads(config.get("XGBOOST","model_sims"))
 test_sims = json.loads(config.get("XGBOOST","test_sims"))
 eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
-ML_dset_path = config["PATHS"]["path_to_calc_info"]
-sim_cosmol = config["MISC"]["sim_cosmol"]
+model_type = config["XGBOOST"]["model_type"]
+
+reduce_rad = config.getfloat("XGBOOST","reduce_rad")
+reduce_perc = config.getfloat("XGBOOST", "reduce_perc")
+
+weight_rad = config.getfloat("XGBOOST","weight_rad")
+min_weight = config.getfloat("XGBOOST","min_weight")
+opt_wghts = config.getboolean("XGBOOST","opt_wghts")
+opt_scale_rad = config.getboolean("XGBOOST","opt_scale_rad")
+
+nu_splits = config["XGBOOST"]["nu_splits"]
+nu_splits = parse_ranges(nu_splits)
+nu_string = create_nu_string(nu_splits)
+
+if sim_cosmol == "planck13-nbody":
+    cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
+else:
+    cosmol = cosmology.setCosmology(sim_cosmol)
+
+if on_zaratan:
+    from dask_mpi import initialize
+    from distributed.scheduler import logger
+    import socket
+elif not on_zaratan and not use_gpu:
+    from dask.distributed import LocalCluster
 
 if __name__ == '__main__':
     if use_gpu:
@@ -43,12 +77,7 @@ if __name__ == '__main__':
     else:
         client = get_CUDA_cluster()
     
-    with timed("Setup"):
-
-        if sim_cosmol == "planck13-nbody":
-            cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
-        else:
-            cosmol = cosmology.setCosmology(sim_cosmol) 
+    with timed("Setup"): 
 
         feature_columns = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
         target_column = ["Orbit_infall"]
