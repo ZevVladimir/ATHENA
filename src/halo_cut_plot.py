@@ -33,7 +33,7 @@ if match:
     sparta_name = match.group(0)
 SPARTA_hdf5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
 
-search_rad = config.getfloat("SEARCH","search_rad")
+search_radius = config.getfloat("SEARCH","search_radius")
 test_sims = json.loads(config.get("XGBOOST","test_sims"))
 model_sims = json.loads(config.get("XGBOOST","model_sims"))
 model_type = config["XGBOOST"]["model_type"]
@@ -88,7 +88,16 @@ with h5py.File(SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".h
 all_red_shifts = dic_sim['snap_z']
 p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
 
-halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_SPARTA_data(SPARTA_hdf5_path,sparta_search_name, p_scale_factor, p_snap, p_sparta_snap)
+param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"],["simulation","particle_mass"]]
+            
+sparta_params, sparta_param_names = load_SPARTA_data(param_paths, curr_sparta_file, p_snap)
+
+halos_pos = sparta_params[sparta_param_names[0]][:,p_sparta_snap,:] * 10**3 * p_scale_factor # convert to kpc/h
+halos_r200m = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
+halos_ids = sparta_params[sparta_param_names[2]][:,p_sparta_snap]
+halos_status = sparta_params[sparta_param_names[3]][:,p_sparta_snap]
+halos_last_snap = sparta_params[sparta_param_names[4]][:]
+ptl_mass = sparta_params[sparta_param_names[5]]
 
 snap_loc = snap_path + sparta_name + "/"
 p_snap_path = snap_loc + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
@@ -107,9 +116,9 @@ while len(used_numbers) < 25:
 
         use_halo_pos = halos_pos[use_idx]
         use_halo_r200m = halos_r200m[use_idx]
-        use_halo_id = halos_id[use_idx]
+        use_halo_id = halos_ids[use_idx]
 
-        ptl_indices = tree.query_ball_point(use_halo_pos, r = search_rad * 1.5 * use_halo_r200m)
+        ptl_indices = tree.query_ball_point(use_halo_pos, r = search_radius * 1.5 * use_halo_r200m)
         ptl_indices = np.array(ptl_indices)
 
         curr_ptl_pos = ptls_pos[ptl_indices]

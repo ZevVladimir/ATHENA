@@ -853,10 +853,10 @@ def plot_halo_slice(ptl_pos, labels, halo_pos, halo_r200m, save_loc, search_rad=
     dx = np.diff(xedges)[0]
     dy = np.diff(yedges)[0]
     bin_area = dx * dy
+    
     all_hist = all_hist / bin_area
     orb_hist = orb_hist / bin_area
     inf_hist = inf_hist / bin_area
-
     # Set up circles for visual aids
     search_circle_1 = Circle((0, 0), radius=search_rad * halo_r200m, edgecolor="green", facecolor='none', linestyle="--", fill=False)
     search_circle_2 = Circle((0, 0), radius=search_rad * halo_r200m, edgecolor="green", facecolor='none', linestyle="--", fill=False)

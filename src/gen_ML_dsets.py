@@ -13,7 +13,7 @@ import psutil
 import json
 from sparta_tools import sparta 
 
-from utils.data_and_loading_functions import load_SPARTA_data, load_or_pickle_ptl_data, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir
+from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir
 from utils.calculation_functions import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -408,7 +408,7 @@ with timed("Startup"):
         print("check sparta redshift:",all_red_shifts[p_sparta_snap])   
 
         # Set constants
-        p_snapshot_path = snap_loc + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
+        p_snap_path = snap_loc + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
 
         p_scale_factor = 1/(1+p_red_shift)
         p_rho_m = cosmol.rho_m(p_red_shift)
@@ -431,8 +431,10 @@ with timed("Startup"):
 
     # load all information needed for the primary snap
     with timed("p_snap ptl load"):
-        p_ptls_pid, p_ptls_vel, p_ptls_pos = load_or_pickle_ptl_data(curr_sparta_file, str(p_snap), p_snapshot_path, p_scale_factor)
-
+        p_ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(p_snap), p_snap_path) 
+        p_ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(p_snap), p_snap_path) # km/s
+        p_ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(p_snap), p_snap_path) * 10**3 * p_scale_factor # kpc/h
+    
     with timed("p_snap SPARTA load"):
         param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"],["simulation","particle_mass"]]
             

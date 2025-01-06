@@ -72,31 +72,20 @@ def load_pickle(path):
             return pickle.load(pickle_file)
     else:
         raise FileNotFoundError
-def check_pickle_exist_gadget(sparta_name, ptl_property, snapshot, snapshot_path, scale_factor):
+
+def load_ptl_param(sparta_name, param_name, snap, snap_path):
     # save to folder containing pickled data to be accessed easily later
-    file_path = pickled_path + str(snapshot) + "_" + str(sparta_name) + "/" + ptl_property + "_" + str(snapshot) + ".pickle" 
-    create_directory(pickled_path + str(snapshot) +  "_" + str(sparta_name) + "/")
+    file_path = pickled_path + str(snap) + "_" + str(sparta_name) + "/" + param_name + "_" + str(snap) + ".pickle" 
+    create_directory(pickled_path + str(snap) +  "_" + str(sparta_name) + "/")
     
     # check if the file has already been pickled if so just load it
-    if os.path.isfile(file_path):
-        with open(file_path, "rb") as pickle_file:
-            ptl_info = pickle.load(pickle_file)
-    # otherwise load the specific information from the particle data and save it as a pickle file
-    else:
-        ptl_info = readsnap(snapshot_path, ptl_property, 'dm')
-        if ptl_property == "pos":
-            ptl_info = ptl_info * 10**3 * scale_factor # convert position to kpc/h and physical
-        with open(file_path, "wb") as pickle_file:
-            pickle.dump(ptl_info, pickle_file)
-    return ptl_info
+    try:
+        ptl_param = load_pickle(file_path)
+    except FileNotFoundError:
+        ptl_param = readsnap(snap_path, param_name, 'dm')
+        save_pickle(ptl_param,file_path)
 
-def load_or_pickle_ptl_data(sparta_name, snapshot, snapshot_path, scale_factor):
-    ptl_pid = check_pickle_exist_gadget(sparta_name, "pid", snapshot, snapshot_path, scale_factor=scale_factor) # kpc/h
-    ptl_vel = check_pickle_exist_gadget(sparta_name, "vel", snapshot, snapshot_path, scale_factor=scale_factor) # km/s
-    ptl_pos = check_pickle_exist_gadget(sparta_name, "pos", snapshot, snapshot_path, scale_factor=scale_factor)
-
-    return ptl_pid, ptl_vel, ptl_pos
-
+    return ptl_param
 
 def load_SPARTA_data(param_path_list, sparta_name, snap):
     create_directory(pickled_path + str(snap) +  "_" + str(sparta_name) + "/")
@@ -228,10 +217,10 @@ def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red
     snapshot_list.append(c_snap)
 
     # switch to comparison snap
-    snapshot_path = snap_loc + "/snapdir_" + snap_dir_format.format(c_snap) + "/snapshot_" + snap_format.format(c_snap)
+    c_snap_path = snap_loc + "/snapdir_" + snap_dir_format.format(c_snap) + "/snapshot_" + snap_format.format(c_snap)
         
     # get constants from pygadgetreader
-    c_red_shift = readheader(snapshot_path, 'redshift')
+    c_red_shift = readheader(c_snap_path, 'redshift')
     c_sparta_snap = np.abs(all_red_shifts - c_red_shift).argmin()
     print("Complementary snapshot:", c_snap, "Complementary redshift:", c_red_shift)
     print("Corresponding SPARTA loc:", c_sparta_snap, "SPARTA redshift:",all_red_shifts[c_sparta_snap])
@@ -247,7 +236,9 @@ def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red
         clean_dir(pickled_path + str(c_snap) + "_" + curr_sparta_file + "/")
     # load particle data and SPARTA data for the comparison snap
     with timed("c_snap ptl load"):
-        c_particles_pid, c_particles_vel, c_particles_pos = load_or_pickle_ptl_data(curr_sparta_file, str(c_snap), snapshot_path, c_scale_factor)
+        c_ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(c_snap), c_snap_path) 
+        c_ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(c_snap), c_snap_path) # km/s
+        c_ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(c_snap), c_snap_path) * 10**3 * c_scale_factor # kpc/h
     with timed("c_snap SPARTA load"):
         param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"]]
             
@@ -258,7 +249,7 @@ def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red
         c_halos_status = c_sparta_params[c_sparta_param_names[3]][:,c_sparta_snap]
         c_halos_last_snap = c_sparta_params[c_sparta_param_names[4]][:]
 
-    return c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_particles_pid, c_particles_vel, c_particles_pos, c_halos_pos, c_halos_r200m, c_halos_ids, c_halos_status, c_halos_last_snap
+    return c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_ptls_pid, c_ptls_vel, c_ptls_pos, c_halos_pos, c_halos_r200m, c_halos_ids, c_halos_status, c_halos_last_snap
 
 def split_orb_inf(data, labels):
     infall = data[np.where(labels == 0)[0]]
