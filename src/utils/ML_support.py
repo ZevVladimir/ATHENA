@@ -11,10 +11,9 @@ import pickle
 import json
 import h5py
 import re
-import matplotlib.pyplot as plt
 import pandas as pd
 from colossus.lss import peaks
-from colossus import cosmology
+from colossus.cosmology import cosmology
 import warnings
 
 from skopt import gp_minimize
@@ -26,7 +25,6 @@ from .data_and_loading_functions import load_SPARTA_data, find_closest_z, conv_h
 from .update_vis_fxns import plot_full_ptl_dist, plot_miss_class_dist, compare_prfs_nu, compare_prfs, inf_orb_frac
 from .calculation_functions import create_mass_prf, create_stack_mass_prf, filter_prf, calculate_density
 from sparta_tools import sparta 
-from colossus.cosmology import cosmology
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
