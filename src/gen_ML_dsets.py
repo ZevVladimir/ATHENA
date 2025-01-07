@@ -438,7 +438,7 @@ with timed("Startup"):
     with timed("p_snap SPARTA load"):
         param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"],["simulation","particle_mass"]]
             
-        p_sparta_params, p_sparta_param_names = load_SPARTA_data(param_paths, curr_sparta_file, p_snap)
+        p_sparta_params, p_sparta_param_names = load_SPARTA_data(sparta_HDF5_path, param_paths, curr_sparta_file, p_snap)
 
         p_halos_pos = p_sparta_params[p_sparta_param_names[0]][:,p_sparta_snap,:] * 10**3 * p_scale_factor # convert to kpc/h
         p_halos_r200m = p_sparta_params[p_sparta_param_names[1]][:,p_sparta_snap]
@@ -449,7 +449,7 @@ with timed("Startup"):
         
     with timed("c_snap load"):
         t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], p_red_shift)
-        c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_ptls_pid, c_ptls_vel, c_ptls_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_loc=snap_loc)
+        c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_ptls_pid, c_ptls_vel, c_ptls_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_loc=snap_loc,sparta_HDF5_path=sparta_HDF5_path)
         c_box_size = sim_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
 
     c_snap_dict = {

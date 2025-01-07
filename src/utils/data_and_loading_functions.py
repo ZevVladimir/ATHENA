@@ -34,7 +34,6 @@ match = re.search(sim_pat, curr_sparta_file)
 if match:
     sparta_name = match.group(0)
 
-sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
 num_processes = mp.cpu_count()
 ##################################################################################################################
 
@@ -87,7 +86,7 @@ def load_ptl_param(sparta_name, param_name, snap, snap_path):
 
     return ptl_param
 
-def load_SPARTA_data(param_path_list, sparta_name, snap):
+def load_SPARTA_data(sparta_HDF5_path, param_path_list, sparta_name, snap):
     create_directory(pickled_path + str(snap) +  "_" + str(sparta_name) + "/")
     
     reload_sparta = False
@@ -209,7 +208,7 @@ def conv_halo_id_spid(my_halo_ids, sdata, snapshot):
         sparta_idx[i] = int(np.where(my_id == sdata['halos']['id'][:,snapshot])[0])
     return sparta_idx
 
-def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red_shifts, snap_dir_format, snap_format, snap_loc):
+def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red_shifts, snap_dir_format, snap_format, snap_loc, sparta_HDF5_path):
     # calculate one dynamical time ago and set that as the comparison snap
     curr_time = cosmol.age(p_red_shift)
     past_time = curr_time - (t_dyn_step * t_dyn)
@@ -242,7 +241,7 @@ def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red
     with timed("c_snap SPARTA load"):
         param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"]]
             
-        c_sparta_params, c_sparta_param_names = load_SPARTA_data(param_paths, curr_sparta_file, c_snap)
+        c_sparta_params, c_sparta_param_names = load_SPARTA_data(sparta_HDF5_path, param_paths, curr_sparta_file, c_snap)
         c_halos_pos = c_sparta_params[c_sparta_param_names[0]][:,c_sparta_snap,:] * 10**3 * c_scale_factor # convert to kpc/h
         c_halos_r200m = c_sparta_params[c_sparta_param_names[1]][:,c_sparta_snap]
         c_halos_ids = c_sparta_params[c_sparta_param_names[2]][:,c_sparta_snap]

@@ -78,7 +78,9 @@ with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
     new_p_snap, curr_z = find_closest_z(curr_z,snap_path + sparta_name + "/",curr_snap_dir_format,curr_snap_format)
     p_scale_factor = 1/(1+curr_z)
     
-with h5py.File(SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5","r") as f:
+curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
+
+with h5py.File(curr_sparta_HDF5_path,"r") as f:
     dic_sim = {}
     grp_sim = f['simulation']
 
@@ -88,9 +90,10 @@ with h5py.File(SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".h
 all_red_shifts = dic_sim['snap_z']
 p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
 
+
+
 param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"],["simulation","particle_mass"]]
-            
-sparta_params, sparta_param_names = load_SPARTA_data(param_paths, curr_sparta_file, p_snap)
+sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, curr_sparta_file, p_snap)
 
 halos_pos = sparta_params[sparta_param_names[0]][:,p_sparta_snap,:] * 10**3 * p_scale_factor # convert to kpc/h
 halos_r200m = sparta_params[sparta_param_names[1]][:,p_sparta_snap]

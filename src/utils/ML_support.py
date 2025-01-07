@@ -250,8 +250,10 @@ def sort_and_lim_files(folder_path,limit_files=False):
 # Returns a simulation's mass used and the redshift of the primary snapshot
 def sim_mass_p_z(sim,config_params):
     sparta_name, sparta_search_name = split_calc_name(sim)
-            
-    with h5py.File(SPARTA_output_path + sparta_name + "/" +  sparta_search_name + ".hdf5","r") as f:
+    
+    curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" +  sparta_search_name + ".hdf5"    
+    
+    with h5py.File(curr_sparta_HDF5_path,"r") as f:
         dic_sim = {}
         grp_sim = f['simulation']
         for f in grp_sim.attrs:
@@ -267,7 +269,7 @@ def sim_mass_p_z(sim,config_params):
     
     param_paths = [["simulation","particle_mass"]]
             
-    sparta_params, sparta_param_names = load_SPARTA_data(param_paths, curr_sparta_file, p_snap)
+    sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, curr_sparta_file, p_snap)
     ptl_mass = sparta_params[sparta_param_names[0]]
     
     return ptl_mass, use_z
@@ -448,8 +450,10 @@ def load_sprta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
             curr_snap_format = config_dict["snap_format"]
             new_p_snap, curr_z = find_closest_z(curr_z,snap_path + sparta_name + "/",curr_snap_dir_format,curr_snap_format)
             p_scale_factor = 1/(1+curr_z)
-            
-        with h5py.File(SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5","r") as f:
+        
+        curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
+        
+        with h5py.File(curr_sparta_HDF5_path,"r") as f:
             dic_sim = {}
             grp_sim = f['simulation']
 
@@ -459,14 +463,15 @@ def load_sprta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         all_red_shifts = dic_sim['snap_z']
         p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
         
+        
         param_paths = [["halos","id"],["simulation","particle_mass"]]
-        sparta_params, sparta_param_names = load_SPARTA_data(param_paths, sparta_search_name, curr_snap_list[0])
+        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, curr_snap_list[0])
         halos_ids = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
         ptl_mass = sparta_params[sparta_param_names[1]]
  
         use_halo_ids = halos_ids[use_idxs]
         
-        sparta_output = sparta.load(filename=SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5", halo_ids=use_halo_ids, log_level=0)
+        sparta_output = sparta.load(filename=curr_sparta_HDF5_path, halo_ids=use_halo_ids, log_level=0)
         new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta re-sort the indices
         
         mass_prf_all_list.append(sparta_output['anl_prf']['M_all'][new_idxs,p_sparta_snap,:])
@@ -493,13 +498,6 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, pl
     with timed("Predictions"):
         print(f"Starting predictions for {y.size.compute():.3e} particles")
         preds = make_preds(client, model, X)
-    X = X.compute()
-    y = y.compute()
-    
-    X_scatter = client.scatter(X)
-    X = dd.from_delayed(X_scatter)
-    y_scatter = client.scatter(y)
-    y = dd.from_delayed(y_scatter)
 
     num_bins = 30
 
