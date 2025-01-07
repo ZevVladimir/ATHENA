@@ -269,7 +269,7 @@ def sim_mass_p_z(sim,config_params):
     
     param_paths = [["simulation","particle_mass"]]
             
-    sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, curr_sparta_file, p_snap)
+    sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, p_snap)
     ptl_mass = sparta_params[sparta_param_names[0]]
     
     return ptl_mass, use_z
@@ -451,7 +451,7 @@ def load_sprta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
             new_p_snap, curr_z = find_closest_z(curr_z,snap_path + sparta_name + "/",curr_snap_dir_format,curr_snap_format)
             p_scale_factor = 1/(1+curr_z)
         
-        curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
+        curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
         
         with h5py.File(curr_sparta_HDF5_path,"r") as f:
             dic_sim = {}
