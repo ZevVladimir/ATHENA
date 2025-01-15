@@ -66,7 +66,7 @@ weight_exp = config.getfloat("XGBOOST","weight_exp")
 hpo_loss = config.get("XGBOOST","hpo_loss")
 nu_splits = config["XGBOOST"]["nu_splits"]
 plt_nu_splits = config["XGBOOST"]["plt_nu_splits"]
-plt_nu_splits = parse_ranges(nu_splits)
+plt_nu_splits = parse_ranges(plt_nu_splits)
 
 linthrsh = config.getfloat("XGBOOST","linthrsh")
 lin_nbin = config.getint("XGBOOST","lin_nbin")

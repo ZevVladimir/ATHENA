@@ -14,14 +14,10 @@ import matplotlib as mpl
 mpl.rcParams.update(mpl.rcParamsDefault)
 import pickle
 from colossus.cosmology import cosmology
-from src.utils.calculation_functions import create_mass_prf, create_stack_mass_prf, filter_prf, calculate_density
-from src.utils.ML_support import load_sprta_mass_prf
-from src.utils.update_vis_fxns import compare_prfs_nu
-
-    
-
-from src.utils.ML_support import load_data, get_CUDA_cluster, get_combined_name, reform_dataset_dfs, parse_ranges, create_nu_string
-from src.utils.data_and_loading_functions import create_directory, timed
+from utils.calculation_functions import create_stack_mass_prf, filter_prf, calculate_density
+from utils.update_vis_fxns import compare_prfs_nu
+from utils.ML_support import load_data, get_CUDA_cluster, get_combined_name, reform_dataset_dfs, parse_ranges, create_nu_string, load_sprta_mass_prf
+from utils.data_and_loading_functions import create_directory, timed
 import configparser
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
@@ -93,13 +89,13 @@ def load_your_data():
         nptl = data.shape[0].compute()
         if nptl > 10000000:
             frac = 10_000_000 / nptl
-            data = data.sample(frac=frac, random_state=42)
-    r = data["p_Scaled_radii"]
-    vr = data["p_Radial_vel"]
-    vphys = data["p_phys_vel"]
+            samp_data = data.sample(frac=frac, random_state=42)
+    r = samp_data["p_Scaled_radii"]
+    vr = samp_data["p_Radial_vel"]
+    vphys = samp_data["p_phys_vel"]
     lnv2 = np.log(vphys**2)
     
-    return r, vr, lnv2
+    return r, vr, lnv2, data, halo_df
 
 def gradient_minima(
     r: np.ndarray,
@@ -190,9 +186,9 @@ def cost_perp_distance(b: float, *data) -> float:
 
 def calibrate_finder(
     n_points: int = 20,
-    perc: float = 0.9,
+    perc: float = 0.85,
     width: float = 0.05,
-    grad_lims: tuple = (0.2, 0.6),
+    grad_lims: tuple = (0.1, 0.7),
 ):
     """_summary_
 
@@ -211,7 +207,7 @@ def calibrate_finder(
         [0.2, 0.5]
     """
     # MODIFY this line if needed ======================
-    r, vr, lnv2 = load_your_data()
+    r, vr, lnv2, my_data, halo_df = load_your_data()
 
     # =================================================
 
@@ -308,9 +304,9 @@ if __name__ == "__main__":
     # to improve results. 'perc' is the percent of particles expected below the line
     # for vr > 0. 'width' is used for 
     width = 0.05
-    perc = 0.9
+    perc = 0.85
 
-    r, vr, lnv2 = load_your_data()
+    r, vr, lnv2, my_data, halo_df = load_your_data()
 
     mask_vr_neg = (vr < 0)
     mask_vr_pos = ~mask_vr_neg
@@ -405,26 +401,14 @@ if __name__ == "__main__":
     print("Testing on:", curr_test_sims)
     # Loop through and/or for Train/Test/All datasets and evaluate the model
     
-    with timed("Model Evaluation on " + dset_name + " dataset"):                  
-        # Load the halo information
-        halo_files = []
-        halo_dfs = []
-        if dset_name == "Full":    
-            for sim in curr_test_sims:
-                halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + "Train" + "/halo_info/"))
-                halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/"))
-        else:
-            for sim in curr_test_sims:
-                halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
-
-        halo_df = pd.concat(halo_dfs)
-        
-        # Load the particle information
-        data,scale_pos_weight = load_data(client,curr_test_sims,dset_name,limit_files=False)
-    
-    r = data["p_Scaled_radii"]
-    vphys = data["p_phys_vel"]
+    r = my_data["p_Scaled_radii"]
+    vr = my_data["p_Radial_vel"]
+    vphys = my_data["p_phys_vel"]
     lnv2 = np.log(vphys**2)
+    
+    mask_vr_neg = (vr < 0)
+    mask_vr_pos = ~mask_vr_neg
+
     mask_cut_pos = (lnv2 < (m_pos * r + b_pos)) & (r < 3.0)
 
     # Orbiting classification for vr < 0
@@ -435,8 +419,8 @@ if __name__ == "__main__":
     (mask_cut_pos & mask_vr_pos) ^ \
     (mask_cut_neg & mask_vr_neg)
     
-    X = data[feature_columns]
-    y = data[target_column]
+    X = my_data[feature_columns]
+    y = my_data[target_column]
     halo_first = halo_df["Halo_first"].values
     halo_n = halo_df["Halo_n"].values
     all_idxs = halo_df["Halo_indices"].values
