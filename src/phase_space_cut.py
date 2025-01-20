@@ -13,11 +13,15 @@ import pandas as pd
 import matplotlib as mpl
 mpl.rcParams.update(mpl.rcParamsDefault)
 import pickle
+import h5py
 from colossus.cosmology import cosmology
+from scipy.spatial import cKDTree
+
 from utils.calculation_functions import create_stack_mass_prf, filter_prf, calculate_density
 from utils.update_vis_fxns import compare_prfs_nu
-from utils.ML_support import load_data, get_CUDA_cluster, get_combined_name, reform_dataset_dfs, parse_ranges, create_nu_string, load_sprta_mass_prf
-from utils.data_and_loading_functions import create_directory, timed
+from utils.ML_support import load_data, get_CUDA_cluster, get_combined_name, reform_dataset_dfs, parse_ranges, create_nu_string, load_sprta_mass_prf, split_calc_name
+from utils.data_and_loading_functions import create_directory, timed, load_pickle, load_SPARTA_data
+
 import configparser
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
@@ -27,6 +31,7 @@ use_gpu = config.getboolean("MISC","use_gpu")
 
 ML_dset_path = config["PATHS"]["ML_dset_path"]
 path_to_models = config["PATHS"]["path_to_models"]
+SPARTA_output_path = config["PATHS"]["SPARTA_output_path"]
 
 model_sims = json.loads(config.get("XGBOOST","model_sims"))
 dask_task_cpus = config.getint("XGBOOST","dask_task_cpus")
@@ -59,6 +64,78 @@ elif not on_zaratan and not use_gpu:
 
 ####################################################################################################################################################################################################################################
     
+def halo_select(sims, ptl_data):
+    curr_tot_nptl = 0
+    all_dfs = []
+    # For each simulation we will search through the largest halos and determine if they dominate their region and only choose those ones
+    for sim in sims:
+        # Get the numnber of particles per halo and use this to sort the halos such that the largest is first
+        n_ptls = load_pickle(ML_dset_path + sim + "num_ptls.pickle")    
+        order_halo = np.argmax(n_ptls)
+        n_ptls = n_ptls[order_halo]
+        
+        # Load which particles belong to which halo and then sort them corresponding to the size of the halos again
+        halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
+        all_idxs = halo_ddf["Halo_indices"].values
+        halo_n = halo_ddf["Halo_n"].values
+        halo_first = halo_ddf["Halo_first"].values
+        
+        all_idxs = all_idxs[order_halo]
+        halo_n = halo_n[order_halo]
+        halo_first = halo_first[order_halo]
+        
+        # Load information about the simulation
+        config_dict = load_pickle(ML_dset_path + sim + "/config.pickle")
+        curr_z = config_dict["p_snap_info"]["red_shift"][()]
+        p_snap = config_dict["p_snap_info"]["p_snap"][()]
+        p_box_size = config_dict["p_snap_info"]["box_size"][()]
+        p_scale_factor = 1/(1+curr_z)
+        
+        sparta_name, sparta_search_name = split_calc_name(sim)
+        
+        curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
+        
+        with h5py.File(curr_sparta_HDF5_path,"r") as f:
+            dic_sim = {}
+            grp_sim = f['simulation']
+
+            for attr in grp_sim.attrs:
+                dic_sim[attr] = grp_sim.attrs[attr]
+
+        all_red_shifts = dic_sim['snap_z']
+        p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
+                
+        # Load the halo's positions and radii
+        param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"],["simulation","particle_mass"]]
+        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, p_snap)
+
+        halos_pos = sparta_params[sparta_param_names[0]][:,p_sparta_snap,:] * 10**3 * p_scale_factor # convert to kpc/h
+        halos_r200m = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
+        
+        use_halo_pos = halos_pos[all_idxs]
+        use_halo_r200m = halos_r200m[all_idxs]
+        
+        # Construct a search tree of halo positions
+        curr_halo_tree = cKDTree(data = use_halo_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size)
+        
+        # For each massive halo search the area around the halo to determine if there are any halos that are more than 20% the size of this halo
+        for i in range(order_halo.shape[0]):
+            curr_halo_indices = curr_halo_tree.query_ball_point(use_halo_pos[i], r = 2 * use_halo_r200m)
+            curr_halo_indices = np.array(curr_halo_indices)
+            surr_n_ptls = n_ptls[curr_halo_indices] 
+            max_loc = np.argmax(surr_n_ptls)
+            
+            # If the largest halo nearby isn't large enough we will consider this halo's particles for our datasets
+            if np.max(surr_n_ptls) < 0.2 * n_ptls[i]:
+                all_dfs.append(ptl_data.iloc[halo_first[curr_halo_indices[max_loc]]:halo_first[curr_halo_indices[max_loc]]+halo_n[curr_halo_indices[max_loc]]])
+                curr_tot_nptl += halo_n[curr_halo_indices[max_loc]]
+                
+            # Once we have 10,000,000 particles we are done
+            if curr_tot_nptl > 10000000:
+                return pd.concat(all_dfs, ignore_index=True)
+            
+    return pd.concat(all_dfs, ignore_index=True)
+    
 def load_your_data():
     curr_test_sims = test_sims[0]
     test_comb_name = get_combined_name(curr_test_sims) 
@@ -88,8 +165,7 @@ def load_your_data():
         data,scale_pos_weight = load_data(client,curr_test_sims,dset_name,limit_files=False)
         nptl = data.shape[0].compute()
         if nptl > 10000000:
-            frac = 10_000_000 / nptl
-            samp_data = data.sample(frac=frac, random_state=42)
+            samp_data = halo_select(curr_test_sims,data)
     r = samp_data["p_Scaled_radii"]
     vr = samp_data["p_Radial_vel"]
     vphys = samp_data["p_phys_vel"]
@@ -362,7 +438,7 @@ if __name__ == "__main__":
     # Orbiting classification for vr < 0
     mask_cut_neg = (lnv2 < (m_neg * r + b_neg)) & (r < 3.0)
 
-    # Particle is infalling if it is below both lines and 2*R00
+    # Particle is infalling if it is below both lines and 3*R00
     mask_orb = \
     (mask_cut_pos & mask_vr_pos) ^ \
     (mask_cut_neg & mask_vr_neg)

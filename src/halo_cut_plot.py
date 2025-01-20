@@ -75,7 +75,6 @@ with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
     curr_z = config_dict["p_snap_info"]["red_shift"][()]
     curr_snap_dir_format = config_dict["snap_dir_format"]
     curr_snap_format = config_dict["snap_format"]
-    new_p_snap, curr_z = find_closest_z(curr_z,snap_path + sparta_name + "/",curr_snap_dir_format,curr_snap_format)
     p_scale_factor = 1/(1+curr_z)
     
 curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
