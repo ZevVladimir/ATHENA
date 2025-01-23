@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import dask.dataframe as dd
 import numpy as np
 from matplotlib.cm import get_cmap
 from scipy.optimize import curve_fit, minimize
@@ -66,13 +67,35 @@ elif not on_zaratan and not use_gpu:
     
 def halo_select(sims, ptl_data):
     curr_tot_nptl = 0
-    all_dfs = []
+    all_row_idxs = []
     # For each simulation we will search through the largest halos and determine if they dominate their region and only choose those ones
     for sim in sims:
         # Get the numnber of particles per halo and use this to sort the halos such that the largest is first
-        n_ptls = load_pickle(ML_dset_path + sim + "num_ptls.pickle")    
-        order_halo = np.argmax(n_ptls)
-        n_ptls = n_ptls[order_halo]
+        n_ptls = load_pickle(ML_dset_path + sim + "/num_ptls.pickle")   
+        match_halo_idxs = load_pickle(ML_dset_path + sim + "/match_halo_idxs.pickle")    
+  
+        total_num_halos = match_halo_idxs.shape[0]
+        
+        # Load information about the simulation
+        config_dict = load_pickle(ML_dset_path + sim + "/config.pickle")
+        test_halos_ratio = config_dict["test_halos_ratio"]
+        curr_z = config_dict["p_snap_info"]["red_shift"][()]
+        p_snap = config_dict["p_snap_info"]["snap"][()]
+        p_box_size = config_dict["p_snap_info"]["box_size"][()]
+        p_scale_factor = 1/(1+curr_z)
+        
+        # split all indices into train and test groups
+        split_pnt = int((1-test_halos_ratio) * total_num_halos)
+        test_idxs = match_halo_idxs[split_pnt:]
+        test_num_ptls = n_ptls[split_pnt:]
+
+        # need to sort indices otherwise sparta.load breaks...      
+        test_idxs_inds = test_idxs.argsort()
+        test_idxs = test_idxs[test_idxs_inds]
+        test_num_ptls = test_num_ptls[test_idxs_inds]
+        
+        order_halo = np.argsort(test_num_ptls)[::-1]
+        n_ptls = test_num_ptls[order_halo]
         
         # Load which particles belong to which halo and then sort them corresponding to the size of the halos again
         halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
@@ -83,13 +106,6 @@ def halo_select(sims, ptl_data):
         all_idxs = all_idxs[order_halo]
         halo_n = halo_n[order_halo]
         halo_first = halo_first[order_halo]
-        
-        # Load information about the simulation
-        config_dict = load_pickle(ML_dset_path + sim + "/config.pickle")
-        curr_z = config_dict["p_snap_info"]["red_shift"][()]
-        p_snap = config_dict["p_snap_info"]["p_snap"][()]
-        p_box_size = config_dict["p_snap_info"]["box_size"][()]
-        p_scale_factor = 1/(1+curr_z)
         
         sparta_name, sparta_search_name = split_calc_name(sim)
         
@@ -120,21 +136,27 @@ def halo_select(sims, ptl_data):
         
         # For each massive halo search the area around the halo to determine if there are any halos that are more than 20% the size of this halo
         for i in range(order_halo.shape[0]):
-            curr_halo_indices = curr_halo_tree.query_ball_point(use_halo_pos[i], r = 2 * use_halo_r200m)
+            curr_halo_indices = curr_halo_tree.query_ball_point(use_halo_pos[i], r = 2 * use_halo_r200m[i])
             curr_halo_indices = np.array(curr_halo_indices)
+            
+            # The search will return the same halo that we are searching so we remove that
             surr_n_ptls = n_ptls[curr_halo_indices] 
-            max_loc = np.argmax(surr_n_ptls)
+            surr_n_ptls = surr_n_ptls[surr_n_ptls != n_ptls[i]]
             
             # If the largest halo nearby isn't large enough we will consider this halo's particles for our datasets
-            if np.max(surr_n_ptls) < 0.2 * n_ptls[i]:
-                all_dfs.append(ptl_data.iloc[halo_first[curr_halo_indices[max_loc]]:halo_first[curr_halo_indices[max_loc]]+halo_n[curr_halo_indices[max_loc]]])
-                curr_tot_nptl += halo_n[curr_halo_indices[max_loc]]
+            if surr_n_ptls.size == 0 or np.max(surr_n_ptls) < 0.2 * n_ptls[i]:
+                row_indices = list(range(
+                    halo_first[i],
+                    halo_first[i] + halo_n[i]
+                ))
+                all_row_idxs.extend(row_indices)
+                curr_tot_nptl += halo_n[i]
                 
             # Once we have 10,000,000 particles we are done
             if curr_tot_nptl > 10000000:
-                return pd.concat(all_dfs, ignore_index=True)
-            
-    return pd.concat(all_dfs, ignore_index=True)
+                break
+    subset_df = ptl_data.compute().loc[all_row_idxs]        
+    return subset_df
     
 def load_your_data():
     curr_test_sims = test_sims[0]
@@ -262,9 +284,9 @@ def cost_perp_distance(b: float, *data) -> float:
 
 def calibrate_finder(
     n_points: int = 20,
-    perc: float = 0.85,
+    perc: float = 0.9,
     width: float = 0.05,
-    grad_lims: tuple = (0.1, 0.7),
+    grad_lims: tuple = (0.2, 0.7),
 ):
     """_summary_
 
@@ -380,7 +402,7 @@ if __name__ == "__main__":
     # to improve results. 'perc' is the percent of particles expected below the line
     # for vr > 0. 'width' is used for 
     width = 0.05
-    perc = 0.85
+    perc = 0.90
 
     r, vr, lnv2, my_data, halo_df = load_your_data()
 
@@ -396,7 +418,7 @@ if __name__ == "__main__":
     x_range = (0, 3)
     y_range = (-2, 2.5)
 
-    fig, axes = plt.subplots(1, 2, figsize=(9, 4))
+    fig, axes = plt.subplots(2, 2, figsize=(9, 4))
     axes = axes.flatten()
     fig.suptitle(
         r"Kinetic energy distribution of particles around halos at $z=0$")
@@ -404,7 +426,7 @@ if __name__ == "__main__":
     for ax in axes:
         ax.set_xlabel(r'$r/R_{200}$')
         ax.set_ylabel(r'$\ln(v^2/v_{200}^2)$')
-        ax.set_xlim(0, 3)
+        ax.set_xlim(0, 2)
         ax.set_ylim(-2, 2.5)
         ax.text(0.25, -1.4, "Orbiting", fontsize=16, color="r",
                 weight="bold", bbox=dict(facecolor='w', alpha=0.75))
@@ -427,6 +449,24 @@ if __name__ == "__main__":
     plt.plot(x, y22, lw=2.0, color="k",
             label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
     plt.colorbar(label=r'$N$ (Counts)')
+    plt.legend()
+    
+    plt.sca(axes[2])
+    plt.title(r'$v_r > 0$')
+    h3 = plt.hist2d(r[mask_vr_pos], lnv2[mask_vr_pos], bins=200,
+                cmap="terrain", range=(x_range, y_range))
+    plt.plot(x, y12, lw=2.0, color="k", norm="log",
+            label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
+    plt.colorbar(h3[3], label=r'$N$ (Counts)')
+    plt.legend()
+
+    plt.sca(axes[3])
+    plt.title(r'$v_r < 0$')
+    h4 = plt.hist2d(r[mask_vr_neg], lnv2[mask_vr_neg], bins=200,
+                cmap="terrain", range=(x_range, y_range))
+    plt.plot(x, y22, lw=2.0, color="k", norm="log",
+            label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
+    plt.colorbar(h4[3], label=r'$N$ (Counts)')
     plt.legend()
 
     plt.tight_layout();
