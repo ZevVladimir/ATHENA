@@ -432,8 +432,8 @@ if __name__ == "__main__":
         r"Kinetic energy distribution of particles around halos at $z=0$")
 
     for ax in axes:
-        ax.set_xlabel(r'$r/R_{200}$')
-        ax.set_ylabel(r'$\ln(v^2/v_{200}^2)$')
+        ax.set_xlabel(r'$r/R_{200m}$')
+        ax.set_ylabel(r'$\ln(v^2/v_{200m}^2)$')
         ax.set_xlim(0, 2)
         ax.set_ylim(-2, 2.5)
         ax.text(0.25, -1.4, "Orbiting", fontsize=16, color="r",
@@ -461,53 +461,56 @@ if __name__ == "__main__":
     plt.legend()
     plt.xlim(0, 2)
     
-    bins = 200
-    hist, x_edges, y_edges = np.histogram2d(r[mask_vr_pos], lnv2[mask_vr_pos], bins=bins)
+    mask_vrn = (vr < 0)
+    mask_vrp = ~mask_vrn
 
-    # Compute gradients in x and y directions
-    grad_x, grad_y = np.gradient(hist)
+    # Compute density and gradient.
+    # For vr > 0
+    hist_zp, hist_xp, hist_yp = np.histogram2d(r[mask_vrp], lnv2[mask_vrp], 
+                                                bins=200, 
+                                                range=((0, 3.), (-2, 2.5)),
+                                                density=True)
+    # Bin centres
+    hist_xp = 0.5 * (hist_xp[:-1] + hist_xp[1:])
+    hist_yp = 0.5 * (hist_yp[:-1] + hist_yp[1:])
+    # Bin spacing
+    dx = np.mean(np.diff(hist_xp))
+    dy = np.mean(np.diff(hist_yp))
+    # Generate a 2D grid corresponding to the histogram
+    hist_xp, hist_yp = np.meshgrid(hist_xp, hist_yp)
+    # Evaluate the gradient at each radial bin
+    hist_z_grad = np.zeros_like(hist_zp)
+    for i in range(hist_xp.shape[0]):
+        hist_z_grad[i, :] = np.gradient(hist_zp[i, :], dy)
+    # Apply a gaussian filter to smooth the gradient.
+    hist_zp = ndimage.gaussian_filter(hist_z_grad, 2.0)
 
-    # Compute gradient magnitude
-    grad_mag = np.sqrt(grad_x**2 + grad_y**2)
-
-    # Apply Gaussian filter for smoothing
-    sigma = 2  # Adjust for more/less smoothing
-    smoothed_grad = ndimage.gaussian_filter(grad_mag, sigma=sigma)
+    # Same for vr < 0
+    hist_zn, hist_xn, hist_yn = np.histogram2d(r[mask_vrn], lnv2[mask_vrn],
+                                                bins=200,
+                                                range=((0, 3.), (-2, 2.5)),
+                                                density=True)
+    hist_xn = 0.5 * (hist_xn[:-1] + hist_xn[1:])
+    hist_yn = 0.5 * (hist_yn[:-1] + hist_yn[1:])
+    dy = np.mean(np.diff(hist_yn))
+    hist_xn, hist_yn = np.meshgrid(hist_xn, hist_yn)
+    hist_z_grad = np.zeros_like(hist_zn)
+    for i in range(hist_xn.shape[0]):
+        hist_z_grad[i, :] = np.gradient(hist_zn[i, :], dy)
+    hist_zn = ndimage.gaussian_filter(hist_z_grad, 2.0)
 
     # Plot the smoothed gradient
     plt.sca(axes[2])
     plt.title(r'$v_r > 0$')
-    plt.imshow(smoothed_grad.T, origin="lower", 
-            extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]], 
-            cmap="inferno", aspect="auto")
+    plt.contourf(hist_xp, hist_yp, hist_zp.T, levels=80, cmap='terrain')
     plt.colorbar(label="Smoothed Gradient Magnitude")
-    plt.xlabel("X")
-    plt.ylabel("Y")
-    plt.title("Smoothed 2D Gradient of Histogram")
     plt.xlim(0, 2)
     
-    hist, x_edges, y_edges = np.histogram2d(r[mask_vr_neg], lnv2[mask_vr_neg], bins=bins)
-
-    # Compute gradients in x and y directions
-    grad_x, grad_y = np.gradient(hist)
-
-    # Compute gradient magnitude
-    grad_mag = np.sqrt(grad_x**2 + grad_y**2)
-
-    # Apply Gaussian filter for smoothing
-    sigma = 2  # Adjust for more/less smoothing
-    smoothed_grad = ndimage.gaussian_filter(grad_mag, sigma=sigma)
-
     # Plot the smoothed gradient
     plt.sca(axes[3])
     plt.title(r'$v_r < 0$')
-    plt.imshow(smoothed_grad.T, origin="lower", 
-            extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]], 
-            cmap="inferno", aspect="auto")
+    plt.contourf(hist_xn, hist_yn, hist_zn.T, levels=80, cmap='terrain')
     plt.colorbar(label="Smoothed Gradient Magnitude")
-    plt.xlabel("X")
-    plt.ylabel("Y")
-    plt.title("Smoothed 2D Gradient of Histogram")
     plt.xlim(0, 2)
     
     # plt.sca(axes[2])
