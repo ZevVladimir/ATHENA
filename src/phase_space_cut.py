@@ -21,7 +21,7 @@ import scipy.ndimage as ndimage
 
 from utils.calculation_functions import create_stack_mass_prf, filter_prf, calculate_density
 from utils.update_vis_fxns import compare_prfs_nu
-from utils.ML_support import load_data, get_CUDA_cluster, get_combined_name, reform_dataset_dfs, parse_ranges, create_nu_string, load_sprta_mass_prf, split_calc_name
+from utils.ML_support import load_data, get_CUDA_cluster, get_combined_name, reform_dataset_dfs, parse_ranges, create_nu_string, load_sprta_mass_prf, split_calc_name, sim_mass_p_z
 from utils.data_and_loading_functions import create_directory, timed, load_pickle, load_SPARTA_data
 
 import configparser
@@ -85,6 +85,8 @@ def halo_select(sims, ptl_data):
         p_box_size = config_dict["p_snap_info"]["box_size"][()]
         p_scale_factor = 1/(1+curr_z)
         
+        # ptl_mass, use_z = sim_mass_p_z(sim,config_dict)
+        
         # split all indices into train and test groups
         split_pnt = int((1-test_halos_ratio) * total_num_halos)
         test_idxs = match_halo_idxs[split_pnt:]
@@ -135,7 +137,7 @@ def halo_select(sims, ptl_data):
         # Construct a search tree of halo positions
         curr_halo_tree = cKDTree(data = use_halo_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size)
         
-        max_nhalo = 200
+        max_nhalo = 500
         if order_halo.shape[0] < max_nhalo:
             max_nhalo = order_halo.shape[0]
         
@@ -263,7 +265,6 @@ def cost_percentile(b: float, *data) -> float:
     below_line = (lnv2 < (slope * r + b)).sum()
     return np.log((target - below_line / r.shape[0]) ** 2)
 
-
 def cost_perp_distance(b: float, *data) -> float:
     """Cost function for y-intercept b parameter. The optimal value of b is such
     that the perpendicular distance of all points to the line is maximal.
@@ -288,7 +289,7 @@ def cost_perp_distance(b: float, *data) -> float:
 
 def calibrate_finder(
     n_points: int = 20,
-    perc: float = 0.9,
+    perc: float = 0.95,
     width: float = 0.05,
     grad_lims: tuple = (0.2, 0.5),
 ):
@@ -402,6 +403,12 @@ if __name__ == "__main__":
     ####################################################################################################################################################################################################################################
     
     (m_pos, b_pos), (m_neg, b_neg) = calibrate_finder()
+    
+    m_pos = -1.8871701416241973
+    b_pos = 1.8737438015852703
+    m_neg = -1.8570568919016017
+    b_neg = 1.498922799454499
+    
     print("\nCalibration Params")
     print(m_pos,b_pos,m_neg,b_neg)
     print("\n")
@@ -409,8 +416,9 @@ if __name__ == "__main__":
     # to improve results. 'perc' is the percent of particles expected below the line
     # for vr > 0. 'width' is used for 
     width = 0.05
-    perc = 0.90
+    perc = 0.95
     grad_lims = "0.2_0.5"
+    r_cut = 1.75
 
     r, vr, lnv2, my_data, halo_df = load_your_data()
 
@@ -426,10 +434,10 @@ if __name__ == "__main__":
     x_range = (0, 3)
     y_range = (-2, 2.5)
 
-    fig, axes = plt.subplots(2, 2, figsize=(9, 8))
+    fig, axes = plt.subplots(3, 2, figsize=(12, 12))
     axes = axes.flatten()
     fig.suptitle(
-        r"Kinetic energy distribution of particles around halos at $z=0$")
+        fr"Kinetic energy distribution of particles around halos at $z=0$\nSim: {test_comb_name}")
 
     for ax in axes:
         ax.set_xlabel(r'$r/R_{200m}$')
@@ -447,6 +455,7 @@ if __name__ == "__main__":
                 cmap="terrain", range=(x_range, y_range))
     plt.plot(x, y12, lw=2.0, color="k",
             label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
+    plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
     plt.colorbar(label=r'$N$ (Counts)')
     plt.legend()
     plt.xlim(0, 2)
@@ -457,6 +466,7 @@ if __name__ == "__main__":
                 cmap="terrain", range=(x_range, y_range))
     plt.plot(x, y22, lw=2.0, color="k",
             label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
+    plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
     plt.colorbar(label=r'$N$ (Counts)')
     plt.legend()
     plt.xlim(0, 2)
@@ -498,40 +508,46 @@ if __name__ == "__main__":
     for i in range(hist_xn.shape[0]):
         hist_z_grad[i, :] = np.gradient(hist_zn[i, :], dy)
     hist_zn = ndimage.gaussian_filter(hist_z_grad, 2.0)
-
-    # Plot the smoothed gradient
+    
     plt.sca(axes[2])
     plt.title(r'$v_r > 0$')
+    h3 = plt.hist2d(r[mask_vr_pos], lnv2[mask_vr_pos], bins=200, norm="log",
+                cmap="terrain", range=(x_range, y_range))
+    plt.plot(x, y12, lw=2.0, color="k",
+            label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
+    plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+    plt.colorbar(h3[3], label=r'$N$ (Counts)')
+    plt.legend()
+    plt.xlim(0, 2)
+
+    plt.sca(axes[3])
+    plt.title(r'$v_r < 0$')
+    h4 = plt.hist2d(r[mask_vr_neg], lnv2[mask_vr_neg], bins=200, norm="log",
+                cmap="terrain", range=(x_range, y_range))
+    plt.plot(x, y22, lw=2.0, color="k",
+            label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
+    plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+    plt.colorbar(h4[3], label=r'$N$ (Counts)')
+    plt.legend()
+    plt.xlim(0, 2)
+
+    # Plot the smoothed gradient
+    plt.sca(axes[4])
+    plt.title(r'$v_r > 0$')
     plt.contourf(hist_xp, hist_yp, hist_zp.T, levels=80, cmap='terrain')
+    plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
     plt.colorbar(label="Smoothed Gradient Magnitude")
     plt.xlim(0, 2)
     
     # Plot the smoothed gradient
-    plt.sca(axes[3])
+    plt.sca(axes[5])
     plt.title(r'$v_r < 0$')
     plt.contourf(hist_xn, hist_yn, hist_zn.T, levels=80, cmap='terrain')
+    plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
     plt.colorbar(label="Smoothed Gradient Magnitude")
     plt.xlim(0, 2)
     
-    # plt.sca(axes[2])
-    # plt.title(r'$v_r > 0$')
-    # h3 = plt.hist2d(r[mask_vr_pos], lnv2[mask_vr_pos], bins=200, norm="log",
-    #             cmap="terrain", range=(x_range, y_range))
-    # plt.plot(x, y12, lw=2.0, color="k",
-    #         label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
-    # plt.colorbar(h3[3], label=r'$N$ (Counts)')
-    # plt.legend()
-    # plt.xlim(0, 2)
-
-    # plt.sca(axes[3])
-    # plt.title(r'$v_r < 0$')
-    # h4 = plt.hist2d(r[mask_vr_neg], lnv2[mask_vr_neg], bins=200, norm="log",
-    #             cmap="terrain", range=(x_range, y_range))
-    # plt.plot(x, y22, lw=2.0, color="k",
-    #         label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
-    # plt.colorbar(h4[3], label=r'$N$ (Counts)')
-    # plt.legend()
-    # plt.xlim(0, 2)
+    
 
     plt.tight_layout();
     plt.savefig(plot_loc + "perc_" + str(perc) + "_" + grad_lims + "_KE_dist_cut.png")
