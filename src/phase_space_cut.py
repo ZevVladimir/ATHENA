@@ -17,6 +17,7 @@ import pickle
 import h5py
 from colossus.cosmology import cosmology
 from scipy.spatial import cKDTree
+import scipy.ndimage as ndimage
 
 from utils.calculation_functions import create_stack_mass_prf, filter_prf, calculate_density
 from utils.update_vis_fxns import compare_prfs_nu
@@ -134,8 +135,12 @@ def halo_select(sims, ptl_data):
         # Construct a search tree of halo positions
         curr_halo_tree = cKDTree(data = use_halo_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size)
         
+        max_nhalo = 200
+        if order_halo.shape[0] < max_nhalo:
+            max_nhalo = order_halo.shape[0]
+        
         # For each massive halo search the area around the halo to determine if there are any halos that are more than 20% the size of this halo
-        for i in range(order_halo.shape[0]):
+        for i in range(max_nhalo):
             curr_halo_indices = curr_halo_tree.query_ball_point(use_halo_pos[i], r = 2 * use_halo_r200m[i])
             curr_halo_indices = np.array(curr_halo_indices)
             
@@ -153,20 +158,20 @@ def halo_select(sims, ptl_data):
                 curr_tot_nptl += halo_n[i]
                 
             # Once we have 10,000,000 particles we are done
-            if curr_tot_nptl > 10000000:
-                break
+            # if curr_tot_nptl > 1000000:
+            #     break
     subset_df = ptl_data.compute().loc[all_row_idxs]        
     return subset_df
     
 def load_your_data():
-    curr_test_sims = test_sims[0]
+    curr_test_sims = ["cbol_l1000_n1024_4r200m_1-5v200m_100to90"]
     test_comb_name = get_combined_name(curr_test_sims) 
         
     print("Testing on:", curr_test_sims)
     # Loop through and/or for Train/Test/All datasets and evaluate the model
     dset_name = eval_datasets[0]
 
-    with timed("Model Evaluation on " + dset_name + " dataset"):             
+    with timed("Loading data"):             
         plot_loc = model_save_loc + dset_name + "_" + test_comb_name + "/plots/"
         create_directory(plot_loc)
         
@@ -186,8 +191,7 @@ def load_your_data():
         # Load the particle information
         data,scale_pos_weight = load_data(client,curr_test_sims,dset_name,limit_files=False)
         nptl = data.shape[0].compute()
-        if nptl > 10000000:
-            samp_data = halo_select(curr_test_sims,data)
+        samp_data = halo_select(curr_test_sims,data)
     r = samp_data["p_Scaled_radii"]
     vr = samp_data["p_Radial_vel"]
     vphys = samp_data["p_phys_vel"]
@@ -234,7 +238,7 @@ def gradient_minima(
         hist_yv, hist_edges = np.histogram(lnv2[mask_vr * r_mask], bins=200)
         hist_lnv2 = 0.5 * (hist_edges[:-1] + hist_edges[1:])
         hist_lnv2_grad = np.gradient(hist_yv, np.mean(np.diff(hist_edges)))
-        lnv2_mask = (1.0 < hist_lnv2) * (hist_lnv2 < 2.0)
+        lnv2_mask = (1.0 < hist_lnv2) * (hist_lnv2 < 1.75)
         grad_min[i] = hist_lnv2[lnv2_mask][np.argmin(hist_lnv2_grad[lnv2_mask])]
 
     return grad_r, grad_min
@@ -286,7 +290,7 @@ def calibrate_finder(
     n_points: int = 20,
     perc: float = 0.9,
     width: float = 0.05,
-    grad_lims: tuple = (0.2, 0.7),
+    grad_lims: tuple = (0.2, 0.5),
 ):
     """_summary_
 
@@ -311,7 +315,7 @@ def calibrate_finder(
 
     mask_vr_neg = (vr < 0)
     mask_vr_pos = ~mask_vr_neg
-    mask_r = r < 2.0
+    mask_r = r < 1.75
 
     # For vr > 0 ===============================================================
     r_grad, min_grad = gradient_minima(r, lnv2, mask_vr_pos, n_points, *grad_lims)
@@ -398,17 +402,21 @@ if __name__ == "__main__":
     ####################################################################################################################################################################################################################################
     
     (m_pos, b_pos), (m_neg, b_neg) = calibrate_finder()
+    print("\nCalibration Params")
+    print(m_pos,b_pos,m_neg,b_neg)
+    print("\n")
     # These are the values I used for my dataset. Feel free to play around with them
     # to improve results. 'perc' is the percent of particles expected below the line
     # for vr > 0. 'width' is used for 
     width = 0.05
     perc = 0.90
+    grad_lims = "0.2_0.5"
 
     r, vr, lnv2, my_data, halo_df = load_your_data()
 
     mask_vr_neg = (vr < 0)
     mask_vr_pos = ~mask_vr_neg
-    mask_r = r < 2.0
+    mask_r = r < 1.75
 
     # y_shift = w / np.cos(np.arctan(m_neg))
     x = np.linspace(0, 3, 1000)
@@ -418,7 +426,7 @@ if __name__ == "__main__":
     x_range = (0, 3)
     y_range = (-2, 2.5)
 
-    fig, axes = plt.subplots(2, 2, figsize=(9, 4))
+    fig, axes = plt.subplots(2, 2, figsize=(9, 8))
     axes = axes.flatten()
     fig.suptitle(
         r"Kinetic energy distribution of particles around halos at $z=0$")
@@ -441,6 +449,7 @@ if __name__ == "__main__":
             label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
     plt.colorbar(label=r'$N$ (Counts)')
     plt.legend()
+    plt.xlim(0, 2)
 
     plt.sca(axes[1])
     plt.title(r'$v_r < 0$')
@@ -450,27 +459,79 @@ if __name__ == "__main__":
             label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
     plt.colorbar(label=r'$N$ (Counts)')
     plt.legend()
+    plt.xlim(0, 2)
     
+    bins = 200
+    hist, x_edges, y_edges = np.histogram2d(r[mask_vr_pos], lnv2[mask_vr_pos], bins=bins)
+
+    # Compute gradients in x and y directions
+    grad_x, grad_y = np.gradient(hist)
+
+    # Compute gradient magnitude
+    grad_mag = np.sqrt(grad_x**2 + grad_y**2)
+
+    # Apply Gaussian filter for smoothing
+    sigma = 2  # Adjust for more/less smoothing
+    smoothed_grad = ndimage.gaussian_filter(grad_mag, sigma=sigma)
+
+    # Plot the smoothed gradient
     plt.sca(axes[2])
     plt.title(r'$v_r > 0$')
-    h3 = plt.hist2d(r[mask_vr_pos], lnv2[mask_vr_pos], bins=200,
-                cmap="terrain", range=(x_range, y_range))
-    plt.plot(x, y12, lw=2.0, color="k", norm="log",
-            label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
-    plt.colorbar(h3[3], label=r'$N$ (Counts)')
-    plt.legend()
+    plt.imshow(smoothed_grad.T, origin="lower", 
+            extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]], 
+            cmap="inferno", aspect="auto")
+    plt.colorbar(label="Smoothed Gradient Magnitude")
+    plt.xlabel("X")
+    plt.ylabel("Y")
+    plt.title("Smoothed 2D Gradient of Histogram")
+    plt.xlim(0, 2)
+    
+    hist, x_edges, y_edges = np.histogram2d(r[mask_vr_neg], lnv2[mask_vr_neg], bins=bins)
 
+    # Compute gradients in x and y directions
+    grad_x, grad_y = np.gradient(hist)
+
+    # Compute gradient magnitude
+    grad_mag = np.sqrt(grad_x**2 + grad_y**2)
+
+    # Apply Gaussian filter for smoothing
+    sigma = 2  # Adjust for more/less smoothing
+    smoothed_grad = ndimage.gaussian_filter(grad_mag, sigma=sigma)
+
+    # Plot the smoothed gradient
     plt.sca(axes[3])
     plt.title(r'$v_r < 0$')
-    h4 = plt.hist2d(r[mask_vr_neg], lnv2[mask_vr_neg], bins=200,
-                cmap="terrain", range=(x_range, y_range))
-    plt.plot(x, y22, lw=2.0, color="k", norm="log",
-            label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
-    plt.colorbar(h4[3], label=r'$N$ (Counts)')
-    plt.legend()
+    plt.imshow(smoothed_grad.T, origin="lower", 
+            extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]], 
+            cmap="inferno", aspect="auto")
+    plt.colorbar(label="Smoothed Gradient Magnitude")
+    plt.xlabel("X")
+    plt.ylabel("Y")
+    plt.title("Smoothed 2D Gradient of Histogram")
+    plt.xlim(0, 2)
+    
+    # plt.sca(axes[2])
+    # plt.title(r'$v_r > 0$')
+    # h3 = plt.hist2d(r[mask_vr_pos], lnv2[mask_vr_pos], bins=200, norm="log",
+    #             cmap="terrain", range=(x_range, y_range))
+    # plt.plot(x, y12, lw=2.0, color="k",
+    #         label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
+    # plt.colorbar(h3[3], label=r'$N$ (Counts)')
+    # plt.legend()
+    # plt.xlim(0, 2)
+
+    # plt.sca(axes[3])
+    # plt.title(r'$v_r < 0$')
+    # h4 = plt.hist2d(r[mask_vr_neg], lnv2[mask_vr_neg], bins=200, norm="log",
+    #             cmap="terrain", range=(x_range, y_range))
+    # plt.plot(x, y22, lw=2.0, color="k",
+    #         label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
+    # plt.colorbar(h4[3], label=r'$N$ (Counts)')
+    # plt.legend()
+    # plt.xlim(0, 2)
 
     plt.tight_layout();
-    plt.savefig(plot_loc + "KE_dist_cut.png")
+    plt.savefig(plot_loc + "perc_" + str(perc) + "_" + grad_lims + "_KE_dist_cut.png")
         
     # Orbiting classification for vr > 0
     mask_cut_pos = (lnv2 < (m_pos * r + b_pos)) & (r < 3.0)
@@ -505,7 +566,7 @@ if __name__ == "__main__":
     plt.colorbar(label=r'$N$ (Counts)')
 
     plt.tight_layout()
-    plt.savefig(plot_loc + "ps_dist.png")
+    plt.savefig(plot_loc + "perc_" + str(perc) + "_" + grad_lims + "_ps_dist.png")
     
     
 ####################################################################################################################################################################################################################################
@@ -615,4 +676,4 @@ if __name__ == "__main__":
         else:
             plt_nu_splits.remove(nu_split)
     lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
-    compare_prfs_nu(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title="ps_cut_dens_")
+    compare_prfs_nu(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "_ps_cut_dens_")
