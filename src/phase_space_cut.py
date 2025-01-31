@@ -166,7 +166,8 @@ def halo_select(sims, ptl_data):
     return subset_df
     
 def load_your_data():
-    curr_test_sims = ["cbol_l1000_n1024_4r200m_1-5v200m_100to90"]
+    # curr_test_sims = ["cbol_l1000_n1024_4r200m_1-5v200m_100to90"]
+    curr_test_sims = test_sims[0]
     test_comb_name = get_combined_name(curr_test_sims) 
         
     print("Testing on:", curr_test_sims)
@@ -198,8 +199,9 @@ def load_your_data():
     vr = samp_data["p_Radial_vel"]
     vphys = samp_data["p_phys_vel"]
     lnv2 = np.log(vphys**2)
+    sparta_labels = samp_data["Orbit_infall"]
     
-    return r, vr, lnv2, data, halo_df
+    return r, vr, lnv2, sparta_labels, data, halo_df
 
 def gradient_minima(
     r: np.ndarray,
@@ -237,7 +239,7 @@ def gradient_minima(
     grad_min = np.zeros(n_points)
     for i in range(n_points):
         r_mask = (r > r_edges_grad[i]) * (r < r_edges_grad[i + 1])
-        hist_yv, hist_edges = np.histogram(lnv2[mask_vr * r_mask], bins=200)
+        hist_yv, hist_edges = np.histogram(lnv2[mask_vr * r_mask], bins=nbins)
         hist_lnv2 = 0.5 * (hist_edges[:-1] + hist_edges[1:])
         hist_lnv2_grad = np.gradient(hist_yv, np.mean(np.diff(hist_edges)))
         lnv2_mask = (1.0 < hist_lnv2) * (hist_lnv2 < 1.75)
@@ -310,7 +312,7 @@ def calibrate_finder(
         [0.2, 0.5]
     """
     # MODIFY this line if needed ======================
-    r, vr, lnv2, my_data, halo_df = load_your_data()
+    r, vr, lnv2, sparta_labels, my_data, halo_df = load_your_data()
 
     # =================================================
 
@@ -403,11 +405,11 @@ if __name__ == "__main__":
     ####################################################################################################################################################################################################################################
     
     (m_pos, b_pos), (m_neg, b_neg) = calibrate_finder()
-    
-    m_pos = -1.8871701416241973
-    b_pos = 1.8737438015852703
-    m_neg = -1.8570568919016017
-    b_neg = 1.498922799454499
+       
+    # m_pos = -2.029839336203588
+    # b_pos = 2.728249722936968
+    # m_neg = -1.6933093792429774
+    # b_neg = 1.4820910679213617
     
     print("\nCalibration Params")
     print(m_pos,b_pos,m_neg,b_neg)
@@ -420,11 +422,21 @@ if __name__ == "__main__":
     grad_lims = "0.2_0.5"
     r_cut = 1.75
 
-    r, vr, lnv2, my_data, halo_df = load_your_data()
+    r, vr, lnv2, sparta_labels, my_data, halo_df = load_your_data()
+
+    sparta_orb = np.where(sparta_labels == 1)[0]
+    sparta_inf = np.where(sparta_labels == 0)[0]
 
     mask_vr_neg = (vr < 0)
     mask_vr_pos = ~mask_vr_neg
     mask_r = r < 1.75
+    
+    fltr_combs = {
+    'orb_vr_neg': np.intersect1d(sparta_orb, np.where(mask_vr_neg)[0]),
+    'orb_vr_pos': np.intersect1d(sparta_orb, np.where(mask_vr_pos)[0]),
+    'inf_vr_neg': np.intersect1d(sparta_inf, np.where(mask_vr_neg)[0]),
+    'inf_vr_pos': np.intersect1d(sparta_inf, np.where(mask_vr_pos)[0]),
+    }
 
     # y_shift = w / np.cos(np.arctan(m_neg))
     x = np.linspace(0, 3, 1000)
@@ -433,124 +445,269 @@ if __name__ == "__main__":
 
     x_range = (0, 3)
     y_range = (-2, 2.5)
-
-    fig, axes = plt.subplots(3, 2, figsize=(12, 12))
-    axes = axes.flatten()
-    fig.suptitle(
-        fr"Kinetic energy distribution of particles around halos at $z=0$\nSim: {test_comb_name}")
-
-    for ax in axes:
-        ax.set_xlabel(r'$r/R_{200m}$')
-        ax.set_ylabel(r'$\ln(v^2/v_{200m}^2)$')
-        ax.set_xlim(0, 2)
-        ax.set_ylim(-2, 2.5)
-        ax.text(0.25, -1.4, "Orbiting", fontsize=16, color="r",
-                weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-        ax.text(1.5, 0.75, "Infalling", fontsize=16, color="b",
-                weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-
-    plt.sca(axes[0])
-    plt.title(r'$v_r > 0$')
-    plt.hist2d(r[mask_vr_pos], lnv2[mask_vr_pos], bins=200,
-                cmap="terrain", range=(x_range, y_range))
-    plt.plot(x, y12, lw=2.0, color="k",
-            label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
-    plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-    plt.colorbar(label=r'$N$ (Counts)')
-    plt.legend()
-    plt.xlim(0, 2)
-
-    plt.sca(axes[1])
-    plt.title(r'$v_r < 0$')
-    plt.hist2d(r[mask_vr_neg], lnv2[mask_vr_neg], bins=200,
-                cmap="terrain", range=(x_range, y_range))
-    plt.plot(x, y22, lw=2.0, color="k",
-            label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
-    plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-    plt.colorbar(label=r'$N$ (Counts)')
-    plt.legend()
-    plt.xlim(0, 2)
     
-    mask_vrn = (vr < 0)
-    mask_vrp = ~mask_vrn
-
-    # Compute density and gradient.
-    # For vr > 0
-    hist_zp, hist_xp, hist_yp = np.histogram2d(r[mask_vrp], lnv2[mask_vrp], 
-                                                bins=200, 
-                                                range=((0, 3.), (-2, 2.5)),
-                                                density=True)
-    # Bin centres
-    hist_xp = 0.5 * (hist_xp[:-1] + hist_xp[1:])
-    hist_yp = 0.5 * (hist_yp[:-1] + hist_yp[1:])
-    # Bin spacing
-    dx = np.mean(np.diff(hist_xp))
-    dy = np.mean(np.diff(hist_yp))
-    # Generate a 2D grid corresponding to the histogram
-    hist_xp, hist_yp = np.meshgrid(hist_xp, hist_yp)
-    # Evaluate the gradient at each radial bin
-    hist_z_grad = np.zeros_like(hist_zp)
-    for i in range(hist_xp.shape[0]):
-        hist_z_grad[i, :] = np.gradient(hist_zp[i, :], dy)
-    # Apply a gaussian filter to smooth the gradient.
-    hist_zp = ndimage.gaussian_filter(hist_z_grad, 2.0)
-
-    # Same for vr < 0
-    hist_zn, hist_xn, hist_yn = np.histogram2d(r[mask_vrn], lnv2[mask_vrn],
-                                                bins=200,
-                                                range=((0, 3.), (-2, 2.5)),
-                                                density=True)
-    hist_xn = 0.5 * (hist_xn[:-1] + hist_xn[1:])
-    hist_yn = 0.5 * (hist_yn[:-1] + hist_yn[1:])
-    dy = np.mean(np.diff(hist_yn))
-    hist_xn, hist_yn = np.meshgrid(hist_xn, hist_yn)
-    hist_z_grad = np.zeros_like(hist_zn)
-    for i in range(hist_xn.shape[0]):
-        hist_z_grad[i, :] = np.gradient(hist_zn[i, :], dy)
-    hist_zn = ndimage.gaussian_filter(hist_z_grad, 2.0)
+    title_fntsize = 18
+    legend_fntsize = 14
     
-    plt.sca(axes[2])
-    plt.title(r'$v_r > 0$')
-    h3 = plt.hist2d(r[mask_vr_pos], lnv2[mask_vr_pos], bins=200, norm="log",
-                cmap="terrain", range=(x_range, y_range))
-    plt.plot(x, y12, lw=2.0, color="k",
-            label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
-    plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-    plt.colorbar(h3[3], label=r'$N$ (Counts)')
-    plt.legend()
-    plt.xlim(0, 2)
+    nbins = 200    
 
-    plt.sca(axes[3])
-    plt.title(r'$v_r < 0$')
-    h4 = plt.hist2d(r[mask_vr_neg], lnv2[mask_vr_neg], bins=200, norm="log",
-                cmap="terrain", range=(x_range, y_range))
-    plt.plot(x, y22, lw=2.0, color="k",
-            label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
-    plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-    plt.colorbar(h4[3], label=r'$N$ (Counts)')
-    plt.legend()
-    plt.xlim(0, 2)
+    with timed("PS KE Dist plot"):
+        fig, axes = plt.subplots(2, 2, figsize=(14, 12))
+        axes = axes.flatten()
+        fig.suptitle(
+            r"Kinetic energy distribution of particles around halos at $z=0$""\nSimulation: Bolshoi 1000Mpc",fontsize=16)
 
-    # Plot the smoothed gradient
-    plt.sca(axes[4])
-    plt.title(r'$v_r > 0$')
-    plt.contourf(hist_xp, hist_yp, hist_zp.T, levels=80, cmap='terrain')
-    plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-    plt.colorbar(label="Smoothed Gradient Magnitude")
-    plt.xlim(0, 2)
-    
-    # Plot the smoothed gradient
-    plt.sca(axes[5])
-    plt.title(r'$v_r < 0$')
-    plt.contourf(hist_xn, hist_yn, hist_zn.T, levels=80, cmap='terrain')
-    plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-    plt.colorbar(label="Smoothed Gradient Magnitude")
-    plt.xlim(0, 2)
-    
-    
+        hist1, xedges, yedges = np.histogram2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins)
+        hist2, _, _ = np.histogram2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins)
+        hist3, _, _ = np.histogram2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins)
+        hist4, _, _ = np.histogram2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins)
 
-    plt.tight_layout();
-    plt.savefig(plot_loc + "perc_" + str(perc) + "_" + grad_lims + "_KE_dist_cut.png")
+        # Combine the histograms to determine the maximum density for consistent color scaling
+        combined_hist = np.maximum.reduce([hist1, hist2, hist3, hist4])
+        vmax=combined_hist.max()
+        print(vmax)
+        lin_vmin = 0
+        log_vmin = 1
+        
+        for ax in axes:
+            ax.set_xlabel(r'$r/R_{200m}$',fontsize=16)
+            ax.set_ylabel(r'$\ln(v^2/v_{200m}^2)$',fontsize=16)
+            ax.set_xlim(0, 2)
+            ax.set_ylim(-2, 2.5)
+            ax.text(0.25, -1.4, "Orbiting", fontsize=16, color="r",
+                    weight="bold", bbox=dict(facecolor='w', alpha=0.75))
+            ax.text(1.5, 0.7, "Infalling", fontsize=16, color="b",
+                    weight="bold", bbox=dict(facecolor='w', alpha=0.75))
+            ax.tick_params(axis='both',which='both',direction="in",labelsize=12,length=8,width=2)
+
+        plt.sca(axes[0])
+        plt.title(r'$v_r > 0$',fontsize=title_fntsize)
+        plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, alpha=0.5, vmin=lin_vmin, vmax=vmax,
+                    cmap="Blues", range=(x_range, y_range))
+        plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, alpha=0.5, vmin=lin_vmin, vmax=vmax,
+                    cmap="Greens", range=(x_range, y_range))
+        plt.plot(x, y12, lw=2.0, color="k",
+                label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(label=r'$N$ (Counts)')
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.xlim(0, 2)
+
+        plt.sca(axes[1])
+        plt.title(r'$v_r < 0$',fontsize=title_fntsize)
+        plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, alpha=0.5, vmin=lin_vmin, vmax=vmax,
+                    cmap="Blues", range=(x_range, y_range))
+        plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, alpha=0.5, vmin=lin_vmin, vmax=vmax,
+                    cmap="Greens", range=(x_range, y_range))
+        plt.plot(x, y22, lw=2.0, color="k",
+                label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(label=r'$N$ (Counts)')
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.xlim(0, 2)
+        
+        plt.sca(axes[2])
+        plt.title(r'$v_r > 0$',fontsize=title_fntsize)
+        plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, norm="log", alpha=0.5, vmin=log_vmin, vmax=vmax,
+                    cmap="Blues", range=(x_range, y_range))
+        plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, norm="log", alpha=0.5, vmin=log_vmin, vmax=vmax,
+                    cmap="Greens", range=(x_range, y_range))
+        plt.plot(x, y12, lw=2.0, color="k",
+                label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(label=r'$N$ (Counts)')
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.xlim(0, 2)
+
+        plt.sca(axes[3])
+        plt.title(r'$v_r < 0$')
+        plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, norm="log", alpha=0.5, vmin=log_vmin, vmax=vmax,
+                    cmap="Blues", range=(x_range, y_range))
+        plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, norm="log", alpha=0.5, vmin=log_vmin, vmax=vmax,
+                    cmap="Greens", range=(x_range, y_range))
+        plt.plot(x, y22, lw=2.0, color="k",
+                label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(label=r'$N$ (Counts)')
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.xlim(0, 2)
+        
+        mask_vrn = (vr < 0)
+        mask_vrp = ~mask_vrn
+
+        # Compute density and gradient.
+        # For vr > 0
+        hist_zp, hist_xp, hist_yp = np.histogram2d(r[mask_vrp], lnv2[mask_vrp], 
+                                                    bins=nbins, 
+                                                    range=((0, 3.), (-2, 2.5)),
+                                                    density=True)
+        # Bin centres
+        hist_xp = 0.5 * (hist_xp[:-1] + hist_xp[1:])
+        hist_yp = 0.5 * (hist_yp[:-1] + hist_yp[1:])
+        # Bin spacing
+        dx = np.mean(np.diff(hist_xp))
+        dy = np.mean(np.diff(hist_yp))
+        # Generate a 2D grid corresponding to the histogram
+        hist_xp, hist_yp = np.meshgrid(hist_xp, hist_yp)
+        # Evaluate the gradient at each radial bin
+        hist_z_grad = np.zeros_like(hist_zp)
+        for i in range(hist_xp.shape[0]):
+            hist_z_grad[i, :] = np.gradient(hist_zp[i, :], dy)
+        # Apply a gaussian filter to smooth the gradient.
+        hist_zp = ndimage.gaussian_filter(hist_z_grad, 2.0)
+
+        # Same for vr < 0
+        hist_zn, hist_xn, hist_yn = np.histogram2d(r[mask_vrn], lnv2[mask_vrn],
+                                                    bins=nbins,
+                                                    range=((0, 3.), (-2, 2.5)),
+                                                    density=True)
+        hist_xn = 0.5 * (hist_xn[:-1] + hist_xn[1:])
+        hist_yn = 0.5 * (hist_yn[:-1] + hist_yn[1:])
+        dy = np.mean(np.diff(hist_yn))
+        hist_xn, hist_yn = np.meshgrid(hist_xn, hist_yn)
+        hist_z_grad = np.zeros_like(hist_zn)
+        for i in range(hist_xn.shape[0]):
+            hist_z_grad[i, :] = np.gradient(hist_zn[i, :], dy)
+        hist_zn = ndimage.gaussian_filter(hist_z_grad, 2.0)
+        
+        # Plot the smoothed gradient
+        # plt.sca(axes[4])
+        # plt.title(r'$v_r > 0$',fontsize=title_fntsize)
+        # plt.contourf(hist_xp, hist_yp, hist_zp.T, levels=80, cmap='terrain')
+        # plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        # plt.colorbar(label="Smoothed Gradient Magnitude")
+        # plt.xlim(0, 2)
+        
+        # # Plot the smoothed gradient
+        # plt.sca(axes[5])
+        # plt.title(r'$v_r < 0$',fontsize=title_fntsize)
+        # plt.contourf(hist_xn, hist_yn, hist_zn.T, levels=80, cmap='terrain')
+        # plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        # plt.colorbar(label="Smoothed Gradient Magnitude")
+        # plt.xlim(0, 2)
+        
+        plt.tight_layout();
+        plt.savefig(plot_loc + "sparta_KE_dist_cut.png")
+    
+    with timed("PS KE Dist plot"):
+        fig, axes = plt.subplots(3, 2, figsize=(12, 12))
+        axes = axes.flatten()
+        fig.suptitle(
+            r"Kinetic energy distribution of particles around halos at $z=0$""\nSimulation: Bolshoi 1000Mpc",fontsize=16)
+
+        for ax in axes:
+            ax.set_xlabel(r'$r/R_{200m}$',fontsize=16)
+            ax.set_ylabel(r'$\ln(v^2/v_{200m}^2)$',fontsize=16)
+            ax.set_xlim(0, 2)
+            ax.set_ylim(-2, 2.5)
+            ax.text(0.25, -1.4, "Orbiting", fontsize=16, color="r",
+                    weight="bold", bbox=dict(facecolor='w', alpha=0.75))
+            ax.text(1.5, 0.7, "Infalling", fontsize=16, color="b",
+                    weight="bold", bbox=dict(facecolor='w', alpha=0.75))
+            ax.tick_params(axis='both',which='both',direction="in",labelsize=12,length=8,width=2)
+
+        plt.sca(axes[0])
+        plt.title(r'$v_r > 0$',fontsize=title_fntsize)
+        plt.hist2d(r[mask_vr_pos], lnv2[mask_vr_pos], bins=nbins,
+                    cmap="terrain", range=(x_range, y_range))
+        plt.plot(x, y12, lw=2.0, color="k",
+                label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(label=r'$N$ (Counts)')
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.xlim(0, 2)
+
+        plt.sca(axes[1])
+        plt.title(r'$v_r < 0$',fontsize=title_fntsize)
+        plt.hist2d(r[mask_vr_neg], lnv2[mask_vr_neg], bins=nbins,
+                    cmap="terrain", range=(x_range, y_range))
+        plt.plot(x, y22, lw=2.0, color="k",
+                label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(label=r'$N$ (Counts)')
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.xlim(0, 2)
+        
+        plt.sca(axes[2])
+        plt.title(r'$v_r > 0$',fontsize=title_fntsize)
+        h3 = plt.hist2d(r[mask_vr_pos], lnv2[mask_vr_pos], bins=nbins, norm="log",
+                    cmap="terrain", range=(x_range, y_range))
+        plt.plot(x, y12, lw=2.0, color="k",
+                label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(h3[3], label=r'$N$ (Counts)')
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.xlim(0, 2)
+
+        plt.sca(axes[3])
+        plt.title(r'$v_r < 0$',fontsize=title_fntsize)
+        h4 = plt.hist2d(r[mask_vr_neg], lnv2[mask_vr_neg], bins=nbins, norm="log",
+                    cmap="terrain", range=(x_range, y_range))
+        plt.plot(x, y22, lw=2.0, color="k",
+                label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(h4[3], label=r'$N$ (Counts)')
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.xlim(0, 2)
+        
+        mask_vrn = (vr < 0)
+        mask_vrp = ~mask_vrn
+
+        # Compute density and gradient.
+        # For vr > 0
+        hist_zp, hist_xp, hist_yp = np.histogram2d(r[mask_vrp], lnv2[mask_vrp], 
+                                                    bins=nbins, 
+                                                    range=((0, 3.), (-2, 2.5)),
+                                                    density=True)
+        # Bin centres
+        hist_xp = 0.5 * (hist_xp[:-1] + hist_xp[1:])
+        hist_yp = 0.5 * (hist_yp[:-1] + hist_yp[1:])
+        # Bin spacing
+        dx = np.mean(np.diff(hist_xp))
+        dy = np.mean(np.diff(hist_yp))
+        # Generate a 2D grid corresponding to the histogram
+        hist_xp, hist_yp = np.meshgrid(hist_xp, hist_yp)
+        # Evaluate the gradient at each radial bin
+        hist_z_grad = np.zeros_like(hist_zp)
+        for i in range(hist_xp.shape[0]):
+            hist_z_grad[i, :] = np.gradient(hist_zp[i, :], dy)
+        # Apply a gaussian filter to smooth the gradient.
+        hist_zp = ndimage.gaussian_filter(hist_z_grad, 2.0)
+
+        # Same for vr < 0
+        hist_zn, hist_xn, hist_yn = np.histogram2d(r[mask_vrn], lnv2[mask_vrn],
+                                                    bins=nbins,
+                                                    range=((0, 3.), (-2, 2.5)),
+                                                    density=True)
+        hist_xn = 0.5 * (hist_xn[:-1] + hist_xn[1:])
+        hist_yn = 0.5 * (hist_yn[:-1] + hist_yn[1:])
+        dy = np.mean(np.diff(hist_yn))
+        hist_xn, hist_yn = np.meshgrid(hist_xn, hist_yn)
+        hist_z_grad = np.zeros_like(hist_zn)
+        for i in range(hist_xn.shape[0]):
+            hist_z_grad[i, :] = np.gradient(hist_zn[i, :], dy)
+        hist_zn = ndimage.gaussian_filter(hist_z_grad, 2.0)
+
+        # Plot the smoothed gradient
+        # plt.sca(axes[4])
+        # plt.title(r'$v_r > 0$',fontsize=title_fntsize)
+        # plt.contourf(hist_xp, hist_yp, hist_zp.T, levels=80, cmap='terrain')
+        # plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        # plt.colorbar(label="Smoothed Gradient Magnitude")
+        # plt.xlim(0, 2)
+        
+        # # Plot the smoothed gradient
+        # plt.sca(axes[5])
+        # plt.title(r'$v_r < 0$',fontsize=title_fntsize)
+        # plt.contourf(hist_xn, hist_yn, hist_zn.T, levels=80, cmap='terrain')
+        # plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        # plt.colorbar(label="Smoothed Gradient Magnitude")
+        # plt.xlim(0, 2)
+        
+        
+
+        plt.tight_layout();
+        plt.savefig(plot_loc + "perc_" + str(perc) + "_" + grad_lims + "_KE_dist_cut.png")
         
     # Orbiting classification for vr > 0
     mask_cut_pos = (lnv2 < (m_pos * r + b_pos)) & (r < 3.0)
@@ -563,136 +720,137 @@ if __name__ == "__main__":
     (mask_cut_pos & mask_vr_pos) ^ \
     (mask_cut_neg & mask_vr_neg)
     
-    fig, axes = plt.subplots(1, 2, figsize=(9, 4))
-    axes = axes.flatten()
-    fig.suptitle(f'Phase-space distribution of particles around haloes at $z=0$')
+    with timed("Phase space dist of ptls plot"):
+        fig, axes = plt.subplots(1, 2, figsize=(9, 4))
+        axes = axes.flatten()
+        fig.suptitle(f'Phase-space distribution of particles around haloes at $z=0$')
 
-    x_range = (0, 3)
-    y_range = (-2, 2)
+        x_range = (0, 3)
+        y_range = (-2, 2)
 
-    for ax in axes:
-        ax.set_xlabel(r'$r/R_{200}$')
-        ax.set_ylabel(r'$v_r/v_{200}$')
+        for ax in axes:
+            ax.set_xlabel(r'$r/R_{200}$')
+            ax.set_ylabel(r'$v_r/v_{200}$')
 
-    plt.sca(axes[0])
-    plt.title('Orbiting')
-    plt.hist2d(r[mask_orb], vr[mask_orb], bins=200, range=(x_range, y_range), cmap='terrain')
-    plt.colorbar(label=r'$N$ (Counts)')
+        plt.sca(axes[0])
+        plt.title('Orbiting')
+        plt.hist2d(r[mask_orb], vr[mask_orb], bins=nbins, range=(x_range, y_range), cmap='terrain')
+        plt.colorbar(label=r'$N$ (Counts)')
 
-    plt.sca(axes[1])
-    plt.title('Infalling')
-    plt.hist2d(r[~mask_orb], vr[~mask_orb], bins=200, range=(x_range, y_range), cmap='terrain')
-    plt.colorbar(label=r'$N$ (Counts)')
+        plt.sca(axes[1])
+        plt.title('Infalling')
+        plt.hist2d(r[~mask_orb], vr[~mask_orb], bins=nbins, range=(x_range, y_range), cmap='terrain')
+        plt.colorbar(label=r'$N$ (Counts)')
 
-    plt.tight_layout()
-    plt.savefig(plot_loc + "perc_" + str(perc) + "_" + grad_lims + "_ps_dist.png")
+        plt.tight_layout()
+        plt.savefig(plot_loc + "perc_" + str(perc) + "_" + grad_lims + "_ps_dist.png")
     
     
 ####################################################################################################################################################################################################################################
 
+    with timed("Density profile plot"):
+        feature_columns = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
+        target_column = ["Orbit_infall"]
 
-    feature_columns = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
-    target_column = ["Orbit_infall"]
+        print("Testing on:", curr_test_sims)
+        # Loop through and/or for Train/Test/All datasets and evaluate the model
+        
+        r = my_data["p_Scaled_radii"]
+        vr = my_data["p_Radial_vel"]
+        vphys = my_data["p_phys_vel"]
+        lnv2 = np.log(vphys**2)
+        
+        mask_vr_neg = (vr < 0)
+        mask_vr_pos = ~mask_vr_neg
 
-    print("Testing on:", curr_test_sims)
-    # Loop through and/or for Train/Test/All datasets and evaluate the model
-    
-    r = my_data["p_Scaled_radii"]
-    vr = my_data["p_Radial_vel"]
-    vphys = my_data["p_phys_vel"]
-    lnv2 = np.log(vphys**2)
-    
-    mask_vr_neg = (vr < 0)
-    mask_vr_pos = ~mask_vr_neg
+        mask_cut_pos = (lnv2 < (m_pos * r + b_pos)) & (r < 3.0)
 
-    mask_cut_pos = (lnv2 < (m_pos * r + b_pos)) & (r < 3.0)
+        # Orbiting classification for vr < 0
+        mask_cut_neg = (lnv2 < (m_neg * r + b_neg)) & (r < 3.0)
 
-    # Orbiting classification for vr < 0
-    mask_cut_neg = (lnv2 < (m_neg * r + b_neg)) & (r < 3.0)
+        # Particle is infalling if it is below both lines and 2*R00
+        mask_orb = \
+        (mask_cut_pos & mask_vr_pos) ^ \
+        (mask_cut_neg & mask_vr_neg)
+        
+        X = my_data[feature_columns]
+        y = my_data[target_column]
+        halo_first = halo_df["Halo_first"].values
+        halo_n = halo_df["Halo_n"].values
+        all_idxs = halo_df["Halo_indices"].values
 
-    # Particle is infalling if it is below both lines and 2*R00
-    mask_orb = \
-    (mask_cut_pos & mask_vr_pos) ^ \
-    (mask_cut_neg & mask_vr_neg)
-    
-    X = my_data[feature_columns]
-    y = my_data[target_column]
-    halo_first = halo_df["Halo_first"].values
-    halo_n = halo_df["Halo_n"].values
-    all_idxs = halo_df["Halo_indices"].values
+        all_z = []
+        all_rhom = []
+        # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
+        sim_splits = np.where(halo_first == 0)[0]
 
-    all_z = []
-    all_rhom = []
-    # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
-    sim_splits = np.where(halo_first == 0)[0]
+        use_sims = curr_test_sims
 
-    use_sims = curr_test_sims
+        # if there are multiple simulations, to correctly index the dataset we need to update the starting values for the 
+        # stacked simulations such that they correspond to the larger dataset and not one specific simulation
+        if len(use_sims) > 1:
+            for i,sim in enumerate(use_sims):
+                # The first sim remains the same
+                if i == 0:
+                    continue
+                # Else if it isn't the final sim 
+                elif i < len(use_sims) - 1:
+                    halo_first[sim_splits[i]:sim_splits[i+1]] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
+                # Else if the final sim
+                else:
+                    halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
 
-    # if there are multiple simulations, to correctly index the dataset we need to update the starting values for the 
-    # stacked simulations such that they correspond to the larger dataset and not one specific simulation
-    if len(use_sims) > 1:
+        # Get the redshifts for each simulation's primary snapshot
         for i,sim in enumerate(use_sims):
-            # The first sim remains the same
-            if i == 0:
-                continue
-            # Else if it isn't the final sim 
-            elif i < len(use_sims) - 1:
-                halo_first[sim_splits[i]:sim_splits[i+1]] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
-            # Else if the final sim
+            with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
+                config_dict = pickle.load(file)
+                curr_z = config_dict["p_snap_info"]["red_shift"][()]
+                all_z.append(curr_z)
+                all_rhom.append(cosmol.rho_m(curr_z))
+                h = config_dict["p_snap_info"]["h"][()]
+
+        tot_num_halos = halo_n.shape[0]
+        min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
+
+        # Get SPARTA's mass profiles
+        act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sprta_mass_prf(sim_splits,all_idxs,use_sims)
+        act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
+
+        # Create mass profiles from the model's predictions
+        preds = np.zeros(X.shape[0].compute())
+        preds[mask_orb] = 1
+
+        calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds, prf_bins=bins, use_mp=True, all_z=all_z)
+
+        # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
+        small_halo_fltr = np.isnan(calc_r200m)
+        act_mass_prf_all[small_halo_fltr,:] = np.nan
+        act_mass_prf_orb[small_halo_fltr,:] = np.nan
+        act_mass_prf_inf[small_halo_fltr,:] = np.nan
+
+        # Calculate the density by divide the mass of each bin by the volume of that bin's radius
+        calc_dens_prf_all = calculate_density(calc_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+        calc_dens_prf_orb = calculate_density(calc_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+        calc_dens_prf_inf = calculate_density(calc_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+
+        act_dens_prf_all = calculate_density(act_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+        act_dens_prf_orb = calculate_density(act_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+        act_dens_prf_inf = calculate_density(act_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+
+        # If we want the density profiles to only consist of halos of a specific peak height (nu) bin 
+
+        all_prf_lst = []
+        orb_prf_lst = []
+        inf_prf_lst = []
+        cpy_plt_nu_splits = plt_nu_splits.copy()
+        for i,nu_split in enumerate(cpy_plt_nu_splits):
+            # Take the second element of the where to filter by the halos (?)
+            fltr = np.where((calc_nus > nu_split[0]) & (calc_nus < nu_split[1]))[0]
+            if fltr.shape[0] > 25:
+                all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
+                orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
+                inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
             else:
-                halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
-
-    # Get the redshifts for each simulation's primary snapshot
-    for i,sim in enumerate(use_sims):
-        with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
-            config_dict = pickle.load(file)
-            curr_z = config_dict["p_snap_info"]["red_shift"][()]
-            all_z.append(curr_z)
-            all_rhom.append(cosmol.rho_m(curr_z))
-            h = config_dict["p_snap_info"]["h"][()]
-
-    tot_num_halos = halo_n.shape[0]
-    min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
-
-    # Get SPARTA's mass profiles
-    act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sprta_mass_prf(sim_splits,all_idxs,use_sims)
-    act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
-
-    # Create mass profiles from the model's predictions
-    preds = np.zeros(X.shape[0].compute())
-    preds[mask_orb] = 1
-
-    calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds, prf_bins=bins, use_mp=True, all_z=all_z)
-
-    # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
-    small_halo_fltr = np.isnan(calc_r200m)
-    act_mass_prf_all[small_halo_fltr,:] = np.nan
-    act_mass_prf_orb[small_halo_fltr,:] = np.nan
-    act_mass_prf_inf[small_halo_fltr,:] = np.nan
-
-    # Calculate the density by divide the mass of each bin by the volume of that bin's radius
-    calc_dens_prf_all = calculate_density(calc_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
-    calc_dens_prf_orb = calculate_density(calc_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
-    calc_dens_prf_inf = calculate_density(calc_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
-
-    act_dens_prf_all = calculate_density(act_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
-    act_dens_prf_orb = calculate_density(act_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
-    act_dens_prf_inf = calculate_density(act_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
-
-    # If we want the density profiles to only consist of halos of a specific peak height (nu) bin 
-
-    all_prf_lst = []
-    orb_prf_lst = []
-    inf_prf_lst = []
-    cpy_plt_nu_splits = plt_nu_splits.copy()
-    for i,nu_split in enumerate(cpy_plt_nu_splits):
-        # Take the second element of the where to filter by the halos (?)
-        fltr = np.where((calc_nus > nu_split[0]) & (calc_nus < nu_split[1]))[0]
-        if fltr.shape[0] > 25:
-            all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
-            orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
-            inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
-        else:
-            plt_nu_splits.remove(nu_split)
-    lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
-    compare_prfs_nu(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "_ps_cut_dens_")
+                plt_nu_splits.remove(nu_split)
+        lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
+        compare_prfs_nu(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "_ps_cut_dens_")
