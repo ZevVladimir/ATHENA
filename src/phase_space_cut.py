@@ -424,6 +424,11 @@ if __name__ == "__main__":
 
     r, vr, lnv2, sparta_labels, my_data, halo_df = load_your_data()
     
+    r = r.to_numpy()
+    vr = vr.to_numpy()
+    lnv2 = lnv2.to_numpy()
+    sparta_labels = sparta_labels.to_numpy()
+    
     sparta_orb = np.where(sparta_labels == 1)[0]
     sparta_inf = np.where(sparta_labels == 0)[0]
 
@@ -456,7 +461,7 @@ if __name__ == "__main__":
         fig, axes = plt.subplots(2, 2, figsize=(14, 12))
         axes = axes.flatten()
         fig.suptitle(
-            r"Kinetic energy distribution of particles around halos at $z=0$""\nSimulation: Bolshoi 1000Mpc",fontsize=16)
+            r"Kinetic energy distribution of ORBITING particles around halos at $z=0$""\nSimulation: Bolshoi 1000Mpc",fontsize=16)
 
         hist1, xedges, yedges = np.histogram2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins)
         hist2, _, _ = np.histogram2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins)
@@ -485,8 +490,6 @@ if __name__ == "__main__":
         plt.title(r'$v_r > 0$',fontsize=title_fntsize)
         plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, alpha=0.5, vmin=lin_vmin, vmax=vmax,
                     cmap="Blues", range=(x_range, y_range))
-        plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, alpha=0.5, vmin=lin_vmin, vmax=vmax,
-                    cmap="Greens", range=(x_range, y_range))
         plt.plot(x, y12, lw=2.0, color="k",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
@@ -498,8 +501,6 @@ if __name__ == "__main__":
         plt.title(r'$v_r < 0$',fontsize=title_fntsize)
         plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, alpha=0.5, vmin=lin_vmin, vmax=vmax,
                     cmap="Blues", range=(x_range, y_range))
-        plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, alpha=0.5, vmin=lin_vmin, vmax=vmax,
-                    cmap="Greens", range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="k",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
@@ -511,8 +512,6 @@ if __name__ == "__main__":
         plt.title(r'$v_r > 0$',fontsize=title_fntsize)
         plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, norm="log", alpha=0.5, vmin=log_vmin, vmax=vmax,
                     cmap="Blues", range=(x_range, y_range))
-        plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, norm="log", alpha=0.5, vmin=log_vmin, vmax=vmax,
-                    cmap="Greens", range=(x_range, y_range))
         plt.plot(x, y12, lw=2.0, color="k",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
@@ -524,8 +523,6 @@ if __name__ == "__main__":
         plt.title(r'$v_r < 0$')
         plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, norm="log", alpha=0.5, vmin=log_vmin, vmax=vmax,
                     cmap="Blues", range=(x_range, y_range))
-        plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, norm="log", alpha=0.5, vmin=log_vmin, vmax=vmax,
-                    cmap="Greens", range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="k",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
