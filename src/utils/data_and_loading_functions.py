@@ -86,7 +86,7 @@ def load_ptl_param(sparta_name, param_name, snap, snap_path):
 
     return ptl_param
 
-def load_SPARTA_data(sparta_HDF5_path, param_path_list, sparta_name, snap):
+def load_SPARTA_data(sparta_HDF5_path, param_path_list, sparta_name, snap, halo_ids=None):
     create_directory(pickled_path + str(snap) +  "_" + str(sparta_name) + "/")
     
     reload_sparta = False
@@ -100,7 +100,10 @@ def load_SPARTA_data(sparta_HDF5_path, param_path_list, sparta_name, snap):
             param = load_pickle(pickled_path + str(snap) + "_" + str(sparta_name) + "/" + save_name + ".pickle")
         except FileNotFoundError:
             if not reload_sparta:
-                sparta_output = sparta.load(filename=sparta_HDF5_path, log_level= 0)
+                if halo_ids is None:
+                    sparta_output = sparta.load(filename=sparta_HDF5_path, log_level= 0)
+                else:
+                    sparta_output = sparta.load(filename=sparta_HDF5_path, halo_ids=halo_ids, log_level=0)
         
             param = reduce(lambda dct, key: dct[key], param_path, sparta_output)
             save_pickle(param,pickled_path + str(snap) + "_" + str(sparta_name) +  "/" + save_name + ".pickle")

@@ -152,6 +152,15 @@ def calc_t_dyn(halo_r200m, red_shift):
 
     return t_dyn
 
+def calc_mass_acc_rate(curr_r200m, past_r200m, curr_z, past_z):
+    curr_m200m = mass_so.R_to_M(curr_r200m, curr_z, "200m")
+    past_m200m = mass_so.R_to_M(past_r200m, past_z, "200m")
+    
+    curr_a = 1/(1+curr_z)
+    past_a = 1/(1+past_z)
+    
+    return (np.log(curr_m200m) - np.log(past_m200m)) / (np.log(curr_a) - np.log(past_a))
+
 # Get the difference in the number of particles present in a mass profile and a dataset
 # This can be useful to create a simple plot of which bins in a generated density profile do not match
 def diff_n_prf(diff_n_ptl, radii, idx, start_bin, end_bin, mass, act_prf):

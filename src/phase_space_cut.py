@@ -18,11 +18,12 @@ import h5py
 from colossus.cosmology import cosmology
 from scipy.spatial import cKDTree
 import scipy.ndimage as ndimage
+from sparta_tools import sparta
 
-from utils.calculation_functions import create_stack_mass_prf, filter_prf, calculate_density
+from utils.calculation_functions import create_stack_mass_prf, filter_prf, calculate_density, calc_mass_acc_rate
 from utils.update_vis_fxns import compare_prfs_nu
 from utils.ML_support import load_data, get_CUDA_cluster, get_combined_name, reform_dataset_dfs, parse_ranges, create_nu_string, load_sprta_mass_prf, split_calc_name, sim_mass_p_z
-from utils.data_and_loading_functions import create_directory, timed, load_pickle, load_SPARTA_data
+from utils.data_and_loading_functions import create_directory, timed, load_pickle, load_SPARTA_data, conv_halo_id_spid
 
 import configparser
 config = configparser.ConfigParser()
@@ -52,6 +53,9 @@ else:
     
 plt_nu_splits = config["XGBOOST"]["plt_nu_splits"]
 plt_nu_splits = parse_ranges(plt_nu_splits)
+
+plt_macc_splits = config["XGBOOST"]["plt_macc_splits"]
+plt_macc_splits = parse_ranges(plt_macc_splits)
 
 nu_splits = config["XGBOOST"]["nu_splits"]
 nu_splits = parse_ranges(nu_splits)
@@ -449,31 +453,31 @@ if __name__ == "__main__":
     y12 = m_pos * x + b_pos
     y22 = m_neg * x + b_neg
 
+    nbins = 200   
+
+    hist1, xedges, yedges = np.histogram2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins)
+    hist2, _, _ = np.histogram2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins)
+    hist3, _, _ = np.histogram2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins)
+    hist4, _, _ = np.histogram2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins)
+
+    # Combine the histograms to determine the maximum density for consistent color scaling
+    combined_hist = np.maximum.reduce([hist1, hist2, hist3, hist4])
+    vmax=combined_hist.max()
+    
+    lin_vmin = 0
+    log_vmin = 1
+
     x_range = (0, 3)
     y_range = (-2, 2.5)
     
     title_fntsize = 18
     legend_fntsize = 14
-    
-    nbins = 200    
 
     with timed("SPARTA orb KE Dist plot"):
         fig, axes = plt.subplots(2, 2, figsize=(14, 12))
         axes = axes.flatten()
         fig.suptitle(
             r"Kinetic energy distribution of ORBITING particles around halos at $z=0$""\nSimulation: Bolshoi 1000Mpc",fontsize=16)
-
-        hist1, xedges, yedges = np.histogram2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins)
-        hist2, _, _ = np.histogram2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins)
-        hist3, _, _ = np.histogram2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins)
-        hist4, _, _ = np.histogram2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins)
-
-        # Combine the histograms to determine the maximum density for consistent color scaling
-        combined_hist = np.maximum.reduce([hist1, hist2, hist3, hist4])
-        vmax=combined_hist.max()
-        
-        lin_vmin = 0
-        log_vmin = 1
         
         for ax in axes:
             ax.set_xlabel(r'$r/R_{200m}$',fontsize=16)
@@ -872,5 +876,61 @@ if __name__ == "__main__":
                 inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
             else:
                 plt_nu_splits.remove(nu_split)
+                
+                
+        config_dict = load_pickle(ML_dset_path + sim + "/config.pickle")
+        p_snap = config_dict["p_snap_info"]["snap"][()]
+        curr_z = config_dict["p_snap_info"]["red_shift"][()]
+        # TODO make this generalizable to when the snapshot separation isn't just 1 dynamical time as needed for mass accretion calculation
+        # we can just use the secondary snap here because we already chose to do 1 dynamical time for that snap
+        past_z = config_dict["c_snap_info"]["red_shift"][()] 
+        
+        sparta_name, sparta_search_name = split_calc_name(sim)
+        
+        curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
+        
+        with h5py.File(curr_sparta_HDF5_path,"r") as f:
+            dic_sim = {}
+            grp_sim = f['simulation']
+
+            for attr in grp_sim.attrs:
+                dic_sim[attr] = grp_sim.attrs[attr]
+        
+        all_red_shifts = dic_sim['snap_z']
+        p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
+        c_sparta_snap = np.abs(all_red_shifts - past_z).argmin()
+                
+        # Load the halo's positions and radii
+        param_paths = [["halos","R200m"],["halos","id"]]
+        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, p_snap)
+
+        curr_halos_r200m = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
+        curr_halos_ids = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
+        
+        use_halo_r200m = curr_halos_r200m[all_idxs]
+        use_halo_ids = curr_halos_ids[all_idxs]
+        
+        sparta_output = sparta.load(filename=curr_sparta_HDF5_path, halo_ids=use_halo_ids, log_level=0)
+        new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta re-sort the indices
+        
+        curr_halos_r200m = sparta_output['halos']['R200m'][:,p_sparta_snap]
+        past_halos_r200m = sparta_output['halos']['R200m'][:,c_sparta_snap]
+        
+        calc_maccs = calc_mass_acc_rate(curr_halos_r200m,past_halos_r200m,curr_z,past_z)
+        print(calc_maccs)
+        print(calc_maccs.shape)
+        print(calc_dens_prf_all.shape)
+        cpy_plt_macc_splits = plt_macc_splits.copy()
+        for i,macc_split in enumerate(cpy_plt_macc_splits):
+            # Take the second element of the where to filter by the halos (?)
+            fltr = np.where((calc_maccs > macc_split[0]) & (calc_maccs < macc_split[1]))[0]
+            if fltr.shape[0] > 25:
+                all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
+                orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
+                inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
+            else:
+                plt_macc_splits.remove(macc_split)
+        
         lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
         compare_prfs_nu(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "_ps_cut_dens_")
+        compare_prfs_nu(plt_macc_splits,len(cpy_plt_macc_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "_ps_cut_macc_dens_")
