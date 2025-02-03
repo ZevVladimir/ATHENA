@@ -295,7 +295,7 @@ def cost_perp_distance(b: float, *data) -> float:
 
 def calibrate_finder(
     n_points: int = 20,
-    perc: float = 0.95,
+    perc: float = 0.99,
     width: float = 0.05,
     grad_lims: tuple = (0.2, 0.5),
 ):
@@ -422,7 +422,7 @@ if __name__ == "__main__":
     # to improve results. 'perc' is the percent of particles expected below the line
     # for vr > 0. 'width' is used for 
     width = 0.05
-    perc = 0.95
+    perc = 0.99
     grad_lims = "0.2_0.5"
     r_cut = 1.75
 
@@ -614,7 +614,7 @@ if __name__ == "__main__":
         plt.savefig(plot_loc + "sparta_inf_KE_dist_cut.png")
     
     with timed("PS KE Dist plot"):
-        fig, axes = plt.subplots(3, 2, figsize=(12, 12))
+        fig, axes = plt.subplots(3, 2, figsize=(12, 14))
         axes = axes.flatten()
         fig.suptitle(
             r"Kinetic energy distribution of particles around halos at $z=0$""\nSimulation: Bolshoi 1000Mpc",fontsize=16)
@@ -712,21 +712,21 @@ if __name__ == "__main__":
             hist_z_grad[i, :] = np.gradient(hist_zn[i, :], dy)
         hist_zn = ndimage.gaussian_filter(hist_z_grad, 2.0)
 
-        # Plot the smoothed gradient
-        # plt.sca(axes[4])
-        # plt.title(r'$v_r > 0$',fontsize=title_fntsize)
-        # plt.contourf(hist_xp, hist_yp, hist_zp.T, levels=80, cmap='terrain')
-        # plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-        # plt.colorbar(label="Smoothed Gradient Magnitude")
-        # plt.xlim(0, 2)
+        #Plot the smoothed gradient
+        plt.sca(axes[4])
+        plt.title(r'$v_r > 0$',fontsize=title_fntsize)
+        plt.contourf(hist_xp, hist_yp, hist_zp.T, levels=80, cmap='terrain')
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(label="Smoothed Gradient Magnitude")
+        plt.xlim(0, 2)
         
-        # # Plot the smoothed gradient
-        # plt.sca(axes[5])
-        # plt.title(r'$v_r < 0$',fontsize=title_fntsize)
-        # plt.contourf(hist_xn, hist_yn, hist_zn.T, levels=80, cmap='terrain')
-        # plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-        # plt.colorbar(label="Smoothed Gradient Magnitude")
-        # plt.xlim(0, 2)
+        # Plot the smoothed gradient
+        plt.sca(axes[5])
+        plt.title(r'$v_r < 0$',fontsize=title_fntsize)
+        plt.contourf(hist_xn, hist_yn, hist_zn.T, levels=80, cmap='terrain')
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(label="Smoothed Gradient Magnitude")
+        plt.xlim(0, 2)
         
         
 
@@ -877,49 +877,53 @@ if __name__ == "__main__":
             else:
                 plt_nu_splits.remove(nu_split)
                 
+        curr_halos_r200m_list = []
+        past_halos_r200m_list = []                
                 
-        config_dict = load_pickle(ML_dset_path + sim + "/config.pickle")
-        p_snap = config_dict["p_snap_info"]["snap"][()]
-        curr_z = config_dict["p_snap_info"]["red_shift"][()]
-        # TODO make this generalizable to when the snapshot separation isn't just 1 dynamical time as needed for mass accretion calculation
-        # we can just use the secondary snap here because we already chose to do 1 dynamical time for that snap
-        past_z = config_dict["c_snap_info"]["red_shift"][()] 
-        
-        sparta_name, sparta_search_name = split_calc_name(sim)
-        
-        curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
-        
-        with h5py.File(curr_sparta_HDF5_path,"r") as f:
-            dic_sim = {}
-            grp_sim = f['simulation']
+        for sim in use_sims:
+            config_dict = load_pickle(ML_dset_path + sim + "/config.pickle")
+            p_snap = config_dict["p_snap_info"]["snap"][()]
+            curr_z = config_dict["p_snap_info"]["red_shift"][()]
+            # TODO make this generalizable to when the snapshot separation isn't just 1 dynamical time as needed for mass accretion calculation
+            # we can just use the secondary snap here because we already chose to do 1 dynamical time for that snap
+            past_z = config_dict["c_snap_info"]["red_shift"][()] 
+            
+            sparta_name, sparta_search_name = split_calc_name(sim)
+            
+            curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
+            
+            with h5py.File(curr_sparta_HDF5_path,"r") as f:
+                dic_sim = {}
+                grp_sim = f['simulation']
 
-            for attr in grp_sim.attrs:
-                dic_sim[attr] = grp_sim.attrs[attr]
-        
-        all_red_shifts = dic_sim['snap_z']
-        p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
-        c_sparta_snap = np.abs(all_red_shifts - past_z).argmin()
-                
-        # Load the halo's positions and radii
-        param_paths = [["halos","R200m"],["halos","id"]]
-        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, p_snap)
+                for attr in grp_sim.attrs:
+                    dic_sim[attr] = grp_sim.attrs[attr]
+            
+            all_red_shifts = dic_sim['snap_z']
+            p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
+            c_sparta_snap = np.abs(all_red_shifts - past_z).argmin()
+                    
+            # Load the halo's positions and radii
+            param_paths = [["halos","R200m"],["halos","id"]]
+            sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, p_snap)
 
-        curr_halos_r200m = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
-        curr_halos_ids = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
-        
-        use_halo_r200m = curr_halos_r200m[all_idxs]
-        use_halo_ids = curr_halos_ids[all_idxs]
-        
-        sparta_output = sparta.load(filename=curr_sparta_HDF5_path, halo_ids=use_halo_ids, log_level=0)
-        new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta re-sort the indices
-        
-        curr_halos_r200m = sparta_output['halos']['R200m'][:,p_sparta_snap]
-        past_halos_r200m = sparta_output['halos']['R200m'][:,c_sparta_snap]
-        
+            curr_halos_r200m = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
+            curr_halos_ids = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
+            
+            use_halo_r200m = curr_halos_r200m[all_idxs]
+            use_halo_ids = curr_halos_ids[all_idxs]
+            
+            sparta_output = sparta.load(filename=curr_sparta_HDF5_path, halo_ids=use_halo_ids, log_level=0)
+            new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta re-sort the indices
+            
+            curr_halos_r200m_list.append(sparta_output['halos']['R200m'][:,p_sparta_snap])
+            past_halos_r200m_list.append(sparta_output['halos']['R200m'][:,c_sparta_snap])
+            
+        curr_halos_r200m = np.concatenate(curr_halos_r200m_list)
+        past_halos_r200m = np.concatenate(past_halos_r200m_list)
+            
         calc_maccs = calc_mass_acc_rate(curr_halos_r200m,past_halos_r200m,curr_z,past_z)
-        print(calc_maccs)
-        print(calc_maccs.shape)
-        print(calc_dens_prf_all.shape)
+
         cpy_plt_macc_splits = plt_macc_splits.copy()
         for i,macc_split in enumerate(cpy_plt_macc_splits):
             # Take the second element of the where to filter by the halos (?)

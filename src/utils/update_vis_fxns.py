@@ -1065,12 +1065,13 @@ def compare_prfs_nu(plt_nu_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
         orb_lb, = orb_ax_0.plot(bins, prf_func(orb_prfs[i][0],axis=0), linestyle='-', color = orb_colors[i], label = str(nu_split[0]) + r"$< \nu <$" + str(nu_split[1]))
         inf_lb, = inf_ax_0.plot(bins, prf_func(inf_prfs[i][0],axis=0), linestyle='-', color = inf_colors[i], label = str(nu_split[0]) + r"$< \nu <$" + str(nu_split[1]))
         
+        #TODO change it so Gamma or nu is selected
         all_plt_lines.append(all_lb)
-        all_plt_lbls.append(str(nu_split[0]) + r"$< \nu <$" + str(nu_split[1]))
+        all_plt_lbls.append(str(nu_split[0]) + r"$< \Gamma <$" + str(nu_split[1]))
         orb_plt_lines.append(orb_lb)
-        orb_plt_lbls.append(str(nu_split[0]) + r"$< \nu <$" + str(nu_split[1]))
+        orb_plt_lbls.append(str(nu_split[0]) + r"$< \Gamma <$" + str(nu_split[1]))
         inf_plt_lines.append(inf_lb)
-        inf_plt_lbls.append(str(nu_split[0]) + r"$< \nu <$" + str(nu_split[1]))
+        inf_plt_lbls.append(str(nu_split[0]) + r"$< \Gamma <$" + str(nu_split[1]))
         
         # Plot the SPARTA (actual) profiles 
         all_ax_0.plot(bins, prf_func(all_prfs[i][1],axis=0), linestyle='--', color = all_colors[i])
