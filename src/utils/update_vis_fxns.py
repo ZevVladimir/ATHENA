@@ -1002,9 +1002,10 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
     else:
         fig.savefig(save_location + title + "avg_prfl_rat.png",bbox_inches='tight')
     
-# Profiles should be a list of lists where each list consists of [calc_prf,act_prf] for each nu split
+# Profiles should be a list of lists where each list consists of [calc_prf,act_prf] for each split
 # You can either use the median plots with use_med=True or the average with use_med=False
-def compare_prfs_nu(plt_nu_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title, use_med=True):    
+# The prf_name_0 and prf_name_1 correspond to what you want each profile to be named in the plot corresponding to where they are located in the _prfs variable
+def compare_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title, use_med=True, split_name="\nu", prf_name_0 = "ML Model", prf_name_1 = "SPARTA"):    
     if use_med:
         prf_func = np.nanmedian
     else:
@@ -1046,32 +1047,31 @@ def compare_prfs_nu(plt_nu_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
     invis_act_inf, = all_ax_0.plot([0], [0], color=inf_cmap(0.75), linestyle='--')
     
     all_plt_lines = [invis_calc_all, invis_act_all]
-    all_plt_lbls = ["Predicted","Actual"]
+    all_plt_lbls = [prf_name_0,prf_name_1]
     
     orb_plt_lines = [invis_calc_orb, invis_act_orb]
-    orb_plt_lbls = ["Predicted","Actual"]
+    orb_plt_lbls = [prf_name_0,prf_name_1]
     
     inf_plt_lines = [invis_calc_inf, invis_act_inf]
-    inf_plt_lbls = ["Predicted","Actual"]
+    inf_plt_lbls = [prf_name_0,prf_name_1]
     
-    for i,nu_split in enumerate(plt_nu_splits):
+    for i,nu_split in enumerate(plt_splits):
         # Take the ratio of the calculated profiles and the actual profiles and center around 0
         ratio_all_prf = (all_prfs[i][0] / all_prfs[i][1]) - 1
         ratio_orb_prf = (orb_prfs[i][0] / orb_prfs[i][1]) - 1
         ratio_inf_prf = (inf_prfs[i][0] / inf_prfs[i][1]) - 1
         
         # Plot the calculated profiles
-        all_lb, = all_ax_0.plot(bins, prf_func(all_prfs[i][0],axis=0), linestyle='-', color = all_colors[i], label = str(nu_split[0]) + r"$< \nu <$" + str(nu_split[1]))
-        orb_lb, = orb_ax_0.plot(bins, prf_func(orb_prfs[i][0],axis=0), linestyle='-', color = orb_colors[i], label = str(nu_split[0]) + r"$< \nu <$" + str(nu_split[1]))
-        inf_lb, = inf_ax_0.plot(bins, prf_func(inf_prfs[i][0],axis=0), linestyle='-', color = inf_colors[i], label = str(nu_split[0]) + r"$< \nu <$" + str(nu_split[1]))
+        all_lb, = all_ax_0.plot(bins, prf_func(all_prfs[i][0],axis=0), linestyle='-', color = all_colors[i], label = rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
+        orb_lb, = orb_ax_0.plot(bins, prf_func(orb_prfs[i][0],axis=0), linestyle='-', color = orb_colors[i], label = rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
+        inf_lb, = inf_ax_0.plot(bins, prf_func(inf_prfs[i][0],axis=0), linestyle='-', color = inf_colors[i], label = rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
         
-        #TODO change it so Gamma or nu is selected
         all_plt_lines.append(all_lb)
-        all_plt_lbls.append(str(nu_split[0]) + r"$< \Gamma <$" + str(nu_split[1]))
+        all_plt_lbls.append(rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
         orb_plt_lines.append(orb_lb)
-        orb_plt_lbls.append(str(nu_split[0]) + r"$< \Gamma <$" + str(nu_split[1]))
+        orb_plt_lbls.append(rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
         inf_plt_lines.append(inf_lb)
-        inf_plt_lbls.append(str(nu_split[0]) + r"$< \Gamma <$" + str(nu_split[1]))
+        inf_plt_lbls.append(rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
         
         # Plot the SPARTA (actual) profiles 
         all_ax_0.plot(bins, prf_func(all_prfs[i][1],axis=0), linestyle='--', color = all_colors[i])

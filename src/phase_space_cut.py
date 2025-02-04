@@ -21,7 +21,7 @@ import scipy.ndimage as ndimage
 from sparta_tools import sparta
 
 from utils.calculation_functions import create_stack_mass_prf, filter_prf, calculate_density, calc_mass_acc_rate
-from utils.update_vis_fxns import compare_prfs_nu
+from utils.update_vis_fxns import compare_prfs
 from utils.ML_support import load_data, get_CUDA_cluster, get_combined_name, reform_dataset_dfs, parse_ranges, create_nu_string, load_sprta_mass_prf, split_calc_name, sim_mass_p_z
 from utils.data_and_loading_functions import create_directory, timed, load_pickle, load_SPARTA_data, conv_halo_id_spid
 
@@ -910,6 +910,9 @@ if __name__ == "__main__":
             curr_halos_r200m = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
             curr_halos_ids = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
             
+            halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
+            all_idxs = halo_ddf["Halo_indices"].values
+            
             use_halo_r200m = curr_halos_r200m[all_idxs]
             use_halo_ids = curr_halos_ids[all_idxs]
             
@@ -936,5 +939,5 @@ if __name__ == "__main__":
                 plt_macc_splits.remove(macc_split)
         
         lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
-        compare_prfs_nu(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "_ps_cut_dens_")
-        compare_prfs_nu(plt_macc_splits,len(cpy_plt_macc_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "_ps_cut_macc_dens_")
+        compare_prfs(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "_ps_cut_dens_")
+        compare_prfs(plt_macc_splits,len(cpy_plt_macc_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "_ps_cut_macc_dens_", split_name="\Gamma", prf_name_0="Phase Space Cut", prf_name_1="SPARTA")
