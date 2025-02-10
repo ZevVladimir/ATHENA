@@ -21,7 +21,7 @@ import scipy.ndimage as ndimage
 from sparta_tools import sparta
 
 from utils.calculation_functions import create_stack_mass_prf, filter_prf, calculate_density, calc_mass_acc_rate
-from utils.update_vis_fxns import compare_prfs
+from utils.update_vis_fxns import compare_split_prfs, plot_full_ptl_dist, plot_prim_ptl_dist
 from utils.ML_support import load_data, get_CUDA_cluster, get_combined_name, reform_dataset_dfs, parse_ranges, create_nu_string, load_sprta_mass_prf, split_calc_name, sim_mass_p_z
 from utils.data_and_loading_functions import create_directory, timed, load_pickle, load_SPARTA_data, conv_halo_id_spid
 
@@ -60,6 +60,16 @@ plt_macc_splits = parse_ranges(plt_macc_splits)
 nu_splits = config["XGBOOST"]["nu_splits"]
 nu_splits = parse_ranges(nu_splits)
 nu_string = create_nu_string(nu_splits)
+
+linthrsh = config.getfloat("XGBOOST","linthrsh")
+lin_nbin = config.getint("XGBOOST","lin_nbin")
+log_nbin = config.getint("XGBOOST","log_nbin")
+lin_rvticks = json.loads(config.get("XGBOOST","lin_rvticks"))
+log_rvticks = json.loads(config.get("XGBOOST","log_rvticks"))
+lin_tvticks = json.loads(config.get("XGBOOST","lin_tvticks"))
+log_tvticks = json.loads(config.get("XGBOOST","log_tvticks"))
+lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
+log_rticks = json.loads(config.get("XGBOOST","log_rticks"))
 
 if on_zaratan:
     from dask_mpi import initialize
@@ -428,10 +438,21 @@ if __name__ == "__main__":
 
     r, vr, lnv2, sparta_labels, my_data, halo_df = load_your_data()
     
-    r = r.to_numpy()
-    vr = vr.to_numpy()
-    lnv2 = lnv2.to_numpy()
-    sparta_labels = sparta_labels.to_numpy()
+    # r = r.to_numpy()
+    # vr = vr.to_numpy()
+    # lnv2 = lnv2.to_numpy()
+    # sparta_labels = sparta_labels.to_numpy()
+    
+    r = my_data["p_Scaled_radii"].compute().to_numpy()
+    vr = my_data["p_Radial_vel"].compute().to_numpy()
+    vt = my_data["p_Tangential_vel"].compute().to_numpy()
+    vphys = my_data["p_phys_vel"].compute().to_numpy()
+    sparta_labels = my_data["Orbit_infall"].compute().to_numpy()
+    lnv2 = np.log(vphys**2)
+    
+    c_r = my_data["c_Scaled_radii"].compute().to_numpy()
+    c_vr = my_data["c_Radial_vel"].compute().to_numpy()
+    c_vt = my_data["c_Tangential_vel"].compute().to_numpy()
     
     sparta_orb = np.where(sparta_labels == 1)[0]
     sparta_inf = np.where(sparta_labels == 0)[0]
@@ -447,6 +468,20 @@ if __name__ == "__main__":
     "inf_vr_pos": np.intersect1d(sparta_inf, np.where(mask_vr_pos)[0]),
     }
 
+    split_scale_dict = {
+            "linthrsh":linthrsh, 
+            "lin_nbin":lin_nbin,
+            "log_nbin":log_nbin,
+            "lin_rvticks":lin_rvticks,
+            "log_rvticks":log_rvticks,
+            "lin_tvticks":lin_tvticks,
+            "log_tvticks":log_tvticks,
+            "lin_rticks":lin_rticks,
+            "log_rticks":log_rticks,
+    }
+
+    plot_full_ptl_dist(sparta_labels,r,vr,vt,c_r,c_vr,split_scale_dict,num_bins=30,save_loc=plot_loc,save_title="_ps_data")
+    plot_prim_ptl_dist(sparta_labels[fltr_combs["inf_vr_neg"]],r[fltr_combs["inf_vr_neg"]],vr[fltr_combs["inf_vr_neg"]],vt[fltr_combs["inf_vr_neg"]],split_scale_dict,num_bins=30,save_loc=plot_loc,save_title="negvr_inf")
     
     # y_shift = w / np.cos(np.arctan(m_neg))
     x = np.linspace(0, 3, 1000)
@@ -477,7 +512,7 @@ if __name__ == "__main__":
         fig, axes = plt.subplots(2, 2, figsize=(14, 12))
         axes = axes.flatten()
         fig.suptitle(
-            r"Kinetic energy distribution of ORBITING particles around halos at $z=0$""\nSimulation: Bolshoi 1000Mpc",fontsize=16)
+            r"Kinetic energy distribution of SPARTA's ORBITING particles around halos at $z=0$""\nSimulation: Bolshoi 1000Mpc",fontsize=16)
         
         for ax in axes:
             ax.set_xlabel(r'$r/R_{200m}$',fontsize=16)
@@ -492,9 +527,9 @@ if __name__ == "__main__":
 
         plt.sca(axes[0])
         plt.title(r'$v_r > 0$',fontsize=title_fntsize)
-        plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, alpha=0.5, vmin=lin_vmin, vmax=vmax,
-                    cmap="Blues", range=(x_range, y_range))
-        plt.plot(x, y12, lw=2.0, color="k",
+        plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
+                    cmap="magma", range=(x_range, y_range))
+        plt.plot(x, y12, lw=2.0, color="g",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.colorbar(label=r'$N$ (Counts)')
@@ -503,9 +538,9 @@ if __name__ == "__main__":
 
         plt.sca(axes[1])
         plt.title(r'$v_r < 0$',fontsize=title_fntsize)
-        plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, alpha=0.5, vmin=lin_vmin, vmax=vmax,
-                    cmap="Blues", range=(x_range, y_range))
-        plt.plot(x, y22, lw=2.0, color="k",
+        plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
+                    cmap="magma", range=(x_range, y_range))
+        plt.plot(x, y22, lw=2.0, color="g",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.colorbar(label=r'$N$ (Counts)')
@@ -514,9 +549,9 @@ if __name__ == "__main__":
         
         plt.sca(axes[2])
         plt.title(r'$v_r > 0$',fontsize=title_fntsize)
-        plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, norm="log", alpha=0.5, vmin=log_vmin, vmax=vmax,
-                    cmap="Blues", range=(x_range, y_range))
-        plt.plot(x, y12, lw=2.0, color="k",
+        plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
+                    cmap="magma", range=(x_range, y_range))
+        plt.plot(x, y12, lw=2.0, color="g",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.colorbar(label=r'$N$ (Counts)')
@@ -525,9 +560,9 @@ if __name__ == "__main__":
 
         plt.sca(axes[3])
         plt.title(r'$v_r < 0$')
-        plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, norm="log", alpha=0.5, vmin=log_vmin, vmax=vmax,
-                    cmap="Blues", range=(x_range, y_range))
-        plt.plot(x, y22, lw=2.0, color="k",
+        plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
+                    cmap="magma", range=(x_range, y_range))
+        plt.plot(x, y22, lw=2.0, color="g",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.colorbar(label=r'$N$ (Counts)')
@@ -541,7 +576,7 @@ if __name__ == "__main__":
         fig, axes = plt.subplots(2, 2, figsize=(14, 12))
         axes = axes.flatten()
         fig.suptitle(
-            r"Kinetic energy distribution of INFALLING particles around halos at $z=0$""\nSimulation: Bolshoi 1000Mpc",fontsize=16)
+            r"Kinetic energy distribution of SPARTA's INFALLING particles around halos at $z=0$""\nSimulation: Bolshoi 1000Mpc",fontsize=16)
 
         hist1, xedges, yedges = np.histogram2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins)
         hist2, _, _ = np.histogram2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins)
@@ -568,9 +603,9 @@ if __name__ == "__main__":
 
         plt.sca(axes[0])
         plt.title(r'$v_r > 0$',fontsize=title_fntsize)
-        plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, alpha=0.5, vmin=lin_vmin, vmax=vmax,
-                    cmap="Greens", range=(x_range, y_range))
-        plt.plot(x, y12, lw=2.0, color="k",
+        plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
+                    cmap="magma", range=(x_range, y_range))
+        plt.plot(x, y12, lw=2.0, color="g",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.colorbar(label=r'$N$ (Counts)')
@@ -579,9 +614,9 @@ if __name__ == "__main__":
 
         plt.sca(axes[1])
         plt.title(r'$v_r < 0$',fontsize=title_fntsize)
-        plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, alpha=0.5, vmin=lin_vmin, vmax=vmax,
-                    cmap="Greens", range=(x_range, y_range))
-        plt.plot(x, y22, lw=2.0, color="k",
+        plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
+                    cmap="magma", range=(x_range, y_range))
+        plt.plot(x, y22, lw=2.0, color="g",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.colorbar(label=r'$N$ (Counts)')
@@ -590,9 +625,9 @@ if __name__ == "__main__":
         
         plt.sca(axes[2])
         plt.title(r'$v_r > 0$',fontsize=title_fntsize)
-        plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, norm="log", alpha=0.5, vmin=log_vmin, vmax=vmax,
-                    cmap="Greens", range=(x_range, y_range))
-        plt.plot(x, y12, lw=2.0, color="k",
+        plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
+                    cmap="magma", range=(x_range, y_range))
+        plt.plot(x, y12, lw=2.0, color="g",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.colorbar(label=r'$N$ (Counts)')
@@ -601,9 +636,9 @@ if __name__ == "__main__":
 
         plt.sca(axes[3])
         plt.title(r'$v_r < 0$')
-        plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, norm="log", alpha=0.5, vmin=log_vmin, vmax=vmax,
-                    cmap="Greens", range=(x_range, y_range))
-        plt.plot(x, y22, lw=2.0, color="k",
+        plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
+                    cmap="magma", range=(x_range, y_range))
+        plt.plot(x, y22, lw=2.0, color="g",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.colorbar(label=r'$N$ (Counts)')
@@ -939,5 +974,5 @@ if __name__ == "__main__":
                 plt_macc_splits.remove(macc_split)
         
         lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
-        compare_prfs(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "_ps_cut_dens_")
-        compare_prfs(plt_macc_splits,len(cpy_plt_macc_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "_ps_cut_macc_dens_", split_name="\Gamma", prf_name_0="Phase Space Cut", prf_name_1="SPARTA")
+        compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "_ps_cut_dens_",prf_name_0="Phase Space Cut", prf_name_1="SPARTA")
+        compare_split_prfs(plt_macc_splits,len(cpy_plt_macc_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "_ps_cut_macc_dens_", split_name="\Gamma", prf_name_0="Phase Space Cut", prf_name_1="SPARTA")

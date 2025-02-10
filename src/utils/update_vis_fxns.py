@@ -243,7 +243,147 @@ def adjust_frac_hist(hist_data, inf_data, orb_data, max_value, min_value):
     hist_data["hist"] = hist
     return hist_data
 
-def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_dict, num_bins, save_loc):
+def plot_prim_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, split_scale_dict, num_bins, save_loc, save_title=""):
+    with timed("Full Ptl Dist Plot"):
+        
+        linthrsh = split_scale_dict["linthrsh"]
+        log_nbin = split_scale_dict["log_nbin"]
+        
+        p_r_range = [np.min(p_r),np.max(p_r)]
+        p_rv_range = [np.min(p_rv),np.max(p_rv)]
+        p_tv_range = [np.min(p_tv),np.max(p_tv)]
+        
+        act_min_ptl = 10
+        set_ptl = 0
+        scale_min_ptl = 1e-4
+
+        inf_p_r, orb_p_r = split_orb_inf(p_r,p_corr_labels)
+        inf_p_rv, orb_p_rv = split_orb_inf(p_rv,p_corr_labels)
+        inf_p_tv, orb_p_tv = split_orb_inf(p_tv,p_corr_labels)
+        
+        # Use the binning from all particles for the orbiting and infalling plots and the secondary snap to keep it consistent
+        all_p_r_p_rv = histogram(p_r,p_rv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+        all_p_r_p_tv = histogram(p_r,p_tv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+        all_p_rv_p_tv = histogram(p_rv,p_tv,use_bins=[num_bins,num_bins],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
+
+        inf_p_r_p_rv = histogram(inf_p_r,inf_p_rv,use_bins=[all_p_r_p_rv["x_edge"],all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+        inf_p_r_p_tv = histogram(inf_p_r,inf_p_tv,use_bins=[all_p_r_p_tv["x_edge"],all_p_r_p_tv["y_edge"]],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+        inf_p_rv_p_tv = histogram(inf_p_rv,inf_p_tv,use_bins=[all_p_rv_p_tv["x_edge"],all_p_rv_p_tv["y_edge"]],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
+
+        orb_p_r_p_rv = histogram(orb_p_r,orb_p_rv,use_bins=[all_p_r_p_rv["x_edge"],all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+        orb_p_r_p_tv = histogram(orb_p_r,orb_p_tv,use_bins=[all_p_r_p_tv["x_edge"],all_p_r_p_tv["y_edge"]],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+        orb_p_rv_p_tv = histogram(orb_p_rv,orb_p_tv,use_bins=[all_p_rv_p_tv["x_edge"],all_p_rv_p_tv["y_edge"]],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
+
+        hist_frac_p_r_p_rv = scale_hists(inf_p_r_p_rv, orb_p_r_p_rv, make_adj=False)
+        hist_frac_p_r_p_tv = scale_hists(inf_p_r_p_tv, orb_p_r_p_tv, make_adj=False)
+        hist_frac_p_rv_p_tv = scale_hists(inf_p_rv_p_tv, orb_p_rv_p_tv, make_adj=False)
+
+        hist_frac_p_r_p_rv["hist"][np.where(hist_frac_p_r_p_rv["hist"] == 0)] = 1e-4
+        hist_frac_p_r_p_tv["hist"][np.where(hist_frac_p_r_p_tv["hist"] == 0)] = 1e-4
+        hist_frac_p_rv_p_tv["hist"][np.where(hist_frac_p_rv_p_tv["hist"] == 0)] = 1e-4
+
+        hist_frac_p_r_p_rv["hist"] = np.log10(hist_frac_p_r_p_rv["hist"])
+        hist_frac_p_r_p_tv["hist"] = np.log10(hist_frac_p_r_p_tv["hist"])
+        hist_frac_p_rv_p_tv["hist"] = np.log10(hist_frac_p_rv_p_tv["hist"])
+
+        # max_frac_ptl = np.max(np.array([np.max(hist_frac_p_r_p_rv["hist"]),np.max(hist_frac_p_r_p_tv["hist"]),np.max(hist_frac_p_rv_p_tv["hist"]),np.max(hist_frac_c_r_c_rv["hist"])]))
+        # min_frac_ptl = np.min(np.array([np.min(hist_frac_p_r_p_rv["hist"]),np.min(hist_frac_p_r_p_tv["hist"]),np.min(hist_frac_p_rv_p_tv["hist"]),np.min(hist_frac_c_r_c_rv["hist"])]))
+        max_frac_ptl = 3.5
+        min_frac_ptl = -3.5
+        
+        
+        hist_frac_p_r_p_rv = adjust_frac_hist(hist_frac_p_r_p_rv, inf_p_r_p_rv, orb_p_r_p_rv, max_frac_ptl, min_frac_ptl)
+        hist_frac_p_r_p_tv = adjust_frac_hist(hist_frac_p_r_p_tv, inf_p_r_p_tv, orb_p_r_p_tv, max_frac_ptl, min_frac_ptl)
+        hist_frac_p_rv_p_tv = adjust_frac_hist(hist_frac_p_rv_p_tv, inf_p_rv_p_tv, orb_p_rv_p_tv, max_frac_ptl, min_frac_ptl)
+ 
+        tot_nptl = p_r.shape[0]
+        
+        # normalize the number of particles so that there are no lines.
+        all_p_r_p_rv = normalize_hists(all_p_r_p_rv,tot_nptl=tot_nptl,min_ptl=scale_min_ptl)
+        all_p_r_p_tv = normalize_hists(all_p_r_p_tv,tot_nptl=tot_nptl,min_ptl=scale_min_ptl)
+        all_p_rv_p_tv = normalize_hists(all_p_rv_p_tv,tot_nptl=tot_nptl,min_ptl=scale_min_ptl)
+        
+        inf_p_r_p_rv = normalize_hists(inf_p_r_p_rv,tot_nptl=tot_nptl,min_ptl=scale_min_ptl)
+        inf_p_r_p_tv = normalize_hists(inf_p_r_p_tv,tot_nptl=tot_nptl,min_ptl=scale_min_ptl)
+        inf_p_rv_p_tv = normalize_hists(inf_p_rv_p_tv,tot_nptl=tot_nptl,min_ptl=scale_min_ptl)
+
+        orb_p_r_p_rv = normalize_hists(orb_p_r_p_rv,tot_nptl=tot_nptl,min_ptl=scale_min_ptl)
+        orb_p_r_p_tv = normalize_hists(orb_p_r_p_tv,tot_nptl=tot_nptl,min_ptl=scale_min_ptl)
+        orb_p_rv_p_tv = normalize_hists(orb_p_rv_p_tv,tot_nptl=tot_nptl,min_ptl=scale_min_ptl)
+        
+        # Can just do the all particle arrays since inf/orb will have equal or less
+        max_ptl = np.max(np.array([np.max(all_p_r_p_rv["hist"]),np.max(all_p_r_p_tv["hist"]),np.max(all_p_rv_p_tv["hist"]),np.max(all_c_r_c_rv["hist"])]))
+        
+        cividis_cmap = plt.get_cmap("cividis")
+        cividis_cmap.set_under(color='black')
+        cividis_cmap.set_bad(color='black') 
+        
+        rdbu_cmap = plt.get_cmap("RdBu")
+        rdbu_cmap.set_under(color='black')
+        rdbu_cmap.set_bad(color='black') 
+        
+        plot_kwargs = {
+                "vmin":scale_min_ptl,
+                "vmax":max_ptl,
+                "norm":"log",
+                "origin":"lower",
+                "aspect":"auto",
+                "cmap":cividis_cmap,
+        }
+        
+        frac_plot_kwargs = {
+                "vmin":min_frac_ptl,
+                "vmax":max_frac_ptl,
+                "origin":"lower",
+                "aspect":"auto",
+                "cmap":rdbu_cmap,
+        }
+        
+        r_ticks = split_scale_dict["lin_rticks"] + split_scale_dict["log_rticks"]
+        
+        rv_ticks = split_scale_dict["lin_rvticks"] + split_scale_dict["log_rvticks"]
+        rv_ticks = rv_ticks + [-x for x in rv_ticks if x != 0]
+        rv_ticks.sort()
+
+        tv_ticks = split_scale_dict["lin_tvticks"] + split_scale_dict["log_tvticks"]       
+        
+        widths = [4,4,4,.5]
+        heights = [0.15,4,4,4,4] # have extra row up top so there is space for the title
+        
+        fig = plt.figure(constrained_layout=True, figsize=(24,22))
+        gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
+        
+        imshow_plot(fig.add_subplot(gs[1,0]),all_p_r_p_rv,y_label="$v_r/v_{200m}$",text="All Particles",title="Current Snapshot",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D1",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[1,1]),all_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="D2",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[1,2]),all_p_rv_p_tv,hide_xtick_labels=True,hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D3",kwargs=plot_kwargs)
+
+        imshow_plot(fig.add_subplot(gs[2,0]),inf_p_r_p_rv,y_label="$v_r/v_{200m}$",text="Infalling Particles",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D5",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[2,1]),inf_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="D6",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[2,2]),inf_p_rv_p_tv,hide_xtick_labels=True,hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D7",kwargs=plot_kwargs)
+             
+        imshow_plot(fig.add_subplot(gs[3,0]),orb_p_r_p_rv,y_label="$v_r/v_{200m}$",text="Orbiting Particles",hide_xtick_labels=True,yticks=rv_ticks,ylinthrsh=linthrsh,number="D9",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,1]),orb_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xtick_labels=True,yticks=tv_ticks,ylinthrsh=linthrsh,number="D10",kwargs=plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[3,2]),orb_p_rv_p_tv,hide_ytick_labels=True,hide_xtick_labels=True,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D11",kwargs=plot_kwargs)
+
+        imshow_plot(fig.add_subplot(gs[4,0]),hist_frac_p_r_p_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text=r"$N_{infalling} / N_{orbiting}$", xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="D13",kwargs=frac_plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[4,1]),hist_frac_p_r_p_tv,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="D14",kwargs=frac_plot_kwargs)
+        imshow_plot(fig.add_subplot(gs[4,2]),hist_frac_p_rv_p_tv,x_label="$v_r/V_{200m}$",hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="D15",kwargs=frac_plot_kwargs)
+
+        print(scale_min_ptl, max_ptl)
+        color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=scale_min_ptl, vmax=max_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[1:-1,-1]))
+        color_bar.set_label(r"$dN N^{-1} dx^{-1} dy^{-1}$",fontsize=22)
+        color_bar.ax.tick_params(which="major",direction="in",labelsize=18,length=5,width=3)
+        color_bar.ax.tick_params(which="minor",direction="in",labelsize=18,length=2.5,width=1.5)
+        
+        color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(vmin=min_frac_ptl, vmax=max_frac_ptl),cmap=rdbu_cmap), cax=plt.subplot(gs[-1,-1]))
+        color_bar.set_label(r"$\log_{10}{N_{inf}/N_{orb}}$",fontsize=22)
+        color_bar.ax.tick_params(which="major",direction="in",labelsize=18,length=5,width=3)
+        color_bar.ax.tick_params(which="minor",direction="in",labelsize=18,length=2.5,width=1.5)
+            
+        fig.savefig(save_loc + "ptl_distr" + save_title + ".png")
+        plt.close()
+
+def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_dict, num_bins, save_loc, save_title=""):
     with timed("Full Ptl Dist Plot"):
         
         linthrsh = split_scale_dict["linthrsh"]
@@ -396,7 +536,7 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         color_bar.ax.tick_params(which="major",direction="in",labelsize=18,length=5,width=3)
         color_bar.ax.tick_params(which="minor",direction="in",labelsize=18,length=2.5,width=1.5)
             
-        fig.savefig(save_loc + "ptl_distr.png")
+        fig.savefig(save_loc + "ptl_distr" + save_title + ".png")
         plt.close()
 
 def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_dict, num_bins, save_loc, model_info,dataset_name):
@@ -1005,7 +1145,7 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
 # Profiles should be a list of lists where each list consists of [calc_prf,act_prf] for each split
 # You can either use the median plots with use_med=True or the average with use_med=False
 # The prf_name_0 and prf_name_1 correspond to what you want each profile to be named in the plot corresponding to where they are located in the _prfs variable
-def compare_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title, use_med=True, split_name="\nu", prf_name_0 = "ML Model", prf_name_1 = "SPARTA"):    
+def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title, use_med=True, split_name="\\nu", prf_name_0 = "ML Model", prf_name_1 = "SPARTA"):    
     if use_med:
         prf_func = np.nanmedian
     else:
