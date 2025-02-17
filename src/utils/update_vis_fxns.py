@@ -312,7 +312,7 @@ def plot_prim_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, split_scale_dict, num_bin
         orb_p_rv_p_tv = normalize_hists(orb_p_rv_p_tv,tot_nptl=tot_nptl,min_ptl=scale_min_ptl)
         
         # Can just do the all particle arrays since inf/orb will have equal or less
-        max_ptl = np.max(np.array([np.max(all_p_r_p_rv["hist"]),np.max(all_p_r_p_tv["hist"]),np.max(all_p_rv_p_tv["hist"]),np.max(all_c_r_c_rv["hist"])]))
+        max_ptl = np.nanmax(np.array([np.nanmax(all_p_r_p_rv["hist"]),np.nanmax(all_p_r_p_tv["hist"]),np.nanmax(all_p_rv_p_tv["hist"])]))
         
         cividis_cmap = plt.get_cmap("cividis")
         cividis_cmap.set_under(color='black')
@@ -464,7 +464,7 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         orb_c_r_c_rv = normalize_hists(orb_c_r_c_rv,tot_nptl=tot_nptl,min_ptl=scale_min_ptl)
         
         # Can just do the all particle arrays since inf/orb will have equal or less
-        max_ptl = np.max(np.array([np.max(all_p_r_p_rv["hist"]),np.max(all_p_r_p_tv["hist"]),np.max(all_p_rv_p_tv["hist"]),np.max(all_c_r_c_rv["hist"])]))
+        max_ptl = np.nanmax(np.array([np.nanmax(all_p_r_p_rv["hist"]),np.nanmax(all_p_r_p_tv["hist"]),np.nanmax(all_p_rv_p_tv["hist"]),np.nanmax(all_c_r_c_rv["hist"])]))
         
         cividis_cmap = plt.get_cmap("cividis")
         cividis_cmap.set_under(color='black')

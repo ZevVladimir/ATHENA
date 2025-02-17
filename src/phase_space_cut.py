@@ -419,11 +419,11 @@ if __name__ == "__main__":
     ####################################################################################################################################################################################################################################
     
     (m_pos, b_pos), (m_neg, b_neg) = calibrate_finder()
-       
-    # m_pos = -2.029839336203588
-    # b_pos = 2.728249722936968
-    # m_neg = -1.6933093792429774
-    # b_neg = 1.4820910679213617
+          
+    # m_pos = -1.9973747688461672
+    # b_pos = 2.730691113802748
+    # m_neg = -1.601325049968688
+    # b_neg = 1.5101195108968333
     
     print("\nCalibration Params")
     print(m_pos,b_pos,m_neg,b_neg)
@@ -489,11 +489,14 @@ if __name__ == "__main__":
     y22 = m_neg * x + b_neg
 
     nbins = 200   
+    
+    x_range = (0, 3)
+    y_range = (-2, 2.5)
 
-    hist1, xedges, yedges = np.histogram2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins)
-    hist2, _, _ = np.histogram2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins)
-    hist3, _, _ = np.histogram2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins)
-    hist4, _, _ = np.histogram2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins)
+    hist1, xedges, yedges = np.histogram2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, range=(x_range, y_range))
+    hist2, _, _ = np.histogram2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, range=(x_range, y_range))
+    hist3, _, _ = np.histogram2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, range=(x_range, y_range))
+    hist4, _, _ = np.histogram2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, range=(x_range, y_range))
 
     # Combine the histograms to determine the maximum density for consistent color scaling
     combined_hist = np.maximum.reduce([hist1, hist2, hist3, hist4])
@@ -502,9 +505,6 @@ if __name__ == "__main__":
     lin_vmin = 0
     log_vmin = 1
 
-    x_range = (0, 3)
-    y_range = (-2, 2.5)
-    
     title_fntsize = 18
     legend_fntsize = 14
 
@@ -578,10 +578,10 @@ if __name__ == "__main__":
         fig.suptitle(
             r"Kinetic energy distribution of SPARTA's INFALLING particles around halos at $z=0$""\nSimulation: Bolshoi 1000Mpc",fontsize=16)
 
-        hist1, xedges, yedges = np.histogram2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins)
-        hist2, _, _ = np.histogram2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins)
-        hist3, _, _ = np.histogram2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins)
-        hist4, _, _ = np.histogram2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins)
+        hist1, xedges, yedges = np.histogram2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, range=(x_range, y_range))
+        hist2, _, _ = np.histogram2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, range=(x_range, y_range))
+        hist3, _, _ = np.histogram2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, range=(x_range, y_range))
+        hist4, _, _ = np.histogram2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, range=(x_range, y_range))
 
         # Combine the histograms to determine the maximum density for consistent color scaling
         combined_hist = np.maximum.reduce([hist1, hist2, hist3, hist4])

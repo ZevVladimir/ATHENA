@@ -14,7 +14,8 @@ import json
 from sparta_tools import sparta 
 
 from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir
-from utils.calculation_functions import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn
+from utils.calculation_functions import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn, create_mass_prf, calculate_density
+from utils.update_vis_fxns import compare_prfs
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 import configparser
@@ -26,6 +27,7 @@ snap_path = config["PATHS"]["snap_path"]
 SPARTA_output_path = config["PATHS"]["SPARTA_output_path"]
 pickled_path = config["PATHS"]["pickled_path"]
 ML_dset_path = config["PATHS"]["ML_dset_path"]
+debug_plt_path = config["PATHS"]["debug_plt_path"]
 debug_mem = config.getboolean("MISC","debug_mem")
 
 sim_cosmol = config["MISC"]["sim_cosmol"]
@@ -42,6 +44,7 @@ curr_chunk_size = config.getint("SEARCH","chunk_size")
 save_mem_size = config.getfloat("SEARCH","save_mem_size")
 
 test_halos_ratio = config.getfloat("XGBOOST","test_halos_ratio")
+lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
 ##################################################################################################################
 create_directory(pickled_path)
 create_directory(ML_dset_path)
@@ -184,9 +187,34 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
     scaled_rad_vel = scaled_rad_vel[scaled_radii_inds]
     scaled_tang_vel = scaled_tang_vel[scaled_radii_inds]
     scaled_phys_vel = scaled_phys_vel[scaled_radii_inds]
-
+    
     if comp_snap == False:
         curr_orb_assn = curr_orb_assn[scaled_radii_inds]
+    
+    global count
+    if create_dens_prf and comp_snap == False:
+        count += 1
+        with open(pickled_path + "99_cbol_l2000_n1024_4r200m_1-5v200m/simulation_particle_mass.pickle", "rb") as pickle_file:
+            ptl_mass = pickle.load(pickle_file)
+        bins = np.insert(bins, 0, 0)
+        dens_prf_all = np.reshape(dens_prf_all,(1,80))
+        dens_prf_1halo = np.reshape(dens_prf_1halo,(1,80))
+        
+        calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, m200m = create_mass_prf(scaled_radii, curr_orb_assn, bins, ptl_mass)
+        
+        calc_dens_prf_all = calculate_density(calc_mass_prf_all, bins, halo_r200m, np.array([0]), p_rho_m)
+        calc_dens_prf_orb = calculate_density(calc_mass_prf_orb, bins, halo_r200m, np.array([0]), p_rho_m)
+        calc_dens_prf_inf = calculate_density(calc_mass_prf_inf, bins, halo_r200m, np.array([0]), p_rho_m)
+        
+        act_dens_prf_all = np.reshape(dens_prf_all,(1,80))
+        act_dens_prf_orb = np.reshape(dens_prf_1halo,(1,80))
+        act_dens_prf_inf = act_dens_prf_all - act_dens_prf_orb
+        
+        all_prfs = [calc_dens_prf_all, act_dens_prf_all]
+        orb_prfs = [calc_dens_prf_orb, act_dens_prf_orb]
+        inf_prfs = [calc_dens_prf_inf, act_dens_prf_inf]
+                
+        compare_prfs(all_prfs,orb_prfs,inf_prfs,bins,lin_rticks,debug_plt_path,str(curr_halo_idx))
 
     if comp_snap == False:
         return fnd_HIPIDs, curr_orb_assn, scaled_rad_vel, scaled_tang_vel, scaled_radii, scaled_phys_vel
@@ -592,11 +620,12 @@ with timed("Startup"):
             print(((np.sum(train_halo_mem[prnt_halo_splits[i]:prnt_halo_splits[i+1]])) + 128 )*1e-9,"GB")
         
 with timed("Finished Calc"):   
+    #TODO make sure the printing of the number of halos per split is correct for Train and Test dataset
     train_num_iter = len(train_halo_splits)
     train_prnt_halo_splits = train_halo_splits.copy()
     train_prnt_halo_splits.append(train_idxs.size)
     print("Train Splits")
-    print("Num halos in each split:", ", ".join(map(str, np.diff(prnt_halo_splits))) + ".", train_num_iter, "splits")
+    print("Num halos in each split:", ", ".join(map(str, np.diff(train_prnt_halo_splits))) + ".", train_num_iter, "splits")
     ptl_idx = 0
     halo_idx = 0
     
@@ -607,7 +636,7 @@ with timed("Finished Calc"):
     test_prnt_halo_splits = test_halo_splits.copy()
     test_prnt_halo_splits.append(test_idxs.size)
     print("Test Splits")
-    print("Num halos in each split:", ", ".join(map(str, np.diff(prnt_halo_splits))) + ".", test_num_iter, "splits")
+    print("Num halos in each split:", ", ".join(map(str, np.diff(test_prnt_halo_splits))) + ".", test_num_iter, "splits")
     ptl_idx = 0
     halo_idx = 0
     for i in range(test_num_iter):
