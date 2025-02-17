@@ -1062,11 +1062,7 @@ def plot_halo_slice(ptl_pos, labels, halo_pos, halo_r200m, save_loc, search_rad=
 
 # Profiles should be a list [calc_prf,act_prf]
 # You can either use the median plots with use_med=True or the average with use_med=False
-def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title, use_med=True):    
-    if use_med:
-        prf_func = np.nanmedian
-    else:
-        prf_func = np.nanmean
+def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title, prf_func=np.nanmedian):            
     # Parameters to tune sizes of plots and fonts
     widths = [1]
     heights = [1,0.5]
@@ -1090,15 +1086,30 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
     ratio_orb_prf = (orb_prfs[0] / orb_prfs[1]) - 1
     ratio_inf_prf = (inf_prfs[0] / inf_prfs[1]) - 1
 
+    if prf_func != None:
+        calc_all_prfs = prf_func(all_prfs[0],axis=0)
+        calc_orb_prfs = prf_func(orb_prfs[0],axis=0)
+        calc_inf_prfs = prf_func(inf_prfs[0],axis=0)
+        act_all_prfs = prf_func(all_prfs[1],axis=0)
+        act_orb_prfs = prf_func(orb_prfs[1],axis=0)
+        act_inf_prfs = prf_func(inf_prfs[1],axis=0)
+    else:
+        calc_all_prfs = all_prfs[0]
+        calc_orb_prfs = orb_prfs[0]
+        calc_inf_prfs = inf_prfs[0]
+        act_all_prfs = all_prfs[1]
+        act_orb_prfs = orb_prfs[1]
+        act_inf_prfs = inf_prfs[1]
+
     # Plot the calculated profiles
-    all_lb, = ax_0.plot(bins, prf_func(all_prfs[0],axis=0), 'r-', label = "All")
-    orb_lb, = ax_0.plot(bins, prf_func(orb_prfs[0],axis=0), 'b-', label = "Orbiting")
-    inf_lb, = ax_0.plot(bins, prf_func(inf_prfs[0],axis=0), 'g-', label = "Infalling")
+    all_lb, = ax_0.plot(bins, calc_all_prfs, 'r-', label = "All")
+    orb_lb, = ax_0.plot(bins, calc_orb_prfs, 'b-', label = "Orbiting")
+    inf_lb, = ax_0.plot(bins, calc_inf_prfs, 'g-', label = "Infalling")
     
     # Plot the SPARTA (actual) profiles 
-    ax_0.plot(bins, prf_func(all_prfs[1],axis=0), 'r--')
-    ax_0.plot(bins, prf_func(orb_prfs[1],axis=0), 'b--')
-    ax_0.plot(bins, prf_func(inf_prfs[1],axis=0), 'g--')
+    ax_0.plot(bins, act_all_prfs, 'r--')
+    ax_0.plot(bins, act_orb_prfs, 'b--')
+    ax_0.plot(bins, act_inf_prfs, 'g--')
 
     
     fig.legend([(invis_calc, invis_act),all_lb,orb_lb,inf_lb], ['Predicted, Actual','All','Orbiting','Infalling'], numpoints=1,handlelength=3,handler_map={tuple: HandlerTuple(ndivide=None)},frameon=False,fontsize=legendfntsize)

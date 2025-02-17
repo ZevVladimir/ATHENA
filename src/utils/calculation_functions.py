@@ -62,11 +62,19 @@ def calc_radius(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_
 # Also can scale by rho_m if supplied
 def calculate_density(masses, bins, r200m, sim_splits, rho_m = None):
     rho = np.zeros_like(masses)
-    V = (bins[None, :] * r200m[:, None])**3 * 4.0 * np.pi / 3.0
-    dV = V[:, 1:] - V[:, :-1]
-    dM = masses[:, 1:] - masses[:, :-1]
-    rho[:, 0] = masses[:, 0] / V[:, 0]
-    rho[:, 1:] = dM / dV
+    
+    if r200m.size == 1:
+        V = (bins * r200m)**3 * 4.0 * np.pi / 3.0
+        dV = V[1:] - V[:-1]
+        dM = masses[1:] - masses[:-1]
+        rho[0] = masses[0] / V[0]
+        rho[1:] = dM / dV
+    else:
+        V = (bins[None, :] * r200m[:, None])**3 * 4.0 * np.pi / 3.0
+        dV = V[:, 1:] - V[:, :-1]
+        dM = masses[:, 1:] - masses[:, :-1]
+        rho[:, 0] = masses[:, 0] / V[:, 0]
+        rho[:, 1:] = dM / dV
 
     if rho_m != None:
         if len(sim_splits) == 1:

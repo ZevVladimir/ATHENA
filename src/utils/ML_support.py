@@ -585,8 +585,8 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, pl
             # Ignore warnigns about taking mean/median of empty slices and division by 0 that are expected with how the profiles are handled
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", category=RuntimeWarning)
-                compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_",use_med=True)
-                compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_",use_med=False)
+                compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_",prf_func=np.nanmedian)
+                compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_",prf_func=np.nanmean)
     
     # Both the missclassification and distribution and infalling orbiting ratio plots are 2D histograms and the model parameters and allow for linear-log split scaling
     if missclass or full_dist or io_frac:       
