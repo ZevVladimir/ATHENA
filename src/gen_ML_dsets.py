@@ -136,7 +136,7 @@ def init_search(halo_positions, halo_r200m, search_rad, comp_snap = False, find_
     
 def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_pos, curr_ptl_vel, 
                  halo_pos, halo_vel, halo_r200m, sparta_last_pericenter_snap=None, sparta_n_pericenter=None, sparta_tracer_ids=None,
-                 sparta_n_is_lower_limit=None, dens_prf_all=None, dens_prf_1halo=None, curr_halo_num=None, bins=None, create_dens_prf=False):
+                 sparta_n_is_lower_limit=None, act_mass_prf_all=None, act_mass_prf_orb=None, curr_halo_num=None, bins=None, create_dens_prf=False):
     # Doing this this way as otherwise will have to generate super large arrays for input from multiprocessing
     snap = snap_dict["snap"]
     red_shift = snap_dict["red_shift"]
@@ -196,11 +196,9 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
     global count
     if create_dens_prf and comp_snap == False:
         if count < 15:
-            with open(pickled_path + "99_cbol_l2000_n1024_4r200m_1-5v200m/simulation_particle_mass.pickle", "rb") as pickle_file:
+            with open(pickled_path + str(p_snap) + "_" + curr_sparta_file + "/simulation_particle_mass.pickle", "rb") as pickle_file:
                 ptl_mass = pickle.load(pickle_file)
             bins = np.insert(bins, 0, 0)
-            dens_prf_all = np.reshape(dens_prf_all,(1,80))
-            dens_prf_1halo = np.reshape(dens_prf_1halo,(1,80))
             
             calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, m200m = create_mass_prf(scaled_radii, curr_orb_assn, bins, ptl_mass)
             
@@ -208,15 +206,20 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
             calc_dens_prf_orb = calculate_density(calc_mass_prf_orb, bins[1:], halo_r200m, np.array([0]), p_rho_m)
             calc_dens_prf_inf = calculate_density(calc_mass_prf_inf, bins[1:], halo_r200m, np.array([0]), p_rho_m)
             
-            act_dens_prf_all = np.reshape(dens_prf_all,(1,80))
-            act_dens_prf_orb = np.reshape(dens_prf_1halo,(1,80))
-            act_dens_prf_inf = act_dens_prf_all - act_dens_prf_orb
+            act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
+            
+            act_dens_prf_all = calculate_density(act_mass_prf_all, bins[1:], halo_r200m, np.array([0]), p_rho_m)
+            act_dens_prf_orb = calculate_density(act_mass_prf_orb, bins[1:], halo_r200m, np.array([0]), p_rho_m)
+            act_dens_prf_inf = calculate_density(act_mass_prf_inf, bins[1:], halo_r200m, np.array([0]), p_rho_m)
+            
+            print(calc_dens_prf_all / act_dens_prf_all)
+            print((calc_dens_prf_all / act_dens_prf_all)/little_h)
             
             all_prfs = [calc_dens_prf_all, act_dens_prf_all]
             orb_prfs = [calc_dens_prf_orb, act_dens_prf_orb]
             inf_prfs = [calc_dens_prf_inf, act_dens_prf_inf]
                     
-            compare_prfs(all_prfs,orb_prfs,inf_prfs,bins,lin_rticks,debug_plt_path,str(curr_halo_idx),prf_func=None)
+            compare_prfs(all_prfs,orb_prfs,inf_prfs,bins[1:],lin_rticks,debug_plt_path,str(curr_halo_idx),prf_func=None)
             count += 1
 
     if comp_snap == False:

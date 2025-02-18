@@ -52,8 +52,6 @@ if match:
     sparta_name = match.group(0)
 SPARTA_hdf5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
 
-p_red_shift = config.getfloat("SEARCH","p_red_shift")
-
 file_lim = config.getint("XGBOOST","file_lim")
 
 reduce_rad = config.getfloat("XGBOOST","reduce_rad")
@@ -576,7 +574,7 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, pl
                 else:
                     plt_nu_splits.remove(nu_split)
 
-            compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_")
+            compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_med_",prf_func=np.nanmedian)
         else:
             all_prf_lst = filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos)
             orb_prf_lst = filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos)
@@ -585,8 +583,8 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, pl
             # Ignore warnigns about taking mean/median of empty slices and division by 0 that are expected with how the profiles are handled
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", category=RuntimeWarning)
-                compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_",prf_func=np.nanmedian)
-                compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_",prf_func=np.nanmean)
+                compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_med_",prf_func=np.nanmedian)
+                compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_avg_",prf_func=np.nanmean)
     
     # Both the missclassification and distribution and infalling orbiting ratio plots are 2D histograms and the model parameters and allow for linear-log split scaling
     if missclass or full_dist or io_frac:       
@@ -830,7 +828,7 @@ def get_combined_name(model_sims):
         v_match = re.search(v_patt, split_string[4])
 
 
-        cond_string = split_string[0] + split_string[1] + split_string[2] 
+        cond_string = split_string[0] + split_string[1] + split_string[2] + "s" + split_string[5]
         # can add these for more information per name
         #+ "r" + r_match.group(1) + "v" + v_match.group(1) + "s" + split_string[5]
         

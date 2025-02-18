@@ -1093,6 +1093,9 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
         act_all_prfs = prf_func(all_prfs[1],axis=0)
         act_orb_prfs = prf_func(orb_prfs[1],axis=0)
         act_inf_prfs = prf_func(inf_prfs[1],axis=0)
+        ratio_all_prf = prf_func(ratio_all_prf,axis=0)
+        ratio_orb_prf = prf_func(ratio_orb_prf,axis=0)
+        ratio_inf_prf = prf_func(ratio_inf_prf,axis=0)
     else:
         calc_all_prfs = all_prfs[0]
         calc_orb_prfs = orb_prfs[0]
@@ -1107,16 +1110,16 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
     inf_lb, = ax_0.plot(bins, calc_inf_prfs, 'g-', label = "Infalling")
     
     # Plot the SPARTA (actual) profiles 
-    ax_0.plot(bins, act_all_prfs, 'r--')
-    ax_0.plot(bins, act_orb_prfs, 'b--')
-    ax_0.plot(bins, act_inf_prfs, 'g--')
+    ax_0.plot(bins, act_all_prfs, ratio_all_prf, 'r--')
+    ax_0.plot(bins, act_orb_prfs, ratio_orb_prf, 'b--')
+    ax_0.plot(bins, act_inf_prfs, ratio_inf_prf, 'g--')
 
     
     fig.legend([(invis_calc, invis_act),all_lb,orb_lb,inf_lb], ['Predicted, Actual','All','Orbiting','Infalling'], numpoints=1,handlelength=3,handler_map={tuple: HandlerTuple(ndivide=None)},frameon=False,fontsize=legendfntsize)
 
-    ax_1.plot(bins, prf_func(ratio_all_prf,axis=0), 'r')
-    ax_1.plot(bins, prf_func(ratio_orb_prf,axis=0), 'b')
-    ax_1.plot(bins, prf_func(ratio_inf_prf,axis=0), 'g')
+    ax_1.plot(bins, ratio_all_prf, 'r')
+    ax_1.plot(bins, ratio_orb_prf, 'b')
+    ax_1.plot(bins, ratio_inf_prf, 'g')
     
     ax_1.fill_between(bins, np.nanpercentile(ratio_all_prf, q=15.9, axis=0),np.nanpercentile(ratio_all_prf, q=84.1, axis=0), color='r', alpha=fill_alpha)
     ax_1.fill_between(bins, np.nanpercentile(ratio_orb_prf, q=15.9, axis=0),np.nanpercentile(ratio_orb_prf, q=84.1, axis=0), color='b', alpha=fill_alpha)
@@ -1148,19 +1151,13 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
 
     ax_1.set_xticks(tick_locs,strng_ticks)  
     ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
-    if use_med:
-        fig.savefig(save_location + title + "med_prfl_rat.png",bbox_inches='tight')
-    else:
-        fig.savefig(save_location + title + "avg_prfl_rat.png",bbox_inches='tight')
+    
+    fig.savefig(save_location + title + "prfl_rat.png",bbox_inches='tight')
     
 # Profiles should be a list of lists where each list consists of [calc_prf,act_prf] for each split
 # You can either use the median plots with use_med=True or the average with use_med=False
 # The prf_name_0 and prf_name_1 correspond to what you want each profile to be named in the plot corresponding to where they are located in the _prfs variable
-def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title, use_med=True, split_name="\\nu", prf_name_0 = "ML Model", prf_name_1 = "SPARTA"):    
-    if use_med:
-        prf_func = np.nanmedian
-    else:
-        prf_func = np.nanmean
+def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title, prf_func=np.nanmedian, split_name="\\nu", prf_name_0 = "ML Model", prf_name_1 = "SPARTA"): 
     
     # Parameters to tune sizes of plots and fonts
     widths = [1,1,1]
@@ -1212,10 +1209,28 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
         ratio_orb_prf = (orb_prfs[i][0] / orb_prfs[i][1]) - 1
         ratio_inf_prf = (inf_prfs[i][0] / inf_prfs[i][1]) - 1
         
+        if prf_func != None:
+            calc_all_prfs = prf_func(all_prfs[i][0],axis=0)
+            calc_orb_prfs = prf_func(orb_prfs[i][0],axis=0)
+            calc_inf_prfs = prf_func(inf_prfs[i][0],axis=0)
+            act_all_prfs = prf_func(all_prfs[i][1],axis=0)
+            act_orb_prfs = prf_func(orb_prfs[i][1],axis=0)
+            act_inf_prfs = prf_func(inf_prfs[i][1],axis=0)
+            ratio_all_prf = prf_func(ratio_all_prf,axis=0)
+            ratio_orb_prf = prf_func(ratio_orb_prf,axis=0)
+            ratio_inf_prf = prf_func(ratio_inf_prf,axis=0)
+        else:
+            calc_all_prfs = all_prfs[i][0]
+            calc_orb_prfs = orb_prfs[i][0]
+            calc_inf_prfs = inf_prfs[i][0]
+            act_all_prfs = all_prfs[i][1]
+            act_orb_prfs = orb_prfs[i][1]
+            act_inf_prfs = inf_prfs[i][1]
+        
         # Plot the calculated profiles
-        all_lb, = all_ax_0.plot(bins, prf_func(all_prfs[i][0],axis=0), linestyle='-', color = all_colors[i], label = rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
-        orb_lb, = orb_ax_0.plot(bins, prf_func(orb_prfs[i][0],axis=0), linestyle='-', color = orb_colors[i], label = rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
-        inf_lb, = inf_ax_0.plot(bins, prf_func(inf_prfs[i][0],axis=0), linestyle='-', color = inf_colors[i], label = rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
+        all_lb, = all_ax_0.plot(bins, calc_all_prfs, linestyle='-', color = all_colors[i], label = rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
+        orb_lb, = orb_ax_0.plot(bins, calc_orb_prfs, linestyle='-', color = orb_colors[i], label = rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
+        inf_lb, = inf_ax_0.plot(bins, calc_inf_prfs, linestyle='-', color = inf_colors[i], label = rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
         
         all_plt_lines.append(all_lb)
         all_plt_lbls.append(rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
@@ -1225,13 +1240,13 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
         inf_plt_lbls.append(rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
         
         # Plot the SPARTA (actual) profiles 
-        all_ax_0.plot(bins, prf_func(all_prfs[i][1],axis=0), linestyle='--', color = all_colors[i])
-        orb_ax_0.plot(bins, prf_func(orb_prfs[i][1],axis=0), linestyle='--', color = orb_colors[i])
-        inf_ax_0.plot(bins, prf_func(inf_prfs[i][1],axis=0), linestyle='--', color = inf_colors[i])
+        all_ax_0.plot(bins, act_all_prfs, linestyle='--', color = all_colors[i])
+        orb_ax_0.plot(bins, act_orb_prfs, linestyle='--', color = orb_colors[i])
+        inf_ax_0.plot(bins, act_inf_prfs, linestyle='--', color = inf_colors[i])
 
-        all_ax_1.plot(bins, prf_func(ratio_all_prf,axis=0), color = all_colors[i])
-        orb_ax_1.plot(bins, prf_func(ratio_orb_prf,axis=0), color = orb_colors[i])
-        inf_ax_1.plot(bins, prf_func(ratio_inf_prf,axis=0), color = inf_colors[i])
+        all_ax_1.plot(bins, ratio_all_prf, color = all_colors[i])
+        orb_ax_1.plot(bins, ratio_orb_prf, color = orb_colors[i])
+        inf_ax_1.plot(bins, ratio_inf_prf, color = inf_colors[i])
         
         all_ax_1.fill_between(bins, np.nanpercentile(ratio_all_prf, q=15.9, axis=0),np.nanpercentile(ratio_all_prf, q=84.1, axis=0), color=all_colors[i], alpha=fill_alpha)
         orb_ax_1.fill_between(bins, np.nanpercentile(ratio_orb_prf, q=15.9, axis=0),np.nanpercentile(ratio_orb_prf, q=84.1, axis=0), color=orb_colors[i], alpha=fill_alpha)
@@ -1317,10 +1332,8 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
     
     inf_ax_1.set_xticks(tick_locs,strng_ticks)  
     inf_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize, labelleft=False)
-    if use_med:
-        fig.savefig(save_location + title + "med_prfl_rat_nu.png",bbox_inches='tight',dpi=300)
-    else:
-        fig.savefig(save_location + title + "avg_prfl_rat_nu.png",bbox_inches='tight')
+    
+    fig.savefig(save_location + title + "prfl_rat_nu.png",bbox_inches='tight',dpi=300)
         
 def inf_orb_frac(p_corr_labels,p_r,p_rv,p_tv,c_r,c_rv,split_scale_dict,num_bins,save_loc):
     linthrsh = split_scale_dict["linthrsh"]
