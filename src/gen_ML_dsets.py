@@ -138,7 +138,7 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
                  halo_pos, halo_vel, halo_r200m, sparta_last_pericenter_snap=None, sparta_n_pericenter=None, sparta_tracer_ids=None,
                  sparta_n_is_lower_limit=None, act_mass_prf_all=None, act_mass_prf_orb=None, curr_halo_num=None, bins=None, create_dens_prf=False):
     # Doing this this way as otherwise will have to generate super large arrays for input from multiprocessing
-    snap = snap_dict["snap"]
+    snap = snap_dict["p_sparta_snap"]
     red_shift = snap_dict["red_shift"]
     scale_factor = snap_dict["scale_factor"]
     hubble_const = snap_dict["hubble_const"]
@@ -211,9 +211,6 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
             act_dens_prf_all = calculate_density(act_mass_prf_all, bins[1:], halo_r200m, np.array([0]), p_rho_m)
             act_dens_prf_orb = calculate_density(act_mass_prf_orb, bins[1:], halo_r200m, np.array([0]), p_rho_m)
             act_dens_prf_inf = calculate_density(act_mass_prf_inf, bins[1:], halo_r200m, np.array([0]), p_rho_m)
-            
-            print(calc_dens_prf_all / act_dens_prf_all)
-            print((calc_dens_prf_all / act_dens_prf_all)/little_h)
             
             all_prfs = [calc_dens_prf_all, act_dens_prf_all]
             orb_prfs = [calc_dens_prf_orb, act_dens_prf_orb]
@@ -452,7 +449,8 @@ with timed("Startup"):
         little_h = dic_sim["h"]
 
         p_snap_dict = {
-            "snap":p_snap,
+            "ptl_snap":p_snap,
+            "sparta_snap":p_sparta_snap,
             "red_shift":p_red_shift,
             "scale_factor": p_scale_factor,
             "hubble_const": p_hubble_constant,
@@ -487,7 +485,8 @@ with timed("Startup"):
         c_box_size = sim_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
 
     c_snap_dict = {
-        "snap":c_snap,
+        "ptl_snap":c_snap,
+        "sparta_snap":c_sparta_snap,
         "red_shift":c_red_shift,
         "scale_factor": c_scale_factor,
         "hubble_const": c_hubble_constant,

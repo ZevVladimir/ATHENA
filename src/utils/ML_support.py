@@ -40,6 +40,7 @@ snap_path = config["PATHS"]["snap_path"]
 SPARTA_output_path = config["PATHS"]["SPARTA_output_path"]
 pickled_path = config["PATHS"]["pickled_path"]
 ML_dset_path = config["PATHS"]["ML_dset_path"]
+debug_plt_path = config["PATHS"]["debug_plt_path"]
 
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
@@ -257,7 +258,7 @@ def sim_mass_p_z(sim,config_params):
         for f in grp_sim.attrs:
             dic_sim[f] = grp_sim.attrs[f]
     
-    p_snap = config_params["p_snap_info"]["snap"]
+    p_snap = config_params["p_snap_info"]["ptl_snap"]
     p_red_shift = config_params["p_red_shift"]
     
     all_red_shifts = dic_sim['snap_z']
@@ -542,12 +543,16 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, pl
         
         # Create mass profiles from the model's predictions
         calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, use_mp=True, all_z=all_z)
-
+        
         # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
         small_halo_fltr = np.isnan(calc_r200m)
         act_mass_prf_all[small_halo_fltr,:] = np.nan
         act_mass_prf_orb[small_halo_fltr,:] = np.nan
         act_mass_prf_inf[small_halo_fltr,:] = np.nan
+        
+        all_prfs = [calc_mass_prf_all, act_mass_prf_all]
+        orb_prfs = [calc_mass_prf_orb, act_mass_prf_orb]
+        inf_prfs = [calc_mass_prf_inf, act_mass_prf_inf]
 
         # Calculate the density by divide the mass of each bin by the volume of that bin's radius
         calc_dens_prf_all = calculate_density(calc_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
@@ -567,6 +572,7 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, pl
             for i,nu_split in enumerate(cpy_plt_nu_splits):
                 # Take the second element of the where to filter by the halos (?)
                 fltr = np.where((calc_nus > nu_split[0]) & (calc_nus < nu_split[1]))[0]
+                #TODO make the minimum number of halos a tunable parameter
                 if fltr.shape[0] > 25:
                     all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
                     orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))

@@ -95,7 +95,7 @@ def halo_select(sims, ptl_data):
         config_dict = load_pickle(ML_dset_path + sim + "/config.pickle")
         test_halos_ratio = config_dict["test_halos_ratio"]
         curr_z = config_dict["p_snap_info"]["red_shift"][()]
-        p_snap = config_dict["p_snap_info"]["snap"][()]
+        p_snap = config_dict["p_snap_info"]["ptl_snap"][()]
         p_box_size = config_dict["p_snap_info"]["box_size"][()]
         p_scale_factor = 1/(1+curr_z)
         
@@ -917,7 +917,7 @@ if __name__ == "__main__":
                 
         for sim in use_sims:
             config_dict = load_pickle(ML_dset_path + sim + "/config.pickle")
-            p_snap = config_dict["p_snap_info"]["snap"][()]
+            p_snap = config_dict["p_snap_info"]["ptl_snap"][()]
             curr_z = config_dict["p_snap_info"]["red_shift"][()]
             # TODO make this generalizable to when the snapshot separation isn't just 1 dynamical time as needed for mass accretion calculation
             # we can just use the secondary snap here because we already chose to do 1 dynamical time for that snap
