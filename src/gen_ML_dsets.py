@@ -449,29 +449,40 @@ with timed("Startup"):
             
             print("corresponding SPARTA snap num:", p_sparta_snap)
             print("check sparta redshift:",all_red_shifts[p_sparta_snap])   
+            
+            p_scale_factor = 1/(1+p_red_shift)
+            p_rho_m = cosmol.rho_m(p_red_shift)
+            p_hubble_const = cosmol.Hz(p_red_shift) * 0.001 # convert to units km/s/kpc
+            sim_box_size = dic_sim["box_size"] #units Mpc/h comoving
+            p_box_size = sim_box_size * 10**3 * p_scale_factor #convert to Kpc/h physical
+            little_h = dic_sim["h"]
         else:
-            p_snap = config_params["p_snap_dict"]["ptl_snap"]
-            p_red_shift = config_params["p_snap_dict"]["red_shift"]
-            p_sparta_snap = config_params["p_snap_dict"]["sparta_snap"]
+            p_snap = config_params["p_snap_info"]["ptl_snap"]
+            p_red_shift = config_params["p_snap_info"]["red_shift"]
+            p_sparta_snap = config_params["p_snap_info"]["sparta_snap"]
+            p_scale_factor = config_params["p_snap_info"]["scale_factor"]
+            p_hubble_const = config_params["p_snap_info"]["hubble_const"]
+            p_box_size = config_params["p_snap_info"]["box_size"]
+            little_h = config_params["p_snap_info"]["h"]
+            #TODO remove this once this parameters is generated for all datasets
+            if "rho_m" not in config_params.get("p_snap_info", {}):
+                p_rho_m = cosmol.rho_m(p_red_shift)
+            else:
+                p_rho_m = config_params["p_snap_info"]["rho_m"]
 
         # Set constants
         p_snap_path = snap_loc + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
-
-        p_scale_factor = 1/(1+p_red_shift)
-        p_rho_m = cosmol.rho_m(p_red_shift)
-        p_hubble_constant = cosmol.Hz(p_red_shift) * 0.001 # convert to units km/s/kpc
-        sim_box_size = dic_sim["box_size"] #units Mpc/h comoving
-        p_box_size = sim_box_size * 10**3 * p_scale_factor #convert to Kpc/h physical
-        little_h = dic_sim["h"]
+        
 
         p_snap_dict = {
             "ptl_snap":p_snap,
             "sparta_snap":p_sparta_snap,
             "red_shift":p_red_shift,
             "scale_factor": p_scale_factor,
-            "hubble_const": p_hubble_constant,
+            "hubble_const": p_hubble_const,
             "box_size": p_box_size,
-            "h":little_h
+            "h":little_h,
+            "rho_m":p_rho_m
         }
 
     if reset_lvl == 3:
@@ -501,12 +512,17 @@ with timed("Startup"):
             c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_loc=snap_loc)
             c_box_size = sim_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
         else:
-            c_snap = config_params["c_snap_dict"]["ptl_snap"]
-            c_sparta_snap = config_params["c_snap_dict"]["sparta_snap"]
-            c_red_shift = config_params["c_snap_dict"]["red_shift"]
-            c_scale_factor = config_params["c_snap_dict"]["scale_factor"]
-            c_hubble_const = config_params["c_snap_dict"]["hubble_const"]
-            c_box_size = config_params["c_snap_dict"]["box_size"]
+            c_snap = config_params["c_snap_info"]["ptl_snap"]
+            c_sparta_snap = config_params["c_snap_info"]["sparta_snap"]
+            c_red_shift = config_params["c_snap_info"]["red_shift"]
+            c_scale_factor = config_params["c_snap_info"]["scale_factor"]
+            c_hubble_const = config_params["c_snap_info"]["hubble_const"]
+            c_box_size = config_params["c_snap_info"]["box_size"]
+            #TODO remove this once this parameters is generated for all datasets
+            if "rho_m" not in config_params.get("c_snap_info", {}):
+                c_rho_m = cosmol.rho_m(c_red_shift)
+            else:
+                c_rho_m = config_params["c_snap_info"]["rho_m"]
         
         c_snap_path = snap_loc + "/snapdir_" + snap_dir_format.format(c_snap) + "/snapshot_" + snap_format.format(c_snap)
         
@@ -534,7 +550,8 @@ with timed("Startup"):
         "scale_factor": c_scale_factor,
         "hubble_const": c_hubble_constant,
         "box_size": c_box_size,
-        "h":little_h
+        "h":little_h,
+        "rho_m":c_rho_m
     }
 
     snapshot_list = [p_snap, c_snap]
