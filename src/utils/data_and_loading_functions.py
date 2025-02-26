@@ -212,7 +212,7 @@ def conv_halo_id_spid(my_halo_ids, sdata, snapshot):
         sparta_idx[i] = int(np.where(my_id == sdata['halos']['id'][:,snapshot])[0])
     return sparta_idx
 
-def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red_shifts, snap_dir_format, snap_format, snap_loc, sparta_HDF5_path):
+def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red_shifts, snap_dir_format, snap_format, snap_loc):
     # calculate one dynamical time ago and set that as the comparison snap
     curr_time = cosmol.age(p_red_shift)
     past_time = curr_time - (t_dyn_step * t_dyn)
@@ -234,25 +234,8 @@ def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red
     # c_box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
     # c_box_size = c_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
     # c_box_size = c_box_size + 0.001 # NEED TO MAKE WORK FOR PARTICLES ON THE VERY EDGE
-    
-    if reset_lvl == 3:
-        clean_dir(pickled_path + str(c_snap) + "_" + curr_sparta_file + "/")
-    # load particle data and SPARTA data for the comparison snap
-    with timed("c_snap ptl load"):
-        c_ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(c_snap), c_snap_path) 
-        c_ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(c_snap), c_snap_path) # km/s
-        c_ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(c_snap), c_snap_path) * 10**3 * c_scale_factor # kpc/h
-    with timed("c_snap SPARTA load"):
-        param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"]]
-            
-        c_sparta_params, c_sparta_param_names = load_SPARTA_data(sparta_HDF5_path, param_paths, curr_sparta_file, c_snap)
-        c_halos_pos = c_sparta_params[c_sparta_param_names[0]][:,c_sparta_snap,:] * 10**3 * c_scale_factor # convert to kpc/h
-        c_halos_r200m = c_sparta_params[c_sparta_param_names[1]][:,c_sparta_snap]
-        c_halos_ids = c_sparta_params[c_sparta_param_names[2]][:,c_sparta_snap]
-        c_halos_status = c_sparta_params[c_sparta_param_names[3]][:,c_sparta_snap]
-        c_halos_last_snap = c_sparta_params[c_sparta_param_names[4]][:]
 
-    return c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_ptls_pid, c_ptls_vel, c_ptls_pos, c_halos_pos, c_halos_r200m, c_halos_ids, c_halos_status, c_halos_last_snap
+    return c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant
 
 def split_orb_inf(data, labels):
     infall = data[np.where(labels == 0)[0]]

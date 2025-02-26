@@ -122,6 +122,7 @@ def print_model_prop(model_dict, indent=''):
             print(f"{indent}{key}: {value}")
 
 # From the input simulation name extract the simulation name (ex: cbol_l0063_n0256) and the SPARTA hdf5 output name (ex: cbol_l0063_n0256_4r200m_1-5v200m)
+#TODO rename the function and the returns and comment what they look like clearly
 def split_calc_name(sim):
     sim_pat = r"cbol_l(\d+)_n(\d+)"
     match = re.search(sim_pat, sim)

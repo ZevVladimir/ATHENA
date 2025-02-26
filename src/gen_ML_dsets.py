@@ -13,7 +13,7 @@ import psutil
 import json
 from sparta_tools import sparta 
 
-from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir
+from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir, load_pickle, save_pickle
 from utils.calculation_functions import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn, create_mass_prf, calculate_density
 from utils.update_vis_fxns import compare_prfs
 ##################################################################################################################
@@ -23,6 +23,7 @@ config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
 
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
+known_snaps = json.loads(config.get("MISC","known_snaps"))
 snap_path = config["PATHS"]["snap_path"]
 SPARTA_output_path = config["PATHS"]["SPARTA_output_path"]
 pickled_path = config["PATHS"]["pickled_path"]
@@ -138,7 +139,7 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
                  halo_pos, halo_vel, halo_r200m, sparta_last_pericenter_snap=None, sparta_n_pericenter=None, sparta_tracer_ids=None,
                  sparta_n_is_lower_limit=None, act_mass_prf_all=None, act_mass_prf_orb=None, curr_halo_num=None, bins=None, create_dens_prf=False):
     # Doing this this way as otherwise will have to generate super large arrays for input from multiprocessing
-    snap = snap_dict["p_sparta_snap"]
+    snap = snap_dict["sparta_snap"]
     red_shift = snap_dict["red_shift"]
     scale_factor = snap_dict["scale_factor"]
     hubble_const = snap_dict["hubble_const"]
@@ -423,20 +424,35 @@ with timed("Startup"):
         cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
     else:
         cosmol = cosmology.setCosmology(sim_cosmol) 
+    
+    if reset_lvl <= 1 and len(known_snaps) > 0:
+        if prim_snap_only:
+            save_location =  ML_dset_path + curr_sparta_file + "_" + str(known_snaps[0]) + "/"
+        else:
+            save_location =  ML_dset_path + curr_sparta_file + "_" + str(known_snaps[0]) + "to" + str(known_snaps[1]) + "/"
+        config_params = load_pickle(save_location+"config.pickle")
+        #TODO implement check that known_snaps correspond to what is stored in the config file
 
     with timed("p_snap information load"):
-        p_snap, p_red_shift = find_closest_z(p_red_shift,snap_loc,snap_dir_format,snap_format)
-        print("Snapshot number found:", p_snap, "Closest redshift found:", p_red_shift)
-        with h5py.File(sparta_HDF5_path,"r") as f:
-            dic_sim = {}
-            grp_sim = f['simulation']
-            for f in grp_sim.attrs:
-                dic_sim[f] = grp_sim.attrs[f]
+        if reset_lvl > 1:
+            p_snap, p_red_shift = find_closest_z(p_red_shift,snap_loc,snap_dir_format,snap_format)
+            print("Snapshot number found:", p_snap, "Closest redshift found:", p_red_shift)
             
-        all_red_shifts = dic_sim['snap_z']
-        p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
-        print("corresponding SPARTA snap num:", p_sparta_snap)
-        print("check sparta redshift:",all_red_shifts[p_sparta_snap])   
+            with h5py.File(sparta_HDF5_path,"r") as f:
+                dic_sim = {}
+                grp_sim = f['simulation']
+                for f in grp_sim.attrs:
+                    dic_sim[f] = grp_sim.attrs[f]
+                
+            all_red_shifts = dic_sim['snap_z']
+            p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
+            
+            print("corresponding SPARTA snap num:", p_sparta_snap)
+            print("check sparta redshift:",all_red_shifts[p_sparta_snap])   
+        else:
+            p_snap = config_params["p_snap_dict"]["ptl_snap"]
+            p_red_shift = config_params["p_snap_dict"]["red_shift"]
+            p_sparta_snap = config_params["p_snap_dict"]["sparta_snap"]
 
         # Set constants
         p_snap_path = snap_loc + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
@@ -480,9 +496,36 @@ with timed("Startup"):
         mass = p_sparta_params[p_sparta_param_names[5]]
         
     with timed("c_snap load"):
-        t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], p_red_shift)
-        c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant, c_ptls_pid, c_ptls_vel, c_ptls_pos, c_halos_pos, c_halos_r200m, c_halos_id, c_halos_status, c_halos_last_snap = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_loc=snap_loc,sparta_HDF5_path=sparta_HDF5_path)
-        c_box_size = sim_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
+        if reset_lvl > 1:
+            t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], p_red_shift)
+            c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_loc=snap_loc)
+            c_box_size = sim_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
+        else:
+            c_snap = config_params["c_snap_dict"]["ptl_snap"]
+            c_sparta_snap = config_params["c_snap_dict"]["sparta_snap"]
+            c_red_shift = config_params["c_snap_dict"]["red_shift"]
+            c_scale_factor = config_params["c_snap_dict"]["scale_factor"]
+            c_hubble_const = config_params["c_snap_dict"]["hubble_const"]
+            c_box_size = config_params["c_snap_dict"]["box_size"]
+        
+        c_snap_path = snap_loc + "/snapdir_" + snap_dir_format.format(c_snap) + "/snapshot_" + snap_format.format(c_snap)
+        
+        if reset_lvl == 3:
+            clean_dir(pickled_path + str(c_snap) + "_" + curr_sparta_file + "/")
+        # load particle data and SPARTA data for the comparison snap
+        with timed("c_snap ptl load"):
+            c_ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(c_snap), c_snap_path) 
+            c_ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(c_snap), c_snap_path) # km/s
+            c_ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(c_snap), c_snap_path) * 10**3 * c_scale_factor # kpc/h
+        with timed("c_snap SPARTA load"):
+            param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"]]
+                
+            c_sparta_params, c_sparta_param_names = load_SPARTA_data(sparta_HDF5_path, param_paths, curr_sparta_file, c_snap)
+            c_halos_pos = c_sparta_params[c_sparta_param_names[0]][:,c_sparta_snap,:] * 10**3 * c_scale_factor # convert to kpc/h
+            c_halos_r200m = c_sparta_params[c_sparta_param_names[1]][:,c_sparta_snap]
+            c_halos_ids = c_sparta_params[c_sparta_param_names[2]][:,c_sparta_snap]
+            c_halos_status = c_sparta_params[c_sparta_param_names[3]][:,c_sparta_snap]
+            c_halos_last_snap = c_sparta_params[c_sparta_param_names[4]][:]
 
     c_snap_dict = {
         "ptl_snap":c_snap,
@@ -579,26 +622,25 @@ with timed("Startup"):
     print(f"Total num halos: {total_num_halos:.3e}")
     print(f"Total num ptls: {tot_num_ptls:.3e}")
 
-    #TODO add functionality to check if all the params are the same and then restart (and throw warning) or maybe just reload them if restart=0
-    config_params = {
-        "sparta_file": curr_sparta_file,
-        "snap_dir_format":snap_dir_format,
-        "snap_format": snap_format,
-        "prim_only": prim_snap_only,
-        "t_dyn_step": t_dyn_step,
-        "p_red_shift":p_red_shift,
-        "search_rad": search_radius,
-        "total_num_snaps": total_num_snaps,
-        "test_halos_ratio": test_halos_ratio,
-        "chunk_size": curr_chunk_size,
-        "HDF5 Mem Size": save_mem_size,
-        "p_snap_info": p_snap_dict,
-        "c_snap_info": c_snap_dict,
-    }
+    if reset_lvl > 1:
+        config_params = {
+            "sparta_file": curr_sparta_file,
+            "snap_dir_format":snap_dir_format,
+            "snap_format": snap_format,
+            "prim_only": prim_snap_only,
+            "t_dyn_step": t_dyn_step,
+            "p_red_shift":p_red_shift,
+            "search_rad": search_radius,
+            "total_num_snaps": total_num_snaps,
+            "test_halos_ratio": test_halos_ratio,
+            "chunk_size": curr_chunk_size,
+            "HDF5 Mem Size": save_mem_size,
+            "p_snap_info": p_snap_dict,
+            "c_snap_info": c_snap_dict,
+        }
 
-    with open((save_location + "config.pickle"), 'wb') as f:
-        pickle.dump(config_params,f)
-        
+        save_pickle(config_params,save_location+"config.pickle")
+    
     create_directory(save_location + "Train/halo_info/")
     create_directory(save_location + "Train/ptl_info/")
     create_directory(save_location + "Test/halo_info/")
