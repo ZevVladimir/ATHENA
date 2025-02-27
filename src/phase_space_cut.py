@@ -22,7 +22,7 @@ from sparta_tools import sparta
 
 from utils.calculation_functions import create_stack_mass_prf, filter_prf, calculate_density, calc_mass_acc_rate
 from utils.update_vis_fxns import compare_split_prfs, plot_full_ptl_dist, plot_prim_ptl_dist
-from utils.ML_support import load_data, get_CUDA_cluster, get_combined_name, reform_dataset_dfs, parse_ranges, create_nu_string, load_sprta_mass_prf, split_calc_name, sim_mass_p_z
+from utils.ML_support import load_data, get_CUDA_cluster, get_combined_name, reform_dataset_dfs, parse_ranges, create_nu_string, load_sparta_mass_prf, split_calc_name, sim_mass_p_z
 from utils.data_and_loading_functions import create_directory, timed, load_pickle, load_SPARTA_data, conv_halo_id_spid
 
 import configparser
@@ -872,7 +872,7 @@ if __name__ == "__main__":
         min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
 
         # Get SPARTA's mass profiles
-        act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sprta_mass_prf(sim_splits,all_idxs,use_sims)
+        act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sparta_mass_prf(sim_splits,all_idxs,use_sims)
         act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
 
         # Create mass profiles from the model's predictions

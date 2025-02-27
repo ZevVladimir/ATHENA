@@ -161,16 +161,14 @@ def search_halos(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_po
         curr_orb_assn = np.zeros((num_new_ptls))
          # Anywhere sparta_last_pericenter is greater than the current snap then that is in the future so set to 0
         future_peri = np.where(sparta_last_pericenter_snap > snap)[0]
-        adj_sparta_n_pericenter = sparta_n_pericenter
-        adj_sparta_n_pericenter[future_peri] = 0
-        adj_sparta_n_is_lower_limit = sparta_n_is_lower_limit
-        adj_sparta_n_is_lower_limit[future_peri] = 0
+        sparta_n_pericenter[future_peri] = 0
+        sparta_n_is_lower_limit[future_peri] = 0
         # If a particle has a pericenter or if the lower limit is 1 then it is orbiting
 
-        compare_sparta_assn[np.where((adj_sparta_n_pericenter >= 1) | (adj_sparta_n_is_lower_limit == 1))[0]] = 1
+        compare_sparta_assn[np.where((sparta_n_pericenter >= 1) | (sparta_n_is_lower_limit == 1))[0]] = 1
         # compare_sparta_assn[np.where(adj_sparta_n_pericenter >= 1)] = 1
         
-        # Compare the ids between SPARTA and the found prtl ids and match the SPARTA results
+        # Compare the ids between SPARTA and the found ptl ids and match the SPARTA results
         matched_ids = np.intersect1d(curr_ptl_pids, sparta_tracer_ids, return_indices = True)
         curr_orb_assn[matched_ids[1]] = compare_sparta_assn[matched_ids[2]]
 
@@ -239,9 +237,6 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
             
             # Load the halo information for the ids within this range
             sparta_output = sparta.load(filename = sparta_HDF5_path, halo_ids=use_halo_ids, log_level=0)
-
-            global c_sparta_snap
-            c_sparta_snap = np.abs(dic_sim["snap_z"][:] - c_red_shift).argmin()
             
             new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta re-sort the indices
             use_halo_idxs = use_indices[new_idxs]
@@ -434,7 +429,7 @@ with timed("Startup"):
         #TODO implement check that known_snaps correspond to what is stored in the config file
 
     with timed("p_snap information load"):
-        if reset_lvl > 1:
+        if reset_lvl > 1 or len(known_snaps) == 0:
             p_snap, p_red_shift = find_closest_z(p_red_shift,snap_loc,snap_dir_format,snap_format)
             print("Snapshot number found:", p_snap, "Closest redshift found:", p_red_shift)
             
@@ -509,7 +504,7 @@ with timed("Startup"):
     with timed("c_snap load"):
         if reset_lvl > 1:
             t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], p_red_shift)
-            c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_loc=snap_loc)
+            c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_const = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_loc=snap_loc)
             c_box_size = sim_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
         else:
             c_snap = config_params["c_snap_info"]["ptl_snap"]
@@ -548,7 +543,7 @@ with timed("Startup"):
         "sparta_snap":c_sparta_snap,
         "red_shift":c_red_shift,
         "scale_factor": c_scale_factor,
-        "hubble_const": c_hubble_constant,
+        "hubble_const": c_hubble_const,
         "box_size": c_box_size,
         "h":little_h,
         "rho_m":c_rho_m

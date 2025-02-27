@@ -421,7 +421,7 @@ def load_data(client, sims, dset_name, bin_edges = None, limit_files = False, sc
         return all_dask_dfs,act_scale_pos_weight
 
 # Reconstruct SPARTA's mass profiles and stack them together for a list of sims
-def load_sprta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):                
+def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):                
     mass_prf_all_list = []
     mass_prf_1halo_list = []
     all_r200m_list = []
@@ -434,7 +434,6 @@ def load_sprta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         else:
             use_idxs = all_idxs[sim_splits[i]:]
         
-        
         sparta_name, sparta_search_name = split_calc_name(sim)
         # find the snapshots for this simulation
         snap_pat = r"(\d+)to(\d+)"
@@ -443,26 +442,11 @@ def load_sprta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
             curr_snap_list = [match.group(1), match.group(2)] 
         
         with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
-            config_dict = pickle.load(file)
+            config_params = pickle.load(file)
             
-            curr_z = config_dict["p_snap_info"]["red_shift"][()]
-            curr_snap_dir_format = config_dict["snap_dir_format"]
-            curr_snap_format = config_dict["snap_format"]
-            new_p_snap, curr_z = find_closest_z(curr_z,snap_path + sparta_name + "/",curr_snap_dir_format,curr_snap_format)
-            p_scale_factor = 1/(1+curr_z)
+        p_sparta_snap = config_params["p_snap_info"]["sparta_snap"]
         
-        curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
-        
-        with h5py.File(curr_sparta_HDF5_path,"r") as f:
-            dic_sim = {}
-            grp_sim = f['simulation']
-
-            for attr in grp_sim.attrs:
-                dic_sim[attr] = grp_sim.attrs[attr]
-        
-        all_red_shifts = dic_sim['snap_z']
-        p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
-        
+        curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"      
         
         param_paths = [["halos","id"],["simulation","particle_mass"]]
         sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, curr_snap_list[0])
@@ -539,7 +523,7 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, pl
         min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
         
         # Get SPARTA's mass profiles
-        act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sprta_mass_prf(sim_splits,all_idxs,use_sims)
+        act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sparta_mass_prf(sim_splits,all_idxs,use_sims)
         act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
         
         # Create mass profiles from the model's predictions
@@ -649,7 +633,7 @@ def dens_prf_loss(halo_ddf,use_sims,radii,labels,use_orb_prf,use_inf_prf):
             else:
                 halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
                
-    sparta_mass_prf_all,sparta_mass_prf_orb,all_masses,bins = load_sprta_mass_prf(sim_splits,all_idxs,use_sims)
+    sparta_mass_prf_all,sparta_mass_prf_orb,all_masses,bins = load_sparta_mass_prf(sim_splits,all_idxs,use_sims)
     sparta_mass_prf_inf = sparta_mass_prf_all - sparta_mass_prf_orb
     sparta_mass_prf_orb = np.sum(sparta_mass_prf_orb,axis=0)
     sparta_mass_prf_inf = np.sum(sparta_mass_prf_inf,axis=0)
