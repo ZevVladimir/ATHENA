@@ -97,7 +97,7 @@ def halo_select(sims, ptl_data):
         curr_z = config_dict["p_snap_info"]["red_shift"][()]
         p_snap = config_dict["p_snap_info"]["ptl_snap"][()]
         p_box_size = config_dict["p_snap_info"]["box_size"][()]
-        p_scale_factor = 1/(1+curr_z)
+        p_scale_factor = config_dict["p_snap_info"]["scale_factor"][()]
         
         # ptl_mass, use_z = sim_mass_p_z(sim,config_dict)
         
@@ -128,16 +128,9 @@ def halo_select(sims, ptl_data):
         
         curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
         
-        with h5py.File(curr_sparta_HDF5_path,"r") as f:
-            dic_sim = {}
-            grp_sim = f['simulation']
+        config_dict = load_pickle(ML_dset_path + sim + "/config.pickle")
+        p_sparta_snap = config_dict["p_snap_info"]["sparta_snap"][()]
 
-            for attr in grp_sim.attrs:
-                dic_sim[attr] = grp_sim.attrs[attr]
-
-        all_red_shifts = dic_sim['snap_z']
-        p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
-                
         # Load the halo's positions and radii
         param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"],["simulation","particle_mass"]]
         sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, p_snap)
@@ -922,21 +915,12 @@ if __name__ == "__main__":
             # TODO make this generalizable to when the snapshot separation isn't just 1 dynamical time as needed for mass accretion calculation
             # we can just use the secondary snap here because we already chose to do 1 dynamical time for that snap
             past_z = config_dict["c_snap_info"]["red_shift"][()] 
+            p_sparta_snap = config_dict["p_snap_info"]["sparta_snap"][()]
+            c_sparta_snap = config_dict["c_snap_info"]["sparta_snap"][()]
             
             sparta_name, sparta_search_name = split_calc_name(sim)
             
             curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
-            
-            with h5py.File(curr_sparta_HDF5_path,"r") as f:
-                dic_sim = {}
-                grp_sim = f['simulation']
-
-                for attr in grp_sim.attrs:
-                    dic_sim[attr] = grp_sim.attrs[attr]
-            
-            all_red_shifts = dic_sim['snap_z']
-            p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
-            c_sparta_snap = np.abs(all_red_shifts - past_z).argmin()
                     
             # Load the halo's positions and radii
             param_paths = [["halos","R200m"],["halos","id"]]

@@ -261,18 +261,14 @@ def sim_mass_p_z(sim,config_params):
     
     p_snap = config_params["p_snap_info"]["ptl_snap"]
     p_red_shift = config_params["p_red_shift"]
-    
-    all_red_shifts = dic_sim['snap_z']
-    p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
-    use_z = all_red_shifts[p_sparta_snap]
-    p_snap_loc = get_pickle_path_for_sim(sim)
+    p_sparta_snap = config_params["p_snap_info"]["sparta_snap"][()]
     
     param_paths = [["simulation","particle_mass"]]
             
     sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, p_snap)
     ptl_mass = sparta_params[sparta_param_names[0]]
     
-    return ptl_mass, use_z
+    return ptl_mass, p_red_shift
 
 # Split a dataframe so that each one is below an inputted maximum memory size
 def split_dataframe(df, max_size, weights=None, use_weights = False):

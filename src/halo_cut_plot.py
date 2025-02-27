@@ -75,21 +75,10 @@ with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
     curr_z = config_dict["p_snap_info"]["red_shift"][()]
     curr_snap_dir_format = config_dict["snap_dir_format"]
     curr_snap_format = config_dict["snap_format"]
-    p_scale_factor = 1/(1+curr_z)
+    p_scale_factor = config_dict["p_snap_info"]["scale_factor"][()]
+    p_sparta_snap = config_dict["p_snap_info"]["sparta_snap"]
     
 curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
-
-with h5py.File(curr_sparta_HDF5_path,"r") as f:
-    dic_sim = {}
-    grp_sim = f['simulation']
-
-    for attr in grp_sim.attrs:
-        dic_sim[attr] = grp_sim.attrs[attr]
-
-all_red_shifts = dic_sim['snap_z']
-p_sparta_snap = np.abs(all_red_shifts - curr_z).argmin()
-
-
 
 param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"],["simulation","particle_mass"]]
 sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, curr_sparta_file, p_snap)
