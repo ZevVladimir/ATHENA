@@ -524,7 +524,7 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, pl
         
         # Create mass profiles from the model's predictions
         calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, use_mp=True, all_z=all_z)
-        
+        my_mass_prf_all, my_mass_prf_orb, my_mass_prf_inf, my_nus, my_r200m = create_stack_mass_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=y.compute().values.flatten(), prf_bins=bins, use_mp=True, all_z=all_z)
         # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
         small_halo_fltr = np.isnan(calc_r200m)
         act_mass_prf_all[small_halo_fltr,:] = np.nan
@@ -543,6 +543,31 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, pl
         act_dens_prf_all = calculate_density(act_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
         act_dens_prf_orb = calculate_density(act_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
         act_dens_prf_inf = calculate_density(act_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+        
+        my_dens_prf_all = calculate_density(my_mass_prf_all*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
+        my_dens_prf_orb = calculate_density(my_mass_prf_orb*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
+        my_dens_prf_inf = calculate_density(my_mass_prf_inf*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
+        
+        ratio = np.where(act_dens_prf_all != 0, calc_dens_prf_all / act_dens_prf_all, np.nan)
+
+        # Compute the difference for each halo (using range: max - min)
+        diff = np.nanmax(ratio, axis=1) - np.nanmin(ratio, axis=1)
+
+        # If you want the top k halos with the largest differences, use:
+        k = 5  # Example value
+        big_halo_loc = np.argsort(diff)[-k:]
+        
+        for i in range(k):
+            all_prfs = [my_mass_prf_all[big_halo_loc[i]], act_mass_prf_all[big_halo_loc[i]]]
+            orb_prfs = [my_mass_prf_orb[big_halo_loc[i]], act_mass_prf_orb[big_halo_loc[i]]]
+            inf_prfs = [my_mass_prf_inf[big_halo_loc[i]], act_mass_prf_inf[big_halo_loc[i]]]
+            compare_prfs(all_prfs,orb_prfs,inf_prfs,bins[1:],lin_rticks,debug_plt_path,sim + "_" + str(i)+"_mass",prf_func=None)
+
+        for i in range(k):
+            all_prfs = [my_dens_prf_all[big_halo_loc[i]], act_dens_prf_all[big_halo_loc[i]]]
+            orb_prfs = [my_dens_prf_orb[big_halo_loc[i]], act_dens_prf_orb[big_halo_loc[i]]]
+            inf_prfs = [my_dens_prf_inf[big_halo_loc[i]], act_dens_prf_inf[big_halo_loc[i]]]
+            compare_prfs(all_prfs,orb_prfs,inf_prfs,bins[1:],lin_rticks,debug_plt_path,sim + "_" + str(i)+"_dens",prf_func=None)
 
         # If we want the density profiles to only consist of halos of a specific peak height (nu) bin 
         if split_nu:

@@ -634,25 +634,25 @@ with timed("Startup"):
     print(f"Total num halos: {total_num_halos:.3e}")
     print(f"Total num ptls: {tot_num_ptls:.3e}")
 
-    if reset_lvl > 1:
-        config_params = {
-            "sparta_file": curr_sparta_file,
-            "snap_dir_format":snap_dir_format,
-            "snap_format": snap_format,
-            "prim_only": prim_snap_only,
-            "t_dyn_step": t_dyn_step,
-            "p_red_shift":p_red_shift,
-            "search_rad": search_radius,
-            "total_num_snaps": total_num_snaps,
-            "test_halos_ratio": test_halos_ratio,
-            "chunk_size": curr_chunk_size,
-            "HDF5 Mem Size": save_mem_size,
-            "p_snap_info": p_snap_dict,
-            "c_snap_info": c_snap_dict,
-        }
-
-        save_pickle(config_params,save_location+"config.pickle")
     
+    config_params = {
+        "sparta_file": curr_sparta_file,
+        "snap_dir_format":snap_dir_format,
+        "snap_format": snap_format,
+        "prim_only": prim_snap_only,
+        "t_dyn_step": t_dyn_step,
+        "p_red_shift":p_red_shift,
+        "search_rad": search_radius,
+        "total_num_snaps": total_num_snaps,
+        "test_halos_ratio": test_halos_ratio,
+        "chunk_size": curr_chunk_size,
+        "HDF5 Mem Size": save_mem_size,
+        "p_snap_info": p_snap_dict,
+        "c_snap_info": c_snap_dict,
+    }
+
+    save_pickle(config_params,save_location+"config.pickle")
+
     create_directory(save_location + "Train/halo_info/")
     create_directory(save_location + "Train/ptl_info/")
     create_directory(save_location + "Test/halo_info/")

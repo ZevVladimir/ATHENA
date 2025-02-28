@@ -1157,7 +1157,7 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
 
         ax_1.set_xticks(tick_locs,strng_ticks)  
         ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
-        
+        fig.suptitle(title)
         fig.savefig(save_location + title + "prfl_rat.png",bbox_inches='tight')
         
 # Profiles should be a list of lists where each list consists of [calc_prf,act_prf] for each split
