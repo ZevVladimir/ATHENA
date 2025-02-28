@@ -502,7 +502,7 @@ with timed("Startup"):
         mass = p_sparta_params[p_sparta_param_names[5]]
         
     with timed("c_snap load"):
-        if reset_lvl > 1:
+        if reset_lvl > 1 or len(known_snaps) == 0:
             t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], p_red_shift)
             c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_const = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_loc=snap_loc)
             c_box_size = sim_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
