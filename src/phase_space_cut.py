@@ -499,15 +499,51 @@ if __name__ == "__main__":
     title_fntsize = 18
     legend_fntsize = 14
 
-    with timed("SPARTA orb KE Dist plot"):
-        fig, axes = plt.subplots(2, 2, figsize=(14, 12))
-        axes = axes.flatten()
+    with timed("SPARTA KE Dist plot"):
+        magma_cmap = plt.get_cmap("magma")
+        magma_cmap.set_under(color='black')
+        magma_cmap.set_bad(color='black') 
+        
+        widths = [4,4,4,4,.5]
+        heights = [0.15,4,4]
+        fig = plt.figure(constrained_layout=True, figsize=(28,12))
+        gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
+
+        
         fig.suptitle(
-            r"Kinetic energy distribution of SPARTA's ORBITING particles around halos at $z=0$""\nSimulation: Bolshoi 1000Mpc",fontsize=16)
+            r"Kinetic Energy Distribution of Particles Around Largest Halos at $z=0.03$""\nSimulation: Bolshoi 1000Mpc",fontsize=16)
+        
+        ax1 = fig.add_subplot(gs[0,0])
+        ax2 = fig.add_subplot(gs[0,1])
+        ax3 = fig.add_subplot(gs[0,2])
+        ax4 = fig.add_subplot(gs[0,3])
+        ax5 = fig.add_subplot(gs[1,0])
+        ax6 = fig.add_subplot(gs[1,1])
+        ax7 = fig.add_subplot(gs[1,2])
+        ax8 = fig.add_subplot(gs[1,3])
+        
+        axes = [ax1,ax2,ax3,ax4,ax5,ax6,ax7,ax8]
+        
+        ax1.set_ylabel(r'$\ln(v^2/v_{200m}^2)$',fontsize=16)
+        ax5.set_ylabel(r'$\ln(v^2/v_{200m}^2)$',fontsize=16)
+        ax5.set_xlabel(r'$r/R_{200m}$',fontsize=16)
+        ax6.set_xlabel(r'$r/R_{200m}$',fontsize=16)
+        ax7.set_xlabel(r'$r/R_{200m}$',fontsize=16)
+        ax8.set_xlabel(r'$r/R_{200m}$',fontsize=16)
+        
+        ax1.tick_params('x', labelbottom=False,colors="white",direction="in")
+        ax2.tick_params('x', labelbottom=False,colors="white",direction="in")
+        ax2.tick_params('y', labelleft=False,colors="white",direction="in")
+        ax3.tick_params('x', labelbottom=False,colors="white",direction="in")
+        ax3.tick_params('y', labelleft=False,colors="white",direction="in")
+        ax4.tick_params('x', labelbottom=False,colors="white",direction="in")
+        ax4.tick_params('y', labelleft=False,colors="white",direction="in")
+        ax6.tick_params('y', labelleft=False,colors="white",direction="in")
+        ax7.tick_params('y', labelleft=False,colors="white",direction="in")
+        ax8.tick_params('y', labelleft=False,colors="white",direction="in")
+
         
         for ax in axes:
-            ax.set_xlabel(r'$r/R_{200m}$',fontsize=16)
-            ax.set_ylabel(r'$\ln(v^2/v_{200m}^2)$',fontsize=16)
             ax.set_xlim(0, 2)
             ax.set_ylim(-2, 2.5)
             ax.text(0.25, -1.4, "Orbiting", fontsize=16, color="r",
@@ -517,127 +553,83 @@ if __name__ == "__main__":
             ax.tick_params(axis='both',which='both',direction="in",labelsize=12,length=8,width=2)
 
         plt.sca(axes[0])
-        plt.title(r'$v_r > 0$',fontsize=title_fntsize)
+        plt.title(r'$Orbiting Particles: v_r > 0$',fontsize=title_fntsize)
         plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
-                    cmap="magma", range=(x_range, y_range))
+                    cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y12, lw=2.0, color="g",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-        plt.colorbar(label=r'$N$ (Counts)')
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
 
         plt.sca(axes[1])
-        plt.title(r'$v_r < 0$',fontsize=title_fntsize)
+        plt.title(r'$Orbiting Particles: v_r < 0$',fontsize=title_fntsize)
         plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
-                    cmap="magma", range=(x_range, y_range))
+                    cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="g",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-        plt.colorbar(label=r'$N$ (Counts)')
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
         
         plt.sca(axes[2])
-        plt.title(r'$v_r > 0$',fontsize=title_fntsize)
-        plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
-                    cmap="magma", range=(x_range, y_range))
-        plt.plot(x, y12, lw=2.0, color="g",
-                label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-        plt.colorbar(label=r'$N$ (Counts)')
-        plt.legend(loc="upper right",fontsize=legend_fntsize)
-        plt.xlim(0, 2)
-
-        plt.sca(axes[3])
-        plt.title(r'$v_r < 0$')
-        plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
-                    cmap="magma", range=(x_range, y_range))
-        plt.plot(x, y22, lw=2.0, color="g",
-                label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-        plt.colorbar(label=r'$N$ (Counts)')
-        plt.legend(loc="upper right",fontsize=legend_fntsize)
-        plt.xlim(0, 2)
-        
-        plt.tight_layout();
-        plt.savefig(plot_loc + "sparta_orb_KE_dist_cut.png")
-   
-    with timed("SPARTA inf KE Dist plot"):
-        fig, axes = plt.subplots(2, 2, figsize=(14, 12))
-        axes = axes.flatten()
-        fig.suptitle(
-            r"Kinetic energy distribution of SPARTA's INFALLING particles around halos at $z=0$""\nSimulation: Bolshoi 1000Mpc",fontsize=16)
-
-        hist1, xedges, yedges = np.histogram2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, range=(x_range, y_range))
-        hist2, _, _ = np.histogram2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, range=(x_range, y_range))
-        hist3, _, _ = np.histogram2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, range=(x_range, y_range))
-        hist4, _, _ = np.histogram2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, range=(x_range, y_range))
-
-        # Combine the histograms to determine the maximum density for consistent color scaling
-        combined_hist = np.maximum.reduce([hist1, hist2, hist3, hist4])
-        vmax=combined_hist.max()
-        
-        lin_vmin = 0
-        log_vmin = 1
-        
-        for ax in axes:
-            ax.set_xlabel(r'$r/R_{200m}$',fontsize=16)
-            ax.set_ylabel(r'$\ln(v^2/v_{200m}^2)$',fontsize=16)
-            ax.set_xlim(0, 2)
-            ax.set_ylim(-2, 2.5)
-            ax.text(0.25, -1.4, "Orbiting", fontsize=16, color="r",
-                    weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-            ax.text(1.5, 0.7, "Infalling", fontsize=16, color="b",
-                    weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-            ax.tick_params(axis='both',which='both',direction="in",labelsize=12,length=8,width=2)
-
-        plt.sca(axes[0])
-        plt.title(r'$v_r > 0$',fontsize=title_fntsize)
+        plt.title(r'Infalling Particles: $v_r > 0$',fontsize=title_fntsize)
         plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
-                    cmap="magma", range=(x_range, y_range))
+                    cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y12, lw=2.0, color="g",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-        plt.colorbar(label=r'$N$ (Counts)')
-        plt.legend(loc="upper right",fontsize=legend_fntsize)
-        plt.xlim(0, 2)
-
-        plt.sca(axes[1])
-        plt.title(r'$v_r < 0$',fontsize=title_fntsize)
-        plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
-                    cmap="magma", range=(x_range, y_range))
-        plt.plot(x, y22, lw=2.0, color="g",
-                label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-        plt.colorbar(label=r'$N$ (Counts)')
-        plt.legend(loc="upper right",fontsize=legend_fntsize)
-        plt.xlim(0, 2)
-        
-        plt.sca(axes[2])
-        plt.title(r'$v_r > 0$',fontsize=title_fntsize)
-        plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
-                    cmap="magma", range=(x_range, y_range))
-        plt.plot(x, y12, lw=2.0, color="g",
-                label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-        plt.colorbar(label=r'$N$ (Counts)')
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
 
         plt.sca(axes[3])
-        plt.title(r'$v_r < 0$')
-        plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
-                    cmap="magma", range=(x_range, y_range))
+        plt.title(r'$Infalling Particles: v_r < 0$',fontsize=title_fntsize)
+        plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
+                    cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="g",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-        plt.colorbar(label=r'$N$ (Counts)')
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.xlim(0, 2)
+        
+        plt.sca(axes[4])
+        plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
+                    cmap=magma_cmap, range=(x_range, y_range))
+        plt.plot(x, y12, lw=2.0, color="g",
+                label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.xlim(0, 2)
+
+        plt.sca(axes[5])
+        plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
+                    cmap=magma_cmap, range=(x_range, y_range))
+        plt.plot(x, y22, lw=2.0, color="g",
+                label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.xlim(0, 2)
+
+        plt.sca(axes[6])
+        plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
+                    cmap=magma_cmap, range=(x_range, y_range))
+        plt.plot(x, y12, lw=2.0, color="g",
+                label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.xlim(0, 2)
+
+        plt.sca(axes[7])
+        plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
+                    cmap=magma_cmap, range=(x_range, y_range))
+        plt.plot(x, y22, lw=2.0, color="g",
+                label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
         
         plt.tight_layout();
-        plt.savefig(plot_loc + "sparta_inf_KE_dist_cut.png")
+        plt.savefig(plot_loc + "sparta_KE_dist_cut.png")
     
     with timed("PS KE Dist plot"):
         fig, axes = plt.subplots(3, 2, figsize=(12, 14))
