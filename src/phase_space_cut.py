@@ -172,9 +172,7 @@ def halo_select(sims, ptl_data):
     subset_df = ptl_data.compute().loc[all_row_idxs]        
     return subset_df
     
-def load_your_data():
-    # curr_test_sims = ["cbol_l1000_n1024_4r200m_1-5v200m_100to90"]
-    curr_test_sims = test_sims[0]
+def load_your_data(curr_test_sims = ["cbol_l1000_n1024_4r200m_1-5v200m_99to90"]):
     test_comb_name = get_combined_name(curr_test_sims) 
         
     print("Testing on:", curr_test_sims)
@@ -429,7 +427,7 @@ if __name__ == "__main__":
     grad_lims = "0.2_0.5"
     r_cut = 1.75
 
-    r, vr, lnv2, sparta_labels, my_data, halo_df = load_your_data()
+    r, vr, lnv2, sparta_labels, my_data, halo_df = load_your_data(test_sims[0])
     
     # r = r.to_numpy()
     # vr = vr.to_numpy()

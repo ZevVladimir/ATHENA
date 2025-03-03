@@ -49,9 +49,6 @@ else:
     cosmol = cosmology.setCosmology(sim_cosmol) 
     sim_pat = r"cbol_l(\d+)_n(\d+)"
 match = re.search(sim_pat, curr_sparta_file)
-if match:
-    sparta_name = match.group(0)
-SPARTA_hdf5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
 
 file_lim = config.getint("XGBOOST","file_lim")
 
@@ -475,8 +472,7 @@ def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
 
 # Evaluate an input model by generating plots of comparisons between the model's predictions and SPARTA
 def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, plot_save_loc, dens_prf = False,missclass=False,full_dist=False,io_frac=False,split_nu=False): 
-    with timed("Predictions"):
-        print(f"Starting predictions for {y.size.compute():.3e} particles")
+    with timed(f"Predictions for {y.size.compute():.3e} particles"):
         preds = make_preds(client, model, X)
 
     num_bins = 30
