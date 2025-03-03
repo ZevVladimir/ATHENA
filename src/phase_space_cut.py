@@ -513,14 +513,14 @@ if __name__ == "__main__":
         fig.suptitle(
             r"Kinetic Energy Distribution of Particles Around Largest Halos at $z=0.03$""\nSimulation: Bolshoi 1000Mpc",fontsize=16)
         
-        ax1 = fig.add_subplot(gs[0,0])
-        ax2 = fig.add_subplot(gs[0,1])
-        ax3 = fig.add_subplot(gs[0,2])
-        ax4 = fig.add_subplot(gs[0,3])
-        ax5 = fig.add_subplot(gs[1,0])
-        ax6 = fig.add_subplot(gs[1,1])
-        ax7 = fig.add_subplot(gs[1,2])
-        ax8 = fig.add_subplot(gs[1,3])
+        ax1 = fig.add_subplot(gs[1,0])
+        ax2 = fig.add_subplot(gs[1,1])
+        ax3 = fig.add_subplot(gs[1,2])
+        ax4 = fig.add_subplot(gs[1,3])
+        ax5 = fig.add_subplot(gs[2,0])
+        ax6 = fig.add_subplot(gs[2,1])
+        ax7 = fig.add_subplot(gs[2,2])
+        ax8 = fig.add_subplot(gs[2,3])
         
         axes = [ax1,ax2,ax3,ax4,ax5,ax6,ax7,ax8]
         
@@ -553,7 +553,7 @@ if __name__ == "__main__":
             ax.tick_params(axis='both',which='both',direction="in",labelsize=12,length=8,width=2)
 
         plt.sca(axes[0])
-        plt.title(r'$Orbiting Particles: v_r > 0$',fontsize=title_fntsize)
+        plt.title("Orbiting Particles: "r'$v_r > 0$',fontsize=title_fntsize)
         plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y12, lw=2.0, color="g",
@@ -563,7 +563,7 @@ if __name__ == "__main__":
         plt.xlim(0, 2)
 
         plt.sca(axes[1])
-        plt.title(r'$Orbiting Particles: v_r < 0$',fontsize=title_fntsize)
+        plt.title("Orbiting Particles: "r'$v_r < 0$',fontsize=title_fntsize)
         plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="g",
@@ -573,7 +573,7 @@ if __name__ == "__main__":
         plt.xlim(0, 2)
         
         plt.sca(axes[2])
-        plt.title(r'Infalling Particles: $v_r > 0$',fontsize=title_fntsize)
+        plt.title("Infalling Particles: "r'$v_r > 0$',fontsize=title_fntsize)
         plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y12, lw=2.0, color="g",
@@ -583,13 +583,14 @@ if __name__ == "__main__":
         plt.xlim(0, 2)
 
         plt.sca(axes[3])
-        plt.title(r'$Infalling Particles: v_r < 0$',fontsize=title_fntsize)
+        plt.title("Infalling Particles: "r'$v_r < 0$',fontsize=title_fntsize)
         plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="g",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.colorbar(label=r'$N$ (Counts)')
         plt.xlim(0, 2)
         
         plt.sca(axes[4])
@@ -626,6 +627,7 @@ if __name__ == "__main__":
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.colorbar(label=r'$N$ (Counts)')
         plt.xlim(0, 2)
         
         plt.tight_layout();

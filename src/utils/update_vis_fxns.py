@@ -1060,6 +1060,17 @@ def plot_halo_slice(ptl_pos, labels, halo_pos, halo_r200m, save_loc, search_rad=
     plt.savefig(f"{save_loc}{title}_halo_dist.png", dpi=500)
     plt.close(fig)
 
+# If less than some percentage of halos are non-zero do not plot
+# prf should be in shape (n_halo, n_bin)
+def clean_prf(prf, frac=0.25):
+    for i in range(prf.shape[1]):
+        nonzero_count = np.count_nonzero(prf[:, i])  
+        total_count = prf.shape[0] 
+        # Check if nonzero fraction is below threshold if it is set entire bin to NaN
+        if nonzero_count / total_count < frac:  
+            prf[:, i] = np.nan 
+    return prf
+
 # Profiles should be a list [calc_prf,act_prf]
 # You can either use the median plots with use_med=True or the average with use_med=False
 def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title, prf_func=np.nanmedian):       
@@ -1083,9 +1094,9 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
         invis_act, = ax_0.plot([0], [0], color='black', linestyle='--')
         
         # Take the ratio of the calculated profiles and the actual profiles and center around 0
-        ratio_all_prf = (all_prfs[0] / all_prfs[1]) - 1
-        ratio_orb_prf = (orb_prfs[0] / orb_prfs[1]) - 1
-        ratio_inf_prf = (inf_prfs[0] / inf_prfs[1]) - 1
+        # ratio_all_prf = (all_prfs[0] / all_prfs[1]) - 1
+        # ratio_orb_prf = (orb_prfs[0] / orb_prfs[1]) - 1
+        # ratio_inf_prf = (inf_prfs[0] / inf_prfs[1]) - 1
 
         if prf_func != None:
             calc_all_prfs = prf_func(all_prfs[0],axis=0)
@@ -1095,9 +1106,9 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
             act_orb_prfs = prf_func(orb_prfs[1],axis=0)
             act_inf_prfs = prf_func(inf_prfs[1],axis=0)
             
-            ratio_all_prf = calc_all_prfs / act_all_prfs
-            ratio_orb_prf = calc_orb_prfs / act_orb_prfs
-            ratio_inf_prf = calc_inf_prfs / act_inf_prfs
+            ratio_all_prf = (calc_all_prfs / act_all_prfs) - 1
+            ratio_orb_prf = (calc_orb_prfs / act_orb_prfs) - 1
+            ratio_inf_prf = (calc_inf_prfs / act_inf_prfs) - 1
         else:
             calc_all_prfs = all_prfs[0]
             calc_orb_prfs = orb_prfs[0]
@@ -1105,9 +1116,9 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
             act_all_prfs = all_prfs[1]
             act_orb_prfs = orb_prfs[1]
             act_inf_prfs = inf_prfs[1]
-            ratio_all_prf = calc_all_prfs / act_all_prfs
-            ratio_orb_prf = calc_orb_prfs / act_orb_prfs
-            ratio_inf_prf = calc_inf_prfs / act_inf_prfs
+            ratio_all_prf = (calc_all_prfs / act_all_prfs) - 1
+            ratio_orb_prf = (calc_orb_prfs / act_orb_prfs) - 1
+            ratio_inf_prf = (calc_inf_prfs / act_inf_prfs) - 1
             
 
         # Plot the calculated profiles
@@ -1211,9 +1222,16 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
         
         for i,nu_split in enumerate(plt_splits):
             # Take the ratio of the calculated profiles and the actual profiles and center around 0
-            ratio_all_prf = (all_prfs[i][0] / all_prfs[i][1]) - 1
-            ratio_orb_prf = (orb_prfs[i][0] / orb_prfs[i][1]) - 1
-            ratio_inf_prf = (inf_prfs[i][0] / inf_prfs[i][1]) - 1
+            # ratio_all_prf = (all_prfs[i][0] / all_prfs[i][1]) - 1
+            # ratio_orb_prf = (orb_prfs[i][0] / orb_prfs[i][1]) - 1
+            # ratio_inf_prf = (inf_prfs[i][0] / inf_prfs[i][1]) - 1
+            
+            clean_prf(all_prfs[i],[0], frac=0.25)
+            clean_prf(all_prfs[i],[1], frac=0.25)
+            clean_prf(orb_prfs[i],[0], frac=0.25)
+            clean_prf(orb_prfs[i],[1], frac=0.25)
+            clean_prf(inf_prfs[i],[0], frac=0.25)
+            clean_prf(inf_prfs[i],[1], frac=0.25)
             
             if prf_func != None:
                 func_calc_all_prfs = prf_func(all_prfs[i][0],axis=0)
@@ -1222,9 +1240,9 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
                 func_act_all_prfs = prf_func(all_prfs[i][1],axis=0)
                 func_act_orb_prfs = prf_func(orb_prfs[i][1],axis=0)
                 func_act_inf_prfs = prf_func(inf_prfs[i][1],axis=0)
-                ratio_all_prf = func_calc_all_prfs / func_act_all_prfs
-                ratio_orb_prf = func_calc_orb_prfs / func_act_orb_prfs
-                ratio_inf_prf = func_calc_inf_prfs / func_act_inf_prfs
+                ratio_all_prf = (func_calc_all_prfs / func_act_all_prfs) - 1
+                ratio_orb_prf = (func_calc_orb_prfs / func_act_orb_prfs) - 1
+                ratio_inf_prf = (func_calc_inf_prfs / func_act_inf_prfs) - 1
             else:
                 calc_all_prfs = all_prfs[i][0]
                 calc_orb_prfs = orb_prfs[i][0]
@@ -1232,9 +1250,9 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
                 act_all_prfs = all_prfs[i][1]
                 act_orb_prfs = orb_prfs[i][1]
                 act_inf_prfs = inf_prfs[i][1]
-                ratio_all_prf = calc_all_prfs / act_all_prfs
-                ratio_orb_prf = calc_orb_prfs / act_orb_prfs
-                ratio_inf_prf = calc_inf_prfs / act_inf_prfs
+                ratio_all_prf = (calc_all_prfs / act_all_prfs) - 1
+                ratio_orb_prf = (calc_orb_prfs / act_orb_prfs) - 1
+                ratio_inf_prf = (calc_inf_prfs / act_inf_prfs) - 1
             
             # Plot the calculated profiles
             all_lb, = all_ax_0.plot(bins, func_calc_all_prfs, linestyle='-', color = all_colors[i], label = rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
@@ -1260,8 +1278,6 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
             all_ax_1.plot(bins, ratio_all_prf, color = all_colors[i])
             orb_ax_1.plot(bins, ratio_orb_prf, color = orb_colors[i])
             inf_ax_1.plot(bins, ratio_inf_prf, color = inf_colors[i])
-            
-                                
             
         all_ax_0.set_ylabel(r"$\rho / \rho_m$", fontsize=axisfntsize)
         all_ax_0.set_xscale("log")
