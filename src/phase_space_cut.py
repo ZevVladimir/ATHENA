@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-import dask.dataframe as dd
 import numpy as np
 from matplotlib.cm import get_cmap
 from scipy.optimize import curve_fit, minimize
@@ -14,7 +13,6 @@ import pandas as pd
 import matplotlib as mpl
 mpl.rcParams.update(mpl.rcParamsDefault)
 import pickle
-import h5py
 from colossus.cosmology import cosmology
 from scipy.spatial import cKDTree
 import scipy.ndimage as ndimage
@@ -24,6 +22,7 @@ from utils.calculation_functions import create_stack_mass_prf, filter_prf, calcu
 from utils.update_vis_fxns import compare_split_prfs, plot_full_ptl_dist, plot_prim_ptl_dist
 from utils.ML_support import load_data, get_CUDA_cluster, get_combined_name, reform_dataset_dfs, parse_ranges, create_nu_string, load_sparta_mass_prf, split_calc_name, sim_mass_p_z
 from utils.data_and_loading_functions import create_directory, timed, load_pickle, load_SPARTA_data, conv_halo_id_spid
+from utils.ps_cut_support import load_ps_data
 
 import configparser
 config = configparser.ConfigParser()
@@ -80,133 +79,7 @@ elif not on_zaratan and not use_gpu:
 
 ####################################################################################################################################################################################################################################
     
-def halo_select(sims, ptl_data):
-    curr_tot_nptl = 0
-    all_row_idxs = []
-    # For each simulation we will search through the largest halos and determine if they dominate their region and only choose those ones
-    for sim in sims:
-        # Get the numnber of particles per halo and use this to sort the halos such that the largest is first
-        n_ptls = load_pickle(ML_dset_path + sim + "/num_ptls.pickle")   
-        match_halo_idxs = load_pickle(ML_dset_path + sim + "/match_halo_idxs.pickle")    
-  
-        total_num_halos = match_halo_idxs.shape[0]
-        
-        # Load information about the simulation
-        config_dict = load_pickle(ML_dset_path + sim + "/config.pickle")
-        test_halos_ratio = config_dict["test_halos_ratio"]
-        curr_z = config_dict["p_snap_info"]["red_shift"][()]
-        p_snap = config_dict["p_snap_info"]["ptl_snap"][()]
-        p_box_size = config_dict["p_snap_info"]["box_size"][()]
-        p_scale_factor = config_dict["p_snap_info"]["scale_factor"][()]
-        
-        # ptl_mass, use_z = sim_mass_p_z(sim,config_dict)
-        
-        # split all indices into train and test groups
-        split_pnt = int((1-test_halos_ratio) * total_num_halos)
-        test_idxs = match_halo_idxs[split_pnt:]
-        test_num_ptls = n_ptls[split_pnt:]
 
-        # need to sort indices otherwise sparta.load breaks...      
-        test_idxs_inds = test_idxs.argsort()
-        test_idxs = test_idxs[test_idxs_inds]
-        test_num_ptls = test_num_ptls[test_idxs_inds]
-        
-        order_halo = np.argsort(test_num_ptls)[::-1]
-        n_ptls = test_num_ptls[order_halo]
-        
-        # Load which particles belong to which halo and then sort them corresponding to the size of the halos again
-        halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
-        all_idxs = halo_ddf["Halo_indices"].values
-        halo_n = halo_ddf["Halo_n"].values
-        halo_first = halo_ddf["Halo_first"].values
-        
-        all_idxs = all_idxs[order_halo]
-        halo_n = halo_n[order_halo]
-        halo_first = halo_first[order_halo]
-        
-        sparta_name, sparta_search_name = split_calc_name(sim)
-        
-        curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
-        
-        config_dict = load_pickle(ML_dset_path + sim + "/config.pickle")
-        p_sparta_snap = config_dict["p_snap_info"]["sparta_snap"][()]
-
-        # Load the halo's positions and radii
-        param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"],["simulation","particle_mass"]]
-        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, p_snap)
-
-        halos_pos = sparta_params[sparta_param_names[0]][:,p_sparta_snap,:] * 10**3 * p_scale_factor # convert to kpc/h
-        halos_r200m = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
-        
-        use_halo_pos = halos_pos[all_idxs]
-        use_halo_r200m = halos_r200m[all_idxs]
-        
-        # Construct a search tree of halo positions
-        curr_halo_tree = cKDTree(data = use_halo_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size)
-        
-        max_nhalo = 500
-        if order_halo.shape[0] < max_nhalo:
-            max_nhalo = order_halo.shape[0]
-        
-        # For each massive halo search the area around the halo to determine if there are any halos that are more than 20% the size of this halo
-        for i in range(max_nhalo):
-            curr_halo_indices = curr_halo_tree.query_ball_point(use_halo_pos[i], r = 2 * use_halo_r200m[i])
-            curr_halo_indices = np.array(curr_halo_indices)
-            
-            # The search will return the same halo that we are searching so we remove that
-            surr_n_ptls = n_ptls[curr_halo_indices] 
-            surr_n_ptls = surr_n_ptls[surr_n_ptls != n_ptls[i]]
-            
-            # If the largest halo nearby isn't large enough we will consider this halo's particles for our datasets
-            if surr_n_ptls.size == 0 or np.max(surr_n_ptls) < 0.2 * n_ptls[i]:
-                row_indices = list(range(
-                    halo_first[i],
-                    halo_first[i] + halo_n[i]
-                ))
-                all_row_idxs.extend(row_indices)
-                curr_tot_nptl += halo_n[i]
-                
-            # Once we have 10,000,000 particles we are done
-            # if curr_tot_nptl > 1000000:
-            #     break
-    subset_df = ptl_data.compute().loc[all_row_idxs]        
-    return subset_df
-    
-def load_your_data(curr_test_sims = ["cbol_l1000_n1024_4r200m_1-5v200m_99to90"]):
-    test_comb_name = get_combined_name(curr_test_sims) 
-        
-    print("Testing on:", curr_test_sims)
-    # Loop through and/or for Train/Test/All datasets and evaluate the model
-    dset_name = eval_datasets[0]
-
-    with timed("Loading data"):             
-        plot_loc = model_save_loc + dset_name + "_" + test_comb_name + "/plots/"
-        create_directory(plot_loc)
-        
-        # Load the halo information
-        halo_files = []
-        halo_dfs = []
-        if dset_name == "Full":    
-            for sim in curr_test_sims:
-                halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + "Train" + "/halo_info/"))
-                halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/"))
-        else:
-            for sim in curr_test_sims:
-                halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
-
-        halo_df = pd.concat(halo_dfs)
-        
-        # Load the particle information
-        data,scale_pos_weight = load_data(client,curr_test_sims,dset_name,limit_files=False)
-        nptl = data.shape[0].compute()
-        samp_data = halo_select(curr_test_sims,data)
-    r = samp_data["p_Scaled_radii"]
-    vr = samp_data["p_Radial_vel"]
-    vphys = samp_data["p_phys_vel"]
-    lnv2 = np.log(vphys**2)
-    sparta_labels = samp_data["Orbit_infall"]
-    
-    return r, vr, lnv2, sparta_labels, data, halo_df
 
 def gradient_minima(
     r: np.ndarray,
@@ -317,7 +190,7 @@ def calibrate_finder(
         [0.2, 0.5]
     """
     # MODIFY this line if needed ======================
-    r, vr, lnv2, sparta_labels, my_data, halo_df = load_your_data()
+    r, vr, lnv2, sparta_labels, my_data, halo_df = load_ps_data(client)
 
     # =================================================
 
@@ -407,6 +280,7 @@ if __name__ == "__main__":
     plot_loc = model_save_loc + dset_name + "_" + test_comb_name + "/plots/"
     create_directory(plot_loc)
     
+    
     ####################################################################################################################################################################################################################################
     
     (m_pos, b_pos), (m_neg, b_neg) = calibrate_finder()
@@ -427,7 +301,7 @@ if __name__ == "__main__":
     grad_lims = "0.2_0.5"
     r_cut = 1.75
 
-    r, vr, lnv2, sparta_labels, my_data, halo_df = load_your_data(test_sims[0])
+    r, vr, lnv2, sparta_labels, my_data, halo_df = load_ps_data(client, test_sims[0])
     
     # r = r.to_numpy()
     # vr = vr.to_numpy()
@@ -496,8 +370,12 @@ if __name__ == "__main__":
     lin_vmin = 0
     log_vmin = 1
 
-    title_fntsize = 18
-    legend_fntsize = 14
+    title_fntsize = 22
+    legend_fntsize = 18
+    axis_fntsize = 20
+    txt_fntsize = 20
+    cbar_label_fntsize = 18
+    cbar_tick_fntsize = 14
 
     with timed("SPARTA KE Dist plot"):
         magma_cmap = plt.get_cmap("magma")
@@ -506,12 +384,12 @@ if __name__ == "__main__":
         
         widths = [4,4,4,4,.5]
         heights = [0.15,4,4]
-        fig = plt.figure(constrained_layout=True, figsize=(28,12))
+        fig = plt.figure(constrained_layout=True, figsize=(28,14))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
 
         
         fig.suptitle(
-            r"Kinetic Energy Distribution of Particles Around Largest Halos at $z=0.03$""\nSimulation: Bolshoi 1000Mpc",fontsize=16)
+            r"Kinetic Energy Distribution of Particles Around Largest Halos at $z=0.03$""\nSimulation: Bolshoi 1000Mpc",fontsize=title_fntsize)
         
         ax1 = fig.add_subplot(gs[1,0])
         ax2 = fig.add_subplot(gs[1,1])
@@ -524,12 +402,12 @@ if __name__ == "__main__":
         
         axes = [ax1,ax2,ax3,ax4,ax5,ax6,ax7,ax8]
         
-        ax1.set_ylabel(r'$\ln(v^2/v_{200m}^2)$',fontsize=16)
-        ax5.set_ylabel(r'$\ln(v^2/v_{200m}^2)$',fontsize=16)
-        ax5.set_xlabel(r'$r/R_{200m}$',fontsize=16)
-        ax6.set_xlabel(r'$r/R_{200m}$',fontsize=16)
-        ax7.set_xlabel(r'$r/R_{200m}$',fontsize=16)
-        ax8.set_xlabel(r'$r/R_{200m}$',fontsize=16)
+        ax1.set_ylabel(r'$\ln(v^2/v_{200m}^2)$',fontsize=axis_fntsize)
+        ax5.set_ylabel(r'$\ln(v^2/v_{200m}^2)$',fontsize=axis_fntsize)
+        ax5.set_xlabel(r'$r/R_{200m}$',fontsize=axis_fntsize)
+        ax6.set_xlabel(r'$r/R_{200m}$',fontsize=axis_fntsize)
+        ax7.set_xlabel(r'$r/R_{200m}$',fontsize=axis_fntsize)
+        ax8.set_xlabel(r'$r/R_{200m}$',fontsize=axis_fntsize)
         
         ax1.tick_params('x', labelbottom=False,colors="white",direction="in")
         ax2.tick_params('x', labelbottom=False,colors="white",direction="in")
@@ -544,13 +422,11 @@ if __name__ == "__main__":
 
         
         for ax in axes:
-            ax.set_xlim(0, 2)
-            ax.set_ylim(-2, 2.5)
-            ax.text(0.25, -1.4, "Orbiting", fontsize=16, color="r",
+            ax.text(0.25, -1.4, "Orbiting", fontsize=txt_fntsize, color="r",
                     weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-            ax.text(1.5, 0.7, "Infalling", fontsize=16, color="b",
+            ax.text(1.4, 0.7, "Infalling", fontsize=txt_fntsize, color="b",
                     weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-            ax.tick_params(axis='both',which='both',direction="in",labelsize=12,length=8,width=2)
+            ax.tick_params(axis='both',which='both',labelcolor="black",colors="white",direction="in",labelsize=16,length=8,width=2)
 
         plt.sca(axes[0])
         plt.title("Orbiting Particles: "r'$v_r > 0$',fontsize=title_fntsize)
@@ -561,6 +437,7 @@ if __name__ == "__main__":
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
+        plt.ylim(-2.2, 2.5)
 
         plt.sca(axes[1])
         plt.title("Orbiting Particles: "r'$v_r < 0$',fontsize=title_fntsize)
@@ -571,6 +448,7 @@ if __name__ == "__main__":
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
+        plt.ylim(-2.2, 2.5)
         
         plt.sca(axes[2])
         plt.title("Infalling Particles: "r'$v_r > 0$',fontsize=title_fntsize)
@@ -581,6 +459,7 @@ if __name__ == "__main__":
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
+        plt.ylim(-2.2, 2.5)
 
         plt.sca(axes[3])
         plt.title("Infalling Particles: "r'$v_r < 0$',fontsize=title_fntsize)
@@ -590,8 +469,11 @@ if __name__ == "__main__":
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.legend(loc="upper right",fontsize=legend_fntsize)
-        plt.colorbar(label=r'$N$ (Counts)')
+        cbar_lin= plt.colorbar()
+        cbar_lin.ax.tick_params(labelsize=cbar_tick_fntsize)
+        cbar_lin.set_label(r'$N$ (Counts)', fontsize=cbar_label_fntsize)
         plt.xlim(0, 2)
+        plt.ylim(-2.2, 2.5)
         
         plt.sca(axes[4])
         plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
@@ -601,6 +483,7 @@ if __name__ == "__main__":
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
+        plt.ylim(-2.2, 2.5)
 
         plt.sca(axes[5])
         plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
@@ -610,6 +493,7 @@ if __name__ == "__main__":
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
+        plt.ylim(-2.2, 2.5)
 
         plt.sca(axes[6])
         plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
@@ -619,6 +503,7 @@ if __name__ == "__main__":
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
+        plt.ylim(-2.2, 2.5)
 
         plt.sca(axes[7])
         plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
@@ -627,11 +512,13 @@ if __name__ == "__main__":
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.legend(loc="upper right",fontsize=legend_fntsize)
-        plt.colorbar(label=r'$N$ (Counts)')
+        cbar_log= plt.colorbar()
+        cbar_log.ax.tick_params(labelsize=cbar_tick_fntsize)
+        cbar_log.set_label(r'$N$ (Counts)', fontsize=cbar_label_fntsize)
         plt.xlim(0, 2)
-        
-        plt.tight_layout();
-        plt.savefig(plot_loc + "sparta_KE_dist_cut.png")
+        plt.ylim(-2.2, 2.5)
+    
+        plt.savefig(plot_loc + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=500)
     
     with timed("PS KE Dist plot"):
         fig, axes = plt.subplots(3, 2, figsize=(12, 14))
@@ -660,6 +547,7 @@ if __name__ == "__main__":
         plt.colorbar(label=r'$N$ (Counts)')
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
+        
 
         plt.sca(axes[1])
         plt.title(r'$v_r < 0$',fontsize=title_fntsize)
