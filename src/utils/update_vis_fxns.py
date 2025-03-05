@@ -1097,15 +1097,15 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
         # ratio_all_prf = (all_prfs[0] / all_prfs[1]) - 1
         # ratio_orb_prf = (orb_prfs[0] / orb_prfs[1]) - 1
         # ratio_inf_prf = (inf_prfs[0] / inf_prfs[1]) - 1
-        
-        clean_prf(all_prfs[0], frac=0.25)
-        clean_prf(all_prfs[1], frac=0.25)
-        clean_prf(orb_prfs[0], frac=0.25)
-        clean_prf(orb_prfs[1], frac=0.25)
-        clean_prf(inf_prfs[0], frac=0.25)
-        clean_prf(inf_prfs[1], frac=0.25)
 
         if prf_func != None:
+            clean_prf(all_prfs[0], frac=0.25)
+            clean_prf(all_prfs[1], frac=0.25)
+            clean_prf(orb_prfs[0], frac=0.25)
+            clean_prf(orb_prfs[1], frac=0.25)
+            clean_prf(inf_prfs[0], frac=0.25)
+            clean_prf(inf_prfs[1], frac=0.25)
+        
             calc_all_prfs = prf_func(all_prfs[0],axis=0)
             calc_orb_prfs = prf_func(orb_prfs[0],axis=0)
             calc_inf_prfs = prf_func(inf_prfs[0],axis=0)
@@ -1232,14 +1232,14 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
             # ratio_all_prf = (all_prfs[i][0] / all_prfs[i][1]) - 1
             # ratio_orb_prf = (orb_prfs[i][0] / orb_prfs[i][1]) - 1
             # ratio_inf_prf = (inf_prfs[i][0] / inf_prfs[i][1]) - 1
-            
-            clean_prf(all_prfs[i][0])
-            clean_prf(all_prfs[i][1])
-            clean_prf(orb_prfs[i][0])
-            clean_prf(orb_prfs[i][1])
-            clean_prf(inf_prfs[i][0])
-            clean_prf(inf_prfs[i][1])
-            
+            if prf_func != None:
+                clean_prf(all_prfs[i][0])
+                clean_prf(all_prfs[i][1])
+                clean_prf(orb_prfs[i][0])
+                clean_prf(orb_prfs[i][1])
+                clean_prf(inf_prfs[i][0])
+                clean_prf(inf_prfs[i][1])
+                
             all_ratio_all_prf = (all_prfs[i][0] / all_prfs[i][1]) - 1
             all_ratio_orb_prf = (orb_prfs[i][0] / orb_prfs[i][1]) - 1
             all_ratio_inf_prf = (inf_prfs[i][0] / inf_prfs[i][1]) - 1
@@ -1459,9 +1459,12 @@ def plt_cust_ps_line(m,b,bins):
         x2 = bins[i+1]
         y1 = m[i] * x1 + b[i]
         y2 = m[i] * x2 + b[i]
-        plt.plot([x1,x2],[y1,y2],lw=2.0, color="magenta",
-        label=fr"$m_fit={m[i]:.3f}$"+"\n"+fr"$b_fit={b[i]:.3f}$")
-
+        if i == 0:
+            plt.plot([x1,x2],[y1,y2],lw=2.0, color="magenta",
+            label=fr"$m_fit={m[i]:.3f}$"+"\n"+fr"$b_fit={b[i]:.3f}$")
+        else:
+            plt.plot([x1,x2],[y1,y2],lw=2.0, color="magenta")
+            
 def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut, plot_loc, title, cust_line_dict = None):
     m_pos = feat_dict["m_pos"]
     b_pos = feat_dict["b_pos"]
@@ -1554,11 +1557,10 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.plot(x, y12, lw=2.0, color="g",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-        plt.legend(loc="upper right",fontsize=legend_fntsize)
         if cust_line_dict is not None:
             plt_cust_ps_line(m = cust_line_dict["orb_vr_pos"]["m"], b = cust_line_dict["orb_vr_pos"]["b"], bins = bins)
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
-        plt.ylim(-2.2, 2.5)
 
         plt.sca(axes[1])
         plt.title("Orbiting Particles: "r'$v_r < 0$',fontsize=title_fntsize)
@@ -1567,11 +1569,10 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.plot(x, y22, lw=2.0, color="g",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-        plt.legend(loc="upper right",fontsize=legend_fntsize)
         if cust_line_dict is not None:
             plt_cust_ps_line(m = cust_line_dict["orb_vr_neg"]["m"], b = cust_line_dict["orb_vr_neg"]["b"], bins = bins)
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
-        plt.ylim(-2.2, 2.5)
         
         plt.sca(axes[2])
         plt.title("Infalling Particles: "r'$v_r > 0$',fontsize=title_fntsize)
@@ -1580,11 +1581,10 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.plot(x, y12, lw=2.0, color="g",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-        plt.legend(loc="upper right",fontsize=legend_fntsize)
         if cust_line_dict is not None:
             plt_cust_ps_line(m = cust_line_dict["inf_vr_pos"]["m"], b = cust_line_dict["inf_vr_pos"]["b"], bins = bins)
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
-        plt.ylim(-2.2, 2.5)
 
         plt.sca(axes[3])
         plt.title("Infalling Particles: "r'$v_r < 0$',fontsize=title_fntsize)
@@ -1593,14 +1593,13 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.plot(x, y22, lw=2.0, color="g",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        if cust_line_dict is not None:
+            plt_cust_ps_line(m = cust_line_dict["inf_vr_neg"]["m"], b = cust_line_dict["inf_vr_neg"]["b"], bins = bins)
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         cbar_lin= plt.colorbar()
         cbar_lin.ax.tick_params(labelsize=cbar_tick_fntsize)
         cbar_lin.set_label(r'$N$ (Counts)', fontsize=cbar_label_fntsize)
-        if cust_line_dict is not None:
-            plt_cust_ps_line(m = cust_line_dict["inf_vr_neg"]["m"], b = cust_line_dict["inf_vr_neg"]["b"], bins = bins)
         plt.xlim(0, 2)
-        plt.ylim(-2.2, 2.5)
         
         plt.sca(axes[4])
         plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
@@ -1608,11 +1607,10 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.plot(x, y12, lw=2.0, color="g",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-        plt.legend(loc="upper right",fontsize=legend_fntsize)
         if cust_line_dict is not None:
             plt_cust_ps_line(m = cust_line_dict["orb_vr_pos"]["m"], b = cust_line_dict["orb_vr_pos"]["b"], bins = bins)
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
-        plt.ylim(-2.2, 2.5)
 
         plt.sca(axes[5])
         plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
@@ -1620,11 +1618,10 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.plot(x, y22, lw=2.0, color="g",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-        plt.legend(loc="upper right",fontsize=legend_fntsize)
         if cust_line_dict is not None:
             plt_cust_ps_line(m = cust_line_dict["orb_vr_neg"]["m"], b = cust_line_dict["orb_vr_neg"]["b"], bins = bins)
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
-        plt.ylim(-2.2, 2.5)
 
         plt.sca(axes[6])
         plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
@@ -1632,25 +1629,23 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.plot(x, y12, lw=2.0, color="g",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
-        plt.legend(loc="upper right",fontsize=legend_fntsize)
         if cust_line_dict is not None:
             plt_cust_ps_line(m = cust_line_dict["inf_vr_pos"]["m"], b = cust_line_dict["inf_vr_pos"]["b"], bins = bins)
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
-        plt.ylim(-2.2, 2.5)
-
+        
         plt.sca(axes[7])
         plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="g",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        if cust_line_dict is not None:
+            plt_cust_ps_line(m = cust_line_dict["inf_vr_neg"]["m"], b = cust_line_dict["inf_vr_neg"]["b"], bins = bins)
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         cbar_log= plt.colorbar()
         cbar_log.ax.tick_params(labelsize=cbar_tick_fntsize)
         cbar_log.set_label(r'$N$ (Counts)', fontsize=cbar_label_fntsize)
-        if cust_line_dict is not None:
-            plt_cust_ps_line(m = cust_line_dict["inf_vr_neg"]["m"], b = cust_line_dict["inf_vr_neg"]["b"], bins = bins)
         plt.xlim(0, 2)
-        plt.ylim(-2.2, 2.5)
     
-        plt.savefig(plot_loc + title + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=500)    
+        plt.savefig(plot_loc + title + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=300)    

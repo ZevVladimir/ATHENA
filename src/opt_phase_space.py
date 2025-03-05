@@ -73,15 +73,23 @@ elif not on_zaratan and not use_gpu:
     
 def overlap_loss_orb(params, r_bin, lnv2_bin, sparta_labels_bin):
     m, b = params
-    line_classification = (lnv2_bin >= (m * r_bin + b)).astype(int)
+    line_classification = (lnv2_bin <= (m * r_bin + b)).astype(int)
     return -np.sum(line_classification == sparta_labels_bin)  # Negative for maximization
 
 def overlap_loss_inf(params, r_bin, lnv2_bin, sparta_labels_bin):
     m, b = params
-    line_classification = (lnv2_bin <= (m * r_bin + b)).astype(int)
+    line_classification = (lnv2_bin >= (m * r_bin + b)).astype(int)
     return -np.sum(line_classification == sparta_labels_bin)  # Negative for maximization
 
-def opt_func(bins, r, lnv2, sparta_labels, orb = True):
+def overlap_loss(params, r_bin, lnv2_bin, sparta_labels_bin):
+    m, b = params
+    orb_class = (lnv2_bin >= (m * r_bin + b)).astype(int)
+    inf_class = (lnv2_bin <= (m * r_bin + b)).astype(int)
+    orb_sparta = sparta_labels_bin[np.where(sparta_labels_bin == 1)[0]]
+    inf_sparta = sparta_labels_bin[np.where(sparta_labels_bin == 0)[0]]
+    return -(np.sum(orb_class == orb_sparta)+np.sum(inf_class == inf_sparta))  # Negative for maximization
+
+def opt_func(bins, r, lnv2, sparta_labels, def_m, def_b, orb = True):
     # Assign bin indices based on radius
     bin_indices = np.digitize(r, bins) - 1  
     
@@ -91,20 +99,26 @@ def opt_func(bins, r, lnv2, sparta_labels, orb = True):
     for i in range(bins.shape[0]-1):
         mask = bin_indices == i
         if np.sum(mask) == 0:
+            slopes.append(def_m)
+            intercepts.append(def_b)
             continue  # Skip empty bins
         
         r_bin = r[mask]
         lnv2_bin = lnv2[mask]
         sparta_labels_bin = sparta_labels[mask]
 
-        # Initial guess for m and b
-        initial_guess = [0, np.mean(lnv2_bin)]
-
         # Optimize
         if orb:
+            # Initial guess for m and b
+            initial_guess = [def_m, np.max(lnv2_bin)]
             result = minimize(overlap_loss_orb, initial_guess, args=(r_bin, lnv2_bin, sparta_labels_bin))
-        else:
+        if orb is False:
+            # Initial guess for m and b
+            initial_guess = [def_m, np.mean(lnv2_bin)]
             result = minimize(overlap_loss_inf, initial_guess, args=(r_bin, lnv2_bin, sparta_labels_bin))
+        else:
+            initial_guess = [def_m, np.mean(lnv2_bin)]
+            result = minimize(overlap_loss, initial_guess, args=(r_bin, lnv2_bin, sparta_labels_bin))
         slopes.append(result.x[0])
         intercepts.append(result.x[1])
         
@@ -233,11 +247,22 @@ if __name__ == "__main__":
     act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sparta_mass_prf(sim_splits,all_idxs,use_sims)
     act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb  
     
+    vr_pos = opt_func(bins, r[mask_vr_pos], lnv2[mask_vr_pos], sparta_labels[mask_vr_pos], 0, ps_param_dict["b_pos"], orb = None)
+    vr_neg = opt_func(bins, r[mask_vr_neg], lnv2[mask_vr_neg], sparta_labels[mask_vr_neg], 0, ps_param_dict["b_neg"], orb = None)
+
+    
+    # opt_param_dict = {
+    #     "orb_vr_pos": opt_func(bins, r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], sparta_labels[fltr_combs["orb_vr_pos"]], ps_param_dict["m_pos"], ps_param_dict["b_pos"], orb = True),
+    #     "orb_vr_neg": opt_func(bins, r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], sparta_labels[fltr_combs["orb_vr_neg"]], ps_param_dict["m_neg"], ps_param_dict["b_neg"], orb = True),
+    #     "inf_vr_neg": opt_func(bins, r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], sparta_labels[fltr_combs["inf_vr_neg"]], ps_param_dict["m_neg"], ps_param_dict["b_neg"], orb = False),
+    #     "inf_vr_pos": opt_func(bins, r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], sparta_labels[fltr_combs["inf_vr_pos"]], ps_param_dict["m_pos"], ps_param_dict["b_pos"], orb = False),
+    # }
+    
     opt_param_dict = {
-        "orb_vr_pos": opt_func(bins, r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], sparta_labels[fltr_combs["orb_vr_pos"]], orb = True),
-        "orb_vr_neg": opt_func(bins, r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], sparta_labels[fltr_combs["orb_vr_neg"]], orb = True),
-        "inf_vr_pos": opt_func(bins, r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], sparta_labels[fltr_combs["inf_vr_neg"]], orb = False),
-        "inf_vr_neg": opt_func(bins, r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], sparta_labels[fltr_combs["inf_vr_pos"]], orb = False),
+        "orb_vr_pos": vr_pos,
+        "orb_vr_neg": vr_neg,
+        "inf_vr_neg": vr_neg,
+        "inf_vr_pos": vr_pos,
     }
     
     width = 0.05
