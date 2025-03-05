@@ -1,10 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.cm import get_cmap
 from scipy.optimize import minimize
 
 plt.rcParams.update({"text.usetex":True, "font.family": "serif", "figure.dpi": 150})
-cmap = get_cmap('terrain')
 import os
 import multiprocessing as mp
 from dask.distributed import Client
@@ -163,7 +161,7 @@ if __name__ == "__main__":
         "b_neg": 1.5101195108968333,
     }
     
-    r, vr, lnv2, sparta_labels, my_data, halo_df = load_ps_data(test_sims[0])
+    r, vr, lnv2, sparta_labels, my_data, halo_df = load_ps_data(client,test_sims[0])
     
     # r = r.to_numpy()
     # vr = vr.to_numpy()

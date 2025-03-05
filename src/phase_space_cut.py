@@ -4,7 +4,6 @@ from matplotlib.cm import get_cmap
 from scipy.optimize import curve_fit, minimize
 
 plt.rcParams.update({"text.usetex":True, "font.family": "serif", "figure.dpi": 150})
-cmap = get_cmap('terrain')
 import os
 import multiprocessing as mp
 from dask.distributed import Client
@@ -426,7 +425,7 @@ if __name__ == "__main__":
                     weight="bold", bbox=dict(facecolor='w', alpha=0.75))
             ax.text(1.4, 0.7, "Infalling", fontsize=txt_fntsize, color="b",
                     weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-            ax.tick_params(axis='both',which='both',labelcolor="black",colors="white",direction="in",labelsize=16,length=8,width=2)
+            ax.tick_params(axis='both',which='both',labelcolor="black",colors="white",direction="in",pad=5,labelsize=16,length=8,width=2)
 
         plt.sca(axes[0])
         plt.title("Orbiting Particles: "r'$v_r > 0$',fontsize=title_fntsize)

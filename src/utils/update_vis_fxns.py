@@ -1240,6 +1240,10 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
             clean_prf(inf_prfs[i][0])
             clean_prf(inf_prfs[i][1])
             
+            all_ratio_all_prf = (all_prfs[i][0] / all_prfs[i][1]) - 1
+            all_ratio_orb_prf = (orb_prfs[i][0] / orb_prfs[i][1]) - 1
+            all_ratio_inf_prf = (inf_prfs[i][0] / inf_prfs[i][1]) - 1
+            
             if prf_func != None:
                 func_calc_all_prfs = prf_func(all_prfs[i][0],axis=0)
                 func_calc_orb_prfs = prf_func(orb_prfs[i][0],axis=0)
@@ -1247,9 +1251,9 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
                 func_act_all_prfs = prf_func(all_prfs[i][1],axis=0)
                 func_act_orb_prfs = prf_func(orb_prfs[i][1],axis=0)
                 func_act_inf_prfs = prf_func(inf_prfs[i][1],axis=0)
-                ratio_all_prf = (func_calc_all_prfs / func_act_all_prfs) - 1
-                ratio_orb_prf = (func_calc_orb_prfs / func_act_orb_prfs) - 1
-                ratio_inf_prf = (func_calc_inf_prfs / func_act_inf_prfs) - 1
+                mid_ratio_all_prf = (func_calc_all_prfs / func_act_all_prfs) - 1
+                mid_ratio_orb_prf = (func_calc_orb_prfs / func_act_orb_prfs) - 1
+                mid_ratio_inf_prf = (func_calc_inf_prfs / func_act_inf_prfs) - 1
             else:
                 calc_all_prfs = all_prfs[i][0]
                 calc_orb_prfs = orb_prfs[i][0]
@@ -1257,19 +1261,15 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
                 act_all_prfs = all_prfs[i][1]
                 act_orb_prfs = orb_prfs[i][1]
                 act_inf_prfs = inf_prfs[i][1]
-                ratio_all_prf = (calc_all_prfs / act_all_prfs) - 1
-                ratio_orb_prf = (calc_orb_prfs / act_orb_prfs) - 1
-                ratio_inf_prf = (calc_inf_prfs / act_inf_prfs) - 1
+                mid_ratio_all_prf = (calc_all_prfs / act_all_prfs) - 1
+                mid_ratio_orb_prf = (calc_orb_prfs / act_orb_prfs) - 1
+                mid_ratio_inf_prf = (calc_inf_prfs / act_inf_prfs) - 1
             
             # Plot the calculated profiles
             all_lb, = all_ax_0.plot(bins, func_calc_all_prfs, linestyle='-', color = all_colors[i], label = rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
             orb_lb, = orb_ax_0.plot(bins, func_calc_orb_prfs, linestyle='-', color = orb_colors[i], label = rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
             inf_lb, = inf_ax_0.plot(bins, func_calc_inf_prfs, linestyle='-', color = inf_colors[i], label = rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
-            
-            # all_ax_1.fill_between(bins, np.nanpercentile(calc_all_prfs, q=15.9, axis=0),np.nanpercentile(calc_all_prfs, q=84.1, axis=0), color=all_colors[i], alpha=fill_alpha)
-            # orb_ax_1.fill_between(bins, np.nanpercentile(calc_orb_prfs, q=15.9, axis=0),np.nanpercentile(calc_orb_prfs, q=84.1, axis=0), color=orb_colors[i], alpha=fill_alpha)
-            # inf_ax_1.fill_between(bins, np.nanpercentile(calc_inf_prfs, q=15.9, axis=0),np.nanpercentile(calc_inf_prfs, q=84.1, axis=0), color=inf_colors[i], alpha=fill_alpha)
- 
+             
             all_plt_lines.append(all_lb)
             all_plt_lbls.append(rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
             orb_plt_lines.append(orb_lb)
@@ -1282,9 +1282,13 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
             orb_ax_0.plot(bins, func_act_orb_prfs, linestyle='--', color = orb_colors[i])
             inf_ax_0.plot(bins, func_act_inf_prfs, linestyle='--', color = inf_colors[i])
 
-            all_ax_1.plot(bins, ratio_all_prf, color = all_colors[i])
-            orb_ax_1.plot(bins, ratio_orb_prf, color = orb_colors[i])
-            inf_ax_1.plot(bins, ratio_inf_prf, color = inf_colors[i])
+            all_ax_1.plot(bins, mid_ratio_all_prf, color = all_colors[i])
+            orb_ax_1.plot(bins, mid_ratio_orb_prf, color = orb_colors[i])
+            inf_ax_1.plot(bins, mid_ratio_inf_prf, color = inf_colors[i])
+            
+            all_ax_1.fill_between(bins, np.nanpercentile(all_ratio_all_prf, q=15.9, axis=0),np.nanpercentile(all_ratio_all_prf, q=84.1, axis=0), color=all_colors[i], alpha=fill_alpha)
+            orb_ax_1.fill_between(bins, np.nanpercentile(all_ratio_orb_prf, q=15.9, axis=0),np.nanpercentile(all_ratio_orb_prf, q=84.1, axis=0), color=orb_colors[i], alpha=fill_alpha)
+            inf_ax_1.fill_between(bins, np.nanpercentile(all_ratio_inf_prf, q=15.9, axis=0),np.nanpercentile(all_ratio_inf_prf, q=84.1, axis=0), color=inf_colors[i], alpha=fill_alpha)
             
         all_ax_0.set_ylabel(r"$\rho / \rho_m$", fontsize=axisfntsize)
         all_ax_0.set_xscale("log")

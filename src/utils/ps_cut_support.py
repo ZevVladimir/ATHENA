@@ -1,10 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.cm import get_cmap
 from scipy.optimize import curve_fit, minimize
 
 plt.rcParams.update({"text.usetex":True, "font.family": "serif", "figure.dpi": 150})
-cmap = get_cmap('terrain')
 import os
 import multiprocessing as mp
 from dask.distributed import Client
@@ -18,10 +16,8 @@ from scipy.spatial import cKDTree
 import scipy.ndimage as ndimage
 from sparta_tools import sparta
 
-from utils.calculation_functions import create_stack_mass_prf, filter_prf, calculate_density, calc_mass_acc_rate
-from utils.update_vis_fxns import compare_split_prfs, plot_full_ptl_dist, plot_prim_ptl_dist
-from utils.ML_support import load_data, get_CUDA_cluster, get_combined_name, reform_dataset_dfs, parse_ranges, create_nu_string, load_sparta_mass_prf, split_calc_name, sim_mass_p_z
-from utils.data_and_loading_functions import create_directory, timed, load_pickle, load_SPARTA_data, conv_halo_id_spid, load_ps_data
+from utils.ML_support import load_data, get_combined_name, reform_dataset_dfs, parse_ranges, create_nu_string, split_calc_name
+from utils.data_and_loading_functions import timed, load_pickle, load_SPARTA_data
 
 import configparser
 config = configparser.ConfigParser()
