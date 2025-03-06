@@ -1453,17 +1453,17 @@ def plot_tree(bst,tree_num,save_loc):
     fig.savefig(save_loc + "/tree_plot.png")
 
 
-def plt_cust_ps_line(m,b,bins):
+def plt_cust_ps_line(b,bins):
     for i in range(bins.shape[0]-1):
         x1 = bins[i]
         x2 = bins[i+1]
-        y1 = m[i] * x1 + b[i]
-        y2 = m[i] * x2 + b[i]
-        if i == 0:
-            plt.plot([x1,x2],[y1,y2],lw=2.0, color="magenta",
-            label=fr"$m_{fit}={m[i]:.3f}$"+"\n"+fr"$b_{fit}={b[i]:.3f}$")
-        else:
-            plt.plot([x1,x2],[y1,y2],lw=2.0, color="magenta")
+        y1 = b[i]
+        y2 = b[i]
+        # if i == 0:
+        #     plt.plot([x1,x2],[y1,y2],lw=2.0, color="magenta",
+        #     label=fr"$m_{fit}={m[i]:.3f}$"+"\n"+fr"$b_{fit}={b[i]:.3f}$")
+        # else:
+        plt.plot([x1,x2],[y1,y2],lw=2.0, color="cyan")
             
 def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut, plot_loc, title, cust_line_dict = None):
     m_pos = feat_dict["m_pos"]
@@ -1558,7 +1558,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         if cust_line_dict is not None:
-            plt_cust_ps_line(m = cust_line_dict["orb_vr_pos"]["m"], b = cust_line_dict["orb_vr_pos"]["b"], bins = bins)
+            plt_cust_ps_line(b = cust_line_dict["orb_vr_pos"]["b"], bins = bins)
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
 
@@ -1570,7 +1570,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         if cust_line_dict is not None:
-            plt_cust_ps_line(m = cust_line_dict["orb_vr_neg"]["m"], b = cust_line_dict["orb_vr_neg"]["b"], bins = bins)
+            plt_cust_ps_line(b = cust_line_dict["orb_vr_neg"]["b"], bins = bins)
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
         
@@ -1582,7 +1582,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         if cust_line_dict is not None:
-            plt_cust_ps_line(m = cust_line_dict["inf_vr_pos"]["m"], b = cust_line_dict["inf_vr_pos"]["b"], bins = bins)
+            plt_cust_ps_line(b = cust_line_dict["inf_vr_pos"]["b"], bins = bins)
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
 
@@ -1594,7 +1594,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         if cust_line_dict is not None:
-            plt_cust_ps_line(m = cust_line_dict["inf_vr_neg"]["m"], b = cust_line_dict["inf_vr_neg"]["b"], bins = bins)
+            plt_cust_ps_line(b = cust_line_dict["inf_vr_neg"]["b"], bins = bins)
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         cbar_lin= plt.colorbar()
         cbar_lin.ax.tick_params(labelsize=cbar_tick_fntsize)
@@ -1608,7 +1608,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         if cust_line_dict is not None:
-            plt_cust_ps_line(m = cust_line_dict["orb_vr_pos"]["m"], b = cust_line_dict["orb_vr_pos"]["b"], bins = bins)
+            plt_cust_ps_line(b = cust_line_dict["orb_vr_pos"]["b"], bins = bins)
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
 
@@ -1619,7 +1619,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         if cust_line_dict is not None:
-            plt_cust_ps_line(m = cust_line_dict["orb_vr_neg"]["m"], b = cust_line_dict["orb_vr_neg"]["b"], bins = bins)
+            plt_cust_ps_line(b = cust_line_dict["orb_vr_neg"]["b"], bins = bins)
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
 
@@ -1630,7 +1630,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         if cust_line_dict is not None:
-            plt_cust_ps_line(m = cust_line_dict["inf_vr_pos"]["m"], b = cust_line_dict["inf_vr_pos"]["b"], bins = bins)
+            plt_cust_ps_line(b = cust_line_dict["inf_vr_pos"]["b"], bins = bins)
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
         
@@ -1641,7 +1641,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         if cust_line_dict is not None:
-            plt_cust_ps_line(m = cust_line_dict["inf_vr_neg"]["m"], b = cust_line_dict["inf_vr_neg"]["b"], bins = bins)
+            plt_cust_ps_line(b = cust_line_dict["inf_vr_neg"]["b"], bins = bins)
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         cbar_log= plt.colorbar()
         cbar_log.ax.tick_params(labelsize=cbar_tick_fntsize)
