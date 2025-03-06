@@ -9,13 +9,14 @@ from dask.distributed import Client
 import json
 import pandas as pd
 import matplotlib as mpl
+import scipy.ndimage as ndimage
 mpl.rcParams.update(mpl.rcParamsDefault)
 from colossus.cosmology import cosmology
 
 from utils.ML_support import get_CUDA_cluster, get_combined_name, parse_ranges, create_nu_string, load_sparta_mass_prf
-from utils.data_and_loading_functions import create_directory
+from utils.data_and_loading_functions import create_directory, timed
 from utils.ps_cut_support import load_ps_data
-from utils.update_vis_fxns import plt_SPARTA_KE_dist
+from utils.update_vis_fxns import plt_SPARTA_KE_dist, plt_cust_ps_line
 
 import configparser
 config = configparser.ConfigParser()
@@ -83,11 +84,10 @@ def overlap_loss_inf(params, r_bin, lnv2_bin, sparta_labels_bin):
 
 def overlap_loss(params, r_bin, lnv2_bin, sparta_labels_bin):
     m, b = params
-    orb_class = (lnv2_bin >= (m * r_bin + b)).astype(int)
-    inf_class = (lnv2_bin <= (m * r_bin + b)).astype(int)
-    orb_sparta = sparta_labels_bin[np.where(sparta_labels_bin == 1)[0]]
-    inf_sparta = sparta_labels_bin[np.where(sparta_labels_bin == 0)[0]]
-    return -(np.sum(orb_class == orb_sparta)+np.sum(inf_class == inf_sparta))  # Negative for maximization
+    decision_boundary = m * r_bin + b
+    line_classif = (lnv2_bin >= decision_boundary).astype(int)  # Orbiting = 1, Infalling = 0
+    correct_classif = np.sum(line_classif == sparta_labels_bin)
+    return -correct_classif  # Negative for maximization
 
 def opt_func(bins, r, lnv2, sparta_labels, def_m, def_b, orb = True):
     # Assign bin indices based on radius
@@ -267,9 +267,170 @@ if __name__ == "__main__":
     
     width = 0.05
     perc = 0.99
+    grad_lims = "0.2_0.5"
     r_cut = 1.75
     
     plot_loc = model_save_loc + dset_name + "_" + test_comb_name + "/plots/"
+    
+    
+    with timed("PS KE Dist plot"):
+        
+        x = np.linspace(0, 3, 1000)
+        m_pos = ps_param_dict["m_pos"]
+        b_pos = ps_param_dict["b_pos"]
+        m_neg = ps_param_dict["m_neg"]
+        b_neg = ps_param_dict["b_neg"]
+        y12 = m_pos * x + b_pos
+        y22 = m_neg * x + b_neg
+
+        nbins = 200   
+        
+        x_range = (0, 3)
+        y_range = (-2, 2.5)
+
+        hist1, xedges, yedges = np.histogram2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, range=(x_range, y_range))
+        hist2, _, _ = np.histogram2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, range=(x_range, y_range))
+        hist3, _, _ = np.histogram2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, range=(x_range, y_range))
+        hist4, _, _ = np.histogram2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, range=(x_range, y_range))
+
+        # Combine the histograms to determine the maximum density for consistent color scaling
+        combined_hist = np.maximum.reduce([hist1, hist2, hist3, hist4])
+        vmax=combined_hist.max()
+        
+        lin_vmin = 0
+        log_vmin = 1
+
+        title_fntsize = 22
+        legend_fntsize = 18
+        axis_fntsize = 20
+        txt_fntsize = 20
+        cbar_label_fntsize = 18
+        cbar_tick_fntsize = 14
+        
+        fig, axes = plt.subplots(3, 2, figsize=(12, 14))
+        axes = axes.flatten()
+        fig.suptitle(
+            r"Kinetic energy distribution of particles around halos at $z=0$""\nSimulation: Bolshoi 1000Mpc",fontsize=16)
+
+        for ax in axes:
+            ax.set_xlabel(r'$r/R_{200m}$',fontsize=16)
+            ax.set_ylabel(r'$\ln(v^2/v_{200m}^2)$',fontsize=16)
+            ax.set_xlim(0, 2)
+            ax.set_ylim(-2, 2.5)
+            ax.text(0.25, -1.4, "Orbiting", fontsize=16, color="r",
+                    weight="bold", bbox=dict(facecolor='w', alpha=0.75))
+            ax.text(1.5, 0.7, "Infalling", fontsize=16, color="b",
+                    weight="bold", bbox=dict(facecolor='w', alpha=0.75))
+            ax.tick_params(axis='both',which='both',direction="in",labelsize=12,length=8,width=2)
+
+        plt.sca(axes[0])
+        plt.title(r'$v_r > 0$',fontsize=title_fntsize)
+        plt.hist2d(r[mask_vr_pos], lnv2[mask_vr_pos], bins=nbins,
+                    cmap="terrain", range=(x_range, y_range))
+        plt.plot(x, y12, lw=2.0, color="k",
+                label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(label=r'$N$ (Counts)')
+        plt_cust_ps_line(m = opt_param_dict["orb_vr_pos"]["m"], b = opt_param_dict["orb_vr_pos"]["b"], bins = bins)
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.xlim(0, 2)
+        
+
+        plt.sca(axes[1])
+        plt.title(r'$v_r < 0$',fontsize=title_fntsize)
+        plt.hist2d(r[mask_vr_neg], lnv2[mask_vr_neg], bins=nbins,
+                    cmap="terrain", range=(x_range, y_range))
+        plt.plot(x, y22, lw=2.0, color="k",
+                label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(label=r'$N$ (Counts)')
+        plt_cust_ps_line(m = opt_param_dict["orb_vr_neg"]["m"], b = opt_param_dict["orb_vr_neg"]["b"], bins = bins)
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.xlim(0, 2)
+        
+        plt.sca(axes[2])
+        plt.title(r'$v_r > 0$',fontsize=title_fntsize)
+        h3 = plt.hist2d(r[mask_vr_pos], lnv2[mask_vr_pos], bins=nbins, norm="log",
+                    cmap="terrain", range=(x_range, y_range))
+        plt.plot(x, y12, lw=2.0, color="k",
+                label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(h3[3], label=r'$N$ (Counts)')
+        plt_cust_ps_line(m = opt_param_dict["orb_vr_pos"]["m"], b = opt_param_dict["orb_vr_pos"]["b"], bins = bins)
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.xlim(0, 2)
+
+        plt.sca(axes[3])
+        plt.title(r'$v_r < 0$',fontsize=title_fntsize)
+        h4 = plt.hist2d(r[mask_vr_neg], lnv2[mask_vr_neg], bins=nbins, norm="log",
+                    cmap="terrain", range=(x_range, y_range))
+        plt.plot(x, y22, lw=2.0, color="k",
+                label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(h4[3], label=r'$N$ (Counts)')
+        plt_cust_ps_line(m = opt_param_dict["orb_vr_neg"]["m"], b = opt_param_dict["orb_vr_neg"]["b"], bins = bins)
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.xlim(0, 2)
+        
+        mask_vrn = (vr < 0)
+        mask_vrp = ~mask_vrn
+
+        # Compute density and gradient.
+        # For vr > 0
+        hist_zp, hist_xp, hist_yp = np.histogram2d(r[mask_vrp], lnv2[mask_vrp], 
+                                                    bins=nbins, 
+                                                    range=((0, 3.), (-2, 2.5)),
+                                                    density=True)
+        # Bin centres
+        hist_xp = 0.5 * (hist_xp[:-1] + hist_xp[1:])
+        hist_yp = 0.5 * (hist_yp[:-1] + hist_yp[1:])
+        # Bin spacing
+        dx = np.mean(np.diff(hist_xp))
+        dy = np.mean(np.diff(hist_yp))
+        # Generate a 2D grid corresponding to the histogram
+        hist_xp, hist_yp = np.meshgrid(hist_xp, hist_yp)
+        # Evaluate the gradient at each radial bin
+        hist_z_grad = np.zeros_like(hist_zp)
+        for i in range(hist_xp.shape[0]):
+            hist_z_grad[i, :] = np.gradient(hist_zp[i, :], dy)
+        # Apply a gaussian filter to smooth the gradient.
+        hist_zp = ndimage.gaussian_filter(hist_z_grad, 2.0)
+
+        # Same for vr < 0
+        hist_zn, hist_xn, hist_yn = np.histogram2d(r[mask_vrn], lnv2[mask_vrn],
+                                                    bins=nbins,
+                                                    range=((0, 3.), (-2, 2.5)),
+                                                    density=True)
+        hist_xn = 0.5 * (hist_xn[:-1] + hist_xn[1:])
+        hist_yn = 0.5 * (hist_yn[:-1] + hist_yn[1:])
+        dy = np.mean(np.diff(hist_yn))
+        hist_xn, hist_yn = np.meshgrid(hist_xn, hist_yn)
+        hist_z_grad = np.zeros_like(hist_zn)
+        for i in range(hist_xn.shape[0]):
+            hist_z_grad[i, :] = np.gradient(hist_zn[i, :], dy)
+        hist_zn = ndimage.gaussian_filter(hist_z_grad, 2.0)
+
+        #Plot the smoothed gradient
+        plt.sca(axes[4])
+        plt.title(r'$v_r > 0$',fontsize=title_fntsize)
+        plt.contourf(hist_xp, hist_yp, hist_zp.T, levels=80, cmap='terrain')
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(label="Smoothed Gradient Magnitude")
+        plt.xlim(0, 2)
+        
+        # Plot the smoothed gradient
+        plt.sca(axes[5])
+        plt.title(r'$v_r < 0$',fontsize=title_fntsize)
+        plt.contourf(hist_xn, hist_yn, hist_zn.T, levels=80, cmap='terrain')
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(label="Smoothed Gradient Magnitude")
+        plt.xlim(0, 2)
+        
+        
+
+        plt.tight_layout();
+        plt.savefig(plot_loc + "bin_fit_perc_" + str(perc) + "_" + grad_lims + "_KE_dist_cut.png")
+    
     
     plt_SPARTA_KE_dist(ps_param_dict, fltr_combs, bins, r, lnv2, perc = perc, width = width, r_cut = r_cut, plot_loc = plot_loc, title = "bin_fit_", cust_line_dict = opt_param_dict)
         

@@ -1461,7 +1461,7 @@ def plt_cust_ps_line(m,b,bins):
         y2 = m[i] * x2 + b[i]
         if i == 0:
             plt.plot([x1,x2],[y1,y2],lw=2.0, color="magenta",
-            label=fr"$m_fit={m[i]:.3f}$"+"\n"+fr"$b_fit={b[i]:.3f}$")
+            label=fr"$m_{fit}={m[i]:.3f}$"+"\n"+fr"$b_{fit}={b[i]:.3f}$")
         else:
             plt.plot([x1,x2],[y1,y2],lw=2.0, color="magenta")
             
