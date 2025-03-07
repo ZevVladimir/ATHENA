@@ -88,9 +88,13 @@ def overlap_loss(params, lnv2_bin, sparta_labels_bin):
     correct_classif = np.sum(line_classif == sparta_labels_bin)
     return ((sparta_labels_bin.shape[0] - correct_classif)/sparta_labels_bin.shape[0])
 
-def opt_func(bins, r, lnv2, sparta_labels, def_m, def_b, orb = True):
+def opt_func(bins, r, lnv2, sparta_labels, def_m, def_b, orb = True, plot_loc = "", title = ""):
     # Assign bin indices based on radius
     bin_indices = np.digitize(r, bins) - 1  
+    
+    magma_cmap = plt.get_cmap("magma")
+    magma_cmap.set_under(color='black')
+    magma_cmap.set_bad(color='black') 
 
     intercepts = []
 
@@ -115,7 +119,12 @@ def opt_func(bins, r, lnv2, sparta_labels, def_m, def_b, orb = True):
             result = minimize(overlap_loss_inf, initial_guess, args=(r_bin, lnv2_bin, sparta_labels_bin))
         else:
             initial_guess = [np.mean(lnv2_bin)]
-            result = minimize(overlap_loss, initial_guess, args=(r_bin, lnv2_bin, sparta_labels_bin))
+            result = minimize(overlap_loss, initial_guess, args=(lnv2_bin, sparta_labels_bin))
+            fig, ax = plt.subplots(1)
+            ax.hist2d(r_bin, lnv2_bin, bins=200, norm="log", cmap=magma_cmap)
+            ax.set_title("Bin " + str(i) + "Radius: " + str(bins[i]) + "-" + str(bins[i+1]))
+            ax.hlines(result.x[0],xmin=bin[i],xmax=bin[i+1])
+            fig.savefig(plot_loc + title + "_bin_" + str(i) + ".png")
         intercepts.append(result.x[0])
         
     return {"b":intercepts}
@@ -243,8 +252,8 @@ if __name__ == "__main__":
     act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sparta_mass_prf(sim_splits,all_idxs,use_sims)
     act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb  
     
-    vr_pos = opt_func(bins, r[mask_vr_pos], lnv2[mask_vr_pos], sparta_labels[mask_vr_pos], 0, ps_param_dict["b_pos"], orb = None)
-    vr_neg = opt_func(bins, r[mask_vr_neg], lnv2[mask_vr_neg], sparta_labels[mask_vr_neg], 0, ps_param_dict["b_neg"], orb = None)
+    vr_pos = opt_func(bins, r[mask_vr_pos], lnv2[mask_vr_pos], sparta_labels[mask_vr_pos], 0, ps_param_dict["b_pos"], orb = None, plot_loc = plot_loc, title = "pos")
+    vr_neg = opt_func(bins, r[mask_vr_neg], lnv2[mask_vr_neg], sparta_labels[mask_vr_neg], 0, ps_param_dict["b_neg"], orb = None, plot_loc = plot_loc, title = "neg")
 
     
     # opt_param_dict = {
@@ -264,9 +273,7 @@ if __name__ == "__main__":
     width = 0.05
     perc = 0.99
     grad_lims = "0.2_0.5"
-    r_cut = 1.75
-    
-    plot_loc = model_save_loc + dset_name + "_" + test_comb_name + "/plots/"    
+    r_cut = 1.75    
     
     plt_SPARTA_KE_dist(ps_param_dict, fltr_combs, bins, r, lnv2, perc = perc, width = width, r_cut = r_cut, plot_loc = plot_loc, title = "bin_fit_", cust_line_dict = opt_param_dict)
         
