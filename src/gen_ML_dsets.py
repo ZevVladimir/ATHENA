@@ -50,7 +50,6 @@ lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
 create_directory(pickled_path)
 create_directory(ML_dset_path)
 
-# Instantiate colossus cosmology depending on input
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
 else:
@@ -58,10 +57,11 @@ else:
 match = re.search(sim_pat, curr_sparta_file)
 if match:
     sparta_name = match.group(0)
+else:
+    sparta_name = curr_sparta_file
 
 # Set up exact paths
 sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
-snap_loc = snap_path + sparta_name + "/"
 
 num_processes = mp.cpu_count()
 global count
@@ -430,7 +430,7 @@ with timed("Startup"):
 
     with timed("p_snap information load"):
         if reset_lvl > 1 or len(known_snaps) == 0:
-            p_snap, p_red_shift = find_closest_z(p_red_shift,snap_loc,snap_dir_format,snap_format)
+            p_snap, p_red_shift = find_closest_z(p_red_shift,snap_path,snap_dir_format,snap_format)
             print("Snapshot number found:", p_snap, "Closest redshift found:", p_red_shift)
             
             with h5py.File(sparta_HDF5_path,"r") as f:
@@ -466,7 +466,7 @@ with timed("Startup"):
                 p_rho_m = config_params["p_snap_info"]["rho_m"]
 
         # Set constants
-        p_snap_path = snap_loc + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
+        p_snap_path = snap_path + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
         
 
         p_snap_dict = {
@@ -504,7 +504,7 @@ with timed("Startup"):
     with timed("c_snap load"):
         if reset_lvl > 1 or len(known_snaps) == 0:
             t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], p_red_shift)
-            c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_const = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_loc=snap_loc)
+            c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_const = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
             c_box_size = sim_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
         else:
             c_snap = config_params["c_snap_info"]["ptl_snap"]
@@ -519,7 +519,7 @@ with timed("Startup"):
             else:
                 c_rho_m = config_params["c_snap_info"]["rho_m"]
         
-        c_snap_path = snap_loc + "/snapdir_" + snap_dir_format.format(c_snap) + "/snapshot_" + snap_format.format(c_snap)
+        c_snap_path = snap_path + "/snapdir_" + snap_dir_format.format(c_snap) + "/snapshot_" + snap_format.format(c_snap)
         
         if reset_lvl == 3:
             clean_dir(pickled_path + str(c_snap) + "_" + curr_sparta_file + "/")

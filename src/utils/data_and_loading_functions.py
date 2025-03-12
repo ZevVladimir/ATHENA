@@ -33,6 +33,8 @@ else:
 match = re.search(sim_pat, curr_sparta_file)
 if match:
     sparta_name = match.group(0)
+else:
+    sparta_name = curr_sparta_file
 
 num_processes = mp.cpu_count()
 ##################################################################################################################
@@ -212,15 +214,15 @@ def conv_halo_id_spid(my_halo_ids, sdata, snapshot):
         sparta_idx[i] = int(np.where(my_id == sdata['halos']['id'][:,snapshot])[0])
     return sparta_idx
 
-def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red_shifts, snap_dir_format, snap_format, snap_loc):
+def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red_shifts, snap_dir_format, snap_format, snap_path):
     # calculate one dynamical time ago and set that as the comparison snap
     curr_time = cosmol.age(p_red_shift)
     past_time = curr_time - (t_dyn_step * t_dyn)
-    c_snap = find_closest_snap(past_time, cosmol, snap_loc, snap_dir_format, snap_format)
+    c_snap = find_closest_snap(past_time, cosmol, snap_path, snap_dir_format, snap_format)
     snapshot_list.append(c_snap)
 
     # switch to comparison snap
-    c_snap_path = snap_loc + "/snapdir_" + snap_dir_format.format(c_snap) + "/snapshot_" + snap_format.format(c_snap)
+    c_snap_path = snap_path + "/snapdir_" + snap_dir_format.format(c_snap) + "/snapshot_" + snap_format.format(c_snap)
         
     # get constants from pygadgetreader
     c_red_shift = readheader(c_snap_path, 'redshift')

@@ -1062,14 +1062,15 @@ def plot_halo_slice(ptl_pos, labels, halo_pos, halo_r200m, save_loc, search_rad=
 
 # If less than some percentage of halos are non-zero do not plot
 # prf should be in shape (n_halo, n_bin)
-def clean_prf(prf, frac=0.25):
-    for i in range(prf.shape[1]):
-        nonzero_count = np.count_nonzero(prf[:, i])  
-        total_count = prf.shape[0] 
-        # Check if nonzero fraction is below threshold if it is set entire bin to NaN
-        if nonzero_count / total_count < frac:  
-            prf[:, i] = np.nan 
-    return prf
+def clean_prf(prf_1, prf_2, frac=0.5):
+    for i in range(prf_1.shape[1]):
+        nonzero_frac_1 = np.count_nonzero(prf_1[:, i]) / prf_1.shape[0]
+        nonzero_frac_2 = np.count_nonzero(prf_2[:, i]) / prf_2.shape[0]
+
+        if (nonzero_frac_1 < frac) or (nonzero_frac_2 < frac):    
+            prf_1[:, i] = np.nan 
+            prf_2[:, i] = np.nan
+    return prf_1, prf_2
 
 # Profiles should be a list [calc_prf,act_prf]
 # You can either use the median plots with use_med=True or the average with use_med=False
@@ -1099,12 +1100,9 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
         # ratio_inf_prf = (inf_prfs[0] / inf_prfs[1]) - 1
 
         if prf_func != None:
-            clean_prf(all_prfs[0], frac=0.25)
-            clean_prf(all_prfs[1], frac=0.25)
-            clean_prf(orb_prfs[0], frac=0.25)
-            clean_prf(orb_prfs[1], frac=0.25)
-            clean_prf(inf_prfs[0], frac=0.25)
-            clean_prf(inf_prfs[1], frac=0.25)
+            clean_prf(all_prfs[0],all_prfs[1])
+            clean_prf(orb_prfs[0],orb_prfs[1])
+            clean_prf(inf_prfs[0],inf_prfs[1])
         
             calc_all_prfs = prf_func(all_prfs[0],axis=0)
             calc_orb_prfs = prf_func(orb_prfs[0],axis=0)
@@ -1233,12 +1231,9 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
             # ratio_orb_prf = (orb_prfs[i][0] / orb_prfs[i][1]) - 1
             # ratio_inf_prf = (inf_prfs[i][0] / inf_prfs[i][1]) - 1
             if prf_func != None:
-                clean_prf(all_prfs[i][0])
-                clean_prf(all_prfs[i][1])
-                clean_prf(orb_prfs[i][0])
-                clean_prf(orb_prfs[i][1])
-                clean_prf(inf_prfs[i][0])
-                clean_prf(inf_prfs[i][1])
+                clean_prf(all_prfs[i][0],all_prfs[i][1])
+                clean_prf(orb_prfs[i][0],orb_prfs[i][1])
+                clean_prf(inf_prfs[i][0],inf_prfs[i][1])
                 
             all_ratio_all_prf = (all_prfs[i][0] / all_prfs[i][1]) - 1
             all_ratio_orb_prf = (orb_prfs[i][0] / orb_prfs[i][1]) - 1
@@ -1649,3 +1644,4 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.xlim(0, 2)
     
         plt.savefig(plot_loc + title + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=300)    
+        

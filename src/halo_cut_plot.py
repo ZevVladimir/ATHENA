@@ -31,6 +31,9 @@ else:
 match = re.search(sim_pat, curr_sparta_file)
 if match:
     sparta_name = match.group(0)
+else:
+    sparta_name = curr_sparta_file
+    
 SPARTA_hdf5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
 
 search_radius = config.getfloat("SEARCH","search_radius")
@@ -90,8 +93,7 @@ halos_status = sparta_params[sparta_param_names[3]][:,p_sparta_snap]
 halos_last_snap = sparta_params[sparta_param_names[4]][:]
 ptl_mass = sparta_params[sparta_param_names[5]]
 
-snap_loc = snap_path + sparta_name + "/"
-p_snap_path = snap_loc + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
+p_snap_path = snap_path + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
 
 ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(p_snap), p_snap_path) 
 ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(p_snap), p_snap_path) # km/s

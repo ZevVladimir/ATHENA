@@ -36,19 +36,15 @@ use_gpu = config.getboolean("MISC","use_gpu")
 curr_sparta_file = config["MISC"]["curr_sparta_file"]
 sim_cosmol = config["MISC"]["sim_cosmol"]
 
-snap_path = config["PATHS"]["snap_path"]
 SPARTA_output_path = config["PATHS"]["SPARTA_output_path"]
 pickled_path = config["PATHS"]["pickled_path"]
 ML_dset_path = config["PATHS"]["ML_dset_path"]
 debug_plt_path = config["PATHS"]["debug_plt_path"]
 
 if sim_cosmol == "planck13-nbody":
-    sim_pat = r"cpla_l(\d+)_n(\d+)"
     cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
 else:
     cosmol = cosmology.setCosmology(sim_cosmol) 
-    sim_pat = r"cbol_l(\d+)_n(\d+)"
-match = re.search(sim_pat, curr_sparta_file)
 
 file_lim = config.getint("XGBOOST","file_lim")
 

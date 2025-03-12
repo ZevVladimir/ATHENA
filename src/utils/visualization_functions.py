@@ -21,7 +21,6 @@ import configparser
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
 
-curr_sparta_file = config["MISC"]["curr_sparta_file"]
 MLOIS_path = config["PATHS"]["MLOIS_path"]
 
 def rv_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = None):
