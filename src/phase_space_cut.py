@@ -344,9 +344,6 @@ if __name__ == "__main__":
             "log_rticks":log_rticks,
     }
 
-    plot_full_ptl_dist(sparta_labels,r,vr,vt,c_r,c_vr,split_scale_dict,num_bins=30,save_loc=plot_loc,save_title="_ps_data")
-    plot_prim_ptl_dist(sparta_labels[fltr_combs["inf_vr_neg"]],r[fltr_combs["inf_vr_neg"]],vr[fltr_combs["inf_vr_neg"]],vt[fltr_combs["inf_vr_neg"]],split_scale_dict,num_bins=30,save_loc=plot_loc,save_title="negvr_inf")
-    
     # y_shift = w / np.cos(np.arctan(m_neg))
     x = np.linspace(0, 3, 1000)
     y12 = m_pos * x + b_pos

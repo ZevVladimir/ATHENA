@@ -84,9 +84,14 @@ def overlap_loss_inf(params, r_bin, lnv2_bin, sparta_labels_bin):
 
 def overlap_loss(params, lnv2_bin, sparta_labels_bin):
     decision_boundary = params
-    line_classif = (lnv2_bin >= decision_boundary).astype(int)  # Orbiting = 1, Infalling = 0
-    correct_classif = np.sum(line_classif == sparta_labels_bin)
-    return ((sparta_labels_bin.shape[0] - correct_classif)/sparta_labels_bin.shape[0])
+    line_classif = (lnv2_bin >= decision_boundary).astype(int)  
+
+    # Count misclassified particles
+    misclass_orb = np.sum((line_classif == 0) & (sparta_labels_bin == 1))
+    misclass_inf = np.sum((line_classif == 1) & (sparta_labels_bin == 0))
+
+    # Loss is the absolute difference between the two misclassification counts
+    return abs(misclass_orb - misclass_inf)
 
 def opt_func(bins, r, lnv2, sparta_labels, def_m, def_b, orb = True, plot_loc = "", title = ""):
     # Assign bin indices based on radius
@@ -97,7 +102,7 @@ def opt_func(bins, r, lnv2, sparta_labels, def_m, def_b, orb = True, plot_loc = 
     magma_cmap.set_bad(color='black') 
 
     intercepts = []
-
+    lnv2_range = (np.min(lnv2),np.max(lnv2))
     for i in range(bins.shape[0]-1):
         mask = bin_indices == i
         if np.sum(mask) == 0:
@@ -113,18 +118,65 @@ def opt_func(bins, r, lnv2, sparta_labels, def_m, def_b, orb = True, plot_loc = 
             # Initial guess for m and b
             initial_guess = [np.max(lnv2_bin)]
             result = minimize(overlap_loss_orb, initial_guess, args=(r_bin, lnv2_bin, sparta_labels_bin))
-        if orb is False:
+        elif orb is False:
             # Initial guess for m and b
             initial_guess = [np.mean(lnv2_bin)]
             result = minimize(overlap_loss_inf, initial_guess, args=(r_bin, lnv2_bin, sparta_labels_bin))
         else:
-            initial_guess = [np.mean(lnv2_bin)]
-            result = minimize(overlap_loss, initial_guess, args=(lnv2_bin, sparta_labels_bin))
-            fig, ax = plt.subplots(1)
-            ax.hist2d(r_bin, lnv2_bin, bins=200, norm="log", cmap=magma_cmap)
-            ax.set_title("Bin " + str(i) + "Radius: " + str(bins[i]) + "-" + str(bins[i+1]))
-            ax.hlines(result.x[0],xmin=bin[i],xmax=bin[i+1])
-            fig.savefig(plot_loc + title + "_bin_" + str(i) + ".png")
+            initial_guess = [np.min(lnv2_bin)]
+            result_min = minimize(overlap_loss, initial_guess, args=(lnv2_bin, sparta_labels_bin), method="Nelder-Mead")
+            
+            initial_guess = [np.max(lnv2_bin)]
+            result_max = minimize(overlap_loss, initial_guess, args=(lnv2_bin, sparta_labels_bin), method="Nelder-Mead")
+            
+            if result_min.fun < result_max.fun:
+                result = result_min
+            else:
+                result = result_max
+            calc_b = result.x[0]
+            if calc_b < -6:
+                calc_b = -6
+            elif calc_b > 4:
+                calc_b = 4
+                
+            create_directory(plot_loc + title + "bins/")
+        
+            fig, ax = plt.subplots(2)
+            for vel in np.arange(lnv2_range[0],lnv2_range[1],0.01):
+                line_classif = (lnv2_bin >= vel).astype(int)  
+                misclass_orb = np.sum((line_classif == 0) & (sparta_labels_bin == 1))
+                misclass_inf = np.sum((line_classif == 1) & (sparta_labels_bin == 0))
+                ax[0].scatter(vel,misclass_inf)
+                ax[1].scatter(vel,misclass_orb)
+            
+            ax[0].set_xlim(r'$\ln(v^2/v_{200m}^2)$')
+            ax[0].set_ylim("Number of Misclassified Particles")
+            ax[0].set_title("Infalling Particles")
+            ax[1].set_xlim(r'$\ln(v^2/v_{200m}^2)$')
+            ax[1].set_ylim("Number of Misclassified Particles")
+            ax[1].set_title("Orbiting Particles")
+            create_directory(plot_loc + title + "bins/miss_class/")
+            fig.savefig(plot_loc + title + "bins/miss_class/miss_class_bin_" + str(i) + ".png")
+            
+            # fig, ax = plt.subplots(2,1)
+            
+            # ax[0].hist2d(r_bin[np.where(sparta_labels_bin == 0)[0]], lnv2_bin[np.where(sparta_labels_bin == 0)[0]], 
+            #             range = [[bins[i],bins[i+1]],lnv2_range], bins=200, norm="log", cmap=magma_cmap)
+            # ax[0].hlines(result.x[0],xmin=bins[i],xmax=bins[i+1])
+            # ax[0].set_title("Infalling particles")
+            # ax[0].set_ylabel(r'$\ln(v^2/v_{200m}^2)$')
+            # ax[0].set_ylim(lnv2_range)
+            
+            # ax[1].hist2d(r_bin[np.where(sparta_labels_bin == 1)[0]], lnv2_bin[np.where(sparta_labels_bin == 1)[0]],
+            #             range = [[bins[i],bins[i+1]],lnv2_range], bins=200, norm="log", cmap=magma_cmap)
+            # ax[1].hlines(result.x[0],xmin=bins[i],xmax=bins[i+1])
+            # ax[1].set_title("Orbiting particles")
+            # ax[1].set_ylabel(r'$\ln(v^2/v_{200m}^2)$')
+            # ax[1].set_xlabel(r'$r/R_{200m}$')
+            # ax[1].set_ylim(lnv2_range)
+            # fig.suptitle("Bin " + str(i) + "Radius: " + str(bins[i]) + "-" + str(bins[i+1]))
+            # create_directory(plot_loc + title + "bins/dist/")
+            # fig.savefig(plot_loc + title + "bins/dist/bin_" + str(i) + ".png")
         intercepts.append(result.x[0])
         
     return {"b":intercepts}
