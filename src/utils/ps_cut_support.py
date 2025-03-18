@@ -28,7 +28,7 @@ use_gpu = config.getboolean("MISC","use_gpu")
 
 ML_dset_path = config["PATHS"]["ML_dset_path"]
 path_to_models = config["PATHS"]["path_to_models"]
-SPARTA_output_path = config["PATHS"]["SPARTA_output_path"]
+SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
 
 model_sims = json.loads(config.get("XGBOOST","model_sims"))
 dask_task_cpus = config.getint("XGBOOST","dask_task_cpus")
@@ -171,8 +171,6 @@ def load_ps_data(client, curr_test_sims = ["cbol_l1000_n1024_4r200m_1-5v200m_99t
     dset_name = eval_datasets[0]
 
     with timed("Loading data"):             
-        
-        
         # Load the halo information
         halo_files = []
         halo_dfs = []
@@ -196,7 +194,7 @@ def load_ps_data(client, curr_test_sims = ["cbol_l1000_n1024_4r200m_1-5v200m_99t
     lnv2 = np.log(vphys**2)
     sparta_labels = samp_data["Orbit_infall"]
     
-    return r, vr, lnv2, sparta_labels, data, halo_df
+    return r, vr, lnv2, sparta_labels, samp_data, data, halo_df
 
 def ps_predictor(feat_dict, r, vr, lnv2):
     m_pos = feat_dict["m_pos"]

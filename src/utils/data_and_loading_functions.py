@@ -17,14 +17,13 @@ import configparser
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
 
-SPARTA_output_path = config["PATHS"]["SPARTA_output_path"]
+SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
 pickled_path = config["PATHS"]["pickled_path"]
 
-curr_sparta_file = config["MISC"]["curr_sparta_file"]
+curr_sparta_file = config["SPARTA_DATA"]["curr_sparta_file"]
 sim_cosmol = config["MISC"]["sim_cosmol"]
 
 reset_lvl = config.getint("SEARCH","reset")
-total_num_snaps = config.getint("SEARCH","total_num_snaps")
 ##################################################################################################################
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
@@ -62,6 +61,14 @@ def clean_dir(path):
                 os.remove(file_path)
     except OSError:
         print("Error occurred while deleting files at location:",path)
+
+# Obtains the highest number snapshot in the given folder path
+# We can't just get the total number of folders as there might be snapshots missing
+def get_num_snaps(path):
+    folders = [d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
+    numbers = [int(re.search(r'\d+', d).group()) for d in folders if re.search(r'\d+', d)]
+    max_number = max(numbers, default=None)
+    return max_number
 
 def save_pickle(data, path):
     with open(path, "wb") as pickle_file:
@@ -190,8 +197,9 @@ def split_data_by_halo(client,frac, halo_props, ptl_data, return_halo=False):
         return ptl_1, ptl_2
     
 def find_closest_z(value,snap_loc,snap_dir_format,snap_format):
-    all_z = np.ones(total_num_snaps) * -1000
-    for i in range(total_num_snaps):
+    tot_num_snaps = get_num_snaps(snap_loc)
+    all_z = np.ones(tot_num_snaps) * -1000
+    for i in range(tot_num_snaps):
         # Sometimes not all snaps exist
         if os.path.isdir(snap_loc + "snapdir_" + snap_dir_format.format(i)):
             all_z[i] = readheader(snap_loc + "snapdir_" + snap_dir_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift')
@@ -200,8 +208,9 @@ def find_closest_z(value,snap_loc,snap_dir_format,snap_format):
     return idx, all_z[idx]
 
 def find_closest_snap(value, cosmology, snap_loc, snap_dir_format, snap_format):
-    all_times = np.ones(total_num_snaps) * -1000
-    for i in range(total_num_snaps):
+    tot_num_snaps = get_num_snaps(snap_loc)
+    all_times = np.ones(tot_num_snaps) * -1000
+    for i in range(tot_num_snaps):
         # Sometimes not all snaps exist
         if os.path.isdir(snap_loc + "snapdir_" + snap_dir_format.format(i)):
             all_times[i] = cosmology.age(readheader(snap_loc + "snapdir_" + snap_dir_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift'))

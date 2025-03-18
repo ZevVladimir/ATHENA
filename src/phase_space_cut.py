@@ -32,7 +32,7 @@ use_gpu = config.getboolean("MISC","use_gpu")
 
 ML_dset_path = config["PATHS"]["ML_dset_path"]
 path_to_models = config["PATHS"]["path_to_models"]
-SPARTA_output_path = config["PATHS"]["SPARTA_output_path"]
+SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
 
 model_sims = json.loads(config.get("XGBOOST","model_sims"))
 dask_task_cpus = config.getint("XGBOOST","dask_task_cpus")

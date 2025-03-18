@@ -31,7 +31,7 @@ use_gpu = config.getboolean("MISC","use_gpu")
 
 ML_dset_path = config["PATHS"]["ML_dset_path"]
 path_to_models = config["PATHS"]["path_to_models"]
-SPARTA_output_path = config["PATHS"]["SPARTA_output_path"]
+SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
 
 model_sims = json.loads(config.get("XGBOOST","model_sims"))
 dask_task_cpus = config.getint("XGBOOST","dask_task_cpus")
@@ -87,7 +87,7 @@ def overlap_loss_inf(params, r_bin, lnv2_bin, sparta_labels_bin):
     return -np.sum(line_classification == sparta_labels_bin)  # Negative for maximization
 
 def overlap_loss(params, lnv2_bin, sparta_labels_bin):
-    decision_boundary = params
+    decision_boundary = params[0]
     line_classif = (lnv2_bin <= decision_boundary).astype(int)  
 
     # Count misclassified particles
@@ -144,52 +144,48 @@ def opt_func(bins, r, lnv2, sparta_labels, def_m, def_b, orb = True, plot_loc = 
             result = result_mean
             
             calc_b = result.x[0]
-            if calc_b < -6:
-                calc_b = -6
-            elif calc_b > 4:
-                calc_b = 4
                 
             create_directory(plot_loc + title + "bins/")
         
-            fig_miss, ax_miss = plt.subplots(1,2,figsize=(14,7),share_y=True)
-            fig_dist, ax_dist = plt.subplots(1,2,figsize=(14,7))
-            for vel in np.arange(lnv2_range[0],lnv2_range[1],0.01):
-                line_classif = (lnv2_bin <= vel).astype(int)  
-                misclass_orb = np.sum((line_classif == 0) & (sparta_labels_bin == 1))
-                misclass_inf = np.sum((line_classif == 1) & (sparta_labels_bin == 0))
-                ax_miss[0].scatter(vel,misclass_inf)
-                ax_miss[1].scatter(vel,misclass_orb)
+            # fig_miss, ax_miss = plt.subplots(1,2,figsize=(14,7),share_y=True)
+            # fig_dist, ax_dist = plt.subplots(1,2,figsize=(14,7))
+            # for vel in np.arange(lnv2_range[0],lnv2_range[1],0.01):
+            #     line_classif = (lnv2_bin <= vel).astype(int)  
+            #     misclass_orb = np.sum((line_classif == 0) & (sparta_labels_bin == 1))
+            #     misclass_inf = np.sum((line_classif == 1) & (sparta_labels_bin == 0))
+            #     ax_miss[0].scatter(vel,misclass_inf)
+            #     ax_miss[1].scatter(vel,misclass_orb)
                 
-                ax_dist[0].hist2d(r_bin[np.where(sparta_labels_bin == 0)[0]], lnv2_bin[np.where(sparta_labels_bin == 0)[0]], 
-                        range = [[bins[i],bins[i+1]],lnv2_range], bins=200, norm="log", cmap=magma_cmap)
-                ax_dist[0].hlines(calc_b,xmin=bins[i],xmax=bins[i+1])
-                ax_dist[1].hist2d(r_bin[np.where(sparta_labels_bin == 1)[0]], lnv2_bin[np.where(sparta_labels_bin == 1)[0]],
-                        range = [[bins[i],bins[i+1]],lnv2_range], bins=200, norm="log", cmap=magma_cmap)
-                ax_dist[1].hlines(calc_b,xmin=bins[i],xmax=bins[i+1])
+            #     ax_dist[0].hist2d(r_bin[np.where(sparta_labels_bin == 0)[0]], lnv2_bin[np.where(sparta_labels_bin == 0)[0]], 
+            #             range = [[bins[i],bins[i+1]],lnv2_range], bins=200, norm="log", cmap=magma_cmap)
+            #     ax_dist[0].hlines(calc_b,xmin=bins[i],xmax=bins[i+1])
+            #     ax_dist[1].hist2d(r_bin[np.where(sparta_labels_bin == 1)[0]], lnv2_bin[np.where(sparta_labels_bin == 1)[0]],
+            #             range = [[bins[i],bins[i+1]],lnv2_range], bins=200, norm="log", cmap=magma_cmap)
+            #     ax_dist[1].hlines(calc_b,xmin=bins[i],xmax=bins[i+1])
             
-            ax_miss[0].set_xlabel(r'$\ln(v^2/v_{200m}^2)$')
-            ax_miss[0].set_ylabel("Number of Misclassified Particles")
-            ax_miss[0].set_title("Infalling Particles Classified as Orbiting")
-            ax_miss[1].set_xlabel(r'$\ln(v^2/v_{200m}^2)$')
-            ax_miss[1].set_ylabel("Number of Misclassified Particles")
-            ax_miss[1].set_title("Orbiting Particles Classified as Infalling")
-            create_directory(plot_loc + title + "bins/miss_class/")
-            fig_miss.savefig(plot_loc + title + "bins/miss_class/miss_class_bin_" + str(i) + ".png")
-            plt.close(fig_miss)
+            # ax_miss[0].set_xlabel(r'$\ln(v^2/v_{200m}^2)$')
+            # ax_miss[0].set_ylabel("Number of Misclassified Particles")
+            # ax_miss[0].set_title("Infalling Particles Classified as Orbiting")
+            # ax_miss[1].set_xlabel(r'$\ln(v^2/v_{200m}^2)$')
+            # ax_miss[1].set_ylabel("Number of Misclassified Particles")
+            # ax_miss[1].set_title("Orbiting Particles Classified as Infalling")
+            # create_directory(plot_loc + title + "bins/miss_class/")
+            # fig_miss.savefig(plot_loc + title + "bins/miss_class/miss_class_bin_" + str(i) + ".png")
+            # plt.close(fig_miss)
             
             
-            ax_dist[0].set_title("Infalling particles")
-            ax_dist[0].set_ylabel(r'$\ln(v^2/v_{200m}^2)$')
-            ax_dist[0].set_ylim(lnv2_range)
+            # ax_dist[0].set_title("Infalling particles")
+            # ax_dist[0].set_ylabel(r'$\ln(v^2/v_{200m}^2)$')
+            # ax_dist[0].set_ylim(lnv2_range)
             
-            ax_dist[1].set_title("Orbiting particles")
-            ax_dist[1].set_ylabel(r'$\ln(v^2/v_{200m}^2)$')
-            ax_dist[1].set_xlabel(r'$r/R_{200m}$')
-            ax_dist[1].set_ylim(lnv2_range)
-            fig_dist.suptitle("Bin " + str(i) + "Radius: " + str(bins[i]) + "-" + str(bins[i+1]))
-            create_directory(plot_loc + title + "bins/dist/")
-            fig_dist.savefig(plot_loc + title + "bins/dist/bin_" + str(i) + ".png")          
-            plt.close(fig_dist)
+            # ax_dist[1].set_title("Orbiting particles")
+            # ax_dist[1].set_ylabel(r'$\ln(v^2/v_{200m}^2)$')
+            # ax_dist[1].set_xlabel(r'$r/R_{200m}$')
+            # ax_dist[1].set_ylim(lnv2_range)
+            # fig_dist.suptitle("Bin " + str(i) + "Radius: " + str(bins[i]) + "-" + str(bins[i+1]))
+            # create_directory(plot_loc + title + "bins/dist/")
+            # fig_dist.savefig(plot_loc + title + "bins/dist/bin_" + str(i) + ".png")          
+            # plt.close(fig_dist)
             
         intercepts.append(calc_b)
         
@@ -246,18 +242,13 @@ if __name__ == "__main__":
         "b_neg": 1.5101195108968333,
     }
     
-    r, vr, lnv2, sparta_labels, my_data, halo_df = load_ps_data(client)
+    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client)
     
-    r = my_data["p_Scaled_radii"].compute().to_numpy()
-    vr = my_data["p_Radial_vel"].compute().to_numpy()
-    vt = my_data["p_Tangential_vel"].compute().to_numpy()
-    vphys = my_data["p_phys_vel"].compute().to_numpy()
-    sparta_labels = my_data["Orbit_infall"].compute().to_numpy()
+    r = r.values
+    vr = vr.values
+    lnv2 = lnv2.values
+    vphys = samp_data["p_phys_vel"].values
     lnv2 = np.log(vphys**2)
-    
-    c_r = my_data["c_Scaled_radii"].compute().to_numpy()
-    c_vr = my_data["c_Radial_vel"].compute().to_numpy()
-    c_vt = my_data["c_Tangential_vel"].compute().to_numpy()
     
     sparta_orb = np.where(sparta_labels == 1)[0]
     sparta_inf = np.where(sparta_labels == 0)[0]
@@ -294,23 +285,10 @@ if __name__ == "__main__":
     # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
     sim_splits = np.where(halo_first == 0)[0]
 
-    use_sims = curr_test_sims
-
-    # if there are multiple simulations, to correctly index the dataset we need to update the starting values for the 
-    # stacked simulations such that they correspond to the larger dataset and not one specific simulation
-    if len(use_sims) > 1:
-        for i,sim in enumerate(use_sims):
-            # The first sim remains the same
-            if i == 0:
-                continue
-            # Else if it isn't the final sim 
-            elif i < len(use_sims) - 1:
-                halo_first[sim_splits[i]:sim_splits[i+1]] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
-            # Else if the final sim
-            else:
-                halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
+    #TODO not hard code this
+    opt_sims = ["cbol_l1000_n1024_4r200m_1-5v200m_99to90"]
     
-    act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sparta_mass_prf(sim_splits,all_idxs,use_sims)
+    act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sparta_mass_prf(sim_splits,all_idxs,opt_sims)
     act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb  
     
     vr_pos = opt_func(bins, r[mask_vr_pos], lnv2[mask_vr_pos], sparta_labels[mask_vr_pos], 0, ps_param_dict["b_pos"], orb = None, plot_loc = plot_loc, title = "pos")
@@ -330,6 +308,33 @@ if __name__ == "__main__":
     
     plt_SPARTA_KE_dist(ps_param_dict, fltr_combs, bins, r, lnv2, perc = perc, width = width, r_cut = r_cut, plot_loc = plot_loc, title = "bin_fit_", cust_line_dict = opt_param_dict)
 
+#######################################################################################################################################
+    
+    use_sims = curr_test_sims
+    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client,curr_test_sims=use_sims)
+    
+    halo_first = halo_df["Halo_first"].values
+    halo_n = halo_df["Halo_n"].values
+    all_idxs = halo_df["Halo_indices"].values
+    
+    all_z = []
+    all_rhom = []
+    # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
+    sim_splits = np.where(halo_first == 0)[0]
+    
+    # if there are multiple simulations, to correctly index the dataset we need to update the starting values for the 
+    # stacked simulations such that they correspond to the larger dataset and not one specific simulation
+    if len(use_sims) > 1:
+        for i,sim in enumerate(use_sims):
+            # The first sim remains the same
+            if i == 0:
+                continue
+            # Else if it isn't the final sim 
+            elif i < len(use_sims) - 1:
+                halo_first[sim_splits[i]:sim_splits[i+1]] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
+            # Else if the final sim
+            else:
+                halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
     # Get the redshifts for each simulation's primary snapshot
     for i,sim in enumerate(use_sims):
         with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
@@ -346,17 +351,23 @@ if __name__ == "__main__":
     act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sparta_mass_prf(sim_splits,all_idxs,use_sims)
     act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
 
-
-    bin_indices = np.digitize(r, bins) - 1  
-    preds = np.zeros(r.shape[0])
+    
+    r_full = my_data["p_Scaled_radii"].compute().to_numpy()
+    vr_full = my_data["p_Radial_vel"].compute().to_numpy()
+    vphys_full = my_data["p_phys_vel"].compute().to_numpy()
+    sparta_labels = my_data["Orbit_infall"].compute().to_numpy()
+    lnv2_full = np.log(vphys_full**2)
+    
+    bin_indices = np.digitize(r_full, bins) - 1  
+    preds = np.zeros(r_full.shape[0])
     for i in range(bins.shape[0]-1):
-        mask_pos = (bin_indices == i) & (vr > 0) & (lnv2 < ps_param_dict["b_pos"][i])
-        mask_neg = (bin_indices == i) & (vr < 0) & (lnv2 < ps_param_dict["b_neg"][i])
+        mask_pos = (bin_indices == i) & (vr_full > 0) & (lnv2_full < opt_param_dict["inf_vr_pos"]["b"][i])
+        mask_neg = (bin_indices == i) & (vr_full < 0) & (lnv2_full < opt_param_dict["inf_vr_neg"]["b"][i])
         
         preds[mask_pos] = 1
         preds[mask_neg] = 1
 
-    calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=r, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds, prf_bins=bins, use_mp=True, all_z=all_z)
+    calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=r_full, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds, prf_bins=bins, use_mp=True, all_z=all_z)
 
     # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
     small_halo_fltr = np.isnan(calc_r200m)
@@ -442,4 +453,4 @@ if __name__ == "__main__":
             plt_macc_splits.remove(macc_split)
     
     lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
-    compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "_ps_cut_dens_",prf_name_0="Fitted Phase Space Cut", prf_name_1="SPARTA")
+    compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "fit_ps_cut_dens_",prf_name_0="Fitted Phase Space Cut", prf_name_1="SPARTA")

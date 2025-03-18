@@ -15,14 +15,14 @@ from utils.data_and_loading_functions import parse_ranges,create_nu_string,creat
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
 
-snap_path = config["PATHS"]["snap_path"]
-SPARTA_output_path = config["PATHS"]["SPARTA_output_path"]
+snap_path = config["SNAP_DATA"]["snap_path"]
+SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
 ML_dset_path = config["PATHS"]["ML_dset_path"]
 path_to_models = config["PATHS"]["path_to_models"]
 
-curr_sparta_file = config["MISC"]["curr_sparta_file"]
-snap_dir_format = config["MISC"]["snap_dir_format"]
-snap_format = config["MISC"]["snap_format"]
+curr_sparta_file = config["SPARTA_DATA"]["curr_sparta_file"]
+snap_dir_format = config["SNAP_DATA"]["snap_dir_format"]
+snap_format = config["SNAP_DATA"]["snap_format"]
 sim_cosmol = config["MISC"]["sim_cosmol"]
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"

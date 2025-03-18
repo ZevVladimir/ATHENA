@@ -33,10 +33,10 @@ config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
 rand_seed = config.getint("MISC","random_seed")
 use_gpu = config.getboolean("MISC","use_gpu")
-curr_sparta_file = config["MISC"]["curr_sparta_file"]
+curr_sparta_file = config["SPARTA_DATA"]["curr_sparta_file"]
 sim_cosmol = config["MISC"]["sim_cosmol"]
 
-SPARTA_output_path = config["PATHS"]["SPARTA_output_path"]
+SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
 pickled_path = config["PATHS"]["pickled_path"]
 ML_dset_path = config["PATHS"]["ML_dset_path"]
 debug_plt_path = config["PATHS"]["debug_plt_path"]

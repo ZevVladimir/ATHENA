@@ -12,7 +12,7 @@ You need the particle data from a GADGET simulation and the .hdf5 output file fr
 
 ## Creating the Datasets
 
-### Particle Data Requirements
+### Snapshot Data Requirements \[SNAP_DATA\]
 
 Currently only GADGET simulation data is usable by the code as we use Pygadget reader to load particle data
 
@@ -21,30 +21,49 @@ Currently only GADGET simulation data is usable by the code as we use Pygadget r
 - The formats should be something like {:03d} and supplied in the config file
 - **If** you already have run the code **and** have the particle information pickled you can instead just use the *known_snaps* parameter.
 
-### SPARTA Data Requirements
+### SPARTA Data Requirements \[SPARTA_DATA\]
 
 - The halo data is expected to be supplidd from the .hdf5 output file from SPARTA
 - The path to this file should be indicated with the *SPARTA_output_path* parameter
 - The file's name should be provided with the *curr_sparta_file* parameter
 - SPARTA should be run with at least the provided parameters so that all information is present
 
-### Initial Config Params
+### Initial \[SEARCH\] Config Parameters
 
-Before running the code several parameters must be specified to determine what dataset will be generated. The generated dataset can consist currently of either one or two snapshots of data. The dataset contains the following information.
+Before running the code several parameters must be specified to determine what dataset will be generated. The generated dataset can consist currently of only two snapshots of data. The dataset contains the following information split into two storage types. The information is stored in at least one pandas dataframe saved as an .h5 file. The number of dataframes is determined by the *sub_dset_mem_size* parameter. Set this to be the maximum number of bytes a file should hold.
+ 
+Currently the way to determine which snapshots are used is done in the following way:
+- The primary snapshot is determined with the snapshot that has the redshift closest to the *p_red_shift* parameter
+- The secondary snapshot is determined by going *t_dyn_step* dynamical time steps (see paper for definition) back in time from the primary snapshot
 
-1. halo_first (The starting indices for the halos)
-2. halo_n (The number of particles in each halo)
-3. HPIDS (The unique ID created for each particle and halo combination)
-4. Orbit/Infall (The classification of each particle as orbiting or infalling according to SPARTA)
-5. Radius (The radii of the particles)
-6. Rad Vel (The radial velocities of the particles)
-7. Tang Vel (The tangential velocities of the particles)
+The search for particles looks within the *search_radius* (in multiples of R200m) of each halo's center. We choose a measure of R200m as this allows for generalizability to all sizes of halos.
 
-Radius, radial velocity, tangential velocity
+### Running the code: gen_ML_dsets.py
 
-- 
+After the \[SEARCH\], \[SNAP_DATA\], and \[SPARTA_DATA\] parameters are set (and potentially \[MISC\] parameters as well) you are ready to create the datasets. This is done by simply running the python code: `python3 ~/src/gen_ML_dsets.py`
 
-#### gen_ML_dsets.py
+### Saved Information
+
+The code will generate several .h5 files of the saved information within the specified output location *ML_dset_path* in the subdirectory of ~/*ML_dset_path*/ + *curr_sparta_file*_\<primary snap number\>to\<secondary snap number\>/ and then there will be a Train/ and Test/ folder each of which contain folders for halo information and particle information.
+
+1. Halo Information
+    1. Halo_first (The starting indices for the halos)
+    2. Halo_n (The number of particles in each halo)
+    3. Halo_indices (The indices of the halos locations in SPARTA's arrays)
+2. Particle Information
+    1. HIPIDS (The unique ID created for each particle and halo combination)
+    2. Orbit_infall (The classification of each particle as orbiting or infalling according to SPARTA)
+    3. p_Scaled_radii (The radii of the particles at the primary snapshot)
+    4. p_Radial_vel (The radial velocities of the particles at the primary snapshot)
+    5. p_Tangential_vel (The tangential velocities of the particles at the primary snapshot)
+    6. c_Scaled_radii (The radii of the particles at the secondary snapshot)
+    7. c_Radial_vel (The radial velocities of the particles at the secondary snapshot)
+    8. c_Tangential_vel (The tangential velocities of the particles at the secondary snapshot)
+    9. p_phys_vel (The physical velocities of the particles at the primary snapshot)
+
+
+
+
 
 
 ## Training the Model

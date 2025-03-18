@@ -1,3 +1,5 @@
+#TODO Add functionality for any number of snaps to be used
+#TODO For the snaps allow it to be either an array of specific redshifts or dynamical time separation
 import numexpr as ne
 import numpy as np
 from scipy.spatial import cKDTree
@@ -13,7 +15,7 @@ import psutil
 import json
 from sparta_tools import sparta 
 
-from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir, load_pickle, save_pickle
+from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir, load_pickle, save_pickle, get_num_snaps
 from utils.calculation_functions import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn, create_mass_prf, calculate_density
 from utils.update_vis_fxns import compare_prfs
 ##################################################################################################################
@@ -22,27 +24,25 @@ import configparser
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
 
-curr_sparta_file = config["MISC"]["curr_sparta_file"]
-known_snaps = json.loads(config.get("MISC","known_snaps"))
-snap_path = config["PATHS"]["snap_path"]
-SPARTA_output_path = config["PATHS"]["SPARTA_output_path"]
+curr_sparta_file = config["SPARTA_DATA"]["curr_sparta_file"]
+known_snaps = json.loads(config.get("SNAP_DATA","known_snaps"))
+snap_path = config["SNAP_DATA"]["snap_path"]
+SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
 pickled_path = config["PATHS"]["pickled_path"]
 ML_dset_path = config["PATHS"]["ML_dset_path"]
 debug_plt_path = config["PATHS"]["debug_plt_path"]
 debug_mem = config.getboolean("MISC","debug_mem")
 
 sim_cosmol = config["MISC"]["sim_cosmol"]
-snap_dir_format = config["MISC"]["snap_dir_format"]
-snap_format = config["MISC"]["snap_format"]
+snap_dir_format = config["SNAP_DATA"]["snap_dir_format"]
+snap_format = config["SNAP_DATA"]["snap_format"]
 
 reset_lvl = config.getint("SEARCH","reset")
-prim_snap_only = config.getboolean("SEARCH","prim_snap_only")
 t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
 p_red_shift = config.getfloat("SEARCH","p_red_shift")
 search_radius = config.getfloat("SEARCH","search_radius")
-total_num_snaps = config.getint("SEARCH","total_num_snaps")
-curr_chunk_size = config.getint("SEARCH","chunk_size")
-save_mem_size = config.getfloat("SEARCH","save_mem_size")
+mp_chunk_size = config.getint("SEARCH","mp_chunk_size")
+sub_dset_mem_size = config.getfloat("SEARCH","sub_dset_mem_size")
 
 test_halos_ratio = config.getfloat("XGBOOST","test_halos_ratio")
 lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
@@ -248,7 +248,7 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
             
             with mp.Pool(processes=num_processes) as p:
                 # halo position, halo r200m, if comparison snap, want mass?, want indices?
-                p_use_num_ptls, p_curr_ptl_indices = zip(*p.starmap(init_search, zip(p_use_halos_pos, p_use_halos_r200m, repeat(search_radius), repeat(False), repeat(False), repeat(True)), chunksize=curr_chunk_size))
+                p_use_num_ptls, p_curr_ptl_indices = zip(*p.starmap(init_search, zip(p_use_halos_pos, p_use_halos_r200m, repeat(search_radius), repeat(False), repeat(False), repeat(True)), chunksize=mp_chunk_size))
             p.close()
             p.join() 
             
@@ -293,7 +293,7 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
                                             np.arange(0,p_curr_num_halos)+halo_idx,
                                             # Uncomment below to create dens profiles
                                             # repeat(sparta_output["config"]['anl_prf']["r_bins_lin"]),repeat(True) 
-                                            ),chunksize=curr_chunk_size))
+                                            ),chunksize=mp_chunk_size))
             p.close()
             p.join()
             
@@ -313,78 +313,68 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
             
             num_bins = 30
         
-            # If multiple snaps also search the comparison snaps in the same manner as with the primary snap
-            if prim_snap_only == False:
-                c_use_halos_pos = sparta_output['halos']['position'][:,c_sparta_snap] * 10**3 * c_scale_factor
-                c_use_halos_r200m = sparta_output['halos']['R200m'][:,c_sparta_snap] 
+            # Search the comparison snaps in the same manner as with the primary snap
 
-                with mp.Pool(processes=num_processes) as p:
-                    # halo position, halo r200m, if comparison snap, if train dataset, want mass?, want indices?
-                    c_use_num_ptls, c_curr_ptl_indices = zip(*p.starmap(init_search, zip(c_use_halos_pos, c_use_halos_r200m, repeat(search_radius), repeat(True), repeat(False), repeat(True)), chunksize=curr_chunk_size))
-                p.close()
-                p.join() 
+            c_use_halos_pos = sparta_output['halos']['position'][:,c_sparta_snap] * 10**3 * c_scale_factor
+            c_use_halos_r200m = sparta_output['halos']['R200m'][:,c_sparta_snap] 
 
-                c_use_num_ptls = np.array(c_use_num_ptls)
-                c_curr_ptl_indices = np.array(c_curr_ptl_indices, dtype=object)
-                has_ptls = np.where(c_use_num_ptls > 0)[0]
-                c_use_num_ptls = c_use_num_ptls[has_ptls]
-                c_curr_ptl_indices = c_curr_ptl_indices[has_ptls]
-                c_use_halo_idxs = use_halo_idxs[has_ptls]
-                c_tot_num_use_ptls = int(np.sum(c_use_num_ptls))
-                c_curr_num_halos = c_curr_ptl_indices.shape[0]
+            with mp.Pool(processes=num_processes) as p:
+                # halo position, halo r200m, if comparison snap, if train dataset, want mass?, want indices?
+                c_use_num_ptls, c_curr_ptl_indices = zip(*p.starmap(init_search, zip(c_use_halos_pos, c_use_halos_r200m, repeat(search_radius), repeat(True), repeat(False), repeat(True)), chunksize=mp_chunk_size))
+            p.close()
+            p.join() 
 
-                with mp.Pool(processes=num_processes) as p:
-                    c_all_HIPIDs, c_all_rad_vel, c_all_tang_vel, c_all_scal_rad = zip(*p.starmap(search_halos, 
-                                                zip(repeat(True), repeat(c_dict),c_use_halo_idxs,
-                                                    (c_ptls_pid[c_curr_ptl_indices[i]] for i in range(c_curr_num_halos)), 
-                                                    (c_ptls_pos[c_curr_ptl_indices[j]] for j in range(c_curr_num_halos)),
-                                                    (c_ptls_vel[c_curr_ptl_indices[k]] for k in range(c_curr_num_halos)),
-                                                    (sparta_output['halos']['position'][l,c_sparta_snap,:] for l in range(c_curr_num_halos)),
-                                                    (sparta_output['halos']['velocity'][l,c_sparta_snap,:] for l in range(c_curr_num_halos)),
-                                                    (sparta_output['halos']['R200m'][l,c_sparta_snap] for l in range(c_curr_num_halos)),
-                                                    ),chunksize=curr_chunk_size))
-                p.close()
-                p.join()
-                
-                c_all_HIPIDs = np.concatenate(c_all_HIPIDs, axis = 0)
-                c_all_rad_vel = np.concatenate(c_all_rad_vel, axis = 0)
-                c_all_tang_vel = np.concatenate(c_all_tang_vel, axis = 0)
-                c_all_scal_rad = np.concatenate(c_all_scal_rad, axis = 0)
-                
-                
-                c_all_HIPIDs = c_all_HIPIDs.astype(np.float64)
-                c_all_rad_vel = c_all_rad_vel.astype(np.float32)
-                c_all_tang_vel = c_all_tang_vel.astype(np.float32)
-                c_all_scal_rad = c_all_scal_rad.astype(np.float32)
-                
-                use_max_shape = (tot_num_ptls,2)                  
-                save_scale_radii = np.zeros((p_tot_num_use_ptls,2), dtype = np.float32)
-                save_rad_vel = np.zeros((p_tot_num_use_ptls,2), dtype = np.float32)
-                save_tang_vel = np.zeros((p_tot_num_use_ptls,2), dtype = np.float32)
+            c_use_num_ptls = np.array(c_use_num_ptls)
+            c_curr_ptl_indices = np.array(c_curr_ptl_indices, dtype=object)
+            has_ptls = np.where(c_use_num_ptls > 0)[0]
+            c_use_num_ptls = c_use_num_ptls[has_ptls]
+            c_curr_ptl_indices = c_curr_ptl_indices[has_ptls]
+            c_use_halo_idxs = use_halo_idxs[has_ptls]
+            c_tot_num_use_ptls = int(np.sum(c_use_num_ptls))
+            c_curr_num_halos = c_curr_ptl_indices.shape[0]
 
-                # Match the PIDs from primary snap to the secondary snap
-                # If they don't have a match set those as np.nan for xgboost 
-                match_hipid_idx = np.intersect1d(p_all_HIPIDs, c_all_HIPIDs, return_indices=True)
-                save_scale_radii[:,0] = p_all_scal_rad
-                save_scale_radii[match_hipid_idx[1],1] = c_all_scal_rad[match_hipid_idx[2]]
-                save_rad_vel[:,0] = p_all_rad_vel
-                save_rad_vel[match_hipid_idx[1],1] = c_all_rad_vel[match_hipid_idx[2]]
-                save_tang_vel[:,0] = p_all_tang_vel
-                save_tang_vel[match_hipid_idx[1],1] = c_all_tang_vel[match_hipid_idx[2]]
-                
-                save_scale_radii[save_scale_radii[:,1] == 0, 1] = np.nan
-                save_rad_vel[save_rad_vel[:,1] == 0, 1] = np.nan
-                save_tang_vel[save_tang_vel[:,1] == 0, 1] = np.nan
+            with mp.Pool(processes=num_processes) as p:
+                c_all_HIPIDs, c_all_rad_vel, c_all_tang_vel, c_all_scal_rad = zip(*p.starmap(search_halos, 
+                                            zip(repeat(True), repeat(c_dict),c_use_halo_idxs,
+                                                (c_ptls_pid[c_curr_ptl_indices[i]] for i in range(c_curr_num_halos)), 
+                                                (c_ptls_pos[c_curr_ptl_indices[j]] for j in range(c_curr_num_halos)),
+                                                (c_ptls_vel[c_curr_ptl_indices[k]] for k in range(c_curr_num_halos)),
+                                                (sparta_output['halos']['position'][l,c_sparta_snap,:] for l in range(c_curr_num_halos)),
+                                                (sparta_output['halos']['velocity'][l,c_sparta_snap,:] for l in range(c_curr_num_halos)),
+                                                (sparta_output['halos']['R200m'][l,c_sparta_snap] for l in range(c_curr_num_halos)),
+                                                ),chunksize=mp_chunk_size))
+            p.close()
+            p.join()
             
-            else:
-                use_max_shape = (tot_num_ptls)  
-                save_scale_radii = np.zeros(p_tot_num_use_ptls)
-                save_rad_vel = np.zeros(p_tot_num_use_ptls)
-                save_tang_vel = np.zeros(p_tot_num_use_ptls)
-                
-                save_scale_radii = p_all_scal_rad
-                save_rad_vel = p_all_rad_vel
-                save_tang_vel = p_all_tang_vel
+            c_all_HIPIDs = np.concatenate(c_all_HIPIDs, axis = 0)
+            c_all_rad_vel = np.concatenate(c_all_rad_vel, axis = 0)
+            c_all_tang_vel = np.concatenate(c_all_tang_vel, axis = 0)
+            c_all_scal_rad = np.concatenate(c_all_scal_rad, axis = 0)
+            
+            
+            c_all_HIPIDs = c_all_HIPIDs.astype(np.float64)
+            c_all_rad_vel = c_all_rad_vel.astype(np.float32)
+            c_all_tang_vel = c_all_tang_vel.astype(np.float32)
+            c_all_scal_rad = c_all_scal_rad.astype(np.float32)
+            
+            use_max_shape = (tot_num_ptls,2)                  
+            save_scale_radii = np.zeros((p_tot_num_use_ptls,2), dtype = np.float32)
+            save_rad_vel = np.zeros((p_tot_num_use_ptls,2), dtype = np.float32)
+            save_tang_vel = np.zeros((p_tot_num_use_ptls,2), dtype = np.float32)
+
+            # Match the PIDs from primary snap to the secondary snap
+            # If they don't have a match set those as np.nan for xgboost 
+            match_hipid_idx = np.intersect1d(p_all_HIPIDs, c_all_HIPIDs, return_indices=True)
+            save_scale_radii[:,0] = p_all_scal_rad
+            save_scale_radii[match_hipid_idx[1],1] = c_all_scal_rad[match_hipid_idx[2]]
+            save_rad_vel[:,0] = p_all_rad_vel
+            save_rad_vel[match_hipid_idx[1],1] = c_all_rad_vel[match_hipid_idx[2]]
+            save_tang_vel[:,0] = p_all_tang_vel
+            save_tang_vel[match_hipid_idx[1],1] = c_all_tang_vel[match_hipid_idx[2]]
+            
+            save_scale_radii[save_scale_radii[:,1] == 0, 1] = np.nan
+            save_rad_vel[save_rad_vel[:,1] == 0, 1] = np.nan
+            save_tang_vel[save_tang_vel[:,1] == 0, 1] = np.nan
             
             halo_df = pd.DataFrame({
                 "Halo_first":p_start_num_ptls,
@@ -421,10 +411,7 @@ with timed("Startup"):
         cosmol = cosmology.setCosmology(sim_cosmol) 
     
     if reset_lvl <= 1 and len(known_snaps) > 0:
-        if prim_snap_only:
-            save_location =  ML_dset_path + curr_sparta_file + "_" + str(known_snaps[0]) + "/"
-        else:
-            save_location =  ML_dset_path + curr_sparta_file + "_" + str(known_snaps[0]) + "to" + str(known_snaps[1]) + "/"
+        save_location =  ML_dset_path + curr_sparta_file + "_" + str(known_snaps[0]) + "to" + str(known_snaps[1]) + "/"
         config_params = load_pickle(save_location+"config.pickle")
         #TODO implement check that known_snaps correspond to what is stored in the config file
 
@@ -550,11 +537,7 @@ with timed("Startup"):
     }
 
     snapshot_list = [p_snap, c_snap]
-
-    if prim_snap_only:
-        save_location =  ML_dset_path + curr_sparta_file + "_" + str(snapshot_list[0]) + "/"
-    else:
-        save_location =  ML_dset_path + curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[1]) + "/"
+    save_location =  ML_dset_path + curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[1]) + "/"
 
     if os.path.exists(save_location) != True:
         os.makedirs(save_location)
@@ -583,13 +566,10 @@ with timed("Startup"):
             match_halo_idxs = pickle.load(pickle_file)
     else:
         # only take halos that are hosts in primary snap and exist past the p_snap and exist in some form at the comparison snap
-        if prim_snap_only:
-            match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap))[0]
-        else:
-            match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap) & (c_halos_status > 0) & (c_halos_last_snap >= c_sparta_snap))[0]
+        match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap) & (c_halos_status > 0) & (c_halos_last_snap >= c_sparta_snap))[0]
         with mp.Pool(processes=num_processes) as p:           
             # halo position, halo r200m, if comparison snap, want mass?, want indices?
-            num_ptls = p.starmap(init_search, zip(p_halos_pos[match_halo_idxs], p_halos_r200m[match_halo_idxs], repeat(1.0), repeat(False), repeat(False), repeat(False)), chunksize=curr_chunk_size)
+            num_ptls = p.starmap(init_search, zip(p_halos_pos[match_halo_idxs], p_halos_r200m[match_halo_idxs], repeat(1.0), repeat(False), repeat(False), repeat(False)), chunksize=mp_chunk_size)
             
             # We want to remove any halos that have less than 200 particles as they are too noisy
             num_ptls = np.array(num_ptls)
@@ -628,25 +608,25 @@ with timed("Startup"):
     train_halo_mem = calc_halo_mem(train_num_ptls)
     test_halo_mem = calc_halo_mem(test_num_ptls)
 
-    train_halo_splits = det_halo_splits(train_halo_mem, save_mem_size)
-    test_halo_splits = det_halo_splits(test_halo_mem, save_mem_size)
+    train_halo_splits = det_halo_splits(train_halo_mem, sub_dset_mem_size)
+    test_halo_splits = det_halo_splits(test_halo_mem, sub_dset_mem_size)
         
     print(f"Total num halos: {total_num_halos:.3e}")
     print(f"Total num ptls: {tot_num_ptls:.3e}")
 
+    tot_num_snaps = get_num_snaps(snap_path)
     
     config_params = {
         "sparta_file": curr_sparta_file,
         "snap_dir_format":snap_dir_format,
         "snap_format": snap_format,
-        "prim_only": prim_snap_only,
         "t_dyn_step": t_dyn_step,
         "p_red_shift":p_red_shift,
         "search_rad": search_radius,
-        "total_num_snaps": total_num_snaps,
+        "total_num_snaps": tot_num_snaps,
         "test_halos_ratio": test_halos_ratio,
-        "chunk_size": curr_chunk_size,
-        "HDF5 Mem Size": save_mem_size,
+        "chunk_size": mp_chunk_size,
+        "HDF5 Mem Size": sub_dset_mem_size,
         "p_snap_info": p_snap_dict,
         "c_snap_info": c_snap_dict,
     }
