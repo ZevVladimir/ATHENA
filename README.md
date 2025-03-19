@@ -104,6 +104,7 @@ The name of the folder where each model is saved is slightly complicated in orde
 If you use some of the additional optimization methods the path can be changed, see section: Optimization of Model for details
 
 ### Optimization of Model
+#TODO finish this section
 
 ### Running the code: train_model.py
 
@@ -113,14 +114,39 @@ After the \[TRAIN_MODEL\] parameters are set (and potentially \[MISC\] and \[DAS
 
 As mentioned all saved information goes to the path for the specific model. The model's json file is saved as well as general information about the model is put in a model_info.pickle.
 
-The model_info file includes the parameters for XGBoost which can be set within the train_model.py file. It also includes misclassified percentages described in the Section Evaluating the Model.
+The model_info file includes the parameters for XGBoost which can be set within the train_model.py file. It also includes misclassified percentages described in the Section Evaluating the Model if that is turned on. We include a generic function that can be added to the ~/.bash_aliases file to easily read the contents of this file:
+
+```
+rdml(){
+        python3 -c "import sys; sys.path.insert(1, '/path/to/MLOIS/src/');from utils.ML_support import print_model_prop;print_model_prop('$1')"
+}
+```
+
+To use this function you simply do `rdml /path/to/model_info.pickle`
 
 ## Evaluating the Model
 
+All plots from the evaluations of the model go within a subfolder of the model's folder labeled by the simulation's name.
+
+### Initial \[EVAL_MODEL\] Config Parameters
+
+To determine which simulations the model will be tested on set the *test_sims* parameter. This is a list of lists such that you can test on multiple simulations separately or all together or some mixture. For example: \[\[l0063_n1024,l1000_n1024\]\] is testing the model on two simulations combined while \[\[l0063_n1024\],\[l1000_n1024\]\] is testing the model on one simulation at a time. You can also test on the "Test" dataset, the "Train" dataset, or "Full" for both using the *eval_datasets* parameter.
+
+Generally to evaluate the model we look at plots which can be enabled or disabled using the following parameters:
+- *dens_prf_plt*: Plots the density profiles scaled by rho_m predicted by the model versus SPARTA's calculated profiles and the ratios between them. Can split the profiles by nu values using the *dens_prf_nu_split* parameter with the splits determined by *plt_nu_splits* where the splits are written like: 0.5-1.0,1.0-1.5. Or by mass accretion rate using *plt_macc_splits*
+- *fulldist_plt*: Plots the distribution of the particles in the phase space of the model (vr vs r, vt vs r, vr vs vt)
+- *misclass_plt*: Plots the distribution of where the model misclassified particles in the same phase space as the fulldist_plt
+- *io_frac_plt*: Plots the ratio between infalling and orbiting particles
+
+Both of the distribution plots make use of plotting linearly up to a threshold and then logarithmically afterwards in order to better visualize the distribution. The threshold for the transition is set with *linthrsh* and the number of bins in the linear region with *lin_nbin* and the number of bins in the logarithmic region with *log_nbin*. The tick labels for each feature can be set with *lin_rvticks*, *log_rvticks*, *lin_tvticks*, *log_tvticks*, *lin_rticks*, and *log_rticks*.
+
 ### test_xgboost.py
-This tests the model on the dataset you decide in the config by making the plots you choose in the config and outputs them under the model and then under the tested dataset 
+
+This code will test the model on the supplied simulations using the chosen plots described above. To run simply do `python3 ~/src/test_model.py`
 
 ### make_shap_plots.py
+
+This creates the SHAP beeswarm plots which can be selected for by filling out the dictionary shown in the file to filter which particles are displayed. `python3 ~/src/make_shap_plots.py`
 
 ## Phase Space Cut Method
 

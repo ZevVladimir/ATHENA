@@ -22,43 +22,42 @@ import configparser
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
 
+ML_dset_path = config["PATHS"]["ML_dset_path"]
+path_to_models = config["PATHS"]["path_to_models"]
+
 snap_path = config["SNAP_DATA"]["snap_path"]
 SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
-
-on_zaratan = config.getboolean("MISC","on_zaratan")
-use_gpu = config.getboolean("MISC","use_gpu")
 curr_sparta_file = config["SPARTA_DATA"]["curr_sparta_file"]
 snap_dir_format = config["SNAP_DATA"]["snap_dir_format"]
 snap_format = config["SNAP_DATA"]["snap_format"]
 sim_cosmol = config["MISC"]["sim_cosmol"]
+
+search_rad = config.getfloat("DSET_CREATE","search_rad")
+
+feature_columns = json.loads(config.get("TRAIN_MODEL","feature_columns"))
+target_column = json.loads(config.get("TRAIN_MODEL","target_columns"))
+model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
+model_type = config["TRAIN_MODEL"]["model_type"]
+
+test_sims = json.loads(config.get("EVAL_MODEL","test_sims"))
+
+reduce_rad = config.getfloat("OPTIMIZE","reduce_rad")
+reduce_perc = config.getfloat("OPTIMIZE", "reduce_perc")
+weight_rad = config.getfloat("OPTIMIZE","weight_rad")
+min_weight = config.getfloat("OPTIMIZE","min_weight")
+
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
-else: 
+else:
     sim_pat = r"cbol_l(\d+)_n(\d+)"
 match = re.search(sim_pat, curr_sparta_file)
 if match:
     sparta_name = match.group(0)
 else:
     sparta_name = curr_sparta_file
-    
-SPARTA_hdf5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
 
-ML_dset_path = config["PATHS"]["ML_dset_path"]
-path_to_models = config["PATHS"]["path_to_models"]
-
-search_rad = config.getfloat("DSET_CREATE","search_rad")
-feature_columns = json.loads(config.get("TRAIN_MODEL","feature_columns"))
-target_column = json.loads(config.get("TRAIN_MODEL","target_columns"))
-model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
-model_type = config["TRAIN_MODEL"]["model_type"]
-test_sims = json.loads(config.get("XGBOOST","test_sims"))
-
-reduce_rad = config.getfloat("XGBOOST","reduce_rad")
-reduce_perc = config.getfloat("XGBOOST", "reduce_perc")
-
-weight_rad = config.getfloat("XGBOOST","weight_rad")
-min_weight = config.getfloat("XGBOOST","min_weight")
-
+# Set up exact paths
+sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
 
 ###############################################################################################################
 
@@ -138,7 +137,7 @@ if __name__ == "__main__":
         p_scale_factor = config_dict["p_snap_info"]["scale_factor"][()]
         p_sparta_snap = config_dict["p_snap_info"]["sparta_snap"]
 
-    halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_SPARTA_data(SPARTA_hdf5_path,sparta_search_name, p_scale_factor, p_snap, p_sparta_snap)
+    halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_SPARTA_data(sparta_HDF5_path,sparta_search_name, p_scale_factor, p_snap, p_sparta_snap)
 
     p_snap_path = snap_path + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
 
@@ -182,7 +181,7 @@ if __name__ == "__main__":
 
     num_new_ptls = curr_ptl_pos.shape[0]
 
-    sparta_output = sparta.load(filename = SPARTA_hdf5_path, halo_ids=use_halo_id, log_level=0)
+    sparta_output = sparta.load(filename = sparta_HDF5_path, halo_ids=use_halo_id, log_level=0)
 
     sparta_last_pericenter_snap = sparta_output['tcr_ptl']['res_oct']['last_pericenter_snap']
     sparta_n_pericenter = sparta_output['tcr_ptl']['res_oct']['n_pericenter']

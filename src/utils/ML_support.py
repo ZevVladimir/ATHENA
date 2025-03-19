@@ -54,27 +54,26 @@ dask_task_cpus = config.getboolean("DASK_CLIENT","dask_task_cpus")
 
 file_lim = config.getint("TRAIN_MODEL","file_lim")
 
-reduce_rad = config.getfloat("XGBOOST","reduce_rad")
-reduce_perc = config.getfloat("XGBOOST", "reduce_perc")
+reduce_rad = config.getfloat("OPTIMIZE","reduce_rad")
+reduce_perc = config.getfloat("OPTIMIZE", "reduce_perc")
 
-weight_rad = config.getfloat("XGBOOST","weight_rad")
-min_weight = config.getfloat("XGBOOST","min_weight")
-weight_exp = config.getfloat("XGBOOST","weight_exp")
+weight_rad = config.getfloat("OPTIMIZE","weight_rad")
+min_weight = config.getfloat("OPTIMIZE","min_weight")
+weight_exp = config.getfloat("OPTIMIZE","weight_exp")
 
-hpo_loss = config.get("XGBOOST","hpo_loss")
-nu_splits = config["XGBOOST"]["nu_splits"]
-plt_nu_splits = config["XGBOOST"]["plt_nu_splits"]
+hpo_loss = config.get("OPTIMIZE","hpo_loss")
+plt_nu_splits = config["OPTIMIZE"]["plt_nu_splits"]
 plt_nu_splits = parse_ranges(plt_nu_splits)
 
-linthrsh = config.getfloat("XGBOOST","linthrsh")
-lin_nbin = config.getint("XGBOOST","lin_nbin")
-log_nbin = config.getint("XGBOOST","log_nbin")
-lin_rvticks = json.loads(config.get("XGBOOST","lin_rvticks"))
-log_rvticks = json.loads(config.get("XGBOOST","log_rvticks"))
-lin_tvticks = json.loads(config.get("XGBOOST","lin_tvticks"))
-log_tvticks = json.loads(config.get("XGBOOST","log_tvticks"))
-lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
-log_rticks = json.loads(config.get("XGBOOST","log_rticks"))
+linthrsh = config.getfloat("EVAL_MODEL","linthrsh")
+lin_nbin = config.getint("EVAL_MODEL","lin_nbin")
+log_nbin = config.getint("EVAL_MODEL","log_nbin")
+lin_rvticks = json.loads(config.get("EVAL_MODEL","lin_rvticks"))
+log_rvticks = json.loads(config.get("EVAL_MODEL","log_rvticks"))
+lin_tvticks = json.loads(config.get("EVAL_MODEL","lin_tvticks"))
+log_tvticks = json.loads(config.get("EVAL_MODEL","log_tvticks"))
+lin_rticks = json.loads(config.get("EVAL_MODEL","lin_rticks"))
+log_rticks = json.loads(config.get("EVAL_MODEL","log_rticks"))
 
 ###############################################################################################################
 if on_zaratan:

@@ -21,24 +21,18 @@ from utils.ps_cut_support import load_ps_data
 from utils.update_vis_fxns import plt_SPARTA_KE_dist, compare_split_prfs
 from utils.calculation_functions import calculate_density, filter_prf, calc_mass_acc_rate
 
-
 import configparser
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
-
-on_zaratan = config.getboolean("MISC","on_zaratan")
-use_gpu = config.getboolean("MISC","use_gpu")
 
 ML_dset_path = config["PATHS"]["ML_dset_path"]
 path_to_models = config["PATHS"]["path_to_models"]
 SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
 
 model_sims = json.loads(config.get("XGBOOST","model_sims"))
-dask_task_cpus = config.getint("XGBOOST","dask_task_cpus")
 model_type = config["TRAIN_MODEL"]["model_type"]
-test_sims = json.loads(config.get("XGBOOST","test_sims"))
-eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
-dask_task_cpus = config.getint("XGBOOST","dask_task_cpus")
+test_sims = json.loads(config.get("EVAL_MODEL","test_sims"))
+eval_datasets = json.loads(config.get("EVAL_MODEL","eval_datasets"))
 
 sim_cosmol = config["MISC"]["sim_cosmol"]
 if sim_cosmol == "planck13-nbody":

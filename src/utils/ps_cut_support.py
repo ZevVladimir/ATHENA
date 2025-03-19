@@ -23,18 +23,11 @@ import configparser
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
 
-on_zaratan = config.getboolean("MISC","on_zaratan")
-use_gpu = config.getboolean("MISC","use_gpu")
-
 ML_dset_path = config["PATHS"]["ML_dset_path"]
-path_to_models = config["PATHS"]["path_to_models"]
 SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
 
-dask_task_cpus = config.getint("XGBOOST","dask_task_cpus")
-model_type = config["TRAIN_MODEL"]["model_type"]
-test_sims = json.loads(config.get("XGBOOST","test_sims"))
-eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
-dask_task_cpus = config.getint("XGBOOST","dask_task_cpus")
+test_sims = json.loads(config.get("EVAL_MODEL","test_sims"))
+eval_datasets = json.loads(config.get("EVAL_MODEL","eval_datasets"))
 
 sim_cosmol = config["MISC"]["sim_cosmol"]
 if sim_cosmol == "planck13-nbody":
@@ -60,12 +53,6 @@ log_tvticks = json.loads(config.get("XGBOOST","log_tvticks"))
 lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
 log_rticks = json.loads(config.get("XGBOOST","log_rticks"))
 
-if on_zaratan:
-    from dask_mpi import initialize
-    from distributed.scheduler import logger
-    import socket
-elif not on_zaratan and not use_gpu:
-    from dask.distributed import LocalCluster
     
 def halo_select(sims, ptl_data):
     curr_tot_nptl = 0

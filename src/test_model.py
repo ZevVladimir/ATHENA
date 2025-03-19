@@ -15,34 +15,28 @@ import configparser
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
 
-on_zaratan = config.getboolean("MISC","on_zaratan")
-use_gpu = config.getboolean("MISC","use_gpu")
-
 ML_dset_path = config["PATHS"]["ML_dset_path"]
 path_to_models = config["PATHS"]["path_to_models"]
 
 model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
-dask_task_cpus = config.getint("XGBOOST","dask_task_cpus")
 model_type = config["TRAIN_MODEL"]["model_type"]
 feature_columns = json.loads(config.get("TRAIN_MODEL","feature_columns"))
 target_column = json.loads(config.get("TRAIN_MODEL","target_columns"))
 
-test_sims = json.loads(config.get("XGBOOST","test_sims"))
-eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
+test_sims = json.loads(config.get("EVAL_MODEL","test_sims"))
+eval_datasets = json.loads(config.get("EVAL_MODEL","eval_datasets"))
+dens_prf_plt = config.getboolean("EVAL_MODEL","dens_prf_plt")
+misclass_plt = config.getboolean("EVAL_MODEL","misclass_plt")
+fulldist_plt = config.getboolean("EVAL_MODEL","fulldist_plt")
+io_frac_plt = config.getboolean("EVAL_MODEL","io_frac_plt")
+dens_prf_nu_split = config.getboolean("EVAL_MODEL","dens_prf_nu_split")
 
-reduce_rad = config.getfloat("XGBOOST","reduce_rad")
-reduce_perc = config.getfloat("XGBOOST", "reduce_perc")
-
-weight_rad = config.getfloat("XGBOOST","weight_rad")
-min_weight = config.getfloat("XGBOOST","min_weight")
-opt_wghts = config.getboolean("XGBOOST","opt_wghts")
-opt_scale_rad = config.getboolean("XGBOOST","opt_scale_rad")
-
-dens_prf_plt = config.getboolean("XGBOOST","dens_prf_plt")
-misclass_plt = config.getboolean("XGBOOST","misclass_plt")
-fulldist_plt = config.getboolean("XGBOOST","fulldist_plt")
-io_frac_plt = config.getboolean("XGBOOST","io_frac_plt")
-dens_prf_nu_split = config.getboolean("XGBOOST","dens_prf_nu_split")
+reduce_rad = config.getfloat("OPTIMIZE","reduce_rad")
+reduce_perc = config.getfloat("OPTIMIZE", "reduce_perc")
+weight_rad = config.getfloat("OPTIMIZE","weight_rad")
+min_weight = config.getfloat("OPTIMIZE","min_weight")
+opt_wghts = config.getboolean("OPTIMIZE","opt_wghts")
+opt_scale_rad = config.getboolean("OPTIMIZE","opt_scale_rad")
 
 ###############################################################################################################
 

@@ -19,8 +19,6 @@ from utils.ML_support import setup_client, get_combined_name, load_data, make_pr
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
 
-on_zaratan = config.getboolean("MISC","on_zaratan")
-use_gpu = config.getboolean("MISC","use_gpu")
 sim_cosmol = config["MISC"]["sim_cosmol"]
 
 path_to_models = config["PATHS"]["path_to_models"]
@@ -28,17 +26,17 @@ path_to_models = config["PATHS"]["path_to_models"]
 feature_columns = json.loads(config.get("TRAIN_MODEL","feature_columns"))
 target_column = json.loads(config.get("TRAIN_MODEL","target_columns"))
 model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
-test_sims = json.loads(config.get("XGBOOST","test_sims"))
-eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
 model_type = config["TRAIN_MODEL"]["model_type"]
 
-reduce_rad = config.getfloat("XGBOOST","reduce_rad")
-reduce_perc = config.getfloat("XGBOOST", "reduce_perc")
+test_sims = json.loads(config.get("EVAL_MODEL","test_sims"))
+eval_datasets = json.loads(config.get("EVAL_MODEL","eval_datasets"))
 
-weight_rad = config.getfloat("XGBOOST","weight_rad")
-min_weight = config.getfloat("XGBOOST","min_weight")
-opt_wghts = config.getboolean("XGBOOST","opt_wghts")
-opt_scale_rad = config.getboolean("XGBOOST","opt_scale_rad")
+reduce_rad = config.getfloat("OPTIMIZE","reduce_rad")
+reduce_perc = config.getfloat("OPTIMIZE", "reduce_perc")
+weight_rad = config.getfloat("OPTIMIZE","weight_rad")
+min_weight = config.getfloat("OPTIMIZE","min_weight")
+opt_wghts = config.getboolean("OPTIMIZE","opt_wghts")
+opt_scale_rad = config.getboolean("OPTIMIZE","opt_scale_rad")
 
 if sim_cosmol == "planck13-nbody":
     cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})

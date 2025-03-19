@@ -17,7 +17,6 @@ import configparser
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
 
-SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
 pickled_path = config["PATHS"]["pickled_path"]
 
 curr_sparta_file = config["SPARTA_DATA"]["curr_sparta_file"]

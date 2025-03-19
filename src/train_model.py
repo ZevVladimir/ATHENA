@@ -26,26 +26,21 @@ test_dset_frac = config.getfloat("DSET_CREATE","test_dset_frac")
 feature_columns = json.loads(config.get("TRAIN_MODEL","feature_columns"))
 target_column = json.loads(config.get("TRAIN_MODEL","target_columns"))
 model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
-dask_task_cpus = config.getint("XGBOOST","dask_task_cpus")
-
 model_type = config["TRAIN_MODEL"]["model_type"]
 
-nu_splits = config["XGBOOST"]["nu_splits"]
 retrain = config.getint("MISC","retrain_model")
 
-reduce_rad = config.getfloat("XGBOOST","reduce_rad")
-reduce_perc = config.getfloat("XGBOOST", "reduce_perc")
+dens_prf_plt = config.getboolean("EVAL_MODEL","dens_prf_plt")
+misclass_plt = config.getboolean("EVAL_MODEL","misclass_plt")
+fulldist_plt = config.getboolean("EVAL_MODEL","fulldist_plt")
+dens_prf_nu_split = config.getboolean("EVAL_MODEL","dens_prf_nu_split")
 
-weight_rad = config.getfloat("XGBOOST","weight_rad")
-min_weight = config.getfloat("XGBOOST","min_weight")
-opt_wghts = config.getboolean("XGBOOST","opt_wghts")
-opt_scale_rad = config.getboolean("XGBOOST","opt_scale_rad")
-
-dens_prf_plt = config.getboolean("XGBOOST","dens_prf_plt")
-misclass_plt = config.getboolean("XGBOOST","misclass_plt")
-fulldist_plt = config.getboolean("XGBOOST","fulldist_plt")
-
-dens_prf_nu_split = config.getboolean("XGBOOST","dens_prf_nu_split")
+reduce_rad = config.getfloat("OPTIMIZE","reduce_rad")
+reduce_perc = config.getfloat("OPTIMIZE", "reduce_perc")
+weight_rad = config.getfloat("OPTIMIZE","weight_rad")
+min_weight = config.getfloat("OPTIMIZE","min_weight")
+opt_wghts = config.getboolean("OPTIMIZE","opt_wghts")
+opt_scale_rad = config.getboolean("OPTIMIZE","opt_scale_rad")
 
 if __name__ == "__main__":        
     client = setup_client()

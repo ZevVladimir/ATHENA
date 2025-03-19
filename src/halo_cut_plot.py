@@ -37,7 +37,7 @@ else:
 SPARTA_hdf5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
 
 search_radius = config.getfloat("DSET_CREATE","search_radius")
-test_sims = json.loads(config.get("XGBOOST","test_sims"))
+test_sims = json.loads(config.get("EVAL_MODEL","test_sims"))
 model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
 model_type = config["TRAIN_MODEL"]["model_type"]
 
