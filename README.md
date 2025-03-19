@@ -105,6 +105,15 @@ If you use some of the additional optimization methods the path can be changed, 
 
 ### Optimization of Model
 
+### Running the code: train_model.py
+
+After the \[TRAIN_MODEL\] parameters are set (and potentially \[MISC\] and \[DASK_CLIENT\] parameters as well) you are ready to create the datasets. This is done by simply running the python code: `python3 ~/src/train_model.py`
+
+### Saved Information
+
+As mentioned all saved information goes to the path for the specific model. The model's json file is saved as well as general information about the model is put in a model_info.pickle.
+
+The model_info file includes the parameters for XGBoost which can be set within the train_model.py file. It also includes misclassified percentages described in the Section Evaluating the Model.
 
 ## Evaluating the Model
 

@@ -13,7 +13,7 @@ import multiprocessing as mp
 import h5py
 from sparta_tools import sparta
 
-from utils.ML_support import get_CUDA_cluster,get_combined_name,reform_dataset_dfs,split_calc_name,load_data,make_preds
+from utils.ML_support import setup_client,get_combined_name,reform_dataset_dfs,split_calc_name,load_data,make_preds
 from utils.data_and_loading_functions import create_directory,load_SPARTA_data,load_ptl_param
 from utils.update_vis_fxns import plot_halo_slice_class, plot_halo_3d_class
 ##################################################################################################################
@@ -59,35 +59,11 @@ reduce_perc = config.getfloat("XGBOOST", "reduce_perc")
 weight_rad = config.getfloat("XGBOOST","weight_rad")
 min_weight = config.getfloat("XGBOOST","min_weight")
 
-if not use_gpu and on_zaratan:
-    from dask_mpi import initialize
-    from distributed.scheduler import logger
-    import socket
 
 ###############################################################################################################
 
 if __name__ == "__main__":   
-    if use_gpu:
-        mp.set_start_method("spawn")
-
-    if not use_gpu and on_zaratan:
-        if 'SLURM_CPUS_PER_TASK' in os.environ:
-            cpus_per_task = int(os.environ['SLURM_CPUS_PER_TASK'])
-        else:
-            print("SLURM_CPUS_PER_TASK is not defined.")
-        if use_gpu:
-            initialize(local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
-        else:
-            initialize(nthreads = cpus_per_task, local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
-        print("Initialized")
-        client = Client()
-        host = client.run_on_scheduler(socket.gethostname)
-        port = client.scheduler_info()['services']['dashboard']
-        login_node_address = "zvladimi@login.zaratan.umd.edu" # Change this to the address/domain of your login node
-
-        logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}")
-    else:
-        client = get_CUDA_cluster()
+    client = setup_client()
     
     model_comb_name = get_combined_name(model_sims) 
     scale_rad=False

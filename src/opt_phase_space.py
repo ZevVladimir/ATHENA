@@ -15,7 +15,7 @@ from colossus.cosmology import cosmology
 import pickle
 from sparta_tools import sparta
 
-from utils.ML_support import get_CUDA_cluster, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, split_calc_name, load_SPARTA_data, reform_dataset_dfs
+from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, split_calc_name, load_SPARTA_data, reform_dataset_dfs
 from utils.data_and_loading_functions import create_directory, load_pickle, conv_halo_id_spid
 from utils.ps_cut_support import load_ps_data
 from utils.update_vis_fxns import plt_SPARTA_KE_dist, compare_split_prfs
@@ -188,38 +188,7 @@ def opt_func(bins, r, lnv2, sparta_labels, def_m, def_b, orb = True, plot_loc = 
     return {"b":intercepts}
     
 if __name__ == "__main__":
-    if use_gpu:
-        mp.set_start_method("spawn")
-
-    if on_zaratan:            
-        if use_gpu:
-            initialize(local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
-        else:
-            if 'SLURM_CPUS_PER_TASK' in os.environ:
-                cpus_per_task = int(os.environ['SLURM_CPUS_PER_TASK'])
-            else:
-                print("SLURM_CPUS_PER_TASK is not defined.")
-            initialize(nthreads = cpus_per_task, local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
-
-        print("Initialized")
-        client = Client()
-        host = client.run_on_scheduler(socket.gethostname)
-        port = client.scheduler_info()['services']['dashboard']
-        login_node_address = "zvladimi@login.zaratan.umd.edu" # Change this to the address/domain of your login node
-
-        logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}")
-    else:
-        if use_gpu:
-            client = get_CUDA_cluster()
-        else:
-            tot_ncpus = mp.cpu_count()
-            n_workers = int(np.floor(tot_ncpus / dask_task_cpus))
-            cluster = LocalCluster(
-                n_workers=n_workers,
-                threads_per_worker=dask_task_cpus,
-                memory_limit='5GB'  
-            )
-            client = Client(cluster)
+    client = setup_client()
     
     model_comb_name = get_combined_name(model_sims) 
     model_dir = model_type

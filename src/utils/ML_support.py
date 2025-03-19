@@ -15,6 +15,8 @@ import pandas as pd
 from colossus.lss import peaks
 from colossus.cosmology import cosmology
 import warnings
+from dask.distributed import Client
+import multiprocessing as mp
 
 from skopt import gp_minimize
 from skopt.space import Real
@@ -46,6 +48,10 @@ if sim_cosmol == "planck13-nbody":
 else:
     cosmol = cosmology.setCosmology(sim_cosmol) 
 
+on_zaratan = config.getboolean("DASK_CLIENT","on_zaratan")
+use_gpu = config.getboolean("DASK_CLIENT","use_gpu")
+dask_task_cpus = config.getboolean("DASK_CLIENT","dask_task_cpus")
+
 file_lim = config.getint("TRAIN_MODEL","file_lim")
 
 reduce_rad = config.getfloat("XGBOOST","reduce_rad")
@@ -70,10 +76,16 @@ log_tvticks = json.loads(config.get("XGBOOST","log_tvticks"))
 lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
 log_rticks = json.loads(config.get("XGBOOST","log_rticks"))
 
-if use_gpu:
+###############################################################################################################
+if on_zaratan:
+    from dask_mpi import initialize
+    from distributed.scheduler import logger
+    import socket
+elif not on_zaratan and not use_gpu:
+    from dask.distributed import LocalCluster
+elif use_gpu:
     from dask_cuda import LocalCUDACluster
-    import cudf
-    import dask_cudf as dc
+###############################################################################################################
 
 # Instantiate a dask cluster with GPUs
 def get_CUDA_cluster():
@@ -81,6 +93,41 @@ def get_CUDA_cluster():
                                device_memory_limit='10GB',
                                jit_unspill=True)
     client = Client(cluster)
+    return client
+
+def setup_client():
+    if use_gpu:
+        mp.set_start_method("spawn")
+
+    if on_zaratan:            
+        if use_gpu:
+            initialize(local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
+        else:
+            if 'SLURM_CPUS_PER_TASK' in os.environ:
+                cpus_per_task = int(os.environ['SLURM_CPUS_PER_TASK'])
+            else:
+                print("SLURM_CPUS_PER_TASK is not defined.")
+            initialize(nthreads = cpus_per_task, local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
+
+        print("Initialized")
+        client = Client()
+        host = client.run_on_scheduler(socket.gethostname)
+        port = client.scheduler_info()['services']['dashboard']
+        login_node_address = "zvladimi@login.zaratan.umd.edu" # Change this to the address/domain of your login node
+
+        logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}")
+    else:
+        if use_gpu:
+            client = get_CUDA_cluster()
+        else:
+            tot_ncpus = mp.cpu_count()
+            n_workers = int(np.floor(tot_ncpus / dask_task_cpus))
+            cluster = LocalCluster(
+                n_workers=n_workers,
+                threads_per_worker=dask_task_cpus,
+                memory_limit='5GB'  
+            )
+            client = Client(cluster)
     return client
 
 # Make predictions using the model. Requires the inputs to be a dask dataframe. Can either return the predictions still as a dask dataframe or as a numpy array
