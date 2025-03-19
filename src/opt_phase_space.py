@@ -15,7 +15,7 @@ from colossus.cosmology import cosmology
 import pickle
 from sparta_tools import sparta
 
-from utils.ML_support import get_CUDA_cluster, get_combined_name, parse_ranges, create_nu_string, load_sparta_mass_prf, create_stack_mass_prf, split_calc_name, load_SPARTA_data, reform_dataset_dfs
+from utils.ML_support import get_CUDA_cluster, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, split_calc_name, load_SPARTA_data, reform_dataset_dfs
 from utils.data_and_loading_functions import create_directory, load_pickle, conv_halo_id_spid
 from utils.ps_cut_support import load_ps_data
 from utils.update_vis_fxns import plt_SPARTA_KE_dist, compare_split_prfs
@@ -35,7 +35,7 @@ SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
 
 model_sims = json.loads(config.get("XGBOOST","model_sims"))
 dask_task_cpus = config.getint("XGBOOST","dask_task_cpus")
-model_type = config["XGBOOST"]["model_type"]
+model_type = config["TRAIN_MODEL"]["model_type"]
 test_sims = json.loads(config.get("XGBOOST","test_sims"))
 eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
 dask_task_cpus = config.getint("XGBOOST","dask_task_cpus")
@@ -53,10 +53,6 @@ plt_nu_splits = parse_ranges(plt_nu_splits)
 
 plt_macc_splits = config["XGBOOST"]["plt_macc_splits"]
 plt_macc_splits = parse_ranges(plt_macc_splits)
-
-nu_splits = config["XGBOOST"]["nu_splits"]
-nu_splits = parse_ranges(nu_splits)
-nu_string = create_nu_string(nu_splits)
 
 linthrsh = config.getfloat("XGBOOST","linthrsh")
 lin_nbin = config.getint("XGBOOST","lin_nbin")
@@ -226,7 +222,7 @@ if __name__ == "__main__":
             client = Client(cluster)
     
     model_comb_name = get_combined_name(model_sims) 
-    model_dir = model_type + "_" + model_comb_name + "nu" + nu_string 
+    model_dir = model_type
     model_save_loc = path_to_models + model_comb_name + "/" + model_dir + "/"    
     
     curr_test_sims = test_sims[0]

@@ -16,7 +16,7 @@ from scipy.spatial import cKDTree
 import scipy.ndimage as ndimage
 from sparta_tools import sparta
 
-from utils.ML_support import load_data, get_combined_name, reform_dataset_dfs, parse_ranges, create_nu_string, split_calc_name
+from utils.ML_support import load_data, get_combined_name, reform_dataset_dfs, parse_ranges, split_calc_name
 from utils.data_and_loading_functions import timed, load_pickle, load_SPARTA_data
 
 import configparser
@@ -30,9 +30,8 @@ ML_dset_path = config["PATHS"]["ML_dset_path"]
 path_to_models = config["PATHS"]["path_to_models"]
 SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
 
-model_sims = json.loads(config.get("XGBOOST","model_sims"))
 dask_task_cpus = config.getint("XGBOOST","dask_task_cpus")
-model_type = config["XGBOOST"]["model_type"]
+model_type = config["TRAIN_MODEL"]["model_type"]
 test_sims = json.loads(config.get("XGBOOST","test_sims"))
 eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
 dask_task_cpus = config.getint("XGBOOST","dask_task_cpus")
@@ -50,10 +49,6 @@ plt_nu_splits = parse_ranges(plt_nu_splits)
 
 plt_macc_splits = config["XGBOOST"]["plt_macc_splits"]
 plt_macc_splits = parse_ranges(plt_macc_splits)
-
-nu_splits = config["XGBOOST"]["nu_splits"]
-nu_splits = parse_ranges(nu_splits)
-nu_string = create_nu_string(nu_splits)
 
 linthrsh = config.getfloat("XGBOOST","linthrsh")
 lin_nbin = config.getint("XGBOOST","lin_nbin")

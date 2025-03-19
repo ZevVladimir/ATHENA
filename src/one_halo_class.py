@@ -14,7 +14,7 @@ import h5py
 from sparta_tools import sparta
 
 from utils.ML_support import get_CUDA_cluster,get_combined_name,reform_dataset_dfs,split_calc_name,load_data,make_preds
-from utils.data_and_loading_functions import parse_ranges,create_nu_string,create_directory,find_closest_z,load_SPARTA_data,load_ptl_param
+from utils.data_and_loading_functions import create_directory,load_SPARTA_data,load_ptl_param
 from utils.update_vis_fxns import plot_halo_slice_class, plot_halo_3d_class
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -46,14 +46,12 @@ SPARTA_hdf5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + "
 ML_dset_path = config["PATHS"]["ML_dset_path"]
 path_to_models = config["PATHS"]["path_to_models"]
 
-search_rad = config.getfloat("SEARCH","search_rad")
-model_sims = json.loads(config.get("XGBOOST","model_sims"))
-model_type = config["XGBOOST"]["model_type"]
+search_rad = config.getfloat("DSET_CREATE","search_rad")
+feature_columns = json.loads(config.get("TRAIN_MODEL","feature_columns"))
+target_column = json.loads(config.get("TRAIN_MODEL","target_columns"))
+model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
+model_type = config["TRAIN_MODEL"]["model_type"]
 test_sims = json.loads(config.get("XGBOOST","test_sims"))
-
-nu_splits = config["XGBOOST"]["nu_splits"]
-nu_splits = parse_ranges(nu_splits)
-nu_string = create_nu_string(nu_splits)
 
 reduce_rad = config.getfloat("XGBOOST","reduce_rad")
 reduce_perc = config.getfloat("XGBOOST", "reduce_perc")
@@ -68,10 +66,7 @@ if not use_gpu and on_zaratan:
 
 ###############################################################################################################
 
-if __name__ == "__main__":
-    feature_columns = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
-    target_column = ["Orbit_infall"]
-    
+if __name__ == "__main__":   
     if use_gpu:
         mp.set_start_method("spawn")
 
@@ -102,7 +97,7 @@ if __name__ == "__main__":
     if weight_rad > 0 and min_weight > 0:
         use_weights=True    
     
-    model_dir = model_type + "_" + model_comb_name + "nu" + nu_string 
+    model_dir = model_type
     
     if scale_rad:
         model_dir += "scl_rad" + str(reduce_rad) + "_" + str(reduce_perc)
@@ -134,7 +129,7 @@ if __name__ == "__main__":
 
     model_comb_name = get_combined_name(model_sims) 
 
-    model_dir = model_type + "_" + model_comb_name + "nu" + nu_string 
+    model_dir = model_type
 
     model_save_loc = path_to_models + model_comb_name + "/" + model_dir + "/"
     dset_name = "Test"

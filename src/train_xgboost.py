@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import multiprocessing as mp
 
-from utils.data_and_loading_functions import create_directory, timed, save_pickle, parse_ranges, create_nu_string
+from utils.data_and_loading_functions import create_directory, timed, save_pickle
 from utils.ML_support import get_CUDA_cluster, get_combined_name, load_data, reform_dataset_dfs, optimize_weights, optimize_scale_rad, weight_by_rad, scale_by_rad, eval_model
 
 ##################################################################################################################
@@ -26,13 +26,13 @@ use_gpu = config.getboolean("MISC","use_gpu")
 ML_dset_path = config["PATHS"]["ML_dset_path"]
 path_to_models = config["PATHS"]["path_to_models"]
 
-model_sims = json.loads(config.get("XGBOOST","model_sims"))
+model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
 dask_task_cpus = config.getint("XGBOOST","dask_task_cpus")
 
-model_type = config["XGBOOST"]["model_type"]
-frac_training_data = config.getfloat("XGBOOST","frac_train_data")
+model_type = config["TRAIN_MODEL"]["model_type"]
+
 nu_splits = config["XGBOOST"]["nu_splits"]
-retrain = config.getint("XGBOOST","retrain")
+retrain = config.getint("MISC","retrain_model")
 
 reduce_rad = config.getfloat("XGBOOST","reduce_rad")
 reduce_perc = config.getfloat("XGBOOST", "reduce_perc")
@@ -47,8 +47,6 @@ misclass_plt = config.getboolean("XGBOOST","misclass_plt")
 fulldist_plt = config.getboolean("XGBOOST","fulldist_plt")
 
 dens_prf_nu_split = config.getboolean("XGBOOST","dens_prf_nu_split")
-nu_splits = parse_ranges(nu_splits)
-nu_string = create_nu_string(nu_splits)
 ###############################################################################################################
 if on_zaratan:
     from dask_mpi import initialize
@@ -106,7 +104,7 @@ if __name__ == "__main__":
         
     combined_name = get_combined_name(model_sims) 
         
-    model_dir = model_type + "_" + combined_name + "nu" + nu_string 
+    model_dir = model_type
 
     if scale_rad:
         model_dir += "scl_rad" + str(reduce_rad) + "_" + str(reduce_perc)
@@ -130,7 +128,6 @@ if __name__ == "__main__":
         model_info = {
             'Misc Info':{
                 'Model trained on': train_sims,
-                'Nus Used': nu_string,
                 }}
     
     # Load previously trained booster or start the training process

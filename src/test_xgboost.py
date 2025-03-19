@@ -7,7 +7,7 @@ import json
 import multiprocessing as mp
 import pandas as pd
 
-from utils.ML_support import get_CUDA_cluster, get_combined_name, parse_ranges, create_nu_string, reform_dataset_dfs, load_data, eval_model
+from utils.ML_support import get_CUDA_cluster, get_combined_name, reform_dataset_dfs, load_data, eval_model
 from utils.data_and_loading_functions import create_directory, timed, save_pickle
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -21,9 +21,12 @@ use_gpu = config.getboolean("MISC","use_gpu")
 ML_dset_path = config["PATHS"]["ML_dset_path"]
 path_to_models = config["PATHS"]["path_to_models"]
 
-model_sims = json.loads(config.get("XGBOOST","model_sims"))
+model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
 dask_task_cpus = config.getint("XGBOOST","dask_task_cpus")
-model_type = config["XGBOOST"]["model_type"]
+model_type = config["TRAIN_MODEL"]["model_type"]
+feature_columns = json.loads(config.get("TRAIN_MODEL","feature_columns"))
+target_column = json.loads(config.get("TRAIN_MODEL","target_columns"))
+
 test_sims = json.loads(config.get("XGBOOST","test_sims"))
 eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
 
@@ -41,10 +44,6 @@ fulldist_plt = config.getboolean("XGBOOST","fulldist_plt")
 io_frac_plt = config.getboolean("XGBOOST","io_frac_plt")
 dens_prf_nu_split = config.getboolean("XGBOOST","dens_prf_nu_split")
 
-nu_splits = config["XGBOOST"]["nu_splits"]
-nu_splits = parse_ranges(nu_splits)
-nu_string = create_nu_string(nu_splits)
-
 if on_zaratan:
     from dask_mpi import initialize
     from distributed.scheduler import logger
@@ -54,10 +53,7 @@ elif not on_zaratan and not use_gpu:
 
 ###############################################################################################################
 
-if __name__ == "__main__":
-    feature_columns = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
-    target_column = ["Orbit_infall"]
-    
+if __name__ == "__main__":    
     if use_gpu:
         mp.set_start_method("spawn")
 
@@ -100,7 +96,7 @@ if __name__ == "__main__":
     if weight_rad > 0 and min_weight > 0:
         use_weights=True    
     
-    model_dir = model_type + "_" + model_comb_name + "nu" + nu_string 
+    model_dir = model_type
     
     if scale_rad:
         model_dir += "scl_rad" + str(reduce_rad) + "_" + str(reduce_perc)

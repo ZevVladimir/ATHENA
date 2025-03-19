@@ -21,7 +21,7 @@ from skopt.space import Real
 from sklearn.metrics import accuracy_score
 from functools import partial
 
-from .data_and_loading_functions import load_SPARTA_data, find_closest_z, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, create_nu_string
+from .data_and_loading_functions import load_SPARTA_data, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges
 from .update_vis_fxns import plot_full_ptl_dist, plot_miss_class_dist, compare_prfs, compare_split_prfs, inf_orb_frac
 from .calculation_functions import create_mass_prf, create_stack_mass_prf, filter_prf, calculate_density
 from sparta_tools import sparta 
@@ -46,7 +46,7 @@ if sim_cosmol == "planck13-nbody":
 else:
     cosmol = cosmology.setCosmology(sim_cosmol) 
 
-file_lim = config.getint("XGBOOST","file_lim")
+file_lim = config.getint("TRAIN_MODEL","file_lim")
 
 reduce_rad = config.getfloat("XGBOOST","reduce_rad")
 reduce_perc = config.getfloat("XGBOOST", "reduce_perc")
@@ -253,7 +253,7 @@ def sim_mass_p_z(sim,config_params):
             dic_sim[f] = grp_sim.attrs[f]
     
     p_snap = config_params["p_snap_info"]["ptl_snap"]
-    p_red_shift = config_params["p_red_shift"]
+    p_red_shift = config_params["p_snap_info"]["red_shift"]
     p_sparta_snap = config_params["p_snap_info"]["sparta_snap"][()]
     
     param_paths = [["simulation","particle_mass"]]

@@ -37,14 +37,14 @@ sim_cosmol = config["MISC"]["sim_cosmol"]
 snap_dir_format = config["SNAP_DATA"]["snap_dir_format"]
 snap_format = config["SNAP_DATA"]["snap_format"]
 
-reset_lvl = config.getint("SEARCH","reset")
-t_dyn_step = config.getfloat("SEARCH","t_dyn_step")
-p_red_shift = config.getfloat("SEARCH","p_red_shift")
-search_radius = config.getfloat("SEARCH","search_radius")
-mp_chunk_size = config.getint("SEARCH","mp_chunk_size")
-sub_dset_mem_size = config.getfloat("SEARCH","sub_dset_mem_size")
+reset_lvl = config.getint("DSET_CREATE","reset")
+t_dyn_step = config.getfloat("DSET_CREATE","t_dyn_step")
+p_red_shift = config.getfloat("DSET_CREATE","p_red_shift")
+search_radius = config.getfloat("DSET_CREATE","search_radius")
+mp_chunk_size = config.getint("DSET_CREATE","mp_chunk_size")
+sub_dset_mem_size = config.getfloat("DSET_CREATE","sub_dset_mem_size")
 
-test_halos_ratio = config.getfloat("XGBOOST","test_halos_ratio")
+test_dset_frac = config.getfloat("DSET_CREATE","test_dset_frac")
 lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
 ##################################################################################################################
 create_directory(pickled_path)
@@ -589,8 +589,9 @@ with timed("Startup"):
     
     total_num_halos = match_halo_idxs.shape[0]
     
+    #TODO split the halos more intelligently so that halo sizes are evenly distributed
     # split all indices into train and test groups
-    split_pnt = int((1-test_halos_ratio) * total_num_halos)
+    split_pnt = int((1-test_dset_frac) * total_num_halos)
     train_idxs = match_halo_idxs[:split_pnt]
     test_idxs = match_halo_idxs[split_pnt:]
     train_num_ptls = num_ptls[:split_pnt]
@@ -621,10 +622,9 @@ with timed("Startup"):
         "snap_dir_format":snap_dir_format,
         "snap_format": snap_format,
         "t_dyn_step": t_dyn_step,
-        "p_red_shift":p_red_shift,
         "search_rad": search_radius,
         "total_num_snaps": tot_num_snaps,
-        "test_halos_ratio": test_halos_ratio,
+        "test_halos_ratio": test_dset_frac,
         "chunk_size": mp_chunk_size,
         "HDF5 Mem Size": sub_dset_mem_size,
         "p_snap_info": p_snap_dict,

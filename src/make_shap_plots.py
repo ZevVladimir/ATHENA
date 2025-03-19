@@ -14,7 +14,7 @@ from shap.plots._utils import convert_color
 import multiprocessing as mp
 
 from utils.data_and_loading_functions import create_directory, timed
-from utils.ML_support import get_CUDA_cluster, get_combined_name, parse_ranges, create_nu_string, load_data, make_preds, shap_with_filter
+from utils.ML_support import get_CUDA_cluster, get_combined_name, load_data, make_preds, shap_with_filter
 
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
@@ -25,10 +25,12 @@ sim_cosmol = config["MISC"]["sim_cosmol"]
 
 path_to_models = config["PATHS"]["path_to_models"]
 
-model_sims = json.loads(config.get("XGBOOST","model_sims"))
+feature_columns = json.loads(config.get("TRAIN_MODEL","feature_columns"))
+target_column = json.loads(config.get("TRAIN_MODEL","target_columns"))
+model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
 test_sims = json.loads(config.get("XGBOOST","test_sims"))
 eval_datasets = json.loads(config.get("XGBOOST","eval_datasets"))
-model_type = config["XGBOOST"]["model_type"]
+model_type = config["TRAIN_MODEL"]["model_type"]
 
 reduce_rad = config.getfloat("XGBOOST","reduce_rad")
 reduce_perc = config.getfloat("XGBOOST", "reduce_perc")
@@ -37,10 +39,6 @@ weight_rad = config.getfloat("XGBOOST","weight_rad")
 min_weight = config.getfloat("XGBOOST","min_weight")
 opt_wghts = config.getboolean("XGBOOST","opt_wghts")
 opt_scale_rad = config.getboolean("XGBOOST","opt_scale_rad")
-
-nu_splits = config["XGBOOST"]["nu_splits"]
-nu_splits = parse_ranges(nu_splits)
-nu_string = create_nu_string(nu_splits)
 
 if sim_cosmol == "planck13-nbody":
     cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
@@ -78,10 +76,6 @@ if __name__ == '__main__':
         client = get_CUDA_cluster()
     
     with timed("Setup"): 
-
-        feature_columns = ["p_Scaled_radii","p_Radial_vel","p_Tangential_vel","c_Scaled_radii","c_Radial_vel","c_Tangential_vel"]
-        target_column = ["Orbit_infall"]
-
         model_comb_name = get_combined_name(model_sims) 
         scale_rad=False
         use_weights=False
@@ -90,7 +84,7 @@ if __name__ == '__main__':
         if weight_rad > 0 and min_weight > 0:
             use_weights=True    
 
-        model_dir = model_type + "_" + model_comb_name + "nu" + nu_string 
+        model_dir = model_type
 
         if scale_rad:
             model_dir += "scl_rad" + str(reduce_rad) + "_" + str(reduce_perc)

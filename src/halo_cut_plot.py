@@ -10,7 +10,7 @@ from sparta_tools import sparta
 
 from utils.ML_support import get_combined_name,reform_dataset_dfs,split_calc_name
 from utils.update_vis_fxns import plot_halo_slice
-from utils.data_and_loading_functions import parse_ranges,create_nu_string,create_directory,find_closest_z,load_SPARTA_data,timed,load_ptl_param
+from utils.data_and_loading_functions import create_directory,load_SPARTA_data,timed,load_ptl_param
 
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
@@ -36,20 +36,16 @@ else:
     
 SPARTA_hdf5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
 
-search_radius = config.getfloat("SEARCH","search_radius")
+search_radius = config.getfloat("DSET_CREATE","search_radius")
 test_sims = json.loads(config.get("XGBOOST","test_sims"))
-model_sims = json.loads(config.get("XGBOOST","model_sims"))
-model_type = config["XGBOOST"]["model_type"]
-nu_splits = config["XGBOOST"]["nu_splits"]
-nu_splits = parse_ranges(nu_splits)
-nu_string = create_nu_string(nu_splits)
-
+model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
+model_type = config["TRAIN_MODEL"]["model_type"]
 
 sim = test_sims[0][0]
 
 model_comb_name = get_combined_name(model_sims) 
 
-model_dir = model_type + "_" + model_comb_name + "nu" + nu_string 
+model_dir = model_type
 
 model_save_loc = path_to_models + model_comb_name + "/" + model_dir + "/"
 dset_name = "Test"

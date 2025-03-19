@@ -23,7 +23,7 @@ pickled_path = config["PATHS"]["pickled_path"]
 curr_sparta_file = config["SPARTA_DATA"]["curr_sparta_file"]
 sim_cosmol = config["MISC"]["sim_cosmol"]
 
-reset_lvl = config.getint("SEARCH","reset")
+reset_lvl = config.getint("MISC","reset")
 ##################################################################################################################
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
