@@ -213,11 +213,11 @@ if __name__ == '__main__':
         ax2 = fig.add_subplot(gs[1])
         plt.sca(ax1)
         ax_all_ptl = shap.plots.beeswarm(all_ptl_explnr,plot_size=(20,10),show=False,order=order,color_bar=False)
-        ax1.set_title("Sample: All Particles",fontsize=26)
+        ax1.set_title("All Particles",fontsize=26)
 
         plt.sca(ax2)
         ax_no_sec = shap.plots.beeswarm(no_sec_explnr,plot_size=(20,10),show=False,order=order,hide_features=True)
-        ax2.set_title("Sample: Particles with no Past Snapshot",fontsize=26)
+        ax2.set_title("Particles with no Past Snapshot",fontsize=26)
         
         # Set the xlim to be the max/min of both axes
         xlims_ax1 = ax1.get_xlim()
@@ -229,7 +229,7 @@ if __name__ == '__main__':
         ax2.set_xlim(combined_xlim)
         
         fig.savefig(plot_loc + "comb_shap.png")
-        print("finished combiend shap plot")
+        print("finished combined shap plot")
          
 
         # widths = [4,4]

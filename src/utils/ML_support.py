@@ -23,9 +23,9 @@ from skopt.space import Real
 from sklearn.metrics import accuracy_score
 from functools import partial
 
-from .data_and_loading_functions import load_SPARTA_data, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges
+from .data_and_loading_functions import load_SPARTA_data, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, load_pickle
 from .update_vis_fxns import plot_full_ptl_dist, plot_miss_class_dist, compare_prfs, compare_split_prfs, inf_orb_frac
-from .calculation_functions import create_mass_prf, create_stack_mass_prf, filter_prf, calculate_density
+from .calculation_functions import create_mass_prf, create_stack_mass_prf, filter_prf, calculate_density, calc_mass_acc_rate
 from sparta_tools import sparta 
 
 ##################################################################################################################
@@ -64,6 +64,9 @@ weight_exp = config.getfloat("OPTIMIZE","weight_exp")
 hpo_loss = config.get("OPTIMIZE","hpo_loss")
 plt_nu_splits = config["OPTIMIZE"]["plt_nu_splits"]
 plt_nu_splits = parse_ranges(plt_nu_splits)
+
+plt_macc_splits = config["XGBOOST"]["plt_macc_splits"]
+plt_macc_splits = parse_ranges(plt_macc_splits)
 
 linthrsh = config.getfloat("EVAL_MODEL","linthrsh")
 lin_nbin = config.getint("EVAL_MODEL","lin_nbin")
@@ -607,6 +610,46 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, pl
             inf_prfs = [my_dens_prf_inf[big_halo_loc[i]], act_dens_prf_inf[big_halo_loc[i]]]
             compare_prfs(all_prfs,orb_prfs,inf_prfs,bins[1:],lin_rticks,debug_plt_path,sim + "_" + str(i)+"_dens",prf_func=None)
 
+        #TODO check if the following is necessary to load all of it
+        curr_halos_r200m_list = []
+        past_halos_r200m_list = []
+        
+        for sim in use_sims:
+            config_dict = load_pickle(ML_dset_path + sim + "/config.pickle")
+            p_snap = config_dict["p_snap_info"]["ptl_snap"][()]
+            curr_z = config_dict["p_snap_info"]["red_shift"][()]
+            # TODO make this generalizable to when the snapshot separation isn't just 1 dynamical time as needed for mass accretion calculation
+            # we can just use the secondary snap here because we already chose to do 1 dynamical time for that snap
+            past_z = config_dict["c_snap_info"]["red_shift"][()] 
+            p_sparta_snap = config_dict["p_snap_info"]["sparta_snap"][()]
+            c_sparta_snap = config_dict["c_snap_info"]["sparta_snap"][()]
+            
+            sparta_name, sparta_search_name = split_calc_name(sim)
+            
+            curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
+                    
+            # Load the halo's positions and radii
+            param_paths = [["halos","R200m"],["halos","id"]]
+            sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, p_snap)
+
+            curr_halos_r200m = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
+            curr_halos_ids = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
+            
+            halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
+            all_idxs = halo_ddf["Halo_indices"].values
+            
+            use_halo_r200m = curr_halos_r200m[all_idxs]
+            use_halo_ids = curr_halos_ids[all_idxs]
+            
+            sparta_output = sparta.load(filename=curr_sparta_HDF5_path, halo_ids=use_halo_ids, log_level=0)
+            new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta re-sort the indices
+            
+            curr_halos_r200m_list.append(sparta_output['halos']['R200m'][:,p_sparta_snap])
+            past_halos_r200m_list.append(sparta_output['halos']['R200m'][:,c_sparta_snap])
+            
+        curr_halos_r200m = np.concatenate(curr_halos_r200m_list)
+        past_halos_r200m = np.concatenate(past_halos_r200m_list)
+        
         # If we want the density profiles to only consist of halos of a specific peak height (nu) bin 
         if split_nu:
             all_prf_lst = []
@@ -624,7 +667,21 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, pl
                 else:
                     plt_nu_splits.remove(nu_split)
 
+            calc_maccs = calc_mass_acc_rate(curr_halos_r200m,past_halos_r200m,curr_z,past_z)
+
+            cpy_plt_macc_splits = plt_macc_splits.copy()
+            for i,macc_split in enumerate(cpy_plt_macc_splits):
+                # Take the second element of the where to filter by the halos (?)
+                fltr = np.where((calc_maccs > macc_split[0]) & (calc_maccs < macc_split[1]))[0]
+                if fltr.shape[0] > 25:
+                    all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
+                    orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
+                    inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
+                else:
+                    plt_macc_splits.remove(macc_split)
+
             compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_med_",prf_func=np.nanmedian)
+            compare_split_prfs(plt_macc_splits,len(cpy_plt_macc_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title= "macc_dens_", split_name="\Gamma", prf_name_0="ML Model", prf_name_1="SPARTA")
         else:
             all_prf_lst = filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos)
             orb_prf_lst = filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos)

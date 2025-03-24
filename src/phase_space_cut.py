@@ -49,10 +49,10 @@ else:
     cosmol = cosmology.setCosmology(sim_cosmol) 
     sim_pat = r"cbol_l(\d+)_n(\d+)"
     
-plt_nu_splits = config["XGBOOST"]["plt_nu_splits"]
+plt_nu_splits = config["EVAL_MODEL"]["plt_nu_splits"]
 plt_nu_splits = parse_ranges(plt_nu_splits)
 
-plt_macc_splits = config["XGBOOST"]["plt_macc_splits"]
+plt_macc_splits = config["EVAL_MODEL"]["plt_macc_splits"]
 plt_macc_splits = parse_ranges(plt_macc_splits)
 
 linthrsh = config.getfloat("XGBOOST","linthrsh")
