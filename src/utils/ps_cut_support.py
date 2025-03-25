@@ -17,41 +17,40 @@ import scipy.ndimage as ndimage
 from sparta_tools import sparta
 
 from utils.ML_support import load_data, get_combined_name, reform_dataset_dfs, parse_ranges, split_calc_name
-from utils.data_and_loading_functions import timed, load_pickle, load_SPARTA_data
+from utils.data_and_loading_functions import timed, load_pickle, load_SPARTA_data, load_config
 
-import configparser
-config = configparser.ConfigParser()
-config.read(os.getcwd() + "/config.ini")
+config_dict = load_config(os.getcwd() + "/config.ini")
 
-ML_dset_path = config["PATHS"]["ML_dset_path"]
-SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
+ML_dset_path = config_dict["PATHS"]["ML_dset_path"]
+SPARTA_output_path = config_dict["SPARTA_DATA"]["SPARTA_output_path"]
 
-test_sims = json.loads(config.get("EVAL_MODEL","test_sims"))
-eval_datasets = json.loads(config.get("EVAL_MODEL","eval_datasets"))
+test_sims = config_dict["EVAL_MODEL"]["test_sims"]
+eval_datasets = config_dict["EVAL_MODEL"]["eval_datasets"]
 
-sim_cosmol = config["MISC"]["sim_cosmol"]
+sim_cosmol = config_dict["MISC"]["sim_cosmol"]
+
+plt_nu_splits = config_dict["EVAL_MODEL"]["plt_nu_splits"]
+plt_nu_splits = parse_ranges(plt_nu_splits)
+
+plt_macc_splits = config_dict["EVAL_MODEL"]["plt_macc_splits"]
+plt_macc_splits = parse_ranges(plt_macc_splits)
+
+linthrsh = config_dict["EVAL_MODEL"]["linthrsh"]
+lin_nbin = config_dict["EVAL_MODEL"]["lin_nbin"]
+log_nbin = config_dict["EVAL_MODEL"]["log_nbin"]
+lin_rvticks = config_dict["EVAL_MODEL"]["lin_rvticks"]
+log_rvticks = config_dict["EVAL_MODEL"]["log_rvticks"]
+lin_tvticks = config_dict["EVAL_MODEL"]["lin_tvticks"]
+log_tvticks = config_dict["EVAL_MODEL"]["log_tvticks"]
+lin_rticks = config_dict["EVAL_MODEL"]["lin_rticks"]
+log_rticks = config_dict["EVAL_MODEL"]["log_rticks"]
+
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
     cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
 else:
     cosmol = cosmology.setCosmology(sim_cosmol) 
     sim_pat = r"cbol_l(\d+)_n(\d+)"
-    
-plt_nu_splits = config["EVAL_MODEL"]["plt_nu_splits"]
-plt_nu_splits = parse_ranges(plt_nu_splits)
-
-plt_macc_splits = config["EVAL_MODEL"]["plt_macc_splits"]
-plt_macc_splits = parse_ranges(plt_macc_splits)
-
-linthrsh = config.getfloat("EVAL_MODEL","linthrsh")
-lin_nbin = config.getint("EVAL_MODEL","lin_nbin")
-log_nbin = config.getint("EVAL_MODEL","log_nbin")
-lin_rvticks = json.loads(config.get("EVAL_MODEL","lin_rvticks"))
-log_rvticks = json.loads(config.get("EVAL_MODEL","log_rvticks"))
-lin_tvticks = json.loads(config.get("EVAL_MODEL","lin_tvticks"))
-log_tvticks = json.loads(config.get("EVAL_MODEL","log_tvticks"))
-lin_rticks = json.loads(config.get("EVAL_MODEL","lin_rticks"))
-log_rticks = json.loads(config.get("EVAL_MODEL","log_rticks"))
 
     
 def halo_select(sims, ptl_data):

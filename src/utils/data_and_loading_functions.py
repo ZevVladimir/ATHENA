@@ -10,17 +10,33 @@ import dask.dataframe as dd
 from pygadgetreader import readsnap, readheader
 from sparta_tools import sparta
 from functools import reduce
+import ast
 
+def parse_value(value):
+    """Convert value to appropriate type (list, int, float, bool, str)."""
+    try:
+        return ast.literal_eval(value)  # Safely evaluates lists, ints, floats, etc.
+    except (ValueError, SyntaxError):
+        return value  # Keep as string if eval fails
+
+# Load the config file into one dictionary separated by the sections as indicated in the config file
+def load_config(file_path):
+    config = configparser.ConfigParser()
+    config.read(file_path)
+    
+    config_dict = {}
+    for section in config.sections():
+        config_dict[section] = {key: parse_value(value) for key, value in config[section].items()}
+    
+    return config_dict
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
-import configparser
-config = configparser.ConfigParser()
-config.read(os.getcwd() + "/config.ini")
+config_dict = load_config(os.getcwd() + "/config.ini")
 
-pickled_path = config["PATHS"]["pickled_path"]
+pickled_path = config_dict["PATHS"]["pickled_path"]
 
-curr_sparta_file = config["SPARTA_DATA"]["curr_sparta_file"]
-sim_cosmol = config["MISC"]["sim_cosmol"]
+curr_sparta_file = config_dict["SPARTA_DATA"]["curr_sparta_file"]
+sim_cosmol = config_dict["MISC"]["sim_cosmol"]
 ##################################################################################################################
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"

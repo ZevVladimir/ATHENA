@@ -13,38 +13,36 @@ import multiprocessing as mp
 import h5py
 from sparta_tools import sparta
 
-from utils.ML_support import setup_client,get_combined_name,reform_dataset_dfs,split_calc_name,load_data,make_preds
-from utils.data_and_loading_functions import create_directory,load_SPARTA_data,load_ptl_param
+from utils.ML_support import setup_client,get_combined_name,reform_dataset_dfs,split_calc_name,load_data,make_preds, get_model_name
+from utils.data_and_loading_functions import create_directory,load_SPARTA_data,load_ptl_param, load_config
 from utils.update_vis_fxns import plot_halo_slice_class, plot_halo_3d_class
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
-import configparser
-config = configparser.ConfigParser()
-config.read(os.getcwd() + "/config.ini")
+config_dict = load_config(os.getcwd() + "/config.ini")
 
-ML_dset_path = config["PATHS"]["ML_dset_path"]
-path_to_models = config["PATHS"]["path_to_models"]
+ML_dset_path = config_dict["PATHS"]["ML_dset_path"]
+path_to_models = config_dict["PATHS"]["path_to_models"]
 
-snap_path = config["SNAP_DATA"]["snap_path"]
-SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
-curr_sparta_file = config["SPARTA_DATA"]["curr_sparta_file"]
-snap_dir_format = config["SNAP_DATA"]["snap_dir_format"]
-snap_format = config["SNAP_DATA"]["snap_format"]
-sim_cosmol = config["MISC"]["sim_cosmol"]
+snap_path = config_dict["SNAP_DATA"]["snap_path"]
+SPARTA_output_path = config_dict["SPARTA_DATA"]["SPARTA_output_path"]
+curr_sparta_file = config_dict["SPARTA_DATA"]["curr_sparta_file"]
+snap_dir_format = config_dict["SNAP_DATA"]["snap_dir_format"]
+snap_format = config_dict["SNAP_DATA"]["snap_format"]
+sim_cosmol = config_dict["MISC"]["sim_cosmol"]
 
-search_rad = config.getfloat("DSET_CREATE","search_rad")
+search_rad = config_dict["DSET_CREATE"]["search_rad"]
 
-feature_columns = json.loads(config.get("TRAIN_MODEL","feature_columns"))
-target_column = json.loads(config.get("TRAIN_MODEL","target_column"))
-model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
-model_type = config["TRAIN_MODEL"]["model_type"]
+feature_columns = config_dict["TRAIN_MODEL"]["feature_columns"]
+target_column = config_dict["TRAIN_MODEL"]["target_column"]
+model_sims = config_dict["TRAIN_MODEL"]["model_sims"]
+model_type = config_dict["TRAIN_MODEL"]["model_type"]
 
-test_sims = json.loads(config.get("EVAL_MODEL","test_sims"))
+test_sims = config_dict["EVAL_MODEL"]["test_sims"]
 
-reduce_rad = config.getfloat("OPTIMIZE","reduce_rad")
-reduce_perc = config.getfloat("OPTIMIZE", "reduce_perc")
-weight_rad = config.getfloat("OPTIMIZE","weight_rad")
-min_weight = config.getfloat("OPTIMIZE","min_weight")
+reduce_rad = config_dict["OPTIMIZE"]["reduce_rad"]
+reduce_perc = config_dict["OPTIMIZE"]["reduce_perc"]
+weight_rad = config_dict["OPTIMIZE"]["weight_rad"]
+min_weight = config_dict["OPTIMIZE"]["min_weight"]
 
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
@@ -64,53 +62,37 @@ sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + "
 if __name__ == "__main__":   
     client = setup_client()
     
-    model_comb_name = get_combined_name(model_sims) 
-    scale_rad=False
-    use_weights=False
-    if reduce_rad > 0 and reduce_perc > 0:
-        scale_rad = True
-    if weight_rad > 0 and min_weight > 0:
-        use_weights=True    
-    
-    model_dir = model_type
-    
-    if scale_rad:
-        model_dir += "scl_rad" + str(reduce_rad) + "_" + str(reduce_perc)
-    if use_weights:
-        model_dir += "wght" + str(weight_rad) + "_" + str(min_weight)
+    comb_model_sims = get_combined_name(model_sims) 
         
-    # model_name =  model_dir + model_comb_name
-    
-    model_save_loc = path_to_models + model_comb_name + "/" + model_dir + "/"
+    model_name = get_model_name(model_type, model_sims, hpo_done=config_dict["OPTIMIZE"]["hpo"], opt_param_dict=config_dict["OPTIMIZE"])    
+    model_fldr_loc = path_to_models + comb_model_sims + "/" + model_name + "/"
+    model_save_loc = model_fldr_loc + model_name + ".json"
+    gen_plot_save_loc = model_fldr_loc + "plots/"
 
     try:
         bst = xgb.Booster()
-        bst.load_model(model_save_loc + model_dir + ".json")
+        bst.load_model(model_save_loc)
         bst.set_param({"device": "cuda:0"})
         print("Loaded Model Trained on:",model_sims)
     except:
-        print("Couldn't load Booster Located at: " + model_save_loc + model_dir + ".json")
+        print("Couldn't load Booster Located at: " + model_save_loc)
         
     try:
-        with open(model_save_loc + "model_info.pickle", "rb") as pickle_file:
+        with open(model_fldr_loc + "model_info.pickle", "rb") as pickle_file:
             model_info = pickle.load(pickle_file)
     except FileNotFoundError:
         print("Model info could not be loaded please ensure the path is correct or rerun train_xgboost.py")
     
     #TODO adjust this?
     # Only takes FIRST SIM
-
     sim = test_sims[0][0]
-
-    model_comb_name = get_combined_name(model_sims) 
 
     model_dir = model_type
 
-    model_save_loc = path_to_models + model_comb_name + "/" + model_dir + "/"
     dset_name = "Test"
     test_comb_name = get_combined_name(test_sims[0]) 
 
-    plot_loc = model_save_loc + dset_name + "_" + test_comb_name + "/plots/"
+    plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
     create_directory(plot_loc)
 
     halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")

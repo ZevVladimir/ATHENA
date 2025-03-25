@@ -8,22 +8,27 @@ import h5py
 import numpy as np
 from sparta_tools import sparta
 
-from utils.ML_support import get_combined_name,reform_dataset_dfs,split_calc_name
+from utils.ML_support import get_combined_name,reform_dataset_dfs,split_calc_name,get_model_name
 from utils.update_vis_fxns import plot_halo_slice
-from utils.data_and_loading_functions import create_directory,load_SPARTA_data,timed,load_ptl_param
+from utils.data_and_loading_functions import create_directory,load_SPARTA_data,timed,load_ptl_param,load_config
 
-config = configparser.ConfigParser()
-config.read(os.getcwd() + "/config.ini")
+config_dict = load_config(os.getcwd() + "/config.ini")
 
-snap_path = config["SNAP_DATA"]["snap_path"]
-SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
-ML_dset_path = config["PATHS"]["ML_dset_path"]
-path_to_models = config["PATHS"]["path_to_models"]
+snap_path = config_dict["SNAP_DATA"]["snap_path"]
+SPARTA_output_path = config_dict["SPARTA_DATA"]["SPARTA_output_path"]
+ML_dset_path = config_dict["PATHS"]["ML_dset_path"]
+path_to_models = config_dict["PATHS"]["path_to_models"]
 
-curr_sparta_file = config["SPARTA_DATA"]["curr_sparta_file"]
-snap_dir_format = config["SNAP_DATA"]["snap_dir_format"]
-snap_format = config["SNAP_DATA"]["snap_format"]
-sim_cosmol = config["MISC"]["sim_cosmol"]
+curr_sparta_file = config_dict["SPARTA_DATA"]["curr_sparta_file"]
+snap_dir_format = config_dict["SNAP_DATA"]["snap_dir_format"]
+snap_format = config_dict["SNAP_DATA"]["snap_format"]
+sim_cosmol = config_dict["MISC"]["sim_cosmol"]
+
+search_radius = config_dict["DSET_CREATE"]["search_radius"]
+test_sims = config_dict["EVAL_MODEL"]["test_sims"]
+model_sims = config_dict["TRAIN_MODEL"]["model_sims"]
+model_type = config_dict["TRAIN_MODEL"]["model_type"]
+
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
 else:
@@ -36,22 +41,18 @@ else:
     
 SPARTA_hdf5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
 
-search_radius = config.getfloat("DSET_CREATE","search_radius")
-test_sims = json.loads(config.get("EVAL_MODEL","test_sims"))
-model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
-model_type = config["TRAIN_MODEL"]["model_type"]
-
 sim = test_sims[0][0]
 
-model_comb_name = get_combined_name(model_sims) 
+comb_model_sims = get_combined_name(model_sims) 
+        
+model_name = get_model_name(model_type, model_sims, hpo_done=config_dict["OPTIMIZE"]["hpo"], opt_param_dict=config_dict["OPTIMIZE"])    
+model_fldr_loc = path_to_models + comb_model_sims + "/" + model_name + "/"
+gen_plot_save_loc = model_fldr_loc + "plots/"
 
-model_dir = model_type
-
-model_save_loc = path_to_models + model_comb_name + "/" + model_dir + "/"
 dset_name = "Test"
 test_comb_name = get_combined_name(test_sims[0]) 
 
-plot_loc = model_save_loc + dset_name + "_" + test_comb_name + "/plots/halo_slices/"
+plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/halo_slices/"
 create_directory(plot_loc)
 
 halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")

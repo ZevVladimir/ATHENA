@@ -7,72 +7,52 @@ import json
 import multiprocessing as mp
 import pandas as pd
 
-from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, load_data, eval_model
-from utils.data_and_loading_functions import create_directory, timed, save_pickle
+from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, load_data, eval_model, get_model_name
+from utils.data_and_loading_functions import create_directory, timed, save_pickle, load_config
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
-import configparser
-config = configparser.ConfigParser()
-config.read(os.getcwd() + "/config.ini")
+config_dict = load_config(os.getcwd() + "/config.ini")
 
-ML_dset_path = config["PATHS"]["ML_dset_path"]
-path_to_models = config["PATHS"]["path_to_models"]
+ML_dset_path = config_dict["PATHS"]["ML_dset_path"]
+path_to_models = config_dict["PATHS"]["path_to_models"]
 
-model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
-model_type = config["TRAIN_MODEL"]["model_type"]
-feature_columns = json.loads(config.get("TRAIN_MODEL","feature_columns"))
-target_column = json.loads(config.get("TRAIN_MODEL","target_column"))
+model_sims = config_dict["TRAIN_MODEL"]["model_sims"]
+model_type = config_dict["TRAIN_MODEL"]["model_type"]
+feature_columns = config_dict["TRAIN_MODEL"]["feature_columns"]
+target_column = config_dict["TRAIN_MODEL"]["target_column"]
 
-test_sims = json.loads(config.get("EVAL_MODEL","test_sims"))
-eval_datasets = json.loads(config.get("EVAL_MODEL","eval_datasets"))
-dens_prf_plt = config.getboolean("EVAL_MODEL","dens_prf_plt")
-misclass_plt = config.getboolean("EVAL_MODEL","misclass_plt")
-fulldist_plt = config.getboolean("EVAL_MODEL","fulldist_plt")
-io_frac_plt = config.getboolean("EVAL_MODEL","io_frac_plt")
-dens_prf_nu_split = config.getboolean("EVAL_MODEL","dens_prf_nu_split")
-
-reduce_rad = config.getfloat("OPTIMIZE","reduce_rad")
-reduce_perc = config.getfloat("OPTIMIZE", "reduce_perc")
-weight_rad = config.getfloat("OPTIMIZE","weight_rad")
-min_weight = config.getfloat("OPTIMIZE","min_weight")
-opt_wghts = config.getboolean("OPTIMIZE","opt_wghts")
-opt_scale_rad = config.getboolean("OPTIMIZE","opt_scale_rad")
+test_sims = config_dict["EVAL_MODEL"]["test_sims"]
+eval_datasets = config_dict["EVAL_MODEL"]["eval_datasets"]
+dens_prf_plt = config_dict["EVAL_MODEL"]["dens_prf_plt"]
+misclass_plt = config_dict["EVAL_MODEL"]["misclass_plt"]
+fulldist_plt = config_dict["EVAL_MODEL"]["fulldist_plt"]
+io_frac_plt = config_dict["EVAL_MODEL"]["io_frac_plt"]
+dens_prf_nu_split = config_dict["EVAL_MODEL"]["dens_prf_nu_split"]
 
 ###############################################################################################################
 
 if __name__ == "__main__":    
     client = setup_client()
     
-    # Adjust name based off what things are being done to the model. This keeps each model unique
-    model_comb_name = get_combined_name(model_sims) 
-    scale_rad=False
-    use_weights=False
-    if reduce_rad > 0 and reduce_perc > 0:
-        scale_rad = True
-    if weight_rad > 0 and min_weight > 0:
-        use_weights=True    
-    
-    model_dir = model_type
-    
-    if scale_rad:
-        model_dir += "scl_rad" + str(reduce_rad) + "_" + str(reduce_perc)
-    if use_weights:
-        model_dir += "wght" + str(weight_rad) + "_" + str(min_weight)
-    
-    model_save_loc = path_to_models + model_comb_name + "/" + model_dir + "/"
+    comb_model_sims = get_combined_name(model_sims) 
+        
+    model_name = get_model_name(model_type, model_sims, hpo_done=config_dict["OPTIMIZE"]["hpo"], opt_param_dict=config_dict["OPTIMIZE"])    
+    model_fldr_loc = path_to_models + comb_model_sims + "/" + model_name + "/"
+    model_save_loc = model_fldr_loc + model_name + ".json"
+    gen_plot_save_loc = model_fldr_loc + "plots/"
 
     # Try loading the model if it can't be thats an error!
     try:
         bst = xgb.Booster()
-        bst.load_model(model_save_loc + model_dir + ".json")
+        bst.load_model(model_save_loc)
         bst.set_param({"device": "cuda:0"})
         print("Loaded Model Trained on:",model_sims)
     except:
-        print("Couldn't load Booster Located at: " + model_save_loc + model_dir + ".json")
+        print("Couldn't load Booster Located at: " + model_save_loc)
     
     # Try loading the model info it it can't that's an error!
     try:
-        with open(model_save_loc + "model_info.pickle", "rb") as pickle_file:
+        with open(model_fldr_loc + "model_info.pickle", "rb") as pickle_file:
             model_info = pickle.load(pickle_file)
     except FileNotFoundError:
         print("Model info could not be loaded please ensure the path is correct or rerun train_xgboost.py")
@@ -86,7 +66,7 @@ if __name__ == "__main__":
         # Loop through and/or for Train/Test/All datasets and evaluate the model
         for dset_name in eval_datasets:
             with timed("Model Evaluation on " + dset_name + " dataset"):             
-                plot_loc = model_save_loc + dset_name + "_" + test_comb_name + "/plots/"
+                plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
                 create_directory(plot_loc)
                 
                 # Load the halo information
@@ -114,6 +94,6 @@ if __name__ == "__main__":
                 del X
                 del y
         
-        save_pickle(model_info,model_save_loc + "model_info.pickle")
+        save_pickle(model_info,model_fldr_loc + "model_info.pickle")
 
     client.close()

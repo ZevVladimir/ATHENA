@@ -13,30 +13,29 @@ from  shap.plots import colors
 from shap.plots._utils import convert_color
 import multiprocessing as mp
 
-from utils.data_and_loading_functions import create_directory, timed
-from utils.ML_support import setup_client, get_combined_name, load_data, make_preds, shap_with_filter
+from utils.data_and_loading_functions import create_directory, timed, load_config
+from utils.ML_support import setup_client, get_combined_name, load_data, make_preds, shap_with_filter, get_model_name
 
-config = configparser.ConfigParser()
-config.read(os.getcwd() + "/config.ini")
+config_dict = load_config(os.getcwd() + "/config.ini")
 
-sim_cosmol = config["MISC"]["sim_cosmol"]
+sim_cosmol = config_dict["MISC"]["sim_cosmol"]
 
-path_to_models = config["PATHS"]["path_to_models"]
+path_to_models = config_dict["PATHS"]["path_to_models"]
 
-feature_columns = json.loads(config.get("TRAIN_MODEL","feature_columns"))
-target_column = json.loads(config.get("TRAIN_MODEL","target_column"))
-model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
-model_type = config["TRAIN_MODEL"]["model_type"]
+feature_columns = config_dict["TRAIN_MODEL"]["feature_columns"]
+target_column = config_dict["TRAIN_MODEL"]["target_column"]
+model_sims = config_dict["TRAIN_MODEL"]["model_sims"]
+model_type = config_dict["TRAIN_MODEL"]["model_type"]
 
-test_sims = json.loads(config.get("EVAL_MODEL","test_sims"))
-eval_datasets = json.loads(config.get("EVAL_MODEL","eval_datasets"))
+test_sims = config_dict["EVAL_MODEL"]["test_sims"]
+eval_datasets = config_dict["EVAL_MODEL"]["eval_datasets"]
 
-reduce_rad = config.getfloat("OPTIMIZE","reduce_rad")
-reduce_perc = config.getfloat("OPTIMIZE", "reduce_perc")
-weight_rad = config.getfloat("OPTIMIZE","weight_rad")
-min_weight = config.getfloat("OPTIMIZE","min_weight")
-opt_wghts = config.getboolean("OPTIMIZE","opt_wghts")
-opt_scale_rad = config.getboolean("OPTIMIZE","opt_scale_rad")
+reduce_rad = config_dict["OPTIMIZE"]["reduce_rad"]
+reduce_perc = config_dict["OPTIMIZE"]["reduce_perc"]
+weight_rad = config_dict["OPTIMIZE"]["weight_rad"]
+min_weight = config_dict["OPTIMIZE"]["min_weight"]
+opt_wghts = config_dict["OPTIMIZE"]["opt_wghts"]
+opt_scale_rad = config_dict["OPTIMIZE"]["opt_scale_rad"]
 
 if sim_cosmol == "planck13-nbody":
     cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
@@ -48,38 +47,24 @@ if __name__ == '__main__':
     client = setup_client()
     
     with timed("Setup"): 
-        model_comb_name = get_combined_name(model_sims) 
-        scale_rad=False
-        use_weights=False
-        if reduce_rad > 0 and reduce_perc > 0:
-            scale_rad = True
-        if weight_rad > 0 and min_weight > 0:
-            use_weights=True    
-
-        model_dir = model_type
-
-        if scale_rad:
-            model_dir += "scl_rad" + str(reduce_rad) + "_" + str(reduce_perc)
-        if use_weights:
-            model_dir += "wght" + str(weight_rad) + "_" + str(min_weight)
-            
-        model_name =  model_dir + "_" + model_comb_name
-
-        model_save_loc = path_to_models + model_comb_name + "/" + model_dir + "/"
-
-        gen_plot_save_loc = model_save_loc + "plots/"
+        comb_model_sims = get_combined_name(model_sims) 
+        
+        model_name = get_model_name(model_type, model_sims, hpo_done=config_dict["OPTIMIZE"]["hpo"], opt_param_dict=config_dict["OPTIMIZE"])    
+        model_fldr_loc = path_to_models + comb_model_sims + "/" + model_name + "/"
+        model_save_loc = model_fldr_loc + model_name + ".json"
+        gen_plot_save_loc = model_fldr_loc + "plots/"
 
         try:
             bst = xgb.Booster()
-            bst.load_model(model_save_loc + model_name + ".json")
+            bst.load_model(model_save_loc)
             print("Loaded Model Trained on:",model_sims)
         except:
-            print("Couldn't load Booster Located at: " + model_save_loc + model_dir + ".json")
+            print("Couldn't load Booster Located at: " + model_save_loc)
 
         for curr_test_sims in test_sims:
             test_comb_name = get_combined_name(curr_test_sims) 
             for dset_name in eval_datasets:
-                plot_loc = model_save_loc + dset_name + "_" + test_comb_name + "/plots/"
+                plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
                 create_directory(plot_loc)
                 
                 data,scale_pos_weight = load_data(client,curr_test_sims,dset_name,limit_files=False)

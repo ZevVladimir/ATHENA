@@ -23,59 +23,58 @@ from skopt.space import Real
 from sklearn.metrics import accuracy_score
 from functools import partial
 
-from .data_and_loading_functions import load_SPARTA_data, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, load_pickle
+from .data_and_loading_functions import load_SPARTA_data, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, load_pickle, load_config
 from .update_vis_fxns import plot_full_ptl_dist, plot_miss_class_dist, compare_prfs, compare_split_prfs, inf_orb_frac
 from .calculation_functions import create_mass_prf, create_stack_mass_prf, filter_prf, calculate_density, calc_mass_acc_rate
 from sparta_tools import sparta 
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
-import configparser
-config = configparser.ConfigParser()
-config.read(os.getcwd() + "/config.ini")
-rand_seed = config.getint("MISC","random_seed")
-curr_sparta_file = config["SPARTA_DATA"]["curr_sparta_file"]
-sim_cosmol = config["MISC"]["sim_cosmol"]
+config_dict = load_config(os.getcwd() + "/config.ini")
+rand_seed = config_dict["MISC"]["random_seed"]
+curr_sparta_file = config_dict["SPARTA_DATA"]["curr_sparta_file"]
+sim_cosmol = config_dict["MISC"]["sim_cosmol"]
 
-SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
-pickled_path = config["PATHS"]["pickled_path"]
-ML_dset_path = config["PATHS"]["ML_dset_path"]
-debug_plt_path = config["PATHS"]["debug_plt_path"]
+SPARTA_output_path = config_dict["SPARTA_DATA"]["SPARTA_output_path"]
+pickled_path = config_dict["PATHS"]["pickled_path"]
+ML_dset_path = config_dict["PATHS"]["ML_dset_path"]
+debug_plt_path = config_dict["PATHS"]["debug_plt_path"]
+
+on_zaratan = config_dict["DASK_CLIENT"]["on_zaratan"]
+use_gpu = config_dict["DASK_CLIENT"]["use_gpu"]
+dask_task_ncpus = config_dict["DASK_CLIENT"]["dask_task_ncpus"]
+
+file_lim = config_dict["TRAIN_MODEL"]["file_lim"]
+
+reduce_rad = config_dict["OPTIMIZE"]["reduce_rad"]
+reduce_perc = config_dict["OPTIMIZE"]["reduce_perc"]
+
+weight_rad = config_dict["OPTIMIZE"]["weight_rad"]
+min_weight = config_dict["OPTIMIZE"]["min_weight"]
+weight_exp = config_dict["OPTIMIZE"]["weight_exp"]
+
+hpo_loss = config_dict["OPTIMIZE"]["hpo_loss"]
+plt_nu_splits = config_dict["EVAL_MODEL"]["plt_nu_splits"]
+plt_nu_splits = parse_ranges(plt_nu_splits)
+
+plt_macc_splits = config_dict["EVAL_MODEL"]["plt_macc_splits"]
+plt_macc_splits = parse_ranges(plt_macc_splits)
+
+linthrsh = config_dict["EVAL_MODEL"]["linthrsh"]
+lin_nbin = config_dict["EVAL_MODEL"]["lin_nbin"]
+log_nbin = config_dict["EVAL_MODEL"]["log_nbin"]
+lin_rvticks = config_dict["EVAL_MODEL"]["lin_rvticks"]
+log_rvticks = config_dict["EVAL_MODEL"]["log_rvticks"]
+lin_tvticks = config_dict["EVAL_MODEL"]["lin_tvticks"]
+log_tvticks = config_dict["EVAL_MODEL"]["log_tvticks"]
+lin_rticks = config_dict["EVAL_MODEL"]["lin_rticks"]
+log_rticks = config_dict["EVAL_MODEL"]["log_rticks"]
+
 
 if sim_cosmol == "planck13-nbody":
     cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
 else:
     cosmol = cosmology.setCosmology(sim_cosmol) 
-
-on_zaratan = config.getboolean("DASK_CLIENT","on_zaratan")
-use_gpu = config.getboolean("DASK_CLIENT","use_gpu")
-dask_task_ncpus = config.getint("DASK_CLIENT","dask_task_ncpus")
-
-file_lim = config.getint("TRAIN_MODEL","file_lim")
-
-reduce_rad = config.getfloat("OPTIMIZE","reduce_rad")
-reduce_perc = config.getfloat("OPTIMIZE", "reduce_perc")
-
-weight_rad = config.getfloat("OPTIMIZE","weight_rad")
-min_weight = config.getfloat("OPTIMIZE","min_weight")
-weight_exp = config.getfloat("OPTIMIZE","weight_exp")
-
-hpo_loss = config.get("OPTIMIZE","hpo_loss")
-plt_nu_splits = config["EVAL_MODEL"]["plt_nu_splits"]
-plt_nu_splits = parse_ranges(plt_nu_splits)
-
-plt_macc_splits = config["EVAL_MODEL"]["plt_macc_splits"]
-plt_macc_splits = parse_ranges(plt_macc_splits)
-
-linthrsh = config.getfloat("EVAL_MODEL","linthrsh")
-lin_nbin = config.getint("EVAL_MODEL","lin_nbin")
-log_nbin = config.getint("EVAL_MODEL","log_nbin")
-lin_rvticks = json.loads(config.get("EVAL_MODEL","lin_rvticks"))
-log_rvticks = json.loads(config.get("EVAL_MODEL","log_rvticks"))
-lin_tvticks = json.loads(config.get("EVAL_MODEL","lin_tvticks"))
-log_tvticks = json.loads(config.get("EVAL_MODEL","log_tvticks"))
-lin_rticks = json.loads(config.get("EVAL_MODEL","lin_rticks"))
-log_rticks = json.loads(config.get("EVAL_MODEL","log_rticks"))
 
 ###############################################################################################################
 if on_zaratan:
@@ -161,6 +160,16 @@ def print_model_prop(model_dict, indent=''):
             print(f"{indent}{key}: {', '.join(map(str, value))}")
         else:
             print(f"{indent}{key}: {value}")
+
+def get_model_name(model_type, trained_on_sims, hpo_done=False, opt_param_dict=None):
+    model_name = f"{model_type}_{get_combined_name(trained_on_sims)}"
+    
+    if hpo_done and opt_param_dict:
+        param_str = "_".join(f"{k}_{v}" for k, v in opt_param_dict.items())
+        model_name += f"_hpo_{param_str}"
+        
+    return model_name
+
 
 # From the input simulation name extract the simulation name (ex: cbol_l0063_n0256) and the SPARTA hdf5 output name (ex: cbol_l0063_n0256_4r200m_1-5v200m)
 #TODO rename the function and the returns and comment what they look like clearly

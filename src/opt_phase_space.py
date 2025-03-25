@@ -15,48 +15,45 @@ from colossus.cosmology import cosmology
 import pickle
 from sparta_tools import sparta
 
-from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, split_calc_name, load_SPARTA_data, reform_dataset_dfs
-from utils.data_and_loading_functions import create_directory, load_pickle, conv_halo_id_spid
+from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, split_calc_name, load_SPARTA_data, reform_dataset_dfs, get_model_name
+from utils.data_and_loading_functions import create_directory, load_pickle, conv_halo_id_spid, load_config
 from utils.ps_cut_support import load_ps_data
 from utils.update_vis_fxns import plt_SPARTA_KE_dist, compare_split_prfs
 from utils.calculation_functions import calculate_density, filter_prf, calc_mass_acc_rate
 
-import configparser
-config = configparser.ConfigParser()
-config.read(os.getcwd() + "/config.ini")
+config_dict = load_config(os.getcwd() + "/config.ini")
 
-ML_dset_path = config["PATHS"]["ML_dset_path"]
-path_to_models = config["PATHS"]["path_to_models"]
-SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
+ML_dset_path = config_dict["PATHS"]["ML_dset_path"]
+path_to_models = config_dict["PATHS"]["path_to_models"]
+SPARTA_output_path = config_dict["SPARTA_DATA"]["SPARTA_output_path"]
 
-model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
-model_type = config["TRAIN_MODEL"]["model_type"]
-test_sims = json.loads(config.get("EVAL_MODEL","test_sims"))
-eval_datasets = json.loads(config.get("EVAL_MODEL","eval_datasets"))
+model_sims = config_dict["TRAIN_MODEL"]["model_sims"]
+model_type = config_dict["TRAIN_MODEL"]["model_type"]
+test_sims = config_dict["EVAL_MODEL"]["test_sims"]
+eval_datasets = config_dict["EVAL_MODEL"]["eval_datasets"]
 
-sim_cosmol = config["MISC"]["sim_cosmol"]
+sim_cosmol = config_dict["MISC"]["sim_cosmol"]
+
+plt_nu_splits = parse_ranges(config_dict["EVAL_MODEL"]["plt_nu_splits"])
+
+plt_macc_splits = parse_ranges(config_dict["EVAL_MODEL"]["plt_macc_splits"])
+
+linthrsh = config_dict["EVAL_MODEL"]["linthrsh"]
+lin_nbin = config_dict["EVAL_MODEL"]["lin_nbin"]
+log_nbin = config_dict["EVAL_MODEL"]["log_nbin"]
+lin_rvticks = config_dict["EVAL_MODEL"]["lin_rvticks"]
+log_rvticks = config_dict["EVAL_MODEL"]["log_rvticks"]
+lin_tvticks = config_dict["EVAL_MODEL"]["lin_tvticks"]
+log_tvticks = config_dict["EVAL_MODEL"]["log_tvticks"]
+lin_rticks = config_dict["EVAL_MODEL"]["lin_rticks"]
+log_rticks = config_dict["EVAL_MODEL"]["log_rticks"]
+    
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
     cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
 else:
     cosmol = cosmology.setCosmology(sim_cosmol) 
     sim_pat = r"cbol_l(\d+)_n(\d+)"
-    
-plt_nu_splits = config["EVAL_MODEL"]["plt_nu_splits"]
-plt_nu_splits = parse_ranges(plt_nu_splits)
-
-plt_macc_splits = config["EVAL_MODEL"]["plt_macc_splits"]
-plt_macc_splits = parse_ranges(plt_macc_splits)
-
-linthrsh = config.getfloat("EVAL_MODEL","linthrsh")
-lin_nbin = config.getint("EVAL_MODEL","lin_nbin")
-log_nbin = config.getint("EVAL_MODEL","log_nbin")
-lin_rvticks = json.loads(config.get("EVAL_MODEL","lin_rvticks"))
-log_rvticks = json.loads(config.get("EVAL_MODEL","log_rvticks"))
-lin_tvticks = json.loads(config.get("EVAL_MODEL","lin_tvticks"))
-log_tvticks = json.loads(config.get("EVAL_MODEL","log_tvticks"))
-lin_rticks = json.loads(config.get("EVAL_MODEL","lin_rticks"))
-log_rticks = json.loads(config.get("EVAL_MODEL","log_rticks"))
     
 def overlap_loss(params, lnv2_bin, sparta_labels_bin):
     decision_boundary = params[0]
@@ -156,14 +153,15 @@ def opt_func(bins, r, lnv2, sparta_labels, def_b, plot_loc = "", title = ""):
 if __name__ == "__main__":
     client = setup_client()
     
-    model_comb_name = get_combined_name(model_sims) 
-    model_dir = model_type
-    model_save_loc = path_to_models + model_comb_name + "/" + model_dir + "/"    
+    comb_model_sims = get_combined_name(model_sims) 
+        
+    model_name = get_model_name(model_type, model_sims, hpo_done=config_dict["OPTIMIZE"]["hpo"], opt_param_dict=config_dict["OPTIMIZE"])    
+    model_fldr_loc = path_to_models + comb_model_sims + "/" + model_name + "/"  
     
     curr_test_sims = test_sims[0]
     test_comb_name = get_combined_name(curr_test_sims) 
     dset_name = eval_datasets[0]
-    plot_loc = model_save_loc + dset_name + "_" + test_comb_name + "/plots/"
+    plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
     create_directory(plot_loc)
     
     ps_param_dict = {

@@ -19,28 +19,40 @@ from sparta_tools import sparta
 
 from utils.calculation_functions import create_stack_mass_prf, filter_prf, calculate_density, calc_mass_acc_rate
 from utils.update_vis_fxns import compare_split_prfs
-from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, parse_ranges, load_sparta_mass_prf, split_calc_name, sim_mass_p_z
-from utils.data_and_loading_functions import create_directory, timed, load_pickle, load_SPARTA_data, conv_halo_id_spid
+from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, parse_ranges, load_sparta_mass_prf, split_calc_name, sim_mass_p_z, get_model_name
+from utils.data_and_loading_functions import create_directory, timed, load_pickle, load_SPARTA_data, conv_halo_id_spid, load_config
 from utils.ps_cut_support import load_ps_data
 
-import configparser
-config = configparser.ConfigParser()
-config.read(os.getcwd() + "/config.ini")
+config_dict = load_config(os.getcwd() + "/config.ini")
 
-ML_dset_path = config["PATHS"]["ML_dset_path"]
-path_to_models = config["PATHS"]["path_to_models"]
+ML_dset_path = config_dict["PATHS"]["ML_dset_path"]
+path_to_models = config_dict["PATHS"]["path_to_models"]
 
-SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
+SPARTA_output_path = config_dict["SPARTA_DATA"]["SPARTA_output_path"]
 
-feature_columns = json.loads(config.get("TRAIN_MODEL","feature_columns"))
-target_column = json.loads(config.get("TRAIN_MODEL","target_column"))
-model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
-model_type = config["TRAIN_MODEL"]["model_type"]
+feature_columns = config_dict["TRAIN_MODEL"]["feature_columns"]
+target_column = config_dict["TRAIN_MODEL"]["target_column"]
+model_sims = config_dict["TRAIN_MODEL"]["model_sims"]
+model_type = config_dict["TRAIN_MODEL"]["model_type"]
 
-test_sims = json.loads(config.get("EVAL_MODEL","test_sims"))
-eval_datasets = json.loads(config.get("EVAL_MODEL","eval_datasets"))
+test_sims = config_dict["EVAL_MODEL"]["test_sims"]
+eval_datasets = config_dict["EVAL_MODEL"]["eval_datasets"]
 
-sim_cosmol = config["MISC"]["sim_cosmol"]
+sim_cosmol = config_dict["MISC"]["sim_cosmol"]
+
+plt_nu_splits = parse_ranges(config_dict["EVAL_MODEL"]["plt_nu_splits"])
+plt_macc_splits = parse_ranges(config_dict["EVAL_MODEL"]["plt_macc_splits"])
+
+linthrsh = config_dict["EVAL_MODEL"]["linthrsh"]
+lin_nbin = config_dict["EVAL_MODEL"]["lin_nbin"]
+log_nbin = config_dict["EVAL_MODEL"]["log_nbin"]
+lin_rvticks = config_dict["EVAL_MODEL"]["lin_rvticks"]
+log_rvticks = config_dict["EVAL_MODEL"]["log_rvticks"]
+lin_tvticks = config_dict["EVAL_MODEL"]["lin_tvticks"]
+log_tvticks = config_dict["EVAL_MODEL"]["log_tvticks"]
+lin_rticks = config_dict["EVAL_MODEL"]["lin_rticks"]
+log_rticks = config_dict["EVAL_MODEL"]["log_rticks"]
+
 
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
@@ -48,27 +60,8 @@ if sim_cosmol == "planck13-nbody":
 else:
     cosmol = cosmology.setCosmology(sim_cosmol) 
     sim_pat = r"cbol_l(\d+)_n(\d+)"
-    
-plt_nu_splits = config["EVAL_MODEL"]["plt_nu_splits"]
-plt_nu_splits = parse_ranges(plt_nu_splits)
-
-plt_macc_splits = config["EVAL_MODEL"]["plt_macc_splits"]
-plt_macc_splits = parse_ranges(plt_macc_splits)
-
-linthrsh = config.getfloat("EVAL_MODEL","linthrsh")
-lin_nbin = config.getint("EVAL_MODEL","lin_nbin")
-log_nbin = config.getint("EVAL_MODEL","log_nbin")
-lin_rvticks = json.loads(config.get("EVAL_MODEL","lin_rvticks"))
-log_rvticks = json.loads(config.get("EVAL_MODEL","log_rvticks"))
-lin_tvticks = json.loads(config.get("EVAL_MODEL","lin_tvticks"))
-log_tvticks = json.loads(config.get("EVAL_MODEL","log_tvticks"))
-lin_rticks = json.loads(config.get("EVAL_MODEL","lin_rticks"))
-log_rticks = json.loads(config.get("EVAL_MODEL","log_rticks"))
-
 ####################################################################################################################################################################################################################################
     
-
-
 def gradient_minima(
     r: np.ndarray,
     lnv2: np.ndarray,
@@ -223,20 +216,19 @@ def calibrate_finder(
 
     return (m_pos, b_pos), (m_neg, b_neg)
     
-    
 if __name__ == "__main__":
     client = setup_client()
     
-    model_comb_name = get_combined_name(model_sims) 
-    model_dir = model_type 
-    model_save_loc = path_to_models + model_comb_name + "/" + model_dir + "/"    
+    comb_model_sims = get_combined_name(model_sims) 
+        
+    model_name = get_model_name(model_type, model_sims, hpo_done=config_dict["OPTIMIZE"]["hpo"], opt_param_dict=config_dict["OPTIMIZE"])    
+    model_fldr_loc = path_to_models + comb_model_sims + "/" + model_name + "/"  
     
     curr_test_sims = test_sims[0]
     test_comb_name = get_combined_name(curr_test_sims) 
     dset_name = eval_datasets[0]
-    plot_loc = model_save_loc + dset_name + "_" + test_comb_name + "/plots/"
+    plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
     create_directory(plot_loc)
-    
     
     ####################################################################################################################################################################################################################################
     
@@ -787,7 +779,6 @@ if __name__ == "__main__":
                 inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
             else:
                 plt_macc_splits.remove(macc_split)
-        
-        lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
+                
         compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "_ps_cut_dens_",prf_name_0="Phase Space Cut", prf_name_1="SPARTA")
         compare_split_prfs(plt_macc_splits,len(cpy_plt_macc_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "_ps_cut_macc_dens_", split_name="\Gamma", prf_name_0="Phase Space Cut", prf_name_1="SPARTA")

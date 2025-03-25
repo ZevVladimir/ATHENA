@@ -15,39 +15,36 @@ import psutil
 import json
 from sparta_tools import sparta 
 
-from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir, load_pickle, save_pickle, get_num_snaps
+from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z, timed, clean_dir, load_pickle, save_pickle, get_num_snaps, load_config
 from utils.calculation_functions import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn, create_mass_prf, calculate_density
 from utils.update_vis_fxns import compare_prfs
 from utils.debug_check import check_string, check_list,check_or_create_directory
 ##################################################################################################################
-# LOAD CONFIG PARAMETERS
-import configparser
-config = configparser.ConfigParser()
-config.read(os.getcwd() + "/config.ini")
+config_dict = load_config(os.getcwd() + "/config.ini")
 
-curr_sparta_file = check_string(config["SPARTA_DATA"]["curr_sparta_file"], "curr_sparta_file")
-known_snaps = check_list(json.loads(config.get("SNAP_DATA","known_snaps")), "known_snaps")
-snap_path = check_or_create_directory(config["SNAP_DATA"]["snap_path"])
-SPARTA_output_path = check_or_create_directory(config["SPARTA_DATA"]["SPARTA_output_path"])
-pickled_path = check_or_create_directory(config["PATHS"]["pickled_path"])
-ML_dset_path = check_or_create_directory(config["PATHS"]["ML_dset_path"])
-debug_plt_path = check_or_create_directory(config["PATHS"]["debug_plt_path"])
+curr_sparta_file = check_string(config_dict["SPARTA_DATA"]["curr_sparta_file"], "curr_sparta_file")
+known_snaps = check_list(json.loads(config_dict.get("SNAP_DATA","known_snaps")), "known_snaps")
+snap_path = check_or_create_directory(config_dict["SNAP_DATA"]["snap_path"])
+SPARTA_output_path = check_or_create_directory(config_dict["SPARTA_DATA"]["SPARTA_output_path"])
+pickled_path = check_or_create_directory(config_dict["PATHS"]["pickled_path"])
+ML_dset_path = check_or_create_directory(config_dict["PATHS"]["ML_dset_path"])
+debug_plt_path = check_or_create_directory(config_dict["PATHS"]["debug_plt_path"])
 
-debug_mem = config.getboolean("MISC","debug_mem")
-sim_cosmol = config["MISC"]["sim_cosmol"]
+debug_mem = config_dict["MISC"]["debug_mem"]
+sim_cosmol = config_dict["MISC"]["sim_cosmol"]
 
-snap_dir_format = config["SNAP_DATA"]["snap_dir_format"]
-snap_format = config["SNAP_DATA"]["snap_format"]
+snap_dir_format = config_dict["SNAP_DATA"]["snap_dir_format"]
+snap_format = config_dict["SNAP_DATA"]["snap_format"]
 
-reset_lvl = config.getint("DSET_CREATE","reset")
-t_dyn_step = config.getfloat("DSET_CREATE","t_dyn_step")
-p_red_shift = config.getfloat("DSET_CREATE","p_red_shift")
-search_radius = config.getfloat("DSET_CREATE","search_radius")
-mp_chunk_size = config.getint("DSET_CREATE","mp_chunk_size")
-sub_dset_mem_size = config.getfloat("DSET_CREATE","sub_dset_mem_size")
+reset_lvl = config_dict["DSET_CREATE"]["reset"]
+t_dyn_step = config_dict["DSET_CREATE"]["t_dyn_step"]
+p_red_shift = config_dict["DSET_CREATE"]["p_red_shift"]
+search_radius = config_dict["DSET_CREATE"]["search_radius"]
+mp_chunk_size = config_dict["DSET_CREATE"]["mp_chunk_size"]
+sub_dset_mem_size = config_dict["DSET_CREATE"]["sub_dset_mem_size"]
 
-test_dset_frac = config.getfloat("DSET_CREATE","test_dset_frac")
-lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
+test_dset_frac = config_dict["DSET_CREATE"]["test_dset_frac"]
+lin_rticks = config_dict["EVAL_MODEL"]["lin_rticks"]
 ##################################################################################################################
 create_directory(pickled_path)
 create_directory(ML_dset_path)

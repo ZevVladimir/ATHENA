@@ -1501,7 +1501,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         
         widths = [4,4,4,4,.5]
         heights = [4]
-        fig = plt.figure(constrained_layout=True, figsize=(28,12))
+        fig = plt.figure(constrained_layout=True, figsize=(24,24))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
 
         ax1 = fig.add_subplot(gs[0])
@@ -1537,7 +1537,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         if cust_line_dict is not None:
             plt_cust_ps_line(b = cust_line_dict["orb_vr_pos"]["b"], bins = bins)
-        plt.title(r"Orbiting Particles According to SPARTA $v_r>0$")
+        plt.title(r"Orbiting Particles According to SPARTA $v_r>0$",fontsize=title_fntsize)
         plt.legend(loc="lower left",fontsize=legend_fntsize)
         plt.xlim(0, 2)
         
@@ -1549,7 +1549,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         if cust_line_dict is not None:
             plt_cust_ps_line(b = cust_line_dict["inf_vr_pos"]["b"], bins = bins)
-        plt.title(r"Infalling Particles According to SPARTA $v_r>0$")
+        plt.title(r"Infalling Particles According to SPARTA $v_r>0$",fontsize=title_fntsize)
         plt.legend(loc="lower left",fontsize=legend_fntsize)
         plt.xlim(0, 2)
 
@@ -1561,7 +1561,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         if cust_line_dict is not None:
             plt_cust_ps_line(b = cust_line_dict["orb_vr_neg"]["b"], bins = bins)
-        plt.title(r"Orbiting Particles According to SPARTA $v_r<0$")
+        plt.title(r"Orbiting Particles According to SPARTA $v_r<0$",fontsize=title_fntsize)
         plt.legend(loc="lower left",fontsize=legend_fntsize)
         plt.xlim(0, 2)
         
@@ -1573,7 +1573,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         if cust_line_dict is not None:
             plt_cust_ps_line(b = cust_line_dict["inf_vr_neg"]["b"], bins = bins)
-        plt.title(r"Infalling Particles According to SPARTA $v_r<0$")
+        plt.title(r"Infalling Particles According to SPARTA $v_r<0$",fontsize=title_fntsize)
         plt.legend(loc="lower left",fontsize=legend_fntsize)
         cbar_log= plt.colorbar()
         cbar_log.ax.tick_params(labelsize=cbar_tick_fntsize)

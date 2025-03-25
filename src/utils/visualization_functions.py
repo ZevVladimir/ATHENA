@@ -9,7 +9,7 @@ import seaborn as sns
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from .data_and_loading_functions import create_directory
+from .data_and_loading_functions import create_directory, load_config
 
 plt.rcParams['mathtext.fontset'] = 'dejavuserif'
 plt.rcParams['font.family'] = 'serif'
@@ -17,11 +17,9 @@ plt.rcParams['font.family'] = 'serif'
 num_processes = mp.cpu_count()
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
-import configparser
-config = configparser.ConfigParser()
-config.read(os.getcwd() + "/config.ini")
+config_dict = load_config(os.getcwd() + "/config.ini")
 
-MLOIS_path = config["PATHS"]["MLOIS_path"]
+MLOIS_path = config_dict["PATHS"]["MLOIS_path"]
 
 def rv_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = None):
     if ax == None:
