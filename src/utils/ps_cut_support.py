@@ -21,7 +21,7 @@ from utils.data_and_loading_functions import timed, load_pickle, load_SPARTA_dat
 
 config_dict = load_config(os.getcwd() + "/config.ini")
 
-ML_dset_path = config_dict["PATHS"]["ML_dset_path"]
+ML_dset_path = config_dict["PATHS"]["ml_dset_path"]
 SPARTA_output_path = config_dict["SPARTA_DATA"]["sparta_output_path"]
 
 test_sims = config_dict["EVAL_MODEL"]["test_sims"]

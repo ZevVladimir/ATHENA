@@ -40,7 +40,7 @@ if __name__ == "__main__":
     comb_model_sims = get_combined_name(model_sims) 
         
     model_name = get_model_name(model_type, model_sims, hpo_done=config_dict["OPTIMIZE"]["hpo"], opt_param_dict=config_dict["OPTIMIZE"])    
-    model_fldr_loc = path_to_models + comb_model_sims + "/" + model_name + "/"
+    model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"
     model_save_loc = model_fldr_loc + model_name + ".json"
     gen_plot_save_loc = model_fldr_loc + "plots/"
      
