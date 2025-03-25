@@ -20,11 +20,11 @@ from utils.update_vis_fxns import plot_halo_slice_class, plot_halo_3d_class
 # LOAD CONFIG PARAMETERS
 config_dict = load_config(os.getcwd() + "/config.ini")
 
-ML_dset_path = config_dict["PATHS"]["ML_dset_path"]
+ML_dset_path = config_dict["PATHS"]["ml_dset_path"]
 path_to_models = config_dict["PATHS"]["path_to_models"]
 
 snap_path = config_dict["SNAP_DATA"]["snap_path"]
-SPARTA_output_path = config_dict["SPARTA_DATA"]["SPARTA_output_path"]
+SPARTA_output_path = config_dict["SPARTA_DATA"]["sparta_output_path"]
 curr_sparta_file = config_dict["SPARTA_DATA"]["curr_sparta_file"]
 snap_dir_format = config_dict["SNAP_DATA"]["snap_dir_format"]
 snap_format = config_dict["SNAP_DATA"]["snap_format"]

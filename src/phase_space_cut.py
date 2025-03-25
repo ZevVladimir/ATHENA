@@ -25,10 +25,10 @@ from utils.ps_cut_support import load_ps_data
 
 config_dict = load_config(os.getcwd() + "/config.ini")
 
-ML_dset_path = config_dict["PATHS"]["ML_dset_path"]
+ML_dset_path = config_dict["PATHS"]["ml_dset_path"]
 path_to_models = config_dict["PATHS"]["path_to_models"]
 
-SPARTA_output_path = config_dict["SPARTA_DATA"]["SPARTA_output_path"]
+SPARTA_output_path = config_dict["SPARTA_DATA"]["sparta_output_path"]
 
 feature_columns = config_dict["TRAIN_MODEL"]["feature_columns"]
 target_column = config_dict["TRAIN_MODEL"]["target_column"]

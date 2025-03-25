@@ -16,7 +16,7 @@ from utils.ML_support import setup_client, get_combined_name, load_data, reform_
 # LOAD CONFIG PARAMETERS
 config_dict = load_config(os.getcwd() + "/config.ini")
 
-ML_dset_path = config_dict["PATHS"]["ML_dset_path"]
+ML_dset_path = config_dict["PATHS"]["ml_dset_path"]
 path_to_models = config_dict["PATHS"]["path_to_models"]
 
 test_dset_frac = config_dict["DSET_CREATE"]["test_dset_frac"]

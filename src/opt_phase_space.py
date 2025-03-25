@@ -23,9 +23,9 @@ from utils.calculation_functions import calculate_density, filter_prf, calc_mass
 
 config_dict = load_config(os.getcwd() + "/config.ini")
 
-ML_dset_path = config_dict["PATHS"]["ML_dset_path"]
+ML_dset_path = config_dict["PATHS"]["ml_dset_path"]
 path_to_models = config_dict["PATHS"]["path_to_models"]
-SPARTA_output_path = config_dict["SPARTA_DATA"]["SPARTA_output_path"]
+SPARTA_output_path = config_dict["SPARTA_DATA"]["sparta_output_path"]
 
 model_sims = config_dict["TRAIN_MODEL"]["model_sims"]
 model_type = config_dict["TRAIN_MODEL"]["model_type"]

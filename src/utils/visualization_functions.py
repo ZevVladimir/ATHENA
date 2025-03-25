@@ -19,7 +19,7 @@ num_processes = mp.cpu_count()
 # LOAD CONFIG PARAMETERS
 config_dict = load_config(os.getcwd() + "/config.ini")
 
-MLOIS_path = config_dict["PATHS"]["MLOIS_path"]
+MLOIS_path = config_dict["PATHS"]["mlois_path"]
 
 def rv_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = None):
     if ax == None:

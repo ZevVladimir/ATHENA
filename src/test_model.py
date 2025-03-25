@@ -13,7 +13,7 @@ from utils.data_and_loading_functions import create_directory, timed, save_pickl
 # LOAD CONFIG PARAMETERS
 config_dict = load_config(os.getcwd() + "/config.ini")
 
-ML_dset_path = config_dict["PATHS"]["ML_dset_path"]
+ML_dset_path = config_dict["PATHS"]["ml_dset_path"]
 path_to_models = config_dict["PATHS"]["path_to_models"]
 
 model_sims = config_dict["TRAIN_MODEL"]["model_sims"]

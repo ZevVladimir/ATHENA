@@ -11,6 +11,7 @@ from pygadgetreader import readsnap, readheader
 from sparta_tools import sparta
 from functools import reduce
 import ast
+import configparser
 
 def parse_value(value):
     """Convert value to appropriate type (list, int, float, bool, str)."""

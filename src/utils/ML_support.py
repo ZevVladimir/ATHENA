@@ -35,9 +35,9 @@ rand_seed = config_dict["MISC"]["random_seed"]
 curr_sparta_file = config_dict["SPARTA_DATA"]["curr_sparta_file"]
 sim_cosmol = config_dict["MISC"]["sim_cosmol"]
 
-SPARTA_output_path = config_dict["SPARTA_DATA"]["SPARTA_output_path"]
+SPARTA_output_path = config_dict["SPARTA_DATA"]["sparta_output_path"]
 pickled_path = config_dict["PATHS"]["pickled_path"]
-ML_dset_path = config_dict["PATHS"]["ML_dset_path"]
+ML_dset_path = config_dict["PATHS"]["ml_dset_path"]
 debug_plt_path = config_dict["PATHS"]["debug_plt_path"]
 
 on_zaratan = config_dict["DASK_CLIENT"]["on_zaratan"]

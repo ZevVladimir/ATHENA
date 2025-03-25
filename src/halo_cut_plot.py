@@ -15,8 +15,8 @@ from utils.data_and_loading_functions import create_directory,load_SPARTA_data,t
 config_dict = load_config(os.getcwd() + "/config.ini")
 
 snap_path = config_dict["SNAP_DATA"]["snap_path"]
-SPARTA_output_path = config_dict["SPARTA_DATA"]["SPARTA_output_path"]
-ML_dset_path = config_dict["PATHS"]["ML_dset_path"]
+SPARTA_output_path = config_dict["SPARTA_DATA"]["sparta_output_path"]
+ML_dset_path = config_dict["PATHS"]["ml_dset_path"]
 path_to_models = config_dict["PATHS"]["path_to_models"]
 
 curr_sparta_file = config_dict["SPARTA_DATA"]["curr_sparta_file"]

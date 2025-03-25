@@ -25,9 +25,9 @@ config_dict = load_config(os.getcwd() + "/config.ini")
 curr_sparta_file = check_string(config_dict["SPARTA_DATA"]["curr_sparta_file"], "curr_sparta_file")
 known_snaps = check_list(json.loads(config_dict.get("SNAP_DATA","known_snaps")), "known_snaps")
 snap_path = check_or_create_directory(config_dict["SNAP_DATA"]["snap_path"])
-SPARTA_output_path = check_or_create_directory(config_dict["SPARTA_DATA"]["SPARTA_output_path"])
+SPARTA_output_path = check_or_create_directory(config_dict["SPARTA_DATA"]["sparta_output_path"])
 pickled_path = check_or_create_directory(config_dict["PATHS"]["pickled_path"])
-ML_dset_path = check_or_create_directory(config_dict["PATHS"]["ML_dset_path"])
+ML_dset_path = check_or_create_directory(config_dict["PATHS"]["ml_dset_path"])
 debug_plt_path = check_or_create_directory(config_dict["PATHS"]["debug_plt_path"])
 
 debug_mem = config_dict["MISC"]["debug_mem"]
