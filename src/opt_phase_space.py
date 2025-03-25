@@ -16,7 +16,7 @@ import pickle
 from sparta_tools import sparta
 
 from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, split_calc_name, load_SPARTA_data, reform_dataset_dfs, get_model_name
-from utils.data_and_loading_functions import create_directory, load_pickle, conv_halo_id_spid, load_config
+from utils.data_and_loading_functions import create_directory, load_pickle, conv_halo_id_spid, load_config, save_pickle, load_pickle
 from utils.ps_cut_support import load_ps_data
 from utils.update_vis_fxns import plt_SPARTA_KE_dist, compare_split_prfs
 from utils.calculation_functions import calculate_density, filter_prf, calc_mass_acc_rate
@@ -164,6 +164,7 @@ if __name__ == "__main__":
     plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
     create_directory(plot_loc)
     
+    #TODO load this from a saved file
     ps_param_dict = {
         "m_pos": -1.9973747688461672,
         "b_pos": 2.730691113802748,
@@ -216,21 +217,25 @@ if __name__ == "__main__":
     # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
     sim_splits = np.where(halo_first == 0)[0]
 
-    #TODO not hard code this
-    # opt_sims = ["cbol_l1000_n1024_4r200m_1-5v200m_99to90"]
     act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sparta_mass_prf(sim_splits,all_idxs,curr_test_sims)
     act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb  
     
-    vr_pos = opt_func(bins, r_full[mask_vr_pos], lnv2_full[mask_vr_pos], sparta_labels[mask_vr_pos], ps_param_dict["b_pos"], plot_loc = plot_loc, title = "pos")
-    vr_neg = opt_func(bins, r_full[mask_vr_neg], lnv2_full[mask_vr_neg], sparta_labels[mask_vr_neg], ps_param_dict["b_neg"], plot_loc = plot_loc, title = "neg")
+    if os.path.isfile(model_fldr_loc + "bin_fit_ps_cut_params.pickle"):
+        opt_param_dict = load_pickle(model_fldr_loc + "bin_fit_ps_cut_params.pickle")
+    else: 
+        vr_pos = opt_func(bins, r_full[mask_vr_pos], lnv2_full[mask_vr_pos], sparta_labels[mask_vr_pos], ps_param_dict["b_pos"], plot_loc = plot_loc, title = "pos")
+        vr_neg = opt_func(bins, r_full[mask_vr_neg], lnv2_full[mask_vr_neg], sparta_labels[mask_vr_neg], ps_param_dict["b_neg"], plot_loc = plot_loc, title = "neg")
     
-    opt_param_dict = {
-        "orb_vr_pos": vr_pos,
-        "orb_vr_neg": vr_neg,
-        "inf_vr_neg": vr_neg,
-        "inf_vr_pos": vr_pos,
-    }
+        opt_param_dict = {
+            "orb_vr_pos": vr_pos,
+            "orb_vr_neg": vr_neg,
+            "inf_vr_neg": vr_neg,
+            "inf_vr_pos": vr_pos,
+        }
     
+        save_pickle(opt_param_dict,model_fldr_loc+"bin_fit_ps_cut_params.pickle")
+    
+    #TODO load this from a file
     width = 0.05
     perc = 0.99
     grad_lims = "0.2_0.5"
