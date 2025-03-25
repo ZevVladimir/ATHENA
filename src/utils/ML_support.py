@@ -34,7 +34,6 @@ import configparser
 config = configparser.ConfigParser()
 config.read(os.getcwd() + "/config.ini")
 rand_seed = config.getint("MISC","random_seed")
-use_gpu = config.getboolean("MISC","use_gpu")
 curr_sparta_file = config["SPARTA_DATA"]["curr_sparta_file"]
 sim_cosmol = config["MISC"]["sim_cosmol"]
 
@@ -50,7 +49,7 @@ else:
 
 on_zaratan = config.getboolean("DASK_CLIENT","on_zaratan")
 use_gpu = config.getboolean("DASK_CLIENT","use_gpu")
-dask_task_cpus = config.getboolean("DASK_CLIENT","dask_task_cpus")
+dask_task_ncpus = config.getint("DASK_CLIENT","dask_task_ncpus")
 
 file_lim = config.getint("TRAIN_MODEL","file_lim")
 
@@ -62,10 +61,10 @@ min_weight = config.getfloat("OPTIMIZE","min_weight")
 weight_exp = config.getfloat("OPTIMIZE","weight_exp")
 
 hpo_loss = config.get("OPTIMIZE","hpo_loss")
-plt_nu_splits = config["OPTIMIZE"]["plt_nu_splits"]
+plt_nu_splits = config["EVAL_MODEL"]["plt_nu_splits"]
 plt_nu_splits = parse_ranges(plt_nu_splits)
 
-plt_macc_splits = config["XGBOOST"]["plt_macc_splits"]
+plt_macc_splits = config["EVAL_MODEL"]["plt_macc_splits"]
 plt_macc_splits = parse_ranges(plt_macc_splits)
 
 linthrsh = config.getfloat("EVAL_MODEL","linthrsh")
@@ -123,10 +122,10 @@ def setup_client():
             client = get_CUDA_cluster()
         else:
             tot_ncpus = mp.cpu_count()
-            n_workers = int(np.floor(tot_ncpus / dask_task_cpus))
+            n_workers = int(np.floor(tot_ncpus / dask_task_ncpus))
             cluster = LocalCluster(
                 n_workers=n_workers,
-                threads_per_worker=dask_task_cpus,
+                threads_per_worker=dask_task_ncpus,
                 memory_limit='5GB'  
             )
             client = Client(cluster)
@@ -251,6 +250,7 @@ def scale_by_rad(data,bin_edges,use_red_rad=reduce_rad,use_red_perc=reduce_perc)
 def filter_df_with_nus(df,nus,halo_first,halo_n):    
     # First masks which halos are within the inputted nu ranges
     mask = pd.Series([False] * nus.shape[0])
+    #TODO feed in nu_splits
     for start, end in nu_splits:
         mask[np.where((nus >= start) & (nus <= end))[0]] = True
     

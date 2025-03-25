@@ -21,7 +21,7 @@ path_to_models = config["PATHS"]["path_to_models"]
 model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
 model_type = config["TRAIN_MODEL"]["model_type"]
 feature_columns = json.loads(config.get("TRAIN_MODEL","feature_columns"))
-target_column = json.loads(config.get("TRAIN_MODEL","target_columns"))
+target_column = json.loads(config.get("TRAIN_MODEL","target_column"))
 
 test_sims = json.loads(config.get("EVAL_MODEL","test_sims"))
 eval_datasets = json.loads(config.get("EVAL_MODEL","eval_datasets"))

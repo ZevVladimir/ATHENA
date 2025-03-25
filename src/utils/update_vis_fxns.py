@@ -1454,11 +1454,10 @@ def plt_cust_ps_line(b,bins):
         x2 = bins[i+1]
         y1 = b[i]
         y2 = b[i]
-        # if i == 0:
-        #     plt.plot([x1,x2],[y1,y2],lw=2.0, color="magenta",
-        #     label=fr"$m_{fit}={m[i]:.3f}$"+"\n"+fr"$b_{fit}={b[i]:.3f}$")
-        # else:
-        plt.plot([x1,x2],[y1,y2],lw=2.0, color="cyan")
+        if i == 0:
+            plt.plot([x1,x2],[y1,y2],lw=2.0, color="cyan", label="Bin-by-bin Phase-space Cut")
+        else:
+            plt.plot([x1,x2],[y1,y2],lw=2.0, color="cyan")
             
 def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut, plot_loc, title, cust_line_dict = None):
     m_pos = feat_dict["m_pos"]
@@ -1501,18 +1500,14 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         magma_cmap.set_bad(color='black') 
         
         widths = [4,4,4,4,.5]
-        heights = [0.15,4]
+        heights = [4]
         fig = plt.figure(constrained_layout=True, figsize=(28,12))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
 
-        
-        fig.suptitle(
-            r"Kinetic Energy Distribution of Particles Around Largest Halos at $z=0.03$""\nSimulation: Bolshoi 1000Mpc",fontsize=title_fntsize)
-        
-        ax1 = fig.add_subplot(gs[1,0])
-        ax2 = fig.add_subplot(gs[1,1])
-        ax3 = fig.add_subplot(gs[1,2])
-        ax4 = fig.add_subplot(gs[1,3])
+        ax1 = fig.add_subplot(gs[0])
+        ax2 = fig.add_subplot(gs[1])
+        ax3 = fig.add_subplot(gs[2])
+        ax4 = fig.add_subplot(gs[3])
         
         axes = [ax1,ax2,ax3,ax4]
         
@@ -1528,9 +1523,9 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         
 
         for ax in axes:
-            ax.text(0.25, -1.4, "Orbiting", fontsize=txt_fntsize, color="r",
+            ax.text(0.25, -1.4, "Orbiting According to\nPhase-space Cut", fontsize=txt_fntsize, color="r",
                     weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-            ax.text(1.4, 0.7, "Infalling", fontsize=txt_fntsize, color="b",
+            ax.text(1.4, 0.7, "Infalling According to\nPhase-space Cut", fontsize=txt_fntsize, color="b",
                     weight="bold", bbox=dict(facecolor='w', alpha=0.75))
             ax.tick_params(axis='both',which='both',labelcolor="black",colors="white",direction="in",labelsize=tick_label_fntsize,length=8,width=2)
         
@@ -1538,47 +1533,48 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y12, lw=2.0, color="g",
-                label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
+                label="Phase Space Cut")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         if cust_line_dict is not None:
             plt_cust_ps_line(b = cust_line_dict["orb_vr_pos"]["b"], bins = bins)
-        plt.legend(loc="bottom right",fontsize=legend_fntsize)
+        plt.title(r"Orbiting Particles According to SPARTA $v_r>0$")
+        plt.legend(loc="lower left",fontsize=legend_fntsize)
         plt.xlim(0, 2)
         
         plt.sca(axes[1])
         plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y12, lw=2.0, color="g",
-                label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
+                label="Phase Space Cut")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         if cust_line_dict is not None:
             plt_cust_ps_line(b = cust_line_dict["inf_vr_pos"]["b"], bins = bins)
-        plt.title(r"Infalling Particles $v_r>0$")
-        plt.legend(loc="bottom right",fontsize=legend_fntsize)
+        plt.title(r"Infalling Particles According to SPARTA $v_r>0$")
+        plt.legend(loc="lower left",fontsize=legend_fntsize)
         plt.xlim(0, 2)
 
         plt.sca(axes[2])
         plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="g",
-                label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
+                label="Phase Space Cut")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         if cust_line_dict is not None:
             plt_cust_ps_line(b = cust_line_dict["orb_vr_neg"]["b"], bins = bins)
-        plt.title(r"Orbiting Particles $v_r<0$")
-        plt.legend(loc="bottom right",fontsize=legend_fntsize)
+        plt.title(r"Orbiting Particles According to SPARTA $v_r<0$")
+        plt.legend(loc="lower left",fontsize=legend_fntsize)
         plt.xlim(0, 2)
         
         plt.sca(axes[3])
         plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="g",
-                label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
+                label="Phase Space Cut")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         if cust_line_dict is not None:
             plt_cust_ps_line(b = cust_line_dict["inf_vr_neg"]["b"], bins = bins)
-        plt.title(r"Infalling Particles $v_r<0$")
-        plt.legend(loc="bottom right",fontsize=legend_fntsize)
+        plt.title(r"Infalling Particles According to SPARTA $v_r<0$")
+        plt.legend(loc="lower left",fontsize=legend_fntsize)
         cbar_log= plt.colorbar()
         cbar_log.ax.tick_params(labelsize=cbar_tick_fntsize)
         cbar_log.set_label(r'$N$ (Counts)', fontsize=cbar_label_fntsize)

@@ -24,7 +24,7 @@ sim_cosmol = config["MISC"]["sim_cosmol"]
 path_to_models = config["PATHS"]["path_to_models"]
 
 feature_columns = json.loads(config.get("TRAIN_MODEL","feature_columns"))
-target_column = json.loads(config.get("TRAIN_MODEL","target_columns"))
+target_column = json.loads(config.get("TRAIN_MODEL","target_column"))
 model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
 model_type = config["TRAIN_MODEL"]["model_type"]
 
@@ -63,7 +63,7 @@ if __name__ == '__main__':
         if use_weights:
             model_dir += "wght" + str(weight_rad) + "_" + str(min_weight)
             
-        # model_name =  model_dir + model_comb_name
+        model_name =  model_dir + "_" + model_comb_name
 
         model_save_loc = path_to_models + model_comb_name + "/" + model_dir + "/"
 
@@ -71,7 +71,7 @@ if __name__ == '__main__':
 
         try:
             bst = xgb.Booster()
-            bst.load_model(model_save_loc + model_dir + ".json")
+            bst.load_model(model_save_loc + model_name + ".json")
             print("Loaded Model Trained on:",model_sims)
         except:
             print("Couldn't load Booster Located at: " + model_save_loc + model_dir + ".json")

@@ -33,7 +33,7 @@ path_to_models = config["PATHS"]["path_to_models"]
 SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
 
 feature_columns = json.loads(config.get("TRAIN_MODEL","feature_columns"))
-target_column = json.loads(config.get("TRAIN_MODEL","target_columns"))
+target_column = json.loads(config.get("TRAIN_MODEL","target_column"))
 model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
 model_type = config["TRAIN_MODEL"]["model_type"]
 
@@ -55,15 +55,15 @@ plt_nu_splits = parse_ranges(plt_nu_splits)
 plt_macc_splits = config["EVAL_MODEL"]["plt_macc_splits"]
 plt_macc_splits = parse_ranges(plt_macc_splits)
 
-linthrsh = config.getfloat("XGBOOST","linthrsh")
-lin_nbin = config.getint("XGBOOST","lin_nbin")
-log_nbin = config.getint("XGBOOST","log_nbin")
-lin_rvticks = json.loads(config.get("XGBOOST","lin_rvticks"))
-log_rvticks = json.loads(config.get("XGBOOST","log_rvticks"))
-lin_tvticks = json.loads(config.get("XGBOOST","lin_tvticks"))
-log_tvticks = json.loads(config.get("XGBOOST","log_tvticks"))
-lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
-log_rticks = json.loads(config.get("XGBOOST","log_rticks"))
+linthrsh = config.getfloat("EVAL_MODEL","linthrsh")
+lin_nbin = config.getint("EVAL_MODEL","lin_nbin")
+log_nbin = config.getint("EVAL_MODEL","log_nbin")
+lin_rvticks = json.loads(config.get("EVAL_MODEL","lin_rvticks"))
+log_rvticks = json.loads(config.get("EVAL_MODEL","log_rvticks"))
+lin_tvticks = json.loads(config.get("EVAL_MODEL","lin_tvticks"))
+log_tvticks = json.loads(config.get("EVAL_MODEL","log_tvticks"))
+lin_rticks = json.loads(config.get("EVAL_MODEL","lin_rticks"))
+log_rticks = json.loads(config.get("EVAL_MODEL","log_rticks"))
 
 ####################################################################################################################################################################################################################################
     

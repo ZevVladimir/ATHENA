@@ -29,7 +29,7 @@ ML_dset_path = config["PATHS"]["ML_dset_path"]
 path_to_models = config["PATHS"]["path_to_models"]
 SPARTA_output_path = config["SPARTA_DATA"]["SPARTA_output_path"]
 
-model_sims = json.loads(config.get("XGBOOST","model_sims"))
+model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
 model_type = config["TRAIN_MODEL"]["model_type"]
 test_sims = json.loads(config.get("EVAL_MODEL","test_sims"))
 eval_datasets = json.loads(config.get("EVAL_MODEL","eval_datasets"))
@@ -42,40 +42,22 @@ else:
     cosmol = cosmology.setCosmology(sim_cosmol) 
     sim_pat = r"cbol_l(\d+)_n(\d+)"
     
-plt_nu_splits = config["XGBOOST"]["plt_nu_splits"]
+plt_nu_splits = config["EVAL_MODEL"]["plt_nu_splits"]
 plt_nu_splits = parse_ranges(plt_nu_splits)
 
-plt_macc_splits = config["XGBOOST"]["plt_macc_splits"]
+plt_macc_splits = config["EVAL_MODEL"]["plt_macc_splits"]
 plt_macc_splits = parse_ranges(plt_macc_splits)
 
-linthrsh = config.getfloat("XGBOOST","linthrsh")
-lin_nbin = config.getint("XGBOOST","lin_nbin")
-log_nbin = config.getint("XGBOOST","log_nbin")
-lin_rvticks = json.loads(config.get("XGBOOST","lin_rvticks"))
-log_rvticks = json.loads(config.get("XGBOOST","log_rvticks"))
-lin_tvticks = json.loads(config.get("XGBOOST","lin_tvticks"))
-log_tvticks = json.loads(config.get("XGBOOST","log_tvticks"))
-lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
-log_rticks = json.loads(config.get("XGBOOST","log_rticks"))
-
-if on_zaratan:
-    from dask_mpi import initialize
-    from distributed.scheduler import logger
-    import socket
-elif not on_zaratan and not use_gpu:
-    from dask.distributed import LocalCluster
+linthrsh = config.getfloat("EVAL_MODEL","linthrsh")
+lin_nbin = config.getint("EVAL_MODEL","lin_nbin")
+log_nbin = config.getint("EVAL_MODEL","log_nbin")
+lin_rvticks = json.loads(config.get("EVAL_MODEL","lin_rvticks"))
+log_rvticks = json.loads(config.get("EVAL_MODEL","log_rvticks"))
+lin_tvticks = json.loads(config.get("EVAL_MODEL","lin_tvticks"))
+log_tvticks = json.loads(config.get("EVAL_MODEL","log_tvticks"))
+lin_rticks = json.loads(config.get("EVAL_MODEL","lin_rticks"))
+log_rticks = json.loads(config.get("EVAL_MODEL","log_rticks"))
     
-    
-def overlap_loss_orb(params, r_bin, lnv2_bin, sparta_labels_bin):
-    m, b = params
-    line_classification = (lnv2_bin <= (m * r_bin + b)).astype(int)
-    return -np.sum(line_classification == sparta_labels_bin)  # Negative for maximization
-
-def overlap_loss_inf(params, r_bin, lnv2_bin, sparta_labels_bin):
-    m, b = params
-    line_classification = (lnv2_bin >= (m * r_bin + b)).astype(int)
-    return -np.sum(line_classification == sparta_labels_bin)  # Negative for maximization
-
 def overlap_loss(params, lnv2_bin, sparta_labels_bin):
     decision_boundary = params[0]
     line_classif = (lnv2_bin <= decision_boundary).astype(int)  
@@ -87,7 +69,7 @@ def overlap_loss(params, lnv2_bin, sparta_labels_bin):
     # Loss is the absolute difference between the two misclassification counts
     return abs(misclass_orb - misclass_inf)
 
-def opt_func(bins, r, lnv2, sparta_labels, def_m, def_b, orb = True, plot_loc = "", title = ""):
+def opt_func(bins, r, lnv2, sparta_labels, def_b, plot_loc = "", title = ""):
     # Assign bin indices based on radius
     bin_indices = np.digitize(r, bins) - 1  
     
@@ -96,86 +78,76 @@ def opt_func(bins, r, lnv2, sparta_labels, def_m, def_b, orb = True, plot_loc = 
     magma_cmap.set_bad(color='black') 
 
     intercepts = []
-    lnv2_range = (np.min(lnv2),np.max(lnv2))
     for i in range(bins.shape[0]-1):
         mask = bin_indices == i
         if np.sum(mask) == 0:
             intercepts.append(def_b)
             continue  # Skip empty bins
         
-        r_bin = r[mask]
         lnv2_bin = lnv2[mask]
         sparta_labels_bin = sparta_labels[mask]
 
         # Optimize
-        if orb:
-            # Initial guess for m and b
-            initial_guess = [np.max(lnv2_bin)]
-            result = minimize(overlap_loss_orb, initial_guess, args=(r_bin, lnv2_bin, sparta_labels_bin))
-        elif orb is False:
-            # Initial guess for m and b
-            initial_guess = [np.mean(lnv2_bin)]
-            result = minimize(overlap_loss_inf, initial_guess, args=(r_bin, lnv2_bin, sparta_labels_bin))
-        else:
-            # initial_guess = [np.min(lnv2_bin)]
-            # result_min = minimize(overlap_loss, initial_guess, args=(lnv2_bin, sparta_labels_bin), method="Nelder-Mead")
-            
-            # initial_guess = [np.max(lnv2_bin)]
-            # result_max = minimize(overlap_loss, initial_guess, args=(lnv2_bin, sparta_labels_bin), method="Nelder-Mead")
-            
-            initial_guess = [np.mean(lnv2_bin)]
-            result_mean = minimize(overlap_loss, initial_guess, args=(lnv2_bin, sparta_labels_bin), method="Nelder-Mead")
-            
-            # if result_min.fun < result_max.fun:
-            #     result = result_min
-            # else:
-            #     result = result_max
-            
-            result = result_mean
-            
-            calc_b = result.x[0]
-                
-            create_directory(plot_loc + title + "bins/")
+
+        # initial_guess = [np.min(lnv2_bin)]
+        # result_min = minimize(overlap_loss, initial_guess, args=(lnv2_bin, sparta_labels_bin), method="Nelder-Mead")
         
-            # fig_miss, ax_miss = plt.subplots(1,2,figsize=(14,7),share_y=True)
-            # fig_dist, ax_dist = plt.subplots(1,2,figsize=(14,7))
-            # for vel in np.arange(lnv2_range[0],lnv2_range[1],0.01):
-            #     line_classif = (lnv2_bin <= vel).astype(int)  
-            #     misclass_orb = np.sum((line_classif == 0) & (sparta_labels_bin == 1))
-            #     misclass_inf = np.sum((line_classif == 1) & (sparta_labels_bin == 0))
-            #     ax_miss[0].scatter(vel,misclass_inf)
-            #     ax_miss[1].scatter(vel,misclass_orb)
-                
-            #     ax_dist[0].hist2d(r_bin[np.where(sparta_labels_bin == 0)[0]], lnv2_bin[np.where(sparta_labels_bin == 0)[0]], 
-            #             range = [[bins[i],bins[i+1]],lnv2_range], bins=200, norm="log", cmap=magma_cmap)
-            #     ax_dist[0].hlines(calc_b,xmin=bins[i],xmax=bins[i+1])
-            #     ax_dist[1].hist2d(r_bin[np.where(sparta_labels_bin == 1)[0]], lnv2_bin[np.where(sparta_labels_bin == 1)[0]],
-            #             range = [[bins[i],bins[i+1]],lnv2_range], bins=200, norm="log", cmap=magma_cmap)
-            #     ax_dist[1].hlines(calc_b,xmin=bins[i],xmax=bins[i+1])
+        initial_guess = [np.max(lnv2_bin)]
+        result_max = minimize(overlap_loss, initial_guess, args=(lnv2_bin, sparta_labels_bin), method="Nelder-Mead")
+        
+        initial_guess = [np.mean(lnv2_bin)]
+        result_mean = minimize(overlap_loss, initial_guess, args=(lnv2_bin, sparta_labels_bin), method="Nelder-Mead")
+        
+        if result_mean.fun < result_max.fun:
+            result = result_mean
+        else:
+            result = result_max
+        
+        # result = result_mean
+        
+        calc_b = result.x[0]
             
-            # ax_miss[0].set_xlabel(r'$\ln(v^2/v_{200m}^2)$')
-            # ax_miss[0].set_ylabel("Number of Misclassified Particles")
-            # ax_miss[0].set_title("Infalling Particles Classified as Orbiting")
-            # ax_miss[1].set_xlabel(r'$\ln(v^2/v_{200m}^2)$')
-            # ax_miss[1].set_ylabel("Number of Misclassified Particles")
-            # ax_miss[1].set_title("Orbiting Particles Classified as Infalling")
-            # create_directory(plot_loc + title + "bins/miss_class/")
-            # fig_miss.savefig(plot_loc + title + "bins/miss_class/miss_class_bin_" + str(i) + ".png")
-            # plt.close(fig_miss)
+        create_directory(plot_loc + title + "bins/")
+    
+        # fig_miss, ax_miss = plt.subplots(1,2,figsize=(14,7),share_y=True)
+        # fig_dist, ax_dist = plt.subplots(1,2,figsize=(14,7))
+        # for vel in np.arange(lnv2_range[0],lnv2_range[1],0.01):
+        #     line_classif = (lnv2_bin <= vel).astype(int)  
+        #     misclass_orb = np.sum((line_classif == 0) & (sparta_labels_bin == 1))
+        #     misclass_inf = np.sum((line_classif == 1) & (sparta_labels_bin == 0))
+        #     ax_miss[0].scatter(vel,misclass_inf)
+        #     ax_miss[1].scatter(vel,misclass_orb)
             
-            
-            # ax_dist[0].set_title("Infalling particles")
-            # ax_dist[0].set_ylabel(r'$\ln(v^2/v_{200m}^2)$')
-            # ax_dist[0].set_ylim(lnv2_range)
-            
-            # ax_dist[1].set_title("Orbiting particles")
-            # ax_dist[1].set_ylabel(r'$\ln(v^2/v_{200m}^2)$')
-            # ax_dist[1].set_xlabel(r'$r/R_{200m}$')
-            # ax_dist[1].set_ylim(lnv2_range)
-            # fig_dist.suptitle("Bin " + str(i) + "Radius: " + str(bins[i]) + "-" + str(bins[i+1]))
-            # create_directory(plot_loc + title + "bins/dist/")
-            # fig_dist.savefig(plot_loc + title + "bins/dist/bin_" + str(i) + ".png")          
-            # plt.close(fig_dist)
+        #     ax_dist[0].hist2d(r_bin[np.where(sparta_labels_bin == 0)[0]], lnv2_bin[np.where(sparta_labels_bin == 0)[0]], 
+        #             range = [[bins[i],bins[i+1]],lnv2_range], bins=200, norm="log", cmap=magma_cmap)
+        #     ax_dist[0].hlines(calc_b,xmin=bins[i],xmax=bins[i+1])
+        #     ax_dist[1].hist2d(r_bin[np.where(sparta_labels_bin == 1)[0]], lnv2_bin[np.where(sparta_labels_bin == 1)[0]],
+        #             range = [[bins[i],bins[i+1]],lnv2_range], bins=200, norm="log", cmap=magma_cmap)
+        #     ax_dist[1].hlines(calc_b,xmin=bins[i],xmax=bins[i+1])
+        
+        # ax_miss[0].set_xlabel(r'$\ln(v^2/v_{200m}^2)$')
+        # ax_miss[0].set_ylabel("Number of Misclassified Particles")
+        # ax_miss[0].set_title("Infalling Particles Classified as Orbiting")
+        # ax_miss[1].set_xlabel(r'$\ln(v^2/v_{200m}^2)$')
+        # ax_miss[1].set_ylabel("Number of Misclassified Particles")
+        # ax_miss[1].set_title("Orbiting Particles Classified as Infalling")
+        # create_directory(plot_loc + title + "bins/miss_class/")
+        # fig_miss.savefig(plot_loc + title + "bins/miss_class/miss_class_bin_" + str(i) + ".png")
+        # plt.close(fig_miss)
+        
+        
+        # ax_dist[0].set_title("Infalling particles")
+        # ax_dist[0].set_ylabel(r'$\ln(v^2/v_{200m}^2)$')
+        # ax_dist[0].set_ylim(lnv2_range)
+        
+        # ax_dist[1].set_title("Orbiting particles")
+        # ax_dist[1].set_ylabel(r'$\ln(v^2/v_{200m}^2)$')
+        # ax_dist[1].set_xlabel(r'$r/R_{200m}$')
+        # ax_dist[1].set_ylim(lnv2_range)
+        # fig_dist.suptitle("Bin " + str(i) + "Radius: " + str(bins[i]) + "-" + str(bins[i+1]))
+        # create_directory(plot_loc + title + "bins/dist/")
+        # fig_dist.savefig(plot_loc + title + "bins/dist/bin_" + str(i) + ".png")          
+        # plt.close(fig_dist)
             
         intercepts.append(calc_b)
         
@@ -201,20 +173,22 @@ if __name__ == "__main__":
         "b_neg": 1.5101195108968333,
     }
     
-    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client)
+    use_sims = curr_test_sims
+    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client,curr_test_sims=use_sims)
     
-    r = r.values
-    vr = vr.values
-    lnv2 = lnv2.values
-    vphys = samp_data["p_phys_vel"].values
-    lnv2 = np.log(vphys**2)
+    # We use the full dataset since for our custom fitting it does not only specific halos (?)
+    r_full = my_data["p_Scaled_radii"].compute().to_numpy()
+    vr_full = my_data["p_Radial_vel"].compute().to_numpy()
+    vphys_full = my_data["p_phys_vel"].compute().to_numpy()
+    sparta_labels = my_data["Orbit_infall"].compute().to_numpy()
+    lnv2_full = np.log(vphys_full**2)
     
     sparta_orb = np.where(sparta_labels == 1)[0]
     sparta_inf = np.where(sparta_labels == 0)[0]
 
-    mask_vr_neg = (vr < 0)
+    mask_vr_neg = (vr_full < 0)
     mask_vr_pos = ~mask_vr_neg
-    mask_r = r < 1.75
+    mask_r = r_full < 1.75
     
     fltr_combs = {
     "orb_vr_neg": np.intersect1d(sparta_orb, np.where(mask_vr_neg)[0]),
@@ -245,13 +219,12 @@ if __name__ == "__main__":
     sim_splits = np.where(halo_first == 0)[0]
 
     #TODO not hard code this
-    opt_sims = ["cbol_l1000_n1024_4r200m_1-5v200m_99to90"]
-    
-    act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sparta_mass_prf(sim_splits,all_idxs,opt_sims)
+    # opt_sims = ["cbol_l1000_n1024_4r200m_1-5v200m_99to90"]
+    act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sparta_mass_prf(sim_splits,all_idxs,curr_test_sims)
     act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb  
     
-    vr_pos = opt_func(bins, r[mask_vr_pos], lnv2[mask_vr_pos], sparta_labels[mask_vr_pos], 0, ps_param_dict["b_pos"], orb = None, plot_loc = plot_loc, title = "pos")
-    vr_neg = opt_func(bins, r[mask_vr_neg], lnv2[mask_vr_neg], sparta_labels[mask_vr_neg], 0, ps_param_dict["b_neg"], orb = None, plot_loc = plot_loc, title = "neg")
+    vr_pos = opt_func(bins, r_full[mask_vr_pos], lnv2_full[mask_vr_pos], sparta_labels[mask_vr_pos], ps_param_dict["b_pos"], plot_loc = plot_loc, title = "pos")
+    vr_neg = opt_func(bins, r_full[mask_vr_neg], lnv2_full[mask_vr_neg], sparta_labels[mask_vr_neg], ps_param_dict["b_neg"], plot_loc = plot_loc, title = "neg")
     
     opt_param_dict = {
         "orb_vr_pos": vr_pos,
@@ -265,21 +238,11 @@ if __name__ == "__main__":
     grad_lims = "0.2_0.5"
     r_cut = 1.75    
     
-    plt_SPARTA_KE_dist(ps_param_dict, fltr_combs, bins, r, lnv2, perc = perc, width = width, r_cut = r_cut, plot_loc = plot_loc, title = "bin_fit_", cust_line_dict = opt_param_dict)
+    plt_SPARTA_KE_dist(ps_param_dict, fltr_combs, bins, r_full, lnv2_full, perc = perc, width = width, r_cut = r_cut, plot_loc = plot_loc, title = "bin_fit_", cust_line_dict = opt_param_dict)
 
-#######################################################################################################################################
-    
-    use_sims = curr_test_sims
-    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client,curr_test_sims=use_sims)
-    
-    halo_first = halo_df["Halo_first"].values
-    halo_n = halo_df["Halo_n"].values
-    all_idxs = halo_df["Halo_indices"].values
-    
+#######################################################################################################################################    
     all_z = []
     all_rhom = []
-    # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
-    sim_splits = np.where(halo_first == 0)[0]
     
     # if there are multiple simulations, to correctly index the dataset we need to update the starting values for the 
     # stacked simulations such that they correspond to the larger dataset and not one specific simulation
@@ -305,23 +268,14 @@ if __name__ == "__main__":
 
     tot_num_halos = halo_n.shape[0]
     min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
-
-    # Get SPARTA's mass profiles
-    act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sparta_mass_prf(sim_splits,all_idxs,use_sims)
-    act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
-
     
-    r_full = my_data["p_Scaled_radii"].compute().to_numpy()
-    vr_full = my_data["p_Radial_vel"].compute().to_numpy()
-    vphys_full = my_data["p_phys_vel"].compute().to_numpy()
-    sparta_labels = my_data["Orbit_infall"].compute().to_numpy()
-    lnv2_full = np.log(vphys_full**2)
+    
     
     bin_indices = np.digitize(r_full, bins) - 1  
     preds = np.zeros(r_full.shape[0])
     for i in range(bins.shape[0]-1):
-        mask_pos = (bin_indices == i) & (vr_full > 0) & (lnv2_full < opt_param_dict["inf_vr_pos"]["b"][i])
-        mask_neg = (bin_indices == i) & (vr_full < 0) & (lnv2_full < opt_param_dict["inf_vr_neg"]["b"][i])
+        mask_pos = (bin_indices == i) & (vr_full > 0) & (lnv2_full <= opt_param_dict["inf_vr_pos"]["b"][i])
+        mask_neg = (bin_indices == i) & (vr_full < 0) & (lnv2_full <= opt_param_dict["inf_vr_neg"]["b"][i])
         
         preds[mask_pos] = 1
         preds[mask_neg] = 1
@@ -411,5 +365,5 @@ if __name__ == "__main__":
         else:
             plt_macc_splits.remove(macc_split)
     
-    lin_rticks = json.loads(config.get("XGBOOST","lin_rticks"))
+    
     compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "fit_ps_cut_dens_",prf_name_0="Fitted Phase Space Cut", prf_name_1="SPARTA")

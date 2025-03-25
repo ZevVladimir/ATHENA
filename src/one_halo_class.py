@@ -35,7 +35,7 @@ sim_cosmol = config["MISC"]["sim_cosmol"]
 search_rad = config.getfloat("DSET_CREATE","search_rad")
 
 feature_columns = json.loads(config.get("TRAIN_MODEL","feature_columns"))
-target_column = json.loads(config.get("TRAIN_MODEL","target_columns"))
+target_column = json.loads(config.get("TRAIN_MODEL","target_column"))
 model_sims = json.loads(config.get("TRAIN_MODEL","model_sims"))
 model_type = config["TRAIN_MODEL"]["model_type"]
 
