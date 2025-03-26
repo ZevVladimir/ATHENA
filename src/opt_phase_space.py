@@ -158,38 +158,6 @@ if __name__ == "__main__":
     model_name = get_model_name(model_type, model_sims, hpo_done=config_dict["OPTIMIZE"]["hpo"], opt_param_dict=config_dict["OPTIMIZE"])    
     model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"  
     
-    #TODO load this from a saved file
-    ps_param_dict = {
-        "m_pos": -1.9973747688461672,
-        "b_pos": 2.730691113802748,
-        "m_neg": -1.601325049968688,
-        "b_neg": 1.5101195108968333,
-    }
-    
-    with timed("Loading Fitting Data"):
-        r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client,curr_test_sims=model_sims)
-        
-        # We use the full dataset since for our custom fitting it does not only specific halos (?)
-        r_fit = my_data["p_Scaled_radii"].compute().to_numpy()
-        vr_fit = my_data["p_Radial_vel"].compute().to_numpy()
-        vphys_fit = my_data["p_phys_vel"].compute().to_numpy()
-        sparta_labels_fit = my_data["Orbit_infall"].compute().to_numpy()
-        lnv2_fit = np.log(vphys_fit**2)
-    
-    sparta_orb = np.where(sparta_labels_fit == 1)[0]
-    sparta_inf = np.where(sparta_labels_fit == 0)[0]
-
-    mask_vr_neg = (vr_fit < 0)
-    mask_vr_pos = ~mask_vr_neg
-    mask_r = r_fit < 1.75
-    
-    fltr_combs = {
-    "orb_vr_neg": np.intersect1d(sparta_orb, np.where(mask_vr_neg)[0]),
-    "orb_vr_pos": np.intersect1d(sparta_orb, np.where(mask_vr_pos)[0]),
-    "inf_vr_neg": np.intersect1d(sparta_inf, np.where(mask_vr_neg)[0]),
-    "inf_vr_pos": np.intersect1d(sparta_inf, np.where(mask_vr_pos)[0]),
-    }
-
     split_scale_dict = {
             "linthrsh":linthrsh, 
             "lin_nbin":lin_nbin,
@@ -201,16 +169,15 @@ if __name__ == "__main__":
             "lin_rticks":lin_rticks,
             "log_rticks":log_rticks,
     }
-
-    halo_first = halo_df["Halo_first"].values
-    halo_n = halo_df["Halo_n"].values
-    all_idxs = halo_df["Halo_indices"].values
-
-    all_z = []
-    all_rhom = []
-    # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
-    sim_splits = np.where(halo_first == 0)[0]
-
+    
+    #TODO load this from a saved file
+    ps_param_dict = {
+        "m_pos": -1.9973747688461672,
+        "b_pos": 2.730691113802748,
+        "m_neg": -1.601325049968688,
+        "b_neg": 1.5101195108968333,
+    }
+    
     #TODO make this a loop
     curr_test_sims = test_sims[0]
     test_comb_name = get_combined_name(curr_test_sims) 
@@ -221,8 +188,49 @@ if __name__ == "__main__":
     if os.path.isfile(model_fldr_loc + "bin_fit_ps_cut_params.pickle"):
         print("Loading parameters from saved file")
         opt_param_dict = load_pickle(model_fldr_loc + "bin_fit_ps_cut_params.pickle")
+        
+        with timed("Loading Testing Data"):
+            r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client,curr_test_sims=curr_test_sims)
+            r_test = my_data["p_Scaled_radii"].compute().to_numpy()
+            vr_test = my_data["p_Radial_vel"].compute().to_numpy()
+            vphys_test = my_data["p_phys_vel"].compute().to_numpy()
+            sparta_labels_test = my_data["Orbit_infall"].compute().to_numpy()
+            lnv2_test = np.log(vphys_test**2)
+            
+            halo_first = halo_df["Halo_first"].values
+            halo_n = halo_df["Halo_n"].values
+            all_idxs = halo_df["Halo_indices"].values
+            # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
+            sim_splits = np.where(halo_first == 0)[0]
+        
+            sparta_orb = np.where(sparta_labels_test == 1)[0]
+            sparta_inf = np.where(sparta_labels_test == 0)[0]
     else:        
         with timed("Optimizing phase-space cut"):
+            with timed("Loading Fitting Data"):
+                r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client,curr_test_sims=model_sims)
+                
+                # We use the full dataset since for our custom fitting it does not only specific halos (?)
+                r_fit = my_data["p_Scaled_radii"].compute().to_numpy()
+                vr_fit = my_data["p_Radial_vel"].compute().to_numpy()
+                vphys_fit = my_data["p_phys_vel"].compute().to_numpy()
+                sparta_labels_fit = my_data["Orbit_infall"].compute().to_numpy()
+                lnv2_fit = np.log(vphys_fit**2)
+                
+                halo_first = halo_df["Halo_first"].values
+                halo_n = halo_df["Halo_n"].values
+                all_idxs = halo_df["Halo_indices"].values
+                # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
+                sim_splits = np.where(halo_first == 0)[0]
+            
+                sparta_orb = np.where(sparta_labels_fit == 1)[0]
+                sparta_inf = np.where(sparta_labels_fit == 0)[0]
+
+                mask_vr_neg = (vr_fit < 0)
+                mask_vr_pos = ~mask_vr_neg
+                mask_r = r_fit < 1.75
+                
+                
             sparta_name, sparta_search_name = split_calc_name(curr_test_sims[0])
             curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"      
             
@@ -242,6 +250,32 @@ if __name__ == "__main__":
             }
         
             save_pickle(opt_param_dict,model_fldr_loc+"bin_fit_ps_cut_params.pickle")
+            
+            # if the testing simulations are the same as the model simulations we don't need to reload the data
+            if sorted(curr_test_sims) == sorted(model_sims):
+                print("Using fitting simulations for testing")
+                r_test = r_fit
+                vr_test = vr_fit
+                vphys_test = vphys_fit
+                sparta_labels_test = sparta_labels_fit
+                lnv2_test = lnv2_fit
+            else:
+                with timed("Loading Testing Data"):
+                    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client,curr_test_sims=curr_test_sims)
+                    r_test = my_data["p_Scaled_radii"].compute().to_numpy()
+                    vr_test = my_data["p_Radial_vel"].compute().to_numpy()
+                    vphys_test = my_data["p_phys_vel"].compute().to_numpy()
+                    sparta_labels_test = my_data["Orbit_infall"].compute().to_numpy()
+                    lnv2_test = np.log(vphys_test**2)
+                    
+            halo_first = halo_df["Halo_first"].values
+            halo_n = halo_df["Halo_n"].values
+            all_idxs = halo_df["Halo_indices"].values
+            # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
+            sim_splits = np.where(halo_first == 0)[0]
+        
+            sparta_orb = np.where(sparta_labels_test == 1)[0]
+            sparta_inf = np.where(sparta_labels_test == 0)[0]
     
     #TODO load this from a file
     width = 0.05
@@ -249,25 +283,18 @@ if __name__ == "__main__":
     grad_lims = "0.2_0.5"
     r_cut = 1.75       
     
-    # if the testing simulations are the same as the model simulations we don't need to reload the data
-    if sorted(curr_test_sims) == sorted(model_sims):
-        print("Using fitting simulations for testing")
-        r_test = r_fit
-        vr_test = vr_fit
-        vphys_test = vphys_fit
-        sparta_labels_test = sparta_labels_fit
-        lnv2_test = lnv2_fit
-    else:
-        with timed("Loading Testing Data"):
-            r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client,curr_test_sims=curr_test_sims)
-            r_test = my_data["p_Scaled_radii"].compute().to_numpy()
-            vr_test = my_data["p_Radial_vel"].compute().to_numpy()
-            vphys_test = my_data["p_phys_vel"].compute().to_numpy()
-            sparta_labels_test = my_data["Orbit_infall"].compute().to_numpy()
-            lnv2_test = np.log(vphys_test**2)
+    mask_vr_neg = (vr_test < 0)
+    mask_vr_pos = ~mask_vr_neg
+    mask_r = r_fit < 1.75
         
-        
-    act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sparta_mass_prf(sim_splits,all_idxs,curr_test_sims)
+    fltr_combs = {
+        "orb_vr_neg": np.intersect1d(sparta_orb, np.where(mask_vr_neg)[0]),
+        "orb_vr_pos": np.intersect1d(sparta_orb, np.where(mask_vr_pos)[0]),
+        "inf_vr_neg": np.intersect1d(sparta_inf, np.where(mask_vr_neg)[0]),
+        "inf_vr_pos": np.intersect1d(sparta_inf, np.where(mask_vr_pos)[0]),
+    } 
+    
+    act_mass_prf_all, act_mass_prf_orb, all_masses, bins = load_sparta_mass_prf(sim_splits,all_idxs,curr_test_sims)
     act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb 
     
     plt_SPARTA_KE_dist(ps_param_dict, fltr_combs, bins, r_test, lnv2_test, perc = perc, width = width, r_cut = r_cut, plot_loc = plot_loc, title = "bin_fit_", cust_line_dict = opt_param_dict)
