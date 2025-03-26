@@ -28,6 +28,7 @@ misclass_plt = config_dict["EVAL_MODEL"]["misclass_plt"]
 fulldist_plt = config_dict["EVAL_MODEL"]["fulldist_plt"]
 io_frac_plt = config_dict["EVAL_MODEL"]["io_frac_plt"]
 dens_prf_nu_split = config_dict["EVAL_MODEL"]["dens_prf_nu_split"]
+dens_prf_macc_split = config_dict["EVAL_MODEL"]["dens_prf_macc_split"]
 
 ###############################################################################################################
 
@@ -89,7 +90,7 @@ if __name__ == "__main__":
                 y = data[target_column]
 
                 eval_model(model_info, client, bst, use_sims=curr_test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, plot_save_loc=plot_loc,dens_prf=dens_prf_plt,missclass=misclass_plt,\
-                    full_dist=fulldist_plt,io_frac=io_frac_plt,split_nu=dens_prf_nu_split)
+                    full_dist=fulldist_plt,io_frac=io_frac_plt,split_nu=dens_prf_nu_split,split_macc=dens_prf_macc_split)
                 del data 
                 del X
                 del y

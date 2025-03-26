@@ -525,7 +525,7 @@ def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         return mass_prf_all,mass_prf_1halo,all_masses,bins
 
 # Evaluate an input model by generating plots of comparisons between the model's predictions and SPARTA
-def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, plot_save_loc, dens_prf = False,missclass=False,full_dist=False,io_frac=False,split_nu=False): 
+def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, plot_save_loc, dens_prf = False,missclass=False,full_dist=False,io_frac=False,split_nu=False,split_macc=False): 
     with timed(f"Predictions for {y.size.compute():.3e} particles"):
         preds = make_preds(client, model, X)
 
@@ -661,21 +661,27 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, pl
         
         # If we want the density profiles to only consist of halos of a specific peak height (nu) bin 
         if split_nu:
-            all_prf_lst = []
-            orb_prf_lst = []
-            inf_prf_lst = []
+            nu_all_prf_lst = []
+            nu_orb_prf_lst = []
+            nu_inf_prf_lst = []
+        
             cpy_plt_nu_splits = plt_nu_splits.copy()
             for i,nu_split in enumerate(cpy_plt_nu_splits):
                 # Take the second element of the where to filter by the halos (?)
                 fltr = np.where((calc_nus > nu_split[0]) & (calc_nus < nu_split[1]))[0]
                 #TODO make the minimum number of halos a tunable parameter
                 if fltr.shape[0] > 25:
-                    all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
-                    orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
-                    inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
+                    nu_all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
+                    nu_orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
+                    nu_inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
                 else:
                     plt_nu_splits.remove(nu_split)
-
+            compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),nu_all_prf_lst,nu_orb_prf_lst,nu_inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="nu_dens_med_",prf_func=np.nanmedian,split_name="\nu", prf_name_0="ML Model", prf_name_1="SPARTA")
+        if split_macc:
+            macc_all_prf_lst = []
+            macc_orb_prf_lst = []
+            macc_inf_prf_lst = []
+            
             calc_maccs = calc_mass_acc_rate(curr_halos_r200m,past_halos_r200m,curr_z,past_z)
 
             cpy_plt_macc_splits = plt_macc_splits.copy()
@@ -683,14 +689,14 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, pl
                 # Take the second element of the where to filter by the halos (?)
                 fltr = np.where((calc_maccs > macc_split[0]) & (calc_maccs < macc_split[1]))[0]
                 if fltr.shape[0] > 25:
-                    all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
-                    orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
-                    inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
+                    macc_all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
+                    macc_orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
+                    macc_inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
                 else:
                     plt_macc_splits.remove(macc_split)
 
-            compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_med_",prf_func=np.nanmedian)
-            compare_split_prfs(plt_macc_splits,len(cpy_plt_macc_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title= "macc_dens_", split_name="\Gamma", prf_name_0="ML Model", prf_name_1="SPARTA")
+            
+            compare_split_prfs(plt_macc_splits,len(cpy_plt_macc_splits),macc_all_prf_lst,macc_orb_prf_lst,macc_inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title= "macc_dens_", split_name="\Gamma", prf_name_0="ML Model", prf_name_1="SPARTA")
         else:
             all_prf_lst = filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos)
             orb_prf_lst = filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos)
