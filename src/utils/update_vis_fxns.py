@@ -1501,7 +1501,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         
         widths = [4,4,4,4,.5]
         heights = [4]
-        fig = plt.figure(constrained_layout=True, figsize=(24,24))
+        fig = plt.figure(constrained_layout=True, figsize=(24,6))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
 
         ax1 = fig.add_subplot(gs[0])
