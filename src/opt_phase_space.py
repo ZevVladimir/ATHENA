@@ -158,12 +158,6 @@ if __name__ == "__main__":
     model_name = get_model_name(model_type, model_sims, hpo_done=config_dict["OPTIMIZE"]["hpo"], opt_param_dict=config_dict["OPTIMIZE"])    
     model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"  
     
-    curr_test_sims = test_sims[0]
-    test_comb_name = get_combined_name(curr_test_sims) 
-    dset_name = eval_datasets[0]
-    plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
-    create_directory(plot_loc)
-    
     #TODO load this from a saved file
     ps_param_dict = {
         "m_pos": -1.9973747688461672,
@@ -172,22 +166,21 @@ if __name__ == "__main__":
         "b_neg": 1.5101195108968333,
     }
     
-    use_sims = curr_test_sims
-    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client,curr_test_sims=use_sims)
+    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client,curr_test_sims=model_sims)
     
     # We use the full dataset since for our custom fitting it does not only specific halos (?)
-    r_full = my_data["p_Scaled_radii"].compute().to_numpy()
-    vr_full = my_data["p_Radial_vel"].compute().to_numpy()
-    vphys_full = my_data["p_phys_vel"].compute().to_numpy()
-    sparta_labels = my_data["Orbit_infall"].compute().to_numpy()
-    lnv2_full = np.log(vphys_full**2)
+    r_fit = my_data["p_Scaled_radii"].compute().to_numpy()
+    vr_fit = my_data["p_Radial_vel"].compute().to_numpy()
+    vphys_fit = my_data["p_phys_vel"].compute().to_numpy()
+    sparta_labels_fit = my_data["Orbit_infall"].compute().to_numpy()
+    lnv2_fit = np.log(vphys_fit**2)
     
-    sparta_orb = np.where(sparta_labels == 1)[0]
-    sparta_inf = np.where(sparta_labels == 0)[0]
+    sparta_orb = np.where(sparta_labels_fit == 1)[0]
+    sparta_inf = np.where(sparta_labels_fit == 0)[0]
 
-    mask_vr_neg = (vr_full < 0)
+    mask_vr_neg = (vr_fit < 0)
     mask_vr_pos = ~mask_vr_neg
-    mask_r = r_full < 1.75
+    mask_r = r_fit < 1.75
     
     fltr_combs = {
     "orb_vr_neg": np.intersect1d(sparta_orb, np.where(mask_vr_neg)[0]),
@@ -217,14 +210,26 @@ if __name__ == "__main__":
     # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
     sim_splits = np.where(halo_first == 0)[0]
 
-    act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sparta_mass_prf(sim_splits,all_idxs,curr_test_sims)
-    act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb  
+    #TODO make this a loop
+    curr_test_sims = test_sims[0]
+    test_comb_name = get_combined_name(curr_test_sims) 
+    dset_name = eval_datasets[0]
+    plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
+    create_directory(plot_loc)
     
     if os.path.isfile(model_fldr_loc + "bin_fit_ps_cut_params.pickle"):
         opt_param_dict = load_pickle(model_fldr_loc + "bin_fit_ps_cut_params.pickle")
-    else: 
-        vr_pos = opt_func(bins, r_full[mask_vr_pos], lnv2_full[mask_vr_pos], sparta_labels[mask_vr_pos], ps_param_dict["b_pos"], plot_loc = plot_loc, title = "pos")
-        vr_neg = opt_func(bins, r_full[mask_vr_neg], lnv2_full[mask_vr_neg], sparta_labels[mask_vr_neg], ps_param_dict["b_neg"], plot_loc = plot_loc, title = "neg")
+    else:        
+        sparta_name, sparta_search_name = split_calc_name(curr_test_sims[0])
+        curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"      
+        
+        sparta_output = sparta.load(filename=curr_sparta_HDF5_path, log_level=0)
+    
+        bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
+        bins = np.insert(bins, 0, 0)
+        
+        vr_pos = opt_func(bins, r_fit[mask_vr_pos], lnv2_fit[mask_vr_pos], sparta_labels_fit[mask_vr_pos], ps_param_dict["b_pos"], plot_loc = plot_loc, title = "pos")
+        vr_neg = opt_func(bins, r_fit[mask_vr_neg], lnv2_fit[mask_vr_neg], sparta_labels_fit[mask_vr_neg], ps_param_dict["b_neg"], plot_loc = plot_loc, title = "neg")
     
         opt_param_dict = {
             "orb_vr_pos": vr_pos,
@@ -239,9 +244,28 @@ if __name__ == "__main__":
     width = 0.05
     perc = 0.99
     grad_lims = "0.2_0.5"
-    r_cut = 1.75    
+    r_cut = 1.75       
     
-    plt_SPARTA_KE_dist(ps_param_dict, fltr_combs, bins, r_full, lnv2_full, perc = perc, width = width, r_cut = r_cut, plot_loc = plot_loc, title = "bin_fit_", cust_line_dict = opt_param_dict)
+    # if the testing simulations are the same as the model simulations we don't need to reload the data
+    if sorted(curr_test_sims) == sorted(model_sims):
+        r_test = r_fit
+        vr_test = vr_fit
+        vphys_test = vphys_fit
+        sparta_labels_test = sparta_labels_fit
+        lnv2_test = lnv2_fit
+    else:
+        r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client,curr_test_sims=curr_test_sims)
+        r_test = my_data["p_Scaled_radii"].compute().to_numpy()
+        vr_test = my_data["p_Radial_vel"].compute().to_numpy()
+        vphys_test = my_data["p_phys_vel"].compute().to_numpy()
+        sparta_labels_test = my_data["Orbit_infall"].compute().to_numpy()
+        lnv2_test = np.log(vphys_test**2)
+        
+        
+    act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sparta_mass_prf(sim_splits,all_idxs,curr_test_sims)
+    act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb 
+    
+    plt_SPARTA_KE_dist(ps_param_dict, fltr_combs, bins, r_test, lnv2_test, perc = perc, width = width, r_cut = r_cut, plot_loc = plot_loc, title = "bin_fit_", cust_line_dict = opt_param_dict)
 
 #######################################################################################################################################    
     all_z = []
@@ -249,19 +273,19 @@ if __name__ == "__main__":
     
     # if there are multiple simulations, to correctly index the dataset we need to update the starting values for the 
     # stacked simulations such that they correspond to the larger dataset and not one specific simulation
-    if len(use_sims) > 1:
-        for i,sim in enumerate(use_sims):
+    if len(curr_test_sims) > 1:
+        for i,sim in enumerate(curr_test_sims):
             # The first sim remains the same
             if i == 0:
                 continue
             # Else if it isn't the final sim 
-            elif i < len(use_sims) - 1:
+            elif i < len(curr_test_sims) - 1:
                 halo_first[sim_splits[i]:sim_splits[i+1]] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
             # Else if the final sim
             else:
                 halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
     # Get the redshifts for each simulation's primary snapshot
-    for i,sim in enumerate(use_sims):
+    for i,sim in enumerate(curr_test_sims):
         with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
             config_dict = pickle.load(file)
             curr_z = config_dict["p_snap_info"]["red_shift"][()]
@@ -274,16 +298,16 @@ if __name__ == "__main__":
     
     
     
-    bin_indices = np.digitize(r_full, bins) - 1  
-    preds = np.zeros(r_full.shape[0])
+    bin_indices = np.digitize(r_test, bins) - 1  
+    preds = np.zeros(r_test.shape[0])
     for i in range(bins.shape[0]-1):
-        mask_pos = (bin_indices == i) & (vr_full > 0) & (lnv2_full <= opt_param_dict["inf_vr_pos"]["b"][i])
-        mask_neg = (bin_indices == i) & (vr_full < 0) & (lnv2_full <= opt_param_dict["inf_vr_neg"]["b"][i])
+        mask_pos = (bin_indices == i) & (vr_test > 0) & (lnv2_test <= opt_param_dict["inf_vr_pos"]["b"][i])
+        mask_neg = (bin_indices == i) & (vr_test < 0) & (lnv2_test <= opt_param_dict["inf_vr_neg"]["b"][i])
         
         preds[mask_pos] = 1
         preds[mask_neg] = 1
 
-    calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=r_full, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds, prf_bins=bins, use_mp=True, all_z=all_z)
+    calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds, prf_bins=bins, use_mp=True, all_z=all_z)
 
     # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
     small_halo_fltr = np.isnan(calc_r200m)
@@ -319,7 +343,7 @@ if __name__ == "__main__":
     curr_halos_r200m_list = []
     past_halos_r200m_list = []                
             
-    for sim in use_sims:
+    for sim in curr_test_sims:
         config_dict = load_pickle(ML_dset_path + sim + "/config.pickle")
         p_snap = config_dict["p_snap_info"]["ptl_snap"][()]
         curr_z = config_dict["p_snap_info"]["red_shift"][()]
