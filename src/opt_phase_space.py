@@ -178,6 +178,12 @@ if __name__ == "__main__":
         "b_neg": 1.5101195108968333,
     }
     
+    #TODO load this from a file/config
+    width = 0.05
+    perc = 0.99
+    grad_lims = "0.2_0.5"
+    r_cut = 1.75  
+    
     #TODO make this a loop
     curr_test_sims = test_sims[0]
     test_comb_name = get_combined_name(curr_test_sims) 
@@ -228,7 +234,7 @@ if __name__ == "__main__":
 
                 mask_vr_neg = (vr_fit < 0)
                 mask_vr_pos = ~mask_vr_neg
-                mask_r = r_fit < 1.75
+                mask_r = r_fit < r_cut
                 
                 
             sparta_name, sparta_search_name = split_calc_name(curr_test_sims[0])
@@ -275,17 +281,11 @@ if __name__ == "__main__":
             sim_splits = np.where(halo_first == 0)[0]
         
             sparta_orb = np.where(sparta_labels_test == 1)[0]
-            sparta_inf = np.where(sparta_labels_test == 0)[0]
-    
-    #TODO load this from a file
-    width = 0.05
-    perc = 0.99
-    grad_lims = "0.2_0.5"
-    r_cut = 1.75       
+            sparta_inf = np.where(sparta_labels_test == 0)[0]     
     
     mask_vr_neg = (vr_test < 0)
     mask_vr_pos = ~mask_vr_neg
-    mask_r = r_fit < 1.75
+    mask_r = r_test < r_cut
         
     fltr_combs = {
         "orb_vr_neg": np.intersect1d(sparta_orb, np.where(mask_vr_neg)[0]),
