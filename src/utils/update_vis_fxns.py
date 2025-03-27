@@ -1583,11 +1583,11 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.savefig(plot_loc + title + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=300)    
         
 
-def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_orb_prfs, simp_inf_prfs, bins, lin_rticks, save_location, title="comb_ps_fits_", prf_func=np.nanmedian, split_name="\\nu", prf_name_0 = "Fitted Phase Space Cut", prf_name_1 = "SPARTA", prf_name_2 = "Phase Space Cut", prf_name_3 = "SPARTA"): 
+def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_orb_prfs, simp_inf_prfs, bins, lin_rticks, save_location, title="comb_ps_fits_", prf_func=np.nanmedian, split_name="\\nu", prf_name_0 = "Fitted Phase Space Cut", prf_name_1 = "SPARTA", prf_name_2 = "Line Phase Space Cut", prf_name_3 = "SPARTA"): 
     with timed("Compare Split Profiles"):
         # Parameters to tune sizes of plots and fonts
-        widths = [1,1]
-        heights = [1,0.5,1,0.5]
+        widths = [1,1,1,1]
+        heights = [1,0.5]
         titlefntsize=18
         axisfntsize=12
         textfntsize = 10
@@ -1595,24 +1595,24 @@ def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_
         legendfntsize=8
         fill_alpha = 0.2
             
-        fig = plt.figure(constrained_layout=True,figsize=(10,10))
+        fig = plt.figure(constrained_layout=True,figsize=(20,5))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
         
     
-        fit_orb_ax_0 = fig.add_subplot(gs[0,1])
-        fit_orb_ax_1 = fig.add_subplot(gs[1,1],sharex=fit_orb_ax_0)
-        fit_inf_ax_0 = fig.add_subplot(gs[0,2])
-        fit_inf_ax_1 = fig.add_subplot(gs[1,2],sharex=fit_inf_ax_0)
+        fit_orb_ax_0 = fig.add_subplot(gs[0,0])
+        fit_orb_ax_1 = fig.add_subplot(gs[1,0],sharex=fit_orb_ax_0)
+        fit_inf_ax_0 = fig.add_subplot(gs[0,1])
+        fit_inf_ax_1 = fig.add_subplot(gs[1,1],sharex=fit_inf_ax_0)
         
-        simp_orb_ax_0 = fig.add_subplot(gs[0,1],sharex=fit_orb_ax_0)
-        simp_orb_ax_1 = fig.add_subplot(gs[1,1],sharex=fit_orb_ax_0)
-        simp_inf_ax_0 = fig.add_subplot(gs[0,2],sharex=fit_inf_ax_0)
-        simp_inf_ax_1 = fig.add_subplot(gs[1,2],sharex=fit_inf_ax_0)
+        simp_orb_ax_0 = fig.add_subplot(gs[0,2],sharex=fit_orb_ax_0)
+        simp_orb_ax_1 = fig.add_subplot(gs[1,2],sharex=fit_orb_ax_0)
+        simp_inf_ax_0 = fig.add_subplot(gs[0,3],sharex=fit_inf_ax_0)
+        simp_inf_ax_1 = fig.add_subplot(gs[1,3],sharex=fit_inf_ax_0)
         
         fit_orb_cmap = plt.cm.Blues
         fit_inf_cmap = plt.cm.Greens
-        simp_orb_cmap = plt.cm.Purples
-        simp_inf_cmap = plt.cm.Oranges
+        simp_orb_cmap = plt.cm.Blues
+        simp_inf_cmap = plt.cm.Greens
         
         fit_orb_colors = [fit_orb_cmap(i) for i in np.linspace(0.3, 1, n_lines)]
         fit_inf_colors = [fit_inf_cmap(i) for i in np.linspace(0.3, 1, n_lines)]
@@ -1695,14 +1695,14 @@ def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_
             simp_inf_lb, = simp_inf_ax_0.plot(bins, simp_func_calc_inf_prfs, linestyle='-', color = simp_inf_colors[i], label = rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
              
     
-            fit_orb_plt_lines.append(orb_lb)
+            fit_orb_plt_lines.append(fit_orb_lb)
             fit_orb_plt_lbls.append(rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
-            fit_inf_plt_lines.append(inf_lb)
+            fit_inf_plt_lines.append(fit_inf_lb)
             fit_inf_plt_lbls.append(rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
             
-            simp_orb_plt_lines.append(orb_lb)
+            simp_orb_plt_lines.append(simp_orb_lb)
             simp_orb_plt_lbls.append(rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
-            simp_inf_plt_lines.append(inf_lb)
+            simp_inf_plt_lines.append(simp_inf_lb)
             simp_inf_plt_lbls.append(rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
             
             # Plot the SPARTA (actual) profiles 
@@ -1729,7 +1729,7 @@ def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_
         fit_orb_ax_0.set_xlim(0.05,np.max(lin_rticks))
         fit_orb_ax_0.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
         fit_orb_ax_0.tick_params(axis='x', which='both', labelbottom=False) # we don't want the labels just the tick marks
-        fit_orb_ax_0.tick_params(axis='y', which='both', labelleft=False)
+        fit_orb_ax_0.tick_params(axis='y', which='both')
         fit_orb_ax_0.legend(fit_orb_plt_lines,fit_orb_plt_lbls,fontsize=legendfntsize, loc = "upper right")
         fit_orb_ax_0.text(0.05,0.05, "Orbiting Particles", ha="left", va="bottom", transform=fit_orb_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
         
@@ -1779,8 +1779,10 @@ def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_
         simp_orb_ax_0.set_ylim(0.1, global_y_max)
         simp_inf_ax_0.set_ylim(0.1, global_y_max)
         
+        fit_orb_ax_0.set_ylabel(r"$\rho/\rho_m$")
         fit_orb_ax_1.set_ylabel(r"$\frac{\rho_{pred}}{\rho_{act}} - 1$", fontsize=axisfntsize)
-        simp_orb_ax_1.set_ylabel(r"$\frac{\rho_{pred}}{\rho_{act}} - 1$", fontsize=axisfntsize)
+        fit_orb_ax_1.set_ylabel(r"$r/R_{200m}$", fontsize=axisfntsize)
+        fit_inf_ax_1.set_ylabel(r"$r/R_{200m}$", fontsize=axisfntsize)
         simp_orb_ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
         simp_inf_ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
         
@@ -1817,7 +1819,7 @@ def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_
         fit_inf_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize, labelleft=False)
         
         simp_orb_ax_1.set_xticks(tick_locs,strng_ticks)
-        simp_orb_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
+        simp_orb_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize, labelleft=False)
         
         simp_inf_ax_1.set_xticks(tick_locs,strng_ticks)  
         simp_inf_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize, labelleft=False)

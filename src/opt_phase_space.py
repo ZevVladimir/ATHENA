@@ -331,11 +331,12 @@ if __name__ == "__main__":
         bin_indices = np.digitize(r_test, bins) - 1  
         preds = np.zeros(r_test.shape[0])
         for i in range(bins.shape[0]-1):
-            mask_pos = (bin_indices == i) & (vr_test > 0) & (lnv2_test <= opt_param_dict["inf_vr_pos"]["b"][i])
-            mask_neg = (bin_indices == i) & (vr_test < 0) & (lnv2_test <= opt_param_dict["inf_vr_neg"]["b"][i])
+            if bins[i] <= 3.0:
+                mask_pos = (bin_indices == i) & (vr_test > 0) & (lnv2_test <= opt_param_dict["inf_vr_pos"]["b"][i])
+                mask_neg = (bin_indices == i) & (vr_test < 0) & (lnv2_test <= opt_param_dict["inf_vr_neg"]["b"][i])
             
-            preds[mask_pos] = 1
-            preds[mask_neg] = 1
+                preds[mask_pos] = 1
+                preds[mask_neg] = 1
 
         calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds, prf_bins=bins, use_mp=True, all_z=all_z)
 

@@ -84,7 +84,8 @@ if __name__ == "__main__":
             sparta_orb = np.where(sparta_labels_test == 1)[0]
             sparta_inf = np.where(sparta_labels_test == 0)[0]
     else:
-        raise FileNotFoundError(f"Expected to find optimized parameters at {model_fldr_loc + "bin_fit_ps_cut_params.pickle"}")
+        raise FileNotFoundError(f"Expected to find optimized parameters at {os.path.join(model_fldr_loc, 'bin_fit_ps_cut_params.pickle')}")
+
             
     act_mass_prf_all, act_mass_prf_orb, all_masses, bins = load_sparta_mass_prf(sim_splits,all_idxs,curr_test_sims)
     act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb 
@@ -122,7 +123,7 @@ if __name__ == "__main__":
         bin_indices = np.digitize(r_test, bins) - 1  
         preds_fit_ps = np.zeros(r_test.shape[0])
         
-        mask_vr_neg = (vr < 0)
+        mask_vr_neg = (vr_test < 0)
         mask_vr_pos = ~mask_vr_neg
 
         #TODO load this from pickle
@@ -133,10 +134,10 @@ if __name__ == "__main__":
         "b_neg": 1.5101195108968333,
         }   
         
-        mask_cut_pos = (lnv2 < (ps_param_dict["m_pos"] * r + ps_param_dict["b_pos"])) & (r < 3.0)
+        mask_cut_pos = (lnv2_test < (ps_param_dict["m_pos"] * r_test + ps_param_dict["b_pos"])) & (r_test < 3.0)
 
         # Orbiting classification for vr < 0
-        mask_cut_neg = (lnv2 < (ps_param_dict["m_neg"] * r + ps_param_dict["b_neg"])) & (r < 3.0)
+        mask_cut_neg = (lnv2_test < (ps_param_dict["m_neg"] * r_test + ps_param_dict["b_neg"])) & (r_test < 3.0)
 
         # Particle is infalling if it is below both lines and 2*R00
         mask_orb = \
@@ -147,11 +148,12 @@ if __name__ == "__main__":
         preds_simp_ps[mask_orb] = 1
         
         for i in range(bins.shape[0]-1):
-            mask_pos = (bin_indices == i) & (vr_test > 0) & (lnv2_test <= opt_param_dict["inf_vr_pos"]["b"][i])
-            mask_neg = (bin_indices == i) & (vr_test < 0) & (lnv2_test <= opt_param_dict["inf_vr_neg"]["b"][i])
+            if bins[i] <= 3.0:
+                mask_pos = (bin_indices == i) & (vr_test > 0) & (lnv2_test <= opt_param_dict["inf_vr_pos"]["b"][i])
+                mask_neg = (bin_indices == i) & (vr_test < 0) & (lnv2_test <= opt_param_dict["inf_vr_neg"]["b"][i])
             
-            preds_fit_ps[mask_pos] = 1
-            preds_fit_ps[mask_neg] = 1
+                preds_fit_ps[mask_pos] = 1
+                preds_fit_ps[mask_neg] = 1
 
         fit_calc_mass_prf_all, fit_calc_mass_prf_orb, fit_calc_mass_prf_inf, fit_calc_nus, fit_calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds_fit_ps, prf_bins=bins, use_mp=True, all_z=all_z)
         simp_calc_mass_prf_all, simp_calc_mass_prf_orb, simp_calc_mass_prf_inf, simp_calc_nus, simp_calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds_simp_ps, prf_bins=bins, use_mp=True, all_z=all_z)
@@ -190,9 +192,9 @@ if __name__ == "__main__":
             if fit_fltr.shape[0] > 25:
                 fit_orb_prf_lst.append(filter_prf(fit_calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fit_fltr))
                 fit_inf_prf_lst.append(filter_prf(fit_calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fit_fltr))
-            elif simp_fltr.shape[0] > 25:
+            if simp_fltr.shape[0] > 25:
                 simp_orb_prf_lst.append(filter_prf(simp_calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,simp_fltr))
                 simp_inf_prf_lst.append(filter_prf(simp_calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,simp_fltr))
-            else:
+            if fit_fltr.shape[0] < 25 and simp_fltr.shape[0] < 25:
                 plt_nu_splits.remove(nu_split)        
         compare_split_prfs_ps(plt_nu_splits,len(cpy_plt_nu_splits),fit_orb_prf_lst,fit_inf_prf_lst,simp_orb_prf_lst,simp_inf_prf_lst,bins[1:],lin_rticks,plot_loc)
