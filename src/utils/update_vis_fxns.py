@@ -1448,16 +1448,16 @@ def plot_tree(bst,tree_num,save_loc):
     fig.savefig(save_loc + "/tree_plot.png")
 
 
-def plt_cust_ps_line(b,bins):
+def plt_cust_ps_line(b,bins,linewidth):
     for i in range(bins.shape[0]-1):
         x1 = bins[i]
         x2 = bins[i+1]
         y1 = b[i]
         y2 = b[i]
         if i == 0:
-            plt.plot([x1,x2],[y1,y2],lw=2.0, color="cyan", label="Bin-by-bin Phase-space Cut")
+            plt.plot([x1,x2],[y1,y2],lw=linewidth, color="cyan", label="Bin-by-bin Phase-space Cut")
         else:
-            plt.plot([x1,x2],[y1,y2],lw=2.0, color="cyan")
+            plt.plot([x1,x2],[y1,y2],lw=linewidth, color="cyan")
             
 def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut, plot_loc, title, cust_line_dict = None):
     m_pos = feat_dict["m_pos"]
@@ -1487,12 +1487,12 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
     log_vmin = 1
 
     legend_title_fntsize = 16
-    legend_fntsize = 12
-    axis_fntsize = 18
-    txt_fntsize = 14
-    tick_label_fntsize = 12
-    cbar_label_fntsize = 14
-    cbar_tick_fntsize = 8
+    legend_fntsize = 24
+    axis_fntsize = 34
+    txt_fntsize = 24
+    tick_label_fntsize = 24
+    cbar_label_fntsize = 26
+    cbar_tick_fntsize = 20
 
     with timed("SPARTA KE Dist plot"):
         magma_cmap = plt.get_cmap("magma")
@@ -1501,7 +1501,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         
         widths = [4,4,4,4,.5]
         heights = [4]
-        fig = plt.figure(constrained_layout=True, figsize=(24,6))
+        fig = plt.figure(constrained_layout=True, figsize=(36,9))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
 
         ax1 = fig.add_subplot(gs[0])
@@ -1520,82 +1520,83 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         ax2.tick_params('y', labelleft=False,colors="white",direction="in")
         ax3.tick_params('y', labelleft=False,colors="white",direction="in")
         ax4.tick_params('y', labelleft=False,colors="white",direction="in")
-        
 
-        for ax in axes:
-            ax.text(0.1, -4.0, "Orbiting According to\nPhase-space Cut", fontsize=txt_fntsize, color="r",
-                    weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-            ax.text(1.1, 2.9, "Infalling According to\nPhase-space Cut", fontsize=txt_fntsize, color="b",
-                    weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-            ax.tick_params(axis='both',which='both',labelcolor="black",colors="white",direction="in",labelsize=tick_label_fntsize,length=8,width=2)
+        line_width = 4.0
         
         plt.sca(axes[0])
         plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
-        plt.plot(x, y12, lw=2.0, color="g",
-                label="Phase Space Cut")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.plot(x, y12, lw=line_width, color="k",
+                label="OASIS")
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut",lw=line_width)
         if cust_line_dict is not None:
-            plt_cust_ps_line(b = cust_line_dict["orb_vr_pos"]["b"], bins = bins)
+            plt_cust_ps_line(b = cust_line_dict["orb_vr_pos"]["b"], bins = bins,linewidth=line_width)
         plt.legend(loc="lower left",fontsize=legend_fntsize)
-        plt.text(0.1,3.6,r"Orbiting Particles $v_r>0$"+"\nAccording to SPARTA",fontsize=txt_fntsize,weight="bold", bbox=dict(facecolor='w', alpha=0.75))
+        plt.text(0.05,3.6,r"Orbiting Particles $v_r>0$"+"\nAccording to SPARTA",fontsize=txt_fntsize,weight="bold", bbox=dict(facecolor='w', alpha=0.75))
         plt.xlim(0, 2)
         
         plt.sca(axes[1])
         plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
-        plt.plot(x, y12, lw=2.0, color="g",
-                label="Phase Space Cut")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.plot(x, y12, lw=line_width, color="k",
+                label="OASIS")
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut",lw=line_width)
         if cust_line_dict is not None:
-            plt_cust_ps_line(b = cust_line_dict["inf_vr_pos"]["b"], bins = bins)
+            plt_cust_ps_line(b = cust_line_dict["inf_vr_pos"]["b"], bins = bins,linewidth=line_width)
         plt.legend(loc="lower left",fontsize=legend_fntsize)
-        plt.text(0.1,3.6,r"Infalling Particles $v_r>0$"+"\nAccording to SPARTA",fontsize=txt_fntsize,weight="bold", bbox=dict(facecolor='w', alpha=0.75))
+        plt.text(0.05,3.6,r"Infalling Particles $v_r>0$"+"\nAccording to SPARTA",fontsize=txt_fntsize,weight="bold", bbox=dict(facecolor='w', alpha=0.75))
         plt.xlim(0, 2)
 
         plt.sca(axes[2])
         plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
-        plt.plot(x, y22, lw=2.0, color="g",
-                label="Phase Space Cut")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.plot(x, y22, lw=line_width, color="k",
+                label="OASIS")
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut",lw=line_width)
         if cust_line_dict is not None:
-            plt_cust_ps_line(b = cust_line_dict["orb_vr_neg"]["b"], bins = bins)
+            plt_cust_ps_line(b = cust_line_dict["orb_vr_neg"]["b"], bins = bins,linewidth=line_width)
         plt.legend(loc="lower left",fontsize=legend_fntsize)
-        plt.text(0.1,3.6,r"Orbiting Particles $v_r<0$"+"\nAccording to SPARTA",fontsize=txt_fntsize,weight="bold", bbox=dict(facecolor='w', alpha=0.75))
+        plt.text(0.05,3.6,r"Orbiting Particles $v_r<0$"+"\nAccording to SPARTA",fontsize=txt_fntsize,weight="bold", bbox=dict(facecolor='w', alpha=0.75))
         plt.xlim(0, 2)
         
         plt.sca(axes[3])
         plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
-        plt.plot(x, y22, lw=2.0, color="g",
-                label="Phase Space Cut")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.plot(x, y22, lw=line_width, color="k",
+                label="OASIS")
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut",lw=line_width)
         if cust_line_dict is not None:
-            plt_cust_ps_line(b = cust_line_dict["inf_vr_neg"]["b"], bins = bins)
+            plt_cust_ps_line(b = cust_line_dict["inf_vr_neg"]["b"], bins = bins,linewidth=line_width)
         plt.legend(loc="lower left",fontsize=legend_fntsize)
-        plt.text(0.1,3.6,r"Infalling Particles $v_r<0$"+"\nAccording to SPARTA",fontsize=txt_fntsize,weight="bold", bbox=dict(facecolor='w', alpha=0.75))
+        plt.text(0.05,3.6,r"Infalling Particles $v_r<0$"+"\nAccording to SPARTA",fontsize=txt_fntsize,weight="bold", bbox=dict(facecolor='w', alpha=0.75))
         cbar_log= plt.colorbar()
         cbar_log.ax.tick_params(labelsize=cbar_tick_fntsize)
         cbar_log.set_label(r'$N$ (Counts)', fontsize=cbar_label_fntsize)
         plt.xlim(0, 2)
-    
-        plt.savefig(plot_loc + title + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=300)    
+        
+        for ax in axes:
+            ax.text(0.1, -4.0, "Orbiting According to\nPhase-space Cut", fontsize=txt_fntsize, color="r",
+                    weight="bold", bbox=dict(facecolor='w', alpha=0.75))
+            ax.text(1.1, 2.4, "Infalling According to\nPhase-space Cut", fontsize=txt_fntsize, color="b",
+                    weight="bold", bbox=dict(facecolor='w', alpha=0.75))
+            ax.tick_params(axis='both',which='both',labelcolor="black",colors="white",direction="in",labelsize=tick_label_fntsize,length=8,width=2)
+
+        plt.savefig(plot_loc + title + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=400)    
         
 
-def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_orb_prfs, simp_inf_prfs, bins, lin_rticks, save_location, title="comb_ps_fits_", prf_func=np.nanmedian, split_name="\\nu", prf_name_0 = "Fitted Phase Space Cut", prf_name_1 = "SPARTA", prf_name_2 = "Line Phase Space Cut", prf_name_3 = "SPARTA"): 
+def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_orb_prfs, simp_inf_prfs, bins, lin_rticks, save_location, title="comb_ps_fits_", prf_func=np.nanmedian, split_name="\\nu", prf_name_0 = "Fitted Phase Space Cut", prf_name_1 = "SPARTA", prf_name_2 = "OASIS Phase Space Cut", prf_name_3 = "SPARTA"): 
     with timed("Compare Split Profiles"):
         # Parameters to tune sizes of plots and fonts
         widths = [1,1,1,1]
         heights = [1,0.5]
         titlefntsize=18
-        axisfntsize=12
-        textfntsize = 10
-        tickfntsize=10
-        legendfntsize=8
+        axisfntsize=22
+        textfntsize = 18
+        tickfntsize=16
+        legendfntsize=14
         fill_alpha = 0.2
             
-        fig = plt.figure(constrained_layout=True,figsize=(20,5))
+        fig = plt.figure(constrained_layout=True,figsize=(24,8))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
         
     
@@ -1779,10 +1780,10 @@ def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_
         simp_orb_ax_0.set_ylim(0.1, global_y_max)
         simp_inf_ax_0.set_ylim(0.1, global_y_max)
         
-        fit_orb_ax_0.set_ylabel(r"$\rho/\rho_m$")
+        fit_orb_ax_0.set_ylabel(r"$\rho/\rho_m$", fontsize=axisfntsize)
         fit_orb_ax_1.set_ylabel(r"$\frac{\rho_{pred}}{\rho_{act}} - 1$", fontsize=axisfntsize)
-        fit_orb_ax_1.set_ylabel(r"$r/R_{200m}$", fontsize=axisfntsize)
-        fit_inf_ax_1.set_ylabel(r"$r/R_{200m}$", fontsize=axisfntsize)
+        fit_orb_ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
+        fit_inf_ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
         simp_orb_ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
         simp_inf_ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
         

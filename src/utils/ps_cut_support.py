@@ -17,12 +17,13 @@ import scipy.ndimage as ndimage
 from sparta_tools import sparta
 
 from utils.ML_support import load_data, get_combined_name, reform_dataset_dfs, parse_ranges, split_calc_name
-from utils.data_and_loading_functions import timed, load_pickle, load_SPARTA_data, load_config
+from utils.data_and_loading_functions import timed, load_pickle, load_SPARTA_data, load_config, load_RSTAR_data, depair_np
 
 config_dict = load_config(os.getcwd() + "/config.ini")
 
 ML_dset_path = config_dict["PATHS"]["ml_dset_path"]
 SPARTA_output_path = config_dict["SPARTA_DATA"]["sparta_output_path"]
+rockstar_ctlgs_path = config_dict["PATHS"]["rockstar_ctlgs_path"]
 
 test_sims = config_dict["EVAL_MODEL"]["test_sims"]
 eval_datasets = config_dict["EVAL_MODEL"]["eval_datasets"]
@@ -55,7 +56,10 @@ else:
     
 def halo_select(sims, ptl_data):
     curr_tot_nptl = 0
+    curr_halo_start = 0
     all_row_idxs = []
+    hipids = ptl_data["HIPIDS"].compute().to_numpy()
+    all_pids, ptl_halo_idxs = depair_np(hipids)
     # For each simulation we will search through the largest halos and determine if they dominate their region and only choose those ones
     for sim in sims:
         # Get the numnber of particles per halo and use this to sort the halos such that the largest is first
@@ -110,9 +114,31 @@ def halo_select(sims, ptl_data):
 
         halos_pos = sparta_params[sparta_param_names[0]][:,p_sparta_snap,:] * 10**3 * p_scale_factor # convert to kpc/h
         halos_r200m = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
+        curr_halos_ids = sparta_params[sparta_param_names[2]][:,p_sparta_snap]
         
         use_halo_pos = halos_pos[all_idxs]
         use_halo_r200m = halos_r200m[all_idxs]
+        
+        rstar_params = ["id(1)","R200b(11)"]
+        rstar_data = load_RSTAR_data(rockstar_ctlgs_path + sparta_name, rstar_params, curr_z)
+        
+        
+        halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
+        all_idxs = halo_ddf["Halo_indices"].values
+        halo_first = halo_ddf["Halo_first"].values + curr_halo_start
+        halo_n = halo_ddf["Halo_n"].values
+        curr_halo_start = curr_halo_start + np.sum(halo_n) # always increment even if this halo isn't going to be coutned
+        
+        # we construct the r200b array to match the halo_id array from sparta such that we can accurately index which r200b belongs to each halo
+        id_to_r200b = dict(zip(rstar_data["id(1)"], rstar_data["R200b(11)"]))
+        curr_r200b = np.array([id_to_r200b[i] for i in all_idxs])
+        
+        sim_r200b_list = []
+        for i in range(halo_n.size):
+            idxs = ptl_halo_idxs[halo_first[i]:halo_first[i]+halo_n[i]]
+            sim_r200b_list.append(curr_r200b[idxs])
+
+        sim_r200b = np.concatenate(sim_r200b_list)
         
         # Construct a search tree of halo positions
         curr_halo_tree = cKDTree(data = use_halo_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size)
@@ -123,7 +149,7 @@ def halo_select(sims, ptl_data):
         
         # For each massive halo search the area around the halo to determine if there are any halos that are more than 20% the size of this halo
         for i in range(max_nhalo):
-            curr_halo_indices = curr_halo_tree.query_ball_point(use_halo_pos[i], r = 2 * use_halo_r200m[i])
+            curr_halo_indices = curr_halo_tree.query_ball_point(use_halo_pos[i], r = 2 * sim_r200b[i])
             curr_halo_indices = np.array(curr_halo_indices)
             
             # The search will return the same halo that we are searching so we remove that
@@ -132,12 +158,13 @@ def halo_select(sims, ptl_data):
             
             # If the largest halo nearby isn't large enough we will consider this halo's particles for our datasets
             if surr_n_ptls.size == 0 or np.max(surr_n_ptls) < 0.2 * n_ptls[i]:
+                print(sim_r200b[i],use_halo_r200m[i])
                 row_indices = list(range(
                     halo_first[i],
                     halo_first[i] + halo_n[i]
                 ))
                 all_row_idxs.extend(row_indices)
-                curr_tot_nptl += halo_n[i]
+                curr_tot_nptl += np.sum(halo_n)
                 
             # Once we have 10,000,000 particles we are done
             # if curr_tot_nptl > 1000000:
@@ -177,23 +204,24 @@ def load_ps_data(client, curr_test_sims = ["cbol_l1000_n1024_4r200m_1-5v200m_99t
     
     return r, vr, lnv2, sparta_labels, samp_data, data, halo_df
 
-def ps_predictor(feat_dict, r, vr, lnv2):
+# For prediction we use the bound radius as OASIS does this
+def ps_predictor(feat_dict, r_r200b, vr, lnv2):
     m_pos = feat_dict["m_pos"]
     b_pos = feat_dict["b_pos"]
     m_neg = feat_dict["m_neg"]
     b_neg = feat_dict["b_neg"]
     
-    preds = np.zeros(r.shape[0].compute())
+    preds = np.zeros(r_r200b.shape[0].compute())
     
     mask_vr_neg = (vr < 0)
     mask_vr_pos = ~mask_vr_neg
 
-    mask_cut_pos = (lnv2 < (m_pos * r + b_pos)) & (r < 3.0)
+    mask_cut_pos = (lnv2 < (m_pos * r_r200b + b_pos)) & (r_r200b < 2.0)
 
     # Orbiting classification for vr < 0
-    mask_cut_neg = (lnv2 < (m_neg * r + b_neg)) & (r < 3.0)
+    mask_cut_neg = (lnv2 < (m_neg * r_r200b + b_neg)) & (r_r200b < 2.0)
 
-    # Particle is infalling if it is below both lines and 2*R00
+    # Particle is infalling if it is below both lines and 2*R00b
     mask_orb = \
     (mask_cut_pos & mask_vr_pos) ^ \
     (mask_cut_neg & mask_vr_neg)

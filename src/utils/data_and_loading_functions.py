@@ -76,6 +76,20 @@ def clean_dir(path):
     except OSError:
         print("Error occurred while deleting files at location:",path)
 
+# Depairs the hipids into (pids, halo_idxs) We use np.vectorize because depair returns two values and we want that split in two
+def depair_np(z):
+    """
+    Modified from https://github.com/perrygeo/pairing to use numpy functions
+    Inverse of Cantor pairing function
+    http://en.wikipedia.org/wiki/Pairing_function#Inverting_the_Cantor_pairing_function
+    """
+    w = np.floor((np.sqrt(8 * z + 1) - 1)/2)
+    t = (w**2 + w) / 2
+    y = (z - t).astype(int)
+    x = (w - y).astype(int)
+    # assert z != pair(x, y, safe=False):
+    return x, y
+
 # Obtains the highest number snapshot in the given folder path
 # We can't just get the total number of folders as there might be snapshots missing
 def get_num_snaps(path):
@@ -135,6 +149,36 @@ def load_SPARTA_data(sparta_HDF5_path, param_path_list, sparta_name, snap, halo_
         param_dict[save_name] = param
     
     return param_dict,all_save_names
+
+def load_RSTAR_data(rockstar_loc, param_list, curr_z):
+    rstar_file_loc = find_closest_z_rstar(curr_z, rockstar_loc)
+    
+    param_data = {param: [] for param in param_list}
+    col_index_map = {}
+
+    with open(rstar_file_loc, 'r') as f:
+        for line in f:
+            if line.startswith('#'):
+                # Only parse the column names once
+                if not col_index_map:
+                    header = line[1:].strip().split()
+                    for i, entry in enumerate(header):
+                        name = entry.split('(')[0]
+                        col_index_map[name] = i
+                continue  # Skip all header lines
+
+
+            # Split data line and collect requested values
+            parts = line.split()
+            for param in param_list:
+                idx = col_index_map.get(param)
+                if idx is not None and len(parts) > idx:
+                    param_data[param].append(float(parts[idx]))
+
+    for param in param_list:
+        param_data[param] = np.array(param_data[param])
+
+    return param_data
 
 def split_dataset_by_mass(halo_first, halo_n, path_to_dataset, curr_dataset):
     with h5py.File((path_to_dataset), 'r') as all_ptl_properties:
@@ -210,7 +254,7 @@ def split_data_by_halo(client,frac, halo_props, ptl_data, return_halo=False):
     else:
         return ptl_1, ptl_2
     
-def find_closest_z(value,snap_loc,snap_dir_format,snap_format):
+def find_closest_z_snap(value,snap_loc,snap_dir_format,snap_format):
     tot_num_snaps = get_num_snaps(snap_loc)
     all_z = np.ones(tot_num_snaps) * -1000
     for i in range(tot_num_snaps):
@@ -220,6 +264,18 @@ def find_closest_z(value,snap_loc,snap_dir_format,snap_format):
 
     idx = (np.abs(all_z - value)).argmin()
     return idx, all_z[idx]
+
+# Returns the path of the rockstar file that has the closest redshift to the inputted value
+def find_closest_z_rstar(value,rockstar_loc):
+    all_z = []
+    for filename in os.listdir(rockstar_loc):
+        match = re.search(r"hlist_(\d+\.\d+)\.list", filename)
+        if match:
+            z_val = float(match.group(1))
+            all_z.append(z_val)
+
+    idx = (np.abs(all_z - value)).argmin()
+    return rockstar_loc + "hlist_" + str(all_z[idx]) + ".list"
 
 def find_closest_snap(value, cosmology, snap_loc, snap_dir_format, snap_format):
     tot_num_snaps = get_num_snaps(snap_loc)
@@ -275,4 +331,5 @@ def parse_ranges(ranges_str):
     return ranges
 def create_nu_string(nu_list):
     return '_'.join('-'.join(map(str, tup)) for tup in nu_list)
+
 

@@ -20,13 +20,14 @@ from sparta_tools import sparta
 from utils.calculation_functions import create_stack_mass_prf, filter_prf, calculate_density, calc_mass_acc_rate
 from utils.update_vis_fxns import compare_split_prfs
 from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, parse_ranges, load_sparta_mass_prf, split_calc_name, sim_mass_p_z, get_model_name
-from utils.data_and_loading_functions import create_directory, timed, load_pickle, load_SPARTA_data, conv_halo_id_spid, load_config
+from utils.data_and_loading_functions import create_directory, timed, load_pickle, load_SPARTA_data, conv_halo_id_spid, load_config, load_RSTAR_data, depair_np
 from utils.ps_cut_support import load_ps_data
 
 config_dict = load_config(os.getcwd() + "/config.ini")
 
 ML_dset_path = config_dict["PATHS"]["ml_dset_path"]
 path_to_models = config_dict["PATHS"]["path_to_models"]
+rockstar_ctlgs_path = config_dict["PATHS"]["rockstar_ctlgs_path"]
 
 SPARTA_output_path = config_dict["SPARTA_DATA"]["sparta_output_path"]
 
@@ -257,11 +258,13 @@ if __name__ == "__main__":
     # lnv2 = lnv2.to_numpy()
     # sparta_labels = sparta_labels.to_numpy()
     
-    r = my_data["p_Scaled_radii"].compute().to_numpy()
+    r_r200m = my_data["p_Scaled_radii"].compute().to_numpy()
     vr = my_data["p_Radial_vel"].compute().to_numpy()
     vt = my_data["p_Tangential_vel"].compute().to_numpy()
     vphys = my_data["p_phys_vel"].compute().to_numpy()
     sparta_labels = my_data["Orbit_infall"].compute().to_numpy()
+    hipids = my_data["HIPIDS"].compute().to_numpy()
+    all_pids, ptl_halo_idxs = depair_np(hipids)
     lnv2 = np.log(vphys**2)
     
     c_r = my_data["c_Scaled_radii"].compute().to_numpy()
@@ -270,10 +273,59 @@ if __name__ == "__main__":
     
     sparta_orb = np.where(sparta_labels == 1)[0]
     sparta_inf = np.where(sparta_labels == 0)[0]
+    
+    all_r200b_list = []
+    all_r200m_list = []
+    rstar_params = ["id(1)","R200b(11)"]
+    sparta_param_paths = [["halos","R200m"],["halos","id"]]
+    curr_halo_start = 0
+    for sim in curr_test_sims:
+        with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
+                config_dict = pickle.load(file)
+                curr_z = config_dict["p_snap_info"]["red_shift"][()]
+                p_snap = config_dict["p_snap_info"]["ptl_snap"][()]
+                p_sparta_snap = config_dict["p_snap_info"]["sparta_snap"][()]
+                
+        sparta_name, sparta_search_name = split_calc_name(sim)
+        curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
+        
+        rstar_data = load_RSTAR_data(rockstar_ctlgs_path + sparta_name, rstar_params, curr_z)
+        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, sparta_param_paths, sparta_search_name, p_snap)
+        
+        curr_r200m = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
+        curr_halos_ids = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
+        
+        halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
+        all_idxs = halo_ddf["Halo_indices"].values
+        halo_first = halo_ddf["Halo_first"].values + curr_halo_start
+        halo_n = halo_ddf["Halo_n"].values
+        curr_halo_start = curr_halo_start + np.sum(halo_n)
+        
+        # we construct the r200b array to match the halo_id array from sparta such that we can accurately index which r200b belongs to each halo
+        id_to_r200b = dict(zip(rstar_data["id(1)"], rstar_data["R200b(11)"]))
+        curr_r200b = np.array([id_to_r200b[i] for i in all_idxs])
+        
+        sim_r200b_list = []
+        sim_r200m_list = []
+        for i in range(halo_n.size):
+            idxs = ptl_halo_idxs[halo_first[i]:halo_first[i]+halo_n[i]]
+            sim_r200b_list.append(curr_r200b[idxs])
+            sim_r200m_list.append(curr_r200m[idxs])
+
+        sim_r200b = np.concatenate(sim_r200b_list)
+        sim_r200m = np.concatenate(sim_r200m_list)
+        
+        all_r200b_list.append(sim_r200b)
+        all_r200m_list.append(sim_r200m)
+    
+    all_ptl_r200b = np.concatenate(all_r200b_list)
+    all_ptl_r200m = np.concatenate(all_r200m_list)
+    
+    unscale_r = r_r200m * all_ptl_r200m
+    r_r200b = unscale_r / all_ptl_r200b
 
     mask_vr_neg = (vr < 0)
     mask_vr_pos = ~mask_vr_neg
-    mask_r = r < 1.75
     
     fltr_combs = {
     "orb_vr_neg": np.intersect1d(sparta_orb, np.where(mask_vr_neg)[0]),
@@ -304,10 +356,10 @@ if __name__ == "__main__":
     x_range = (0, 3)
     y_range = (-2, 2.5)
 
-    hist1, xedges, yedges = np.histogram2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, range=(x_range, y_range))
-    hist2, _, _ = np.histogram2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, range=(x_range, y_range))
-    hist3, _, _ = np.histogram2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, range=(x_range, y_range))
-    hist4, _, _ = np.histogram2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, range=(x_range, y_range))
+    hist1, xedges, yedges = np.histogram2d(r_r200m[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, range=(x_range, y_range))
+    hist2, _, _ = np.histogram2d(r_r200m[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, range=(x_range, y_range))
+    hist3, _, _ = np.histogram2d(r_r200m[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, range=(x_range, y_range))
+    hist4, _, _ = np.histogram2d(r_r200m[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, range=(x_range, y_range))
 
     # Combine the histograms to determine the maximum density for consistent color scaling
     combined_hist = np.maximum.reduce([hist1, hist2, hist3, hist4])
@@ -376,7 +428,7 @@ if __name__ == "__main__":
 
         plt.sca(axes[0])
         plt.title("Orbiting Particles: "r'$v_r > 0$',fontsize=title_fntsize)
-        plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
+        plt.hist2d(r_r200m[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y12, lw=2.0, color="g",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
@@ -387,7 +439,7 @@ if __name__ == "__main__":
 
         plt.sca(axes[1])
         plt.title("Orbiting Particles: "r'$v_r < 0$',fontsize=title_fntsize)
-        plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
+        plt.hist2d(r_r200m[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="g",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
@@ -398,7 +450,7 @@ if __name__ == "__main__":
         
         plt.sca(axes[2])
         plt.title("Infalling Particles: "r'$v_r > 0$',fontsize=title_fntsize)
-        plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
+        plt.hist2d(r_r200m[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y12, lw=2.0, color="g",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
@@ -409,7 +461,7 @@ if __name__ == "__main__":
 
         plt.sca(axes[3])
         plt.title("Infalling Particles: "r'$v_r < 0$',fontsize=title_fntsize)
-        plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
+        plt.hist2d(r_r200m[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="g",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
@@ -422,7 +474,7 @@ if __name__ == "__main__":
         plt.ylim(-2.2, 2.5)
         
         plt.sca(axes[4])
-        plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
+        plt.hist2d(r_r200m[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y12, lw=2.0, color="g",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
@@ -432,7 +484,7 @@ if __name__ == "__main__":
         plt.ylim(-2.2, 2.5)
 
         plt.sca(axes[5])
-        plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
+        plt.hist2d(r_r200m[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="g",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
@@ -442,7 +494,7 @@ if __name__ == "__main__":
         plt.ylim(-2.2, 2.5)
 
         plt.sca(axes[6])
-        plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
+        plt.hist2d(r_r200m[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y12, lw=2.0, color="g",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
@@ -452,7 +504,7 @@ if __name__ == "__main__":
         plt.ylim(-2.2, 2.5)
 
         plt.sca(axes[7])
-        plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
+        plt.hist2d(r_r200m[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="g",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
@@ -485,7 +537,7 @@ if __name__ == "__main__":
 
         plt.sca(axes[0])
         plt.title(r'$v_r > 0$',fontsize=title_fntsize)
-        plt.hist2d(r[mask_vr_pos], lnv2[mask_vr_pos], bins=nbins,
+        plt.hist2d(r_r200m[mask_vr_pos], lnv2[mask_vr_pos], bins=nbins,
                     cmap="terrain", range=(x_range, y_range))
         plt.plot(x, y12, lw=2.0, color="k",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
@@ -497,7 +549,7 @@ if __name__ == "__main__":
 
         plt.sca(axes[1])
         plt.title(r'$v_r < 0$',fontsize=title_fntsize)
-        plt.hist2d(r[mask_vr_neg], lnv2[mask_vr_neg], bins=nbins,
+        plt.hist2d(r_r200m[mask_vr_neg], lnv2[mask_vr_neg], bins=nbins,
                     cmap="terrain", range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="k",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
@@ -508,7 +560,7 @@ if __name__ == "__main__":
         
         plt.sca(axes[2])
         plt.title(r'$v_r > 0$',fontsize=title_fntsize)
-        h3 = plt.hist2d(r[mask_vr_pos], lnv2[mask_vr_pos], bins=nbins, norm="log",
+        h3 = plt.hist2d(r_r200m[mask_vr_pos], lnv2[mask_vr_pos], bins=nbins, norm="log",
                     cmap="terrain", range=(x_range, y_range))
         plt.plot(x, y12, lw=2.0, color="k",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
@@ -519,7 +571,7 @@ if __name__ == "__main__":
 
         plt.sca(axes[3])
         plt.title(r'$v_r < 0$',fontsize=title_fntsize)
-        h4 = plt.hist2d(r[mask_vr_neg], lnv2[mask_vr_neg], bins=nbins, norm="log",
+        h4 = plt.hist2d(r_r200m[mask_vr_neg], lnv2[mask_vr_neg], bins=nbins, norm="log",
                     cmap="terrain", range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="k",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
@@ -533,7 +585,7 @@ if __name__ == "__main__":
 
         # Compute density and gradient.
         # For vr > 0
-        hist_zp, hist_xp, hist_yp = np.histogram2d(r[mask_vrp], lnv2[mask_vrp], 
+        hist_zp, hist_xp, hist_yp = np.histogram2d(r_r200m[mask_vrp], lnv2[mask_vrp], 
                                                     bins=nbins, 
                                                     range=((0, 3.), (-2, 2.5)),
                                                     density=True)
@@ -553,7 +605,7 @@ if __name__ == "__main__":
         hist_zp = ndimage.gaussian_filter(hist_z_grad, 2.0)
 
         # Same for vr < 0
-        hist_zn, hist_xn, hist_yn = np.histogram2d(r[mask_vrn], lnv2[mask_vrn],
+        hist_zn, hist_xn, hist_yn = np.histogram2d(r_r200m[mask_vrn], lnv2[mask_vrn],
                                                     bins=nbins,
                                                     range=((0, 3.), (-2, 2.5)),
                                                     density=True)
@@ -588,12 +640,12 @@ if __name__ == "__main__":
         plt.savefig(plot_loc + "perc_" + str(perc) + "_" + grad_lims + "_KE_dist_cut.png")
         
     # Orbiting classification for vr > 0
-    mask_cut_pos = (lnv2 < (m_pos * r + b_pos)) & (r < 3.0)
+    mask_cut_pos = (lnv2 < (m_pos * r_r200b + b_pos)) & (r_r200b < 2.0)
 
     # Orbiting classification for vr < 0
-    mask_cut_neg = (lnv2 < (m_neg * r + b_neg)) & (r < 3.0)
+    mask_cut_neg = (lnv2 < (m_neg * r_r200b + b_neg)) & (r_r200b < 2.0)
 
-    # Particle is infalling if it is below both lines and 3*R00
+    # Particle is infalling if it is below both lines and 2*R00b
     mask_orb = \
     (mask_cut_pos & mask_vr_pos) ^ \
     (mask_cut_neg & mask_vr_neg)
@@ -612,12 +664,12 @@ if __name__ == "__main__":
 
         plt.sca(axes[0])
         plt.title('Orbiting')
-        plt.hist2d(r[mask_orb], vr[mask_orb], bins=nbins, range=(x_range, y_range), cmap='terrain')
+        plt.hist2d(r_r200m[mask_orb], vr[mask_orb], bins=nbins, range=(x_range, y_range), cmap='terrain')
         plt.colorbar(label=r'$N$ (Counts)')
 
         plt.sca(axes[1])
         plt.title('Infalling')
-        plt.hist2d(r[~mask_orb], vr[~mask_orb], bins=nbins, range=(x_range, y_range), cmap='terrain')
+        plt.hist2d(r_r200m[~mask_orb], vr[~mask_orb], bins=nbins, range=(x_range, y_range), cmap='terrain')
         plt.colorbar(label=r'$N$ (Counts)')
 
         plt.tight_layout()
@@ -630,7 +682,7 @@ if __name__ == "__main__":
         print("Testing on:", curr_test_sims)
         # Loop through and/or for Train/Test/All datasets and evaluate the model
         
-        r = my_data["p_Scaled_radii"]
+        r_r200m = my_data["p_Scaled_radii"]
         vr = my_data["p_Radial_vel"]
         vphys = my_data["p_phys_vel"]
         lnv2 = np.log(vphys**2)
@@ -638,10 +690,10 @@ if __name__ == "__main__":
         mask_vr_neg = (vr < 0)
         mask_vr_pos = ~mask_vr_neg
 
-        mask_cut_pos = (lnv2 < (m_pos * r + b_pos)) & (r < 3.0)
+        mask_cut_pos = (lnv2 < (m_pos * r_r200b + b_pos)) & (r_r200b < 2.0)
 
         # Orbiting classification for vr < 0
-        mask_cut_neg = (lnv2 < (m_neg * r + b_neg)) & (r < 3.0)
+        mask_cut_neg = (lnv2 < (m_neg * r_r200b + b_neg)) & (r_r200b < 2.0)
 
         # Particle is infalling if it is below both lines and 2*R00
         mask_orb = \
