@@ -172,7 +172,7 @@ def calibrate_finder(
         [0.2, 0.5]
     """
     # MODIFY this line if needed ======================
-    r, vr, lnv2, sparta_labels, my_data, halo_df = load_ps_data(client)
+    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client)
 
     # =================================================
 
@@ -251,7 +251,7 @@ if __name__ == "__main__":
     grad_lims = "0.2_0.5"
     r_cut = 1.75
 
-    r, vr, lnv2, sparta_labels, my_data, halo_df = load_ps_data(client, test_sims[0])
+    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client, test_sims[0])
     
     # r = r.to_numpy()
     # vr = vr.to_numpy()
@@ -297,22 +297,25 @@ if __name__ == "__main__":
         
         halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
         all_idxs = halo_ddf["Halo_indices"].values
-        halo_first = halo_ddf["Halo_first"].values + curr_halo_start
+        halo_first = halo_ddf["Halo_first"].values
         halo_n = halo_ddf["Halo_n"].values
         curr_halo_start = curr_halo_start + np.sum(halo_n)
         
         # we construct the r200b array to match the halo_id array from sparta such that we can accurately index which r200b belongs to each halo
         id_to_r200b = dict(zip(rstar_data["id(1)"], rstar_data["R200b(11)"]))
-        curr_r200b = np.array([id_to_r200b[i] for i in all_idxs])
-        
+
         sim_r200b_list = []
         sim_r200m_list = []
         for i in range(halo_n.size):
-            idxs = ptl_halo_idxs[halo_first[i]:halo_first[i]+halo_n[i]]
-            sim_r200b_list.append(curr_r200b[idxs])
-            sim_r200m_list.append(curr_r200m[idxs])
+            curr_idxs = ptl_halo_idxs[halo_first[i]:halo_first[i]+halo_n[i]]
+            sim_r200b_list.append(np.array([id_to_r200b[curr_halos_ids[idx]] for idx in curr_idxs]))
+            sim_r200m_list.append(curr_r200m[curr_idxs])
 
+        config_dict = load_pickle(ML_dset_path + sim + "/config.pickle")
+        p_scale_factor = config_dict["p_snap_info"]["scale_factor"][()]
+        
         sim_r200b = np.concatenate(sim_r200b_list)
+        sim_r200b = sim_r200b * p_scale_factor # conver to kpc/h physical
         sim_r200m = np.concatenate(sim_r200m_list)
         
         all_r200b_list.append(sim_r200b)

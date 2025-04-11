@@ -76,8 +76,6 @@ def halo_select(sims, ptl_data):
         p_box_size = config_dict["p_snap_info"]["box_size"][()]
         p_scale_factor = config_dict["p_snap_info"]["scale_factor"][()]
         
-        # ptl_mass, use_z = sim_mass_p_z(sim,config_dict)
-        
         # split all indices into train and test groups
         split_pnt = int((1-test_halos_ratio) * total_num_halos)
         test_idxs = match_halo_idxs[split_pnt:]
@@ -87,19 +85,6 @@ def halo_select(sims, ptl_data):
         test_idxs_inds = test_idxs.argsort()
         test_idxs = test_idxs[test_idxs_inds]
         test_num_ptls = test_num_ptls[test_idxs_inds]
-        
-        order_halo = np.argsort(test_num_ptls)[::-1]
-        n_ptls = test_num_ptls[order_halo]
-        
-        # Load which particles belong to which halo and then sort them corresponding to the size of the halos again
-        halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
-        all_idxs = halo_ddf["Halo_indices"].values
-        halo_n = halo_ddf["Halo_n"].values
-        halo_first = halo_ddf["Halo_first"].values
-        
-        all_idxs = all_idxs[order_halo]
-        halo_n = halo_n[order_halo]
-        halo_first = halo_first[order_halo]
         
         sparta_name, sparta_search_name = split_calc_name(sim)
         
@@ -112,7 +97,7 @@ def halo_select(sims, ptl_data):
         param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"],["simulation","particle_mass"]]
         sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, p_snap)
 
-        halos_pos = sparta_params[sparta_param_names[0]][:,p_sparta_snap,:] * 10**3 * p_scale_factor # convert to kpc/h
+        halos_pos = sparta_params[sparta_param_names[0]][:,p_sparta_snap,:] * 10**3 * p_scale_factor # convert to kpc/h physical
         halos_r200m = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
         curr_halos_ids = sparta_params[sparta_param_names[2]][:,p_sparta_snap]
         
@@ -122,30 +107,37 @@ def halo_select(sims, ptl_data):
         rstar_params = ["id(1)","R200b(11)"]
         rstar_data = load_RSTAR_data(rockstar_ctlgs_path + sparta_name, rstar_params, curr_z)
         
-        
         halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
         all_idxs = halo_ddf["Halo_indices"].values
-        halo_first = halo_ddf["Halo_first"].values + curr_halo_start
+        halo_first = halo_ddf["Halo_first"].values
         halo_n = halo_ddf["Halo_n"].values
-        curr_halo_start = curr_halo_start + np.sum(halo_n) # always increment even if this halo isn't going to be coutned
+        curr_halo_start = curr_halo_start + np.sum(halo_n) # always increment even if this halo isn't going to be counted
         
         # we construct the r200b array to match the halo_id array from sparta such that we can accurately index which r200b belongs to each halo
         id_to_r200b = dict(zip(rstar_data["id(1)"], rstar_data["R200b(11)"]))
-        curr_r200b = np.array([id_to_r200b[i] for i in all_idxs])
         
         sim_r200b_list = []
         for i in range(halo_n.size):
-            idxs = ptl_halo_idxs[halo_first[i]:halo_first[i]+halo_n[i]]
-            sim_r200b_list.append(curr_r200b[idxs])
+            curr_idxs = ptl_halo_idxs[halo_first[i]:halo_first[i]+halo_n[i]]
+            sim_r200b_list.append(np.array([id_to_r200b[curr_halos_ids[idx]] for idx in curr_idxs]))
 
         sim_r200b = np.concatenate(sim_r200b_list)
+        sim_r200b = sim_r200b * p_scale_factor # conver to kpc/h physical
         
         # Construct a search tree of halo positions
         curr_halo_tree = cKDTree(data = use_halo_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size)
         
         max_nhalo = 500
+        
+        order_halo = np.argsort(test_num_ptls)[::-1]
+        n_ptls = test_num_ptls[order_halo]
         if order_halo.shape[0] < max_nhalo:
             max_nhalo = order_halo.shape[0]
+        
+        # Load which particles belong to which halo and then sort them corresponding to the size of the halos again
+        all_idxs = all_idxs[order_halo]
+        halo_n = halo_n[order_halo]
+        halo_first = halo_first[order_halo]
         
         # For each massive halo search the area around the halo to determine if there are any halos that are more than 20% the size of this halo
         for i in range(max_nhalo):

@@ -151,7 +151,7 @@ def load_SPARTA_data(sparta_HDF5_path, param_path_list, sparta_name, snap, halo_
     return param_dict,all_save_names
 
 def load_RSTAR_data(rockstar_loc, param_list, curr_z):
-    rstar_file_loc = find_closest_z_rstar(curr_z, rockstar_loc)
+    rstar_file_loc = find_closest_a_rstar(curr_z, rockstar_loc)
     
     param_data = {param: [] for param in param_list}
     col_index_map = {}
@@ -266,16 +266,17 @@ def find_closest_z_snap(value,snap_loc,snap_dir_format,snap_format):
     return idx, all_z[idx]
 
 # Returns the path of the rockstar file that has the closest redshift to the inputted value
-def find_closest_z_rstar(value,rockstar_loc):
-    all_z = []
+def find_closest_a_rstar(z,rockstar_loc):
+    all_a = []
     for filename in os.listdir(rockstar_loc):
         match = re.search(r"hlist_(\d+\.\d+)\.list", filename)
         if match:
-            z_val = float(match.group(1))
-            all_z.append(z_val)
+            a_val = float(match.group(1))
+            all_a.append(a_val)
 
-    idx = (np.abs(all_z - value)).argmin()
-    return rockstar_loc + "hlist_" + str(all_z[idx]) + ".list"
+    idx = (np.abs(all_a - 1/(1+z))).argmin()
+    print(rockstar_loc + "/hlist_" + str(all_a[idx]) + ".list")
+    return rockstar_loc + "/hlist_" + str(all_a[idx]) + ".list"
 
 def find_closest_snap(value, cosmology, snap_loc, snap_dir_format, snap_format):
     tot_num_snaps = get_num_snaps(snap_loc)
