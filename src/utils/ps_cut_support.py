@@ -94,38 +94,18 @@ def halo_select(sims, ptl_data):
         p_sparta_snap = config_dict["p_snap_info"]["sparta_snap"][()]
 
         # Load the halo's positions and radii
-        param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"],["simulation","particle_mass"]]
+        param_paths = [["halos","position"],["halos","R200m"]]
         sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, p_snap)
 
         halos_pos = sparta_params[sparta_param_names[0]][:,p_sparta_snap,:] * 10**3 * p_scale_factor # convert to kpc/h physical
         halos_r200m = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
-        curr_halos_ids = sparta_params[sparta_param_names[2]][:,p_sparta_snap]
         
-        use_halo_pos = halos_pos[all_idxs]
-        use_halo_r200m = halos_r200m[all_idxs]
-        
-        rstar_params = ["id(1)","R200b(11)"]
-        rstar_data = load_RSTAR_data(rockstar_ctlgs_path + sparta_name, rstar_params, curr_z)
         
         halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
         all_idxs = halo_ddf["Halo_indices"].values
         halo_first = halo_ddf["Halo_first"].values
         halo_n = halo_ddf["Halo_n"].values
         curr_halo_start = curr_halo_start + np.sum(halo_n) # always increment even if this halo isn't going to be counted
-        
-        # we construct the r200b array to match the halo_id array from sparta such that we can accurately index which r200b belongs to each halo
-        id_to_r200b = dict(zip(rstar_data["id(1)"], rstar_data["R200b(11)"]))
-        
-        sim_r200b_list = []
-        for i in range(halo_n.size):
-            curr_idxs = ptl_halo_idxs[halo_first[i]:halo_first[i]+halo_n[i]]
-            sim_r200b_list.append(np.array([id_to_r200b[curr_halos_ids[idx]] for idx in curr_idxs]))
-
-        sim_r200b = np.concatenate(sim_r200b_list)
-        sim_r200b = sim_r200b * p_scale_factor # conver to kpc/h physical
-        
-        # Construct a search tree of halo positions
-        curr_halo_tree = cKDTree(data = use_halo_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size)
         
         max_nhalo = 500
         
@@ -139,9 +119,14 @@ def halo_select(sims, ptl_data):
         halo_n = halo_n[order_halo]
         halo_first = halo_first[order_halo]
         
+        use_halo_pos = halos_pos[all_idxs]
+        use_halo_r200m = halos_r200m[all_idxs]
+        # Construct a search tree of halo positions
+        curr_halo_tree = cKDTree(data = use_halo_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size)
+        
         # For each massive halo search the area around the halo to determine if there are any halos that are more than 20% the size of this halo
         for i in range(max_nhalo):
-            curr_halo_indices = curr_halo_tree.query_ball_point(use_halo_pos[i], r = 2 * sim_r200b[i])
+            curr_halo_indices = curr_halo_tree.query_ball_point(use_halo_pos[i], r = 2 * use_halo_r200m[i])
             curr_halo_indices = np.array(curr_halo_indices)
             
             # The search will return the same halo that we are searching so we remove that
@@ -150,7 +135,7 @@ def halo_select(sims, ptl_data):
             
             # If the largest halo nearby isn't large enough we will consider this halo's particles for our datasets
             if surr_n_ptls.size == 0 or np.max(surr_n_ptls) < 0.2 * n_ptls[i]:
-                print(sim_r200b[i],use_halo_r200m[i])
+
                 row_indices = list(range(
                     halo_first[i],
                     halo_first[i] + halo_n[i]

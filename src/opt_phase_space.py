@@ -170,13 +170,18 @@ if __name__ == "__main__":
             "log_rticks":log_rticks,
     }
     
-    #TODO load this from a saved file
-    ps_param_dict = {
-        "m_pos": -1.9973747688461672,
-        "b_pos": 2.730691113802748,
-        "m_neg": -1.601325049968688,
-        "b_neg": 1.5101195108968333,
-    }
+    param_path = model_fldr_loc + "ps_optparam_dict.pickle"
+    if os.path.exists(param_path):
+        ps_param_dict = load_pickle(param_path)
+        m_pos = ps_param_dict["m_pos"]
+        b_pos = ps_param_dict["b_pos"]
+        m_neg = ps_param_dict["m_neg"]
+        b_neg = ps_param_dict["b_neg"]
+    else:
+        raise FileNotFoundError(
+            f"Parameter file not found at {param_path}. Please run the optimization code to generate it."
+        )
+
     
     #TODO load this from a file/config
     width = 0.05
@@ -331,7 +336,7 @@ if __name__ == "__main__":
         bin_indices = np.digitize(r_test, bins) - 1  
         preds = np.zeros(r_test.shape[0])
         for i in range(bins.shape[0]-1):
-            if bins[i] <= 3.0:
+            if bins[i] <= 2.0:
                 mask_pos = (bin_indices == i) & (vr_test > 0) & (lnv2_test <= opt_param_dict["inf_vr_pos"]["b"][i])
                 mask_neg = (bin_indices == i) & (vr_test < 0) & (lnv2_test <= opt_param_dict["inf_vr_neg"]["b"][i])
             

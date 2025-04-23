@@ -20,7 +20,7 @@ from sparta_tools import sparta
 from utils.calculation_functions import create_stack_mass_prf, filter_prf, calculate_density, calc_mass_acc_rate
 from utils.update_vis_fxns import compare_split_prfs
 from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, parse_ranges, load_sparta_mass_prf, split_calc_name, sim_mass_p_z, get_model_name
-from utils.data_and_loading_functions import create_directory, timed, load_pickle, load_SPARTA_data, conv_halo_id_spid, load_config, load_RSTAR_data, depair_np
+from utils.data_and_loading_functions import create_directory, timed, save_pickle, load_pickle, load_SPARTA_data, conv_halo_id_spid, load_config, load_RSTAR_data, depair_np
 from utils.ps_cut_support import load_ps_data
 
 config_dict = load_config(os.getcwd() + "/config.ini")
@@ -233,12 +233,22 @@ if __name__ == "__main__":
     
     ####################################################################################################################################################################################################################################
     
-    (m_pos, b_pos), (m_neg, b_neg) = calibrate_finder()
+    if os.path.exists(model_fldr_loc + "ps_optparam_dict.pickle"):
+        ps_param_dict = load_pickle(model_fldr_loc + "ps_optparam_dict.pickle")
+        m_pos = ps_param_dict["m_pos"]
+        b_pos = ps_param_dict["b_pos"]
+        m_neg = ps_param_dict["m_neg"]
+        b_neg = ps_param_dict["b_neg"]
+    else:
+        (m_pos, b_pos), (m_neg, b_neg) = calibrate_finder()
           
-    # m_pos = -1.9973747688461672
-    # b_pos = 2.730691113802748
-    # m_neg = -1.601325049968688
-    # b_neg = 1.5101195108968333
+        ps_param_dict = {
+            "m_pos":m_pos,
+            "b_pos":b_pos,
+            "m_neg":m_neg,
+            "b_neg":b_neg
+        }
+        save_pickle(ps_param_dict, model_fldr_loc + "ps_optparam_dict.pickle")
     
     print("\nCalibration Params")
     print(m_pos,b_pos,m_neg,b_neg)
@@ -273,59 +283,6 @@ if __name__ == "__main__":
     
     sparta_orb = np.where(sparta_labels == 1)[0]
     sparta_inf = np.where(sparta_labels == 0)[0]
-    
-    all_r200b_list = []
-    all_r200m_list = []
-    rstar_params = ["id(1)","R200b(11)"]
-    sparta_param_paths = [["halos","R200m"],["halos","id"]]
-    curr_halo_start = 0
-    for sim in curr_test_sims:
-        with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
-                config_dict = pickle.load(file)
-                curr_z = config_dict["p_snap_info"]["red_shift"][()]
-                p_snap = config_dict["p_snap_info"]["ptl_snap"][()]
-                p_sparta_snap = config_dict["p_snap_info"]["sparta_snap"][()]
-                
-        sparta_name, sparta_search_name = split_calc_name(sim)
-        curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
-        
-        rstar_data = load_RSTAR_data(rockstar_ctlgs_path + sparta_name, rstar_params, curr_z)
-        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, sparta_param_paths, sparta_search_name, p_snap)
-        
-        curr_r200m = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
-        curr_halos_ids = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
-        
-        halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
-        all_idxs = halo_ddf["Halo_indices"].values
-        halo_first = halo_ddf["Halo_first"].values
-        halo_n = halo_ddf["Halo_n"].values
-        curr_halo_start = curr_halo_start + np.sum(halo_n)
-        
-        # we construct the r200b array to match the halo_id array from sparta such that we can accurately index which r200b belongs to each halo
-        id_to_r200b = dict(zip(rstar_data["id(1)"], rstar_data["R200b(11)"]))
-
-        sim_r200b_list = []
-        sim_r200m_list = []
-        for i in range(halo_n.size):
-            curr_idxs = ptl_halo_idxs[halo_first[i]:halo_first[i]+halo_n[i]]
-            sim_r200b_list.append(np.array([id_to_r200b[curr_halos_ids[idx]] for idx in curr_idxs]))
-            sim_r200m_list.append(curr_r200m[curr_idxs])
-
-        config_dict = load_pickle(ML_dset_path + sim + "/config.pickle")
-        p_scale_factor = config_dict["p_snap_info"]["scale_factor"][()]
-        
-        sim_r200b = np.concatenate(sim_r200b_list)
-        sim_r200b = sim_r200b * p_scale_factor # conver to kpc/h physical
-        sim_r200m = np.concatenate(sim_r200m_list)
-        
-        all_r200b_list.append(sim_r200b)
-        all_r200m_list.append(sim_r200m)
-    
-    all_ptl_r200b = np.concatenate(all_r200b_list)
-    all_ptl_r200m = np.concatenate(all_r200m_list)
-    
-    unscale_r = r_r200m * all_ptl_r200m
-    r_r200b = unscale_r / all_ptl_r200b
 
     mask_vr_neg = (vr < 0)
     mask_vr_pos = ~mask_vr_neg
@@ -643,10 +600,10 @@ if __name__ == "__main__":
         plt.savefig(plot_loc + "perc_" + str(perc) + "_" + grad_lims + "_KE_dist_cut.png")
         
     # Orbiting classification for vr > 0
-    mask_cut_pos = (lnv2 < (m_pos * r_r200b + b_pos)) & (r_r200b < 2.0)
+    mask_cut_pos = (lnv2 < (m_pos * r_r200m + b_pos)) & (r_r200m < 2.0)
 
     # Orbiting classification for vr < 0
-    mask_cut_neg = (lnv2 < (m_neg * r_r200b + b_neg)) & (r_r200b < 2.0)
+    mask_cut_neg = (lnv2 < (m_neg * r_r200m + b_neg)) & (r_r200m < 2.0)
 
     # Particle is infalling if it is below both lines and 2*R00b
     mask_orb = \
@@ -693,10 +650,10 @@ if __name__ == "__main__":
         mask_vr_neg = (vr < 0)
         mask_vr_pos = ~mask_vr_neg
 
-        mask_cut_pos = (lnv2 < (m_pos * r_r200b + b_pos)) & (r_r200b < 2.0)
+        mask_cut_pos = (lnv2 < (m_pos * r_r200m + b_pos)) & (r_r200m < 2.0)
 
         # Orbiting classification for vr < 0
-        mask_cut_neg = (lnv2 < (m_neg * r_r200b + b_neg)) & (r_r200b < 2.0)
+        mask_cut_neg = (lnv2 < (m_neg * r_r200m + b_neg)) & (r_r200m < 2.0)
 
         # Particle is infalling if it is below both lines and 2*R00
         mask_orb = \
