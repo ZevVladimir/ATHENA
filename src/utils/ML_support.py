@@ -101,13 +101,13 @@ def setup_client():
 
     if on_zaratan:            
         if use_gpu:
-            initialize(local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
+            initialize(local_directory = "/home/zvladimi/scratch/ATHENA/dask_logs/")
         else:
             if 'SLURM_CPUS_PER_TASK' in os.environ:
                 cpus_per_task = int(os.environ['SLURM_CPUS_PER_TASK'])
             else:
                 print("SLURM_CPUS_PER_TASK is not defined.")
-            initialize(nthreads = cpus_per_task, local_directory = "/home/zvladimi/scratch/MLOIS/dask_logs/")
+            initialize(nthreads = cpus_per_task, local_directory = "/home/zvladimi/scratch/ATHENA/dask_logs/")
 
         print("Initialized")
         client = Client()

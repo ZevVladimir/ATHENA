@@ -1487,12 +1487,12 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
     log_vmin = 1
 
     legend_title_fntsize = 16
-    legend_fntsize = 26
-    axis_fntsize = 34
+    legend_fntsize = 24
+    axis_fntsize = 32
     txt_fntsize = 26
     tick_label_fntsize = 24
     cbar_label_fntsize = 26
-    cbar_tick_fntsize = 20
+    cbar_tick_fntsize = 24
 
     with timed("SPARTA KE Dist plot"):
         magma_cmap = plt.get_cmap("magma")
@@ -1521,7 +1521,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         ax3.tick_params('y', labelleft=False,colors="white",direction="in")
         ax4.tick_params('y', labelleft=False,colors="white",direction="in")
 
-        line_width = 4.0
+        line_width = 6.0
         
         plt.sca(axes[0])
         plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
@@ -1575,25 +1575,25 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.xlim(0, 2)
         
         for ax in axes:
-            ax.text(0.1, -4.0, "Orbiting According to\nPhase-space Cut", fontsize=txt_fntsize, color="r",
+            ax.text(0.1, -3.9, "Orbiting According\nto Phase-space Cut", fontsize=txt_fntsize, color="r",
                     weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-            ax.text(1.2, 2.3, "Infalling According to\nPhase-space Cut", fontsize=txt_fntsize, color="b",
+            ax.text(0.9, 2.2, "Infalling According\nto Phase-space Cut", fontsize=txt_fntsize, color="b",
                     weight="bold", bbox=dict(facecolor='w', alpha=0.75))
             ax.tick_params(axis='both',which='both',labelcolor="black",colors="white",direction="in",labelsize=tick_label_fntsize,length=8,width=2)
 
         plt.savefig(plot_loc + title + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=400)    
         
 
-def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_orb_prfs, simp_inf_prfs, bins, lin_rticks, save_location, title="comb_ps_fits_", prf_func=np.nanmedian, split_name="\\nu", prf_name_0 = "Fitted Phase Space Cut", prf_name_1 = "SPARTA", prf_name_2 = "Simple Phase Space Cut", prf_name_3 = "SPARTA"): 
+def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_orb_prfs, simp_inf_prfs, bins, lin_rticks, save_location, title="comb_ps_fits_", prf_func=np.nanmedian, split_name="\\nu", prf_name_0 = "Fitted Phase\nSpace Cut", prf_name_1 = "SPARTA", prf_name_2 = "Simple Phase\nSpace Cut", prf_name_3 = "SPARTA"): 
     with timed("Compare Split Profiles"):
         # Parameters to tune sizes of plots and fonts
         widths = [1,1,1,1]
         heights = [1,0.5]
         titlefntsize=18
         axisfntsize=22
-        textfntsize = 18
+        textfntsize = 22
         tickfntsize=16
-        legendfntsize=14
+        legendfntsize=16
         fill_alpha = 0.2
             
         fig = plt.figure(constrained_layout=True,figsize=(24,8))
@@ -1731,8 +1731,8 @@ def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_
         fit_orb_ax_0.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
         fit_orb_ax_0.tick_params(axis='x', which='both', labelbottom=False) # we don't want the labels just the tick marks
         fit_orb_ax_0.tick_params(axis='y', which='both')
-        fit_orb_ax_0.legend(fit_orb_plt_lines,fit_orb_plt_lbls,fontsize=legendfntsize, loc = "upper right")
-        fit_orb_ax_0.text(0.05,0.05, "Orbiting Particles", ha="left", va="bottom", transform=fit_orb_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
+        fit_orb_ax_0.legend(fit_orb_plt_lines,fit_orb_plt_lbls,fontsize=legendfntsize, loc = "lower left")
+        fit_orb_ax_0.text(0.95,0.95, "Orbiting Particles", ha="right", va="top", transform=fit_orb_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
         
         fit_inf_ax_0.set_xscale("log")
         fit_inf_ax_0.set_yscale("log")
@@ -1741,8 +1741,8 @@ def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_
         fit_inf_ax_0.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
         fit_inf_ax_0.tick_params(axis='x', which='both', labelbottom=False) # we don't want the labels just the tick marks
         fit_inf_ax_0.tick_params(axis='y', which='both', labelleft=False) 
-        fit_inf_ax_0.legend(fit_inf_plt_lines,fit_inf_plt_lbls,fontsize=legendfntsize, loc = "upper right")
-        fit_inf_ax_0.text(0.05,0.05, "Infalling Particles", ha="left", va="bottom", transform=fit_inf_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
+        fit_inf_ax_0.legend(fit_inf_plt_lines,fit_inf_plt_lbls,fontsize=legendfntsize, loc = "lower left")
+        fit_inf_ax_0.text(0.95,0.95, "Infalling Particles", ha="right", va="top", transform=fit_inf_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
 
         simp_orb_ax_0.set_xscale("log")
         simp_orb_ax_0.set_yscale("log")
@@ -1750,8 +1750,8 @@ def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_
         simp_orb_ax_0.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
         simp_orb_ax_0.tick_params(axis='x', which='both', labelbottom=False) # we don't want the labels just the tick marks
         simp_orb_ax_0.tick_params(axis='y', which='both', labelleft=False)
-        simp_orb_ax_0.legend(simp_orb_plt_lines,simp_orb_plt_lbls,fontsize=legendfntsize, loc = "upper right")
-        simp_orb_ax_0.text(0.05,0.05, "Orbiting Particles", ha="left", va="bottom", transform=simp_orb_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
+        simp_orb_ax_0.legend(simp_orb_plt_lines,simp_orb_plt_lbls,fontsize=legendfntsize, loc = "lower left")
+        simp_orb_ax_0.text(0.95,0.95, "Orbiting Particles", ha="right", va="top", transform=simp_orb_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
         
         simp_inf_ax_0.set_xscale("log")
         simp_inf_ax_0.set_yscale("log")
@@ -1760,8 +1760,8 @@ def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_
         simp_inf_ax_0.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
         simp_inf_ax_0.tick_params(axis='x', which='both', labelbottom=False) # we don't want the labels just the tick marks
         simp_inf_ax_0.tick_params(axis='y', which='both', labelleft=False) 
-        simp_inf_ax_0.legend(simp_inf_plt_lines,simp_inf_plt_lbls,fontsize=legendfntsize, loc = "upper right")
-        simp_inf_ax_0.text(0.05,0.05, "Infalling Particles", ha="left", va="bottom", transform=simp_inf_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
+        simp_inf_ax_0.legend(simp_inf_plt_lines,simp_inf_plt_lbls,fontsize=legendfntsize, loc = "lower left")
+        simp_inf_ax_0.text(0.95,0.95, "Infalling Particles", ha="right", va="top", transform=simp_inf_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
 
 
         fit_orb_y_min, fit_orb_y_max = fit_orb_ax_0.get_ylim()
@@ -1825,5 +1825,5 @@ def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_
         simp_inf_ax_1.set_xticks(tick_locs,strng_ticks)  
         simp_inf_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize, labelleft=False)
         
-        fig.savefig(save_location + title + "prfl_rat.png",bbox_inches='tight',dpi=300)    
+        fig.savefig(save_location + title + "prfl_rat.png",bbox_inches='tight',dpi=400)    
     

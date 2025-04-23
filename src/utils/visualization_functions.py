@@ -19,7 +19,7 @@ num_processes = mp.cpu_count()
 # LOAD CONFIG PARAMETERS
 config_dict = load_config(os.getcwd() + "/config.ini")
 
-MLOIS_path = config_dict["PATHS"]["mlois_path"]
+ATHENA_path = config_dict["PATHS"]["athena_path"]
 
 def rv_vs_radius_plot(rad_vel, hubble_vel, start_nu, end_nu, color, ax = None):
     if ax == None:
@@ -227,7 +227,7 @@ def halo_plot_3d(ptl_pos, halo_pos, real_labels, preds):
 
     fig.subplots_adjust(wspace=0.05)
     
-    fig.savefig("/home/zvladimi/MLOIS/Random_figures/3d_one_halo_all.png")
+    fig.savefig("/home/zvladimi/ATHENA/Random_figures/3d_one_halo_all.png")
 
     fig, ax = plt.subplots(1, 3,figsize=(30,10))
     
@@ -254,7 +254,7 @@ def halo_plot_3d(ptl_pos, halo_pos, real_labels, preds):
     ax[2].tick_params(axis='y', which='both',left=False,labelleft=False)
     ax[2].legend(fontsize=axis_fontsize,frameon=False)
     
-    fig.savefig("/home/zvladimi/MLOIS/Random_figures/one_halo.png")
+    fig.savefig("/home/zvladimi/ATHENA/Random_figures/one_halo.png")
     
 def compute_alpha(num_points, max_alpha=1.0, min_alpha=0.001, scaling_factor=0.5):
     return max(min_alpha, max_alpha * (scaling_factor / (num_points ** 0.5)))    
@@ -325,7 +325,7 @@ def halo_plot_3d_vec(ptl_pos, ptl_vel, halo_pos, halo_vel, halo_r200m, labels, c
         yaxis=dict(title='Y position (kpc/h)', range=[halo_pos[1] - 10 * halo_r200m,halo_pos[1] + 10 * halo_r200m]),
         zaxis=dict(title='Z position (kpc/h)', range=[halo_pos[2] - 10 * halo_r200m,halo_pos[2] + 10 * halo_r200m]),
         row=1,col=2)
-    fig.write_html(MLOIS_path + "/Random_figs/high_vel_halo_idx_" + str(halo_idx) + ".html")
+    fig.write_html(ATHENA_path + "/Random_figs/high_vel_halo_idx_" + str(halo_idx) + ".html")
     
 def plot_rad_dist(bin_edges,filter_radii,save_path):
     fig,ax = plt.subplots(1,2,figsize=(25,10))

@@ -1,4 +1,5 @@
-# Current State as of 05//2024
+# ATHENA: pArticle classificaTion with macHine lEarning N-body simulAtions
+# Current State as of 04//2025
 
 ## Data Requirements
 You need the particle data from a GADGET simulation and the .hdf5 output file from SPARTA. We used the Erebos suite of simulations for our work.
@@ -118,7 +119,7 @@ The model_info file includes the parameters for XGBoost which can be set within 
 
 ```
 rdml(){
-        python3 -c "import sys; sys.path.insert(1, '/path/to/MLOIS/src/');from utils.ML_support import print_model_prop;print_model_prop('$1')"
+        python3 -c "import sys; sys.path.insert(1, '/path/to/ATHENA/src/');from utils.ML_support import print_model_prop;print_model_prop('$1')"
 }
 ```
 
