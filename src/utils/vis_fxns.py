@@ -1531,7 +1531,6 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut",lw=line_width)
         if cust_line_dict is not None:
             plt_cust_ps_line(b = cust_line_dict["orb_vr_pos"]["b"], bins = bins,linewidth=line_width)
-        plt.legend(loc="lower left",fontsize=legend_fntsize)
         plt.text(0.05,3.6,r"Orbiting Particles $v_r>0$"+"\nAccording to SPARTA",fontsize=txt_fntsize,weight="bold", bbox=dict(facecolor='w', alpha=0.75))
         plt.xlim(0, 2)
         
@@ -1543,7 +1542,6 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut",lw=line_width)
         if cust_line_dict is not None:
             plt_cust_ps_line(b = cust_line_dict["inf_vr_pos"]["b"], bins = bins,linewidth=line_width)
-        plt.legend(loc="lower left",fontsize=legend_fntsize)
         plt.text(0.05,3.6,r"Infalling Particles $v_r>0$"+"\nAccording to SPARTA",fontsize=txt_fntsize,weight="bold", bbox=dict(facecolor='w', alpha=0.75))
         plt.xlim(0, 2)
 
@@ -1555,7 +1553,6 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut",lw=line_width)
         if cust_line_dict is not None:
             plt_cust_ps_line(b = cust_line_dict["orb_vr_neg"]["b"], bins = bins,linewidth=line_width)
-        plt.legend(loc="lower left",fontsize=legend_fntsize)
         plt.text(0.05,3.6,r"Orbiting Particles $v_r<0$"+"\nAccording to SPARTA",fontsize=txt_fntsize,weight="bold", bbox=dict(facecolor='w', alpha=0.75))
         plt.xlim(0, 2)
         
@@ -1574,10 +1571,11 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         cbar_log.set_label(r'$N$ (Counts)', fontsize=cbar_label_fntsize)
         plt.xlim(0, 2)
         
-        for ax in axes:
-            ax.text(0.1, -3.7, "Orbiting According\nto Phase-space Cut", fontsize=txt_fntsize, color="r",
+        for i,ax in enumerate(axes):
+            if i == 3:
+                ax.text(0.1, -3.7, "Orbiting According\nto Phase-space Cut", fontsize=txt_fntsize, color="r",
                     weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-            ax.text(0.9, 2.2, "Infalling According\nto Phase-space Cut", fontsize=txt_fntsize, color="b",
+                ax.text(0.9, 2.2, "Infalling According\nto Phase-space Cut", fontsize=txt_fntsize, color="b",
                     weight="bold", bbox=dict(facecolor='w', alpha=0.75))
             ax.tick_params(axis='both',which='both',labelcolor="black",colors="white",direction="in",labelsize=tick_label_fntsize,length=8,width=2)
 

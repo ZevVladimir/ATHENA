@@ -216,30 +216,5 @@ if __name__ == "__main__":
             history = output["history"]
             bst.save_model(model_save_loc)
             save_pickle(model_info,model_fldr_loc + "model_info.pickle")
-        
-            del dtrain
-    
-    # Evaluate the model on the corresponding testing dataset to what the model was trained on
-    with timed("Model Evaluation"):
-        plot_loc = model_fldr_loc + "Test_" + comb_model_sims + "/plots/"
-        create_directory(plot_loc)
-        
-        halo_files = []
-        halo_dfs = []
-        
-        for sim in model_sims:
-            halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/Test/halo_info/"))
-
-        halo_df = pd.concat(halo_dfs)
-        
-        test_data,test_scale_pos_weight = load_data(client,model_sims,"Test",limit_files=False)
-        X_test = test_data[feature_columns]
-        y_test = test_data[target_column]
-        
-        eval_model(model_info, client, bst, use_sims=model_sims, dst_type="Test", X=X_test, y=y_test, halo_ddf=halo_df, plot_save_loc=plot_loc, dens_prf=dens_prf_plt,missclass=misclass_plt,full_dist=fulldist_plt,split_nu=dens_prf_nu_split)
-   
-    # Save the updated model and model info file
-    bst.save_model(model_save_loc)
-    save_pickle(model_info,model_fldr_loc + "model_info.pickle")
     
     client.close()
