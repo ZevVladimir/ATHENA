@@ -11,7 +11,7 @@ import pickle
 from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, get_model_name
 from utils.data_and_loading_functions import create_directory, load_pickle, load_config, load_pickle, timed
 from utils.ps_cut_support import load_ps_data
-from utils.update_vis_fxns import compare_split_prfs_ps
+from src.utils.vis_fxns import compare_split_prfs_ps
 from utils.calculation_functions import calculate_density, filter_prf
 
 config_dict = load_config(os.getcwd() + "/config.ini")

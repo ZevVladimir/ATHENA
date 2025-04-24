@@ -394,3 +394,18 @@ def calc_halo_params(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_pt
         return fnd_HIPIDs, curr_orb_assn, scaled_rad_vel, scaled_tang_vel, scaled_radii, scaled_phys_vel
     else:
         return fnd_HIPIDs, scaled_rad_vel, scaled_tang_vel, scaled_radii
+
+    
+def plot_rad_dist(bin_edges,filter_radii,save_path):
+    #TODO make this into a function that says how many orbiting particles are out the halo and how many infalling are inside
+    fig,ax = plt.subplots(1,2,figsize=(25,10))
+    ax[0].hist(filter_radii)
+    ax[0].set_xlabel("Radius $r/R_{200m}$")
+    ax[0].set_ylabel("counts")
+    ax[1].hist(filter_radii,bins=bin_edges)
+    ax[1].set_xlabel("Radius $r/R_{200m}$")
+    ax[1].set_xscale("log")
+    print("num ptl within 2 R200m", np.where(filter_radii < 2)[0].shape)
+    print("num ptl outside 2 R200m", np.where(filter_radii > 2)[0].shape)
+    print("ratio in/out", np.where(filter_radii < 2)[0].shape[0] / np.where(filter_radii > 2)[0].shape[0])
+    fig.savefig(save_path + "radii_dist.png",bbox_inches="tight")

@@ -18,7 +18,7 @@ import scipy.ndimage as ndimage
 from sparta_tools import sparta
 
 from utils.calculation_functions import create_stack_mass_prf, filter_prf, calculate_density, calc_mass_acc_rate
-from utils.update_vis_fxns import compare_split_prfs
+from src.utils.vis_fxns import compare_split_prfs
 from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, parse_ranges, load_sparta_mass_prf, split_calc_name, sim_mass_p_z, get_model_name
 from utils.data_and_loading_functions import create_directory, timed, save_pickle, load_pickle, load_SPARTA_data, conv_halo_id_spid, load_config, load_RSTAR_data, depair_np
 from utils.ps_cut_support import load_ps_data

@@ -18,7 +18,7 @@ from sparta_tools import sparta
 from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, split_calc_name, load_SPARTA_data, reform_dataset_dfs, get_model_name
 from utils.data_and_loading_functions import create_directory, load_pickle, conv_halo_id_spid, load_config, save_pickle, load_pickle, timed
 from utils.ps_cut_support import load_ps_data
-from utils.update_vis_fxns import plt_SPARTA_KE_dist, compare_split_prfs
+from src.utils.vis_fxns import plt_SPARTA_KE_dist, compare_split_prfs
 from utils.calculation_functions import calculate_density, filter_prf, calc_mass_acc_rate
 
 config_dict = load_config(os.getcwd() + "/config.ini")

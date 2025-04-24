@@ -9,7 +9,7 @@ import numpy as np
 from sparta_tools import sparta
 
 from utils.ML_support import get_combined_name,reform_dataset_dfs,split_calc_name,get_model_name
-from utils.update_vis_fxns import plot_halo_slice
+from src.utils.vis_fxns import plot_halo_slice
 from utils.data_and_loading_functions import create_directory,load_SPARTA_data,timed,load_ptl_param,load_config
 
 config_dict = load_config(os.getcwd() + "/config.ini")

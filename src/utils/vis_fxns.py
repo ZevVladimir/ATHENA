@@ -1455,7 +1455,7 @@ def plt_cust_ps_line(b,bins,linewidth):
         y1 = b[i]
         y2 = b[i]
         if i == 0:
-            plt.plot([x1,x2],[y1,y2],lw=linewidth, color="cyan", label="Bin-by-bin Phase-space Cut")
+            plt.plot([x1,x2],[y1,y2],lw=linewidth, color="cyan", label="Bin-by-bin\nPhase-space Cut")
         else:
             plt.plot([x1,x2],[y1,y2],lw=linewidth, color="cyan")
             
@@ -1527,7 +1527,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y12, lw=line_width, color="k",
-                label="Simple Phase Space Cut")
+                label="Simple Phase-\nSpace Cut")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut",lw=line_width)
         if cust_line_dict is not None:
             plt_cust_ps_line(b = cust_line_dict["orb_vr_pos"]["b"], bins = bins,linewidth=line_width)
@@ -1539,7 +1539,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y12, lw=line_width, color="k",
-                label="Simple Phase Space Cut")
+                label="Simple Phase-\nSpace Cut")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut",lw=line_width)
         if cust_line_dict is not None:
             plt_cust_ps_line(b = cust_line_dict["inf_vr_pos"]["b"], bins = bins,linewidth=line_width)
@@ -1551,7 +1551,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=line_width, color="k",
-                label="Simple Phase Space Cut")
+                label="Simple Phase-\nSpace Cut")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut",lw=line_width)
         if cust_line_dict is not None:
             plt_cust_ps_line(b = cust_line_dict["orb_vr_neg"]["b"], bins = bins,linewidth=line_width)
@@ -1563,7 +1563,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=line_width, color="k",
-                label="Simple Phase Space Cut")
+                label="Simple Phase-\nSpace Cut")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut",lw=line_width)
         if cust_line_dict is not None:
             plt_cust_ps_line(b = cust_line_dict["inf_vr_neg"]["b"], bins = bins,linewidth=line_width)
@@ -1575,7 +1575,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.xlim(0, 2)
         
         for ax in axes:
-            ax.text(0.1, -3.9, "Orbiting According\nto Phase-space Cut", fontsize=txt_fntsize, color="r",
+            ax.text(0.1, -3.7, "Orbiting According\nto Phase-space Cut", fontsize=txt_fntsize, color="r",
                     weight="bold", bbox=dict(facecolor='w', alpha=0.75))
             ax.text(0.9, 2.2, "Infalling According\nto Phase-space Cut", fontsize=txt_fntsize, color="b",
                     weight="bold", bbox=dict(facecolor='w', alpha=0.75))

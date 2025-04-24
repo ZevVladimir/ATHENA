@@ -15,7 +15,7 @@ from sparta_tools import sparta
 
 from utils.ML_support import setup_client,get_combined_name,reform_dataset_dfs,split_calc_name,load_data,make_preds, get_model_name
 from utils.data_and_loading_functions import create_directory,load_SPARTA_data,load_ptl_param, load_config
-from utils.update_vis_fxns import plot_halo_slice_class, plot_halo_3d_class
+from src.utils.vis_fxns import plot_halo_slice_class, plot_halo_3d_class
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 config_dict = load_config(os.getcwd() + "/config.ini")

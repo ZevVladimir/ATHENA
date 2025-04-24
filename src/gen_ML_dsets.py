@@ -17,7 +17,7 @@ from sparta_tools import sparta
 
 from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z_snap, timed, clean_dir, load_pickle, save_pickle, get_num_snaps, load_config
 from utils.calculation_functions import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn, create_mass_prf, calculate_density
-from utils.update_vis_fxns import compare_prfs
+from src.utils.vis_fxns import compare_prfs
 from utils.debug_check import check_string, check_list,check_or_create_directory
 ##################################################################################################################
 config_dict = load_config(os.getcwd() + "/config.ini")
