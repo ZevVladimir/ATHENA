@@ -3,7 +3,9 @@ import dask.dataframe as dd
 import xgboost as xgb
 from xgboost import dask as dxgb
     
-import json
+import time
+from sklearn.metrics import accuracy_score
+import matplotlib.pyplot as plt
 import pickle
 import os
 import numpy as np
@@ -32,6 +34,33 @@ dens_prf_plt = config_dict["EVAL_MODEL"]["dens_prf_plt"]
 misclass_plt = config_dict["EVAL_MODEL"]["misclass_plt"]
 fulldist_plt = config_dict["EVAL_MODEL"]["fulldist_plt"]
 dens_prf_nu_split = config_dict["EVAL_MODEL"]["dens_prf_nu_split"]
+
+
+def evaluate_accuracy_and_speed(model, dtest, max_trees):
+    accuracies = []
+    times = []
+    
+    for num_trees in range(1, max_trees + 1):
+        # Start the timer
+        start_time = time.time()
+        
+        # Make predictions using the first 'num_trees' trees
+        preds = model.predict(dtest, ntree_limit=num_trees)
+        
+        # End the timer and calculate time taken
+        elapsed_time = time.time() - start_time
+        
+        # Convert probabilities to binary class predictions
+        preds = np.round(preds)
+        
+        # Calculate accuracy
+        accuracy = accuracy_score(y_test, preds)
+        
+        # Append results
+        accuracies.append(accuracy)
+        times.append(elapsed_time)
+    
+    return accuracies, times
 
 
 if __name__ == "__main__":        
@@ -202,13 +231,15 @@ if __name__ == "__main__":
                 'Training Params': params}
         
         # Train and save the model
+        #TODO make params selectable params?
+        num_trees = 100
         with timed("Trained Model"):
             print("Starting train using params:", params)
             output = dxgb.train(
                 client,
                 params,
                 dtrain,
-                num_boost_round=100,
+                num_boost_round=num_trees,
                 evals=[(dtrain, "train")],
                 early_stopping_rounds=10,      
                 )
@@ -216,5 +247,62 @@ if __name__ == "__main__":
             history = output["history"]
             bst.save_model(model_save_loc)
             save_pickle(model_info,model_fldr_loc + "model_info.pickle")
+            
+            #TODO make this optional and document evaluation of model
+            test_data,scale_pos_weight = load_data(client,model_sims,"Test",scale_rad=False,use_weights=False,filter_nu=False,limit_files=False)
+            
+            X_test = test_data[feature_columns]
+            y_test = test_data[target_column]
+            
+            dtest = xgb.dask.DaskDMatrix(client, X_test, y_test, weight=train_weights)
+            
+            evals=[(dtrain, "train"),(dtest,"test")]
+            evals_result = bst.eval_set(evals)
+
+            # Get accuracy at each boosting round
+            # Extract training and validation error (1 - accuracy) at each round
+            train_errors = evals_result['train']['error']
+            test_errors = evals_result['eval']['error']
+
+            # Calculate accuracies
+            train_accuracies = [1 - error for error in train_errors]
+            test_accuracies = [1 - error for error in test_errors]
+
+            # Plot or analyze accuracy vs. number of trees (boosting rounds)
+            plt.plot(range(len(train_accuracies)), train_accuracies, label='Train Accuracy')
+            plt.plot(range(len(test_accuracies)), test_accuracies, label='Test Accuracy')
+            plt.xlabel('Number of Trees')
+            plt.ylabel('Accuracy')
+            plt.legend()
+            plt.savefig(gen_plot_save_loc + "train_test_acc.png")
+
+            # You can also inspect the final accuracy after training
+            final_train_accuracy = train_accuracies[-1]
+            final_test_accuracy = test_accuracies[-1]
+            print(f"Final train accuracy: {final_train_accuracy}")
+            print(f"Final test accuracy: {final_test_accuracy}")
+            
+            accuracies, times = evaluate_accuracy_and_speed(bst, dtest, max_trees=num_trees)
+
+            # Plot accuracy vs number of trees
+            plt.figure(figsize=(12, 6))
+
+            # Subplot for accuracy
+            plt.subplot(1, 2, 1)
+            plt.plot(range(1, 101), accuracies, label='Test Accuracy', color='blue')
+            plt.xlabel('Number of Trees')
+            plt.ylabel('Accuracy')
+            plt.legend()
+
+            # Subplot for time
+            plt.subplot(1, 2, 2)
+            plt.plot(range(1, 101), times, label='Prediction Time', color='red')
+            plt.xlabel('Number of Trees')
+            plt.ylabel('Time (seconds)')
+            plt.legend()
+
+            plt.tight_layout()
+            plt.savefig(gen_plot_save_loc + "tree_time_acc.png")
+
     
     client.close()
