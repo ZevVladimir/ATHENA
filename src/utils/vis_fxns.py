@@ -1455,7 +1455,7 @@ def plt_cust_ps_line(b,bins,linewidth):
         y1 = b[i]
         y2 = b[i]
         if i == 0:
-            plt.plot([x1,x2],[y1,y2],lw=linewidth, color="cyan", label="Bin-by-bin\nPhase-space Cut")
+            plt.plot([x1,x2],[y1,y2],lw=linewidth, color="cyan", label="Bin-by-bin Fit Cut")
         else:
             plt.plot([x1,x2],[y1,y2],lw=linewidth, color="cyan")
             
@@ -1527,7 +1527,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y12, lw=line_width, color="k",
-                label="Simple Phase-\nSpace Cut")
+                label="Simple Cut")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut",lw=line_width)
         if cust_line_dict is not None:
             plt_cust_ps_line(b = cust_line_dict["orb_vr_pos"]["b"], bins = bins,linewidth=line_width)
@@ -1538,7 +1538,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y12, lw=line_width, color="k",
-                label="Simple Phase-\nSpace Cut")
+                label="Simple Cut")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut",lw=line_width)
         if cust_line_dict is not None:
             plt_cust_ps_line(b = cust_line_dict["inf_vr_pos"]["b"], bins = bins,linewidth=line_width)
@@ -1549,7 +1549,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=line_width, color="k",
-                label="Simple Phase-\nSpace Cut")
+                label="Simple Cut")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut",lw=line_width)
         if cust_line_dict is not None:
             plt_cust_ps_line(b = cust_line_dict["orb_vr_neg"]["b"], bins = bins,linewidth=line_width)
@@ -1560,7 +1560,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=line_width, color="k",
-                label="Simple Phase-\nSpace Cut")
+                label="Simple Cut")
         plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut",lw=line_width)
         if cust_line_dict is not None:
             plt_cust_ps_line(b = cust_line_dict["inf_vr_neg"]["b"], bins = bins,linewidth=line_width)
@@ -1582,7 +1582,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.savefig(plot_loc + title + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=400)    
         
 
-def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_orb_prfs, simp_inf_prfs, bins, lin_rticks, save_location, title="comb_ps_fits_", prf_func=np.nanmedian, split_name="\\nu", prf_name_0 = "Fitted Phase\nSpace Cut", prf_name_1 = "SPARTA", prf_name_2 = "Simple Phase\nSpace Cut", prf_name_3 = "SPARTA"): 
+def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_orb_prfs, simp_inf_prfs, bins, lin_rticks, save_location, title="comb_ps_fits_", prf_func=np.nanmedian, split_name="\\nu", prf_name_0 = "Fitted Phase\nSpace Cut", prf_name_1 = "SPARTA", prf_name_2 = "Simple Phase\nSacpe Cut", prf_name_3 = "SPARTA"): 
     with timed("Compare Split Profiles"):
         # Parameters to tune sizes of plots and fonts
         widths = [1,1,1,1]

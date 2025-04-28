@@ -129,7 +129,10 @@ if __name__ == "__main__":
             train_data,scale_pos_weight,train_weights = load_data(client,model_sims,"Train",scale_rad=use_scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
         else:
             train_data,scale_pos_weight = load_data(client,model_sims,"Train",scale_rad=use_scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
-
+        test_data,scale_pos_weight = load_data(client,model_sims,"Test",scale_rad=False,use_weights=False,filter_nu=False,limit_files=False)
+            
+        X_test = test_data[feature_columns]
+        y_test = test_data[target_column]
         print("Calculated Scale Position Weight:",scale_pos_weight)
         
         X_train = train_data[feature_columns]
@@ -213,6 +216,7 @@ if __name__ == "__main__":
             dtrain = xgb.dask.DaskDMatrix(client, X_train, y_train, weight=train_weights)
         else:
             dtrain = xgb.dask.DaskDMatrix(client, X_train, y_train)
+        dtest = xgb.dask.DaskDMatrix(client, X_test, y_test)
         
         if 'Training Info' in model_info: 
             params = model_info.get('Training Info',{}).get('Training Params')
@@ -235,13 +239,15 @@ if __name__ == "__main__":
         num_trees = 100
         with timed("Trained Model"):
             print("Starting train using params:", params)
+            evals_result = {}
             output = dxgb.train(
                 client,
                 params,
                 dtrain,
                 num_boost_round=num_trees,
-                evals=[(dtrain, "train")],
-                early_stopping_rounds=10,      
+                evals=[(dtrain, 'train'), (dtest, 'test')],
+                early_stopping_rounds=10,  
+                evals_result=evals_result    
                 )
             bst = output["booster"]
             history = output["history"]
@@ -249,16 +255,7 @@ if __name__ == "__main__":
             save_pickle(model_info,model_fldr_loc + "model_info.pickle")
             
             #TODO make this optional and document evaluation of model
-            test_data,scale_pos_weight = load_data(client,model_sims,"Test",scale_rad=False,use_weights=False,filter_nu=False,limit_files=False)
-            
-            X_test = test_data[feature_columns]
-            y_test = test_data[target_column]
-            
-            dtest = xgb.dask.DaskDMatrix(client, X_test, y_test, weight=train_weights)
-            
-            evals=[(dtrain, "train"),(dtest,"test")]
-            evals_result = bst.eval_set(evals)
-
+            print(evals_result)
             # Get accuracy at each boosting round
             # Extract training and validation error (1 - accuracy) at each round
             train_errors = evals_result['train']['error']
