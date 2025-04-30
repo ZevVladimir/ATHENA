@@ -1597,17 +1597,16 @@ def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_
         fig = plt.figure(constrained_layout=True,figsize=(24,8))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
         
-    
-        fit_orb_ax_0 = fig.add_subplot(gs[0,0])
-        fit_orb_ax_1 = fig.add_subplot(gs[1,0],sharex=fit_orb_ax_0)
-        fit_inf_ax_0 = fig.add_subplot(gs[0,1])
-        fit_inf_ax_1 = fig.add_subplot(gs[1,1],sharex=fit_inf_ax_0)
+        simp_orb_ax_0 = fig.add_subplot(gs[0,0])
+        simp_orb_ax_1 = fig.add_subplot(gs[1,0],sharex=simp_orb_ax_0)
+        simp_inf_ax_0 = fig.add_subplot(gs[0,1])
+        simp_inf_ax_1 = fig.add_subplot(gs[1,1],sharex=simp_inf_ax_0)
         
-        simp_orb_ax_0 = fig.add_subplot(gs[0,2],sharex=fit_orb_ax_0)
-        simp_orb_ax_1 = fig.add_subplot(gs[1,2],sharex=fit_orb_ax_0)
-        simp_inf_ax_0 = fig.add_subplot(gs[0,3],sharex=fit_inf_ax_0)
-        simp_inf_ax_1 = fig.add_subplot(gs[1,3],sharex=fit_inf_ax_0)
-        
+        fit_orb_ax_0 = fig.add_subplot(gs[0,2],sharex=simp_orb_ax_0)
+        fit_orb_ax_1 = fig.add_subplot(gs[1,2],sharex=simp_orb_ax_0)
+        fit_inf_ax_0 = fig.add_subplot(gs[0,3],sharex=simp_inf_ax_0)
+        fit_inf_ax_1 = fig.add_subplot(gs[1,3],sharex=simp_inf_ax_0)
+         
         fit_orb_cmap = plt.cm.Blues
         fit_inf_cmap = plt.cm.Greens
         simp_orb_cmap = plt.cm.Blues
@@ -1778,27 +1777,27 @@ def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_
         simp_orb_ax_0.set_ylim(0.1, global_y_max)
         simp_inf_ax_0.set_ylim(0.1, global_y_max)
         
-        fit_orb_ax_0.set_ylabel(r"$\rho/\rho_m$", fontsize=axisfntsize)
-        fit_orb_ax_1.set_ylabel(r"$\frac{\rho_{pred}}{\rho_{act}} - 1$", fontsize=axisfntsize)
+        simp_orb_ax_0.set_ylabel(r"$\rho/\rho_m$", fontsize=axisfntsize)
+        simp_orb_ax_1.set_ylabel(r"$\frac{\rho_{pred}}{\rho_{act}} - 1$", fontsize=axisfntsize)
         fit_orb_ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
         fit_inf_ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
         simp_orb_ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
         simp_inf_ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
         
         fit_orb_ax_1.set_xlim(0.05,np.max(lin_rticks))
-        fit_orb_ax_1.set_ylim(bottom=-0.3,top=0.3)
+        fit_orb_ax_1.set_ylim(bottom=-0.5,top=0.5)
         fit_orb_ax_1.set_xscale("log")
         
         fit_inf_ax_1.set_xlim(0.05,np.max(lin_rticks))
-        fit_inf_ax_1.set_ylim(bottom=-0.3,top=0.3)
+        fit_inf_ax_1.set_ylim(bottom=-0.5,top=0.5)
         fit_inf_ax_1.set_xscale("log")
         
         simp_orb_ax_1.set_xlim(0.05,np.max(lin_rticks))
-        simp_orb_ax_1.set_ylim(bottom=-0.3,top=0.3)
+        simp_orb_ax_1.set_ylim(bottom=-0.5,top=0.5)
         simp_orb_ax_1.set_xscale("log")
         
         simp_inf_ax_1.set_xlim(0.05,np.max(lin_rticks))
-        simp_inf_ax_1.set_ylim(bottom=-0.3,top=0.3)
+        simp_inf_ax_1.set_ylim(bottom=-0.5,top=0.5)
         simp_inf_ax_1.set_xscale("log")
         
         tick_locs = lin_rticks.copy()
@@ -1812,13 +1811,13 @@ def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_
         strng_ticks = list(map(str, tick_locs))
         
         fit_orb_ax_1.set_xticks(tick_locs,strng_ticks)
-        fit_orb_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
+        fit_orb_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize, labelleft=False)
         
         fit_inf_ax_1.set_xticks(tick_locs,strng_ticks)  
         fit_inf_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize, labelleft=False)
         
         simp_orb_ax_1.set_xticks(tick_locs,strng_ticks)
-        simp_orb_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize, labelleft=False)
+        simp_orb_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
         
         simp_inf_ax_1.set_xticks(tick_locs,strng_ticks)  
         simp_inf_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize, labelleft=False)
