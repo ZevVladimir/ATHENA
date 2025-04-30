@@ -1582,7 +1582,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.savefig(plot_loc + title + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=400)    
         
 
-def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_orb_prfs, simp_inf_prfs, bins, lin_rticks, save_location, title="comb_ps_fits_", prf_func=np.nanmedian, split_name="\\nu", prf_name_0 = "Fitted Phase\nSpace Cut", prf_name_1 = "SPARTA", prf_name_2 = "Simple Phase\nSacpe Cut", prf_name_3 = "SPARTA"): 
+def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_orb_prfs, simp_inf_prfs, bins, lin_rticks, save_location, title="comb_ps_fits_", prf_func=np.nanmedian, split_name="\\nu", prf_name_0 = "Optimized Cut", prf_name_1 = "SPARTA", prf_name_2 = "Fast Cut", prf_name_3 = "SPARTA"): 
     with timed("Compare Split Profiles"):
         # Parameters to tune sizes of plots and fonts
         widths = [1,1,1,1]

@@ -11,6 +11,7 @@ from sparta_tools import sparta
 from utils.ML_support import get_combined_name,reform_dataset_dfs,split_calc_name,get_model_name
 from src.utils.vis_fxns import plot_halo_slice
 from utils.data_and_loading_functions import create_directory,load_SPARTA_data,timed,load_ptl_param,load_config
+from utils.calculation_functions import calc_radius
 
 config_dict = load_config(os.getcwd() + "/config.ini")
 
@@ -77,6 +78,7 @@ with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
     curr_snap_format = config_dict["snap_format"]
     p_scale_factor = config_dict["p_snap_info"]["scale_factor"][()]
     p_sparta_snap = config_dict["p_snap_info"]["sparta_snap"]
+    p_box_size = config_dict["p_snap_info"]["box_size"]
     
 curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
 
@@ -144,5 +146,18 @@ while len(used_numbers) < 25:
         # Compare the ids between SPARTA and the found prtl ids and match the SPARTA results
         matched_ids = np.intersect1d(curr_ptl_pids, sparta_tracer_ids, return_indices = True)
         curr_orb_assn[matched_ids[1]] = compare_sparta_assn[matched_ids[2]]
+        
+        r, = calc_radius(use_halo_pos[:,0],use_halo_pos[:,1],use_halo_pos[:,2],curr_ptl_pos[:,0],curr_ptl_pos[:,1],curr_ptl_pos[:,2],curr_ptl_pos.shape[0],p_box_size)
+        r_scale = r/use_halo_r200m
 
+        # Get the number of infalling particles within R200m and orbiting particles outside
+        n_inf_inside = np.where((r_scale < 1.0) & (curr_orb_assn == 0))[0].shape[0]
+        n_orb_inside = np.where((r_scale > 1.0) & (curr_orb_assn == 1))[0].shape[0]
+        
+        n_inf = np.where(curr_orb_assn==0)[0].shape[0]
+        n_orb = np.where(curr_orb_assn==1)[0].shape[0]
+        
+        print("Number of infalling particles within R200m:",n_inf_inside,"Fraction of total infalling population:",n_inf_inside / n_inf)
+        print("Number of orbiting particles outside of R200m:",n_orb_inside, "Fraction of total orbiting population:",n_orb_inside / n_orb)
+        
         plot_halo_slice(curr_ptl_pos,curr_orb_assn,use_halo_pos,use_halo_r200m,plot_loc,search_rad=4,title=str(num)+"_")

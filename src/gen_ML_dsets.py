@@ -22,25 +22,25 @@ from utils.debug_check import check_string, check_list,check_or_create_directory
 ##################################################################################################################
 config_dict = load_config(os.getcwd() + "/config.ini")
 
-curr_sparta_file = check_string(config_dict["SPARTA_DATA"]["curr_sparta_file"], "curr_sparta_file")
-known_snaps = check_list(json.loads(config_dict.get("SNAP_DATA","known_snaps")), "known_snaps")
-snap_path = check_or_create_directory(config_dict["SNAP_DATA"]["snap_path"])
-SPARTA_output_path = check_or_create_directory(config_dict["SPARTA_DATA"]["sparta_output_path"])
-pickled_path = check_or_create_directory(config_dict["PATHS"]["pickled_path"])
-ML_dset_path = check_or_create_directory(config_dict["PATHS"]["ml_dset_path"])
-debug_plt_path = check_or_create_directory(config_dict["PATHS"]["debug_plt_path"])
+curr_sparta_file = config_dict["SPARTA_DATA"]["curr_sparta_file"]
+known_snaps = config_dict.get("SNAP_DATA","known_snaps")
+snap_path = config_dict["SNAP_DATA"]["snap_path"]
+SPARTA_output_path = config_dict["SPARTA_DATA"]["sparta_output_path"]
+pickled_path = config_dict["PATHS"]["pickled_path"]
+ML_dset_path = config_dict["PATHS"]["ml_dset_path"]
+debug_plt_path = config_dict["PATHS"]["debug_plt_path"]
 
 debug_mem = config_dict["MISC"]["debug_mem"]
 sim_cosmol = config_dict["MISC"]["sim_cosmol"]
+reset_lvl = config_dict["MISC"]["reset_search"]
+mp_chunk_size = config_dict["MISC"]["mp_chunk_size"]
 
 snap_dir_format = config_dict["SNAP_DATA"]["snap_dir_format"]
 snap_format = config_dict["SNAP_DATA"]["snap_format"]
 
-reset_lvl = config_dict["DSET_CREATE"]["reset"]
 t_dyn_step = config_dict["DSET_CREATE"]["t_dyn_step"]
 p_red_shift = config_dict["DSET_CREATE"]["p_red_shift"]
 search_radius = config_dict["DSET_CREATE"]["search_radius"]
-mp_chunk_size = config_dict["DSET_CREATE"]["mp_chunk_size"]
 sub_dset_mem_size = config_dict["DSET_CREATE"]["sub_dset_mem_size"]
 
 test_dset_frac = config_dict["DSET_CREATE"]["test_dset_frac"]
@@ -379,6 +379,7 @@ def halo_loop(halo_idx,ptl_idx,curr_iter,num_iter,rst_pnt, indices, halo_splits,
                 "Halo_first":p_start_num_ptls,
                 "Halo_n":p_use_num_ptls,
                 "Halo_indices":use_indices,
+                "Halo_R200m":sparta_output['halos']['R200m'][:,p_sparta_snap],
             })
             
             ptl_df = pd.DataFrame({

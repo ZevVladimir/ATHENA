@@ -19,6 +19,7 @@ def calc_halo_mem(n_ptl):
     return n_bytes
 
 # Calculate radii of particles relative to a halo and the difference in each coordinate for particles and halos for use in calculating rhat
+#TODO can new_particles just be determined from size of the positions?
 def calc_radius(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_particles, box_size):
     x_dist = particle_x - halo_x
     y_dist = particle_y - halo_y

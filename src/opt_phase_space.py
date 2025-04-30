@@ -429,5 +429,5 @@ if __name__ == "__main__":
                 plt_macc_splits.remove(macc_split)
         
         
-        compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "fit_ps_cut_dens_",prf_name_0="Fitted Phase Space Cut", prf_name_1="SPARTA")
+        compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "fit_ps_cut_dens_",prf_name_0="Optimized Cut", prf_name_1="SPARTA")
         

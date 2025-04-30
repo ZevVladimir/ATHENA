@@ -45,7 +45,7 @@ def evaluate_accuracy_and_speed(model, dtest, max_trees):
         start_time = time.time()
         
         # Make predictions using the first 'num_trees' trees
-        preds = model.predict(dtest, ntree_limit=num_trees)
+        preds = model.predict(dtest, iteration_range=(0,num_trees))
         
         # End the timer and calculate time taken
         elapsed_time = time.time() - start_time
@@ -148,6 +148,7 @@ if __name__ == "__main__":
                     "device": "cuda",
                     "subsample": 0.5,
                     'objective': 'binary:logistic',
+                    'eval_metric': 'error',
                     }
 
             halo_files = []
@@ -229,6 +230,7 @@ if __name__ == "__main__":
                 "device": "cuda",
                 "subsample": 0.5,
                 'objective': 'binary:logistic',
+                'eval_metric': 'error',
                 }
             model_info['Training Info']={
                 'Fraction of Training Data Used': test_dset_frac,
@@ -239,15 +241,13 @@ if __name__ == "__main__":
         num_trees = 100
         with timed("Trained Model"):
             print("Starting train using params:", params)
-            evals_result = {}
             output = dxgb.train(
                 client,
                 params,
                 dtrain,
                 num_boost_round=num_trees,
                 evals=[(dtrain, 'train'), (dtest, 'test')],
-                early_stopping_rounds=10,  
-                evals_result=evals_result    
+                early_stopping_rounds=10, 
                 )
             bst = output["booster"]
             history = output["history"]
@@ -255,11 +255,11 @@ if __name__ == "__main__":
             save_pickle(model_info,model_fldr_loc + "model_info.pickle")
             
             #TODO make this optional and document evaluation of model
-            print(evals_result)
+            #TODO see if it is possible to save the history
             # Get accuracy at each boosting round
             # Extract training and validation error (1 - accuracy) at each round
-            train_errors = evals_result['train']['error']
-            test_errors = evals_result['eval']['error']
+            train_errors = history['train']['error']
+            test_errors = history['eval']['error']
 
             # Calculate accuracies
             train_accuracies = [1 - error for error in train_errors]
@@ -279,6 +279,11 @@ if __name__ == "__main__":
             print(f"Final train accuracy: {final_train_accuracy}")
             print(f"Final test accuracy: {final_test_accuracy}")
             
+            
+            X_test_local = X_test.compute()
+            y_test_local = y_test.compute()
+            dtest = xgb.DMatrix(X_test_local, label=y_test_local)
+
             accuracies, times = evaluate_accuracy_and_speed(bst, dtest, max_trees=num_trees)
 
             # Plot accuracy vs number of trees
