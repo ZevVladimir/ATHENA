@@ -3,8 +3,7 @@ import json
 import random
 import pickle
 import re
-import configparser
-import h5py
+from scipy.spatial import cKDTree
 import numpy as np
 from sparta_tools import sparta
 
@@ -59,8 +58,7 @@ create_directory(plot_loc)
 halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
 all_idxs = halo_ddf["Halo_indices"].values
 
-with open(ML_dset_path + sim + "/p_ptl_tree.pickle", "rb") as pickle_file:
-    tree = pickle.load(pickle_file)
+
         
 sparta_name, sparta_search_name = split_calc_name(sim)
 # find the snapshots for this simulation
@@ -97,6 +95,12 @@ p_snap_path = snap_path + "snapdir_" + snap_dir_format.format(p_snap) + "/snapsh
 ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(p_snap), p_snap_path) 
 ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(p_snap), p_snap_path) # km/s
 ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(p_snap), p_snap_path) * 10**3 * p_scale_factor # kpc/h
+
+if os.path.isfile(ML_dset_path + sim + "/p_ptl_tree.pickle"):
+    with open(ML_dset_path + sim + "/p_ptl_tree.pickle", "rb") as pickle_file:
+        tree = pickle.load(pickle_file)
+else:
+    tree = cKDTree(data = ptls_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size)
 
 random.seed(365)
 used_numbers = set()
