@@ -157,6 +157,7 @@ while len(used_numbers) < 25:
         n_inf = np.where(curr_orb_assn==0)[0].shape[0]
         n_orb = np.where(curr_orb_assn==1)[0].shape[0]
         
+        print("\nHalo:",str(num))
         print("Number of infalling particles within R200m:",n_inf_inside,"Fraction of total infalling population:",n_inf_inside / n_inf)
         print("Number of orbiting particles outside of R200m:",n_orb_inside, "Fraction of total orbiting population:",n_orb_inside / n_orb)
         
