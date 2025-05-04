@@ -155,7 +155,7 @@ while len(used_numbers) < 25:
         matched_ids = np.intersect1d(curr_ptl_pids, sparta_tracer_ids, return_indices = True)
         curr_orb_assn[matched_ids[1]] = compare_sparta_assn[matched_ids[2]]
         
-        r, = calc_radius(use_halo_pos[0],use_halo_pos[1],use_halo_pos[2],curr_ptl_pos[:,0],curr_ptl_pos[:,1],curr_ptl_pos[:,2],curr_ptl_pos.shape[0],p_box_size)
+        r, = calc_radius(use_halo_pos[0],use_halo_pos[1],use_halo_pos[2],curr_ptl_pos[:,0],curr_ptl_pos[:,1],curr_ptl_pos[:,2],p_box_size)
         r_scale = r/use_halo_r200m
 
         # Get the number of infalling particles within R200m and orbiting particles outside

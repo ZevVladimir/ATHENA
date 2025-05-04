@@ -19,13 +19,14 @@ def calc_halo_mem(n_ptl):
     return n_bytes
 
 # Calculate radii of particles relative to a halo and the difference in each coordinate for particles and halos for use in calculating rhat
-#TODO can new_particles just be determined from size of the positions?
-def calc_radius(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_particles, box_size):
+def calc_radius(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, box_size):
+    n_ptls = particle_x.shape[0]
+    
     x_dist = particle_x - halo_x
     y_dist = particle_y - halo_y
     z_dist = particle_z - halo_z
     
-    coord_diff = np.zeros((new_particles, 3))
+    coord_diff = np.zeros((n_ptls, 3))
     half_box_size = box_size/2
     
     # Handles periodic boundary conditions by checking if you were to add or subtract a boxsize would it then be within half a box size of the halo
@@ -54,7 +55,7 @@ def calc_radius(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, new_
     coord_diff[:,2] = particle_z - halo_z
 
     # Calculate radii with standard distance formula
-    distance = np.zeros((new_particles,1))
+    distance = np.zeros((n_ptls,1))
     distance = np.sqrt(np.square((coord_diff[:,0])) + np.square((coord_diff[:,1])) + np.square((coord_diff[:,2])))
     
     return distance, coord_diff #kpc/h
@@ -348,7 +349,7 @@ def calc_halo_params(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_pt
     fnd_HIPIDs = ne.evaluate("0.5 * (curr_ptl_pids + curr_halo_idx) * (curr_ptl_pids + curr_halo_idx + 1) + curr_halo_idx")
     
     # Calculate the radii of each particle based on the distance formula
-    ptl_rad, coord_dist = calc_radius(halo_pos[0], halo_pos[1], halo_pos[2], curr_ptl_pos[:,0], curr_ptl_pos[:,1], curr_ptl_pos[:,2], num_new_ptls, box_size)         
+    ptl_rad, coord_dist = calc_radius(halo_pos[0], halo_pos[1], halo_pos[2], curr_ptl_pos[:,0], curr_ptl_pos[:,1], curr_ptl_pos[:,2], box_size)         
     
     # Only find orbiting(1)/infalling(0) classification for the primary snapshot
     if comp_snap == False:         
