@@ -12,22 +12,22 @@ from src.utils.vis_fxns import plot_halo_slice
 from utils.data_and_loading_functions import create_directory,load_SPARTA_data,timed,load_ptl_param,load_config
 from utils.calculation_functions import calc_radius
 
-config_dict = load_config(os.getcwd() + "/config.ini")
+dset_params = load_config(os.getcwd() + "/config.ini")
 
-snap_path = config_dict["SNAP_DATA"]["snap_path"]
-SPARTA_output_path = config_dict["SPARTA_DATA"]["sparta_output_path"]
-ML_dset_path = config_dict["PATHS"]["ml_dset_path"]
-path_to_models = config_dict["PATHS"]["path_to_models"]
+snap_path = dset_params["SNAP_DATA"]["snap_path"]
+SPARTA_output_path = dset_params["SPARTA_DATA"]["sparta_output_path"]
+ML_dset_path = dset_params["PATHS"]["ml_dset_path"]
+path_to_models = dset_params["PATHS"]["path_to_models"]
 
-curr_sparta_file = config_dict["SPARTA_DATA"]["curr_sparta_file"]
-snap_dir_format = config_dict["SNAP_DATA"]["snap_dir_format"]
-snap_format = config_dict["SNAP_DATA"]["snap_format"]
-sim_cosmol = config_dict["MISC"]["sim_cosmol"]
+curr_sparta_file = dset_params["SPARTA_DATA"]["curr_sparta_file"]
+snap_dir_format = dset_params["SNAP_DATA"]["snap_dir_format"]
+snap_format = dset_params["SNAP_DATA"]["snap_format"]
+sim_cosmol = dset_params["MISC"]["sim_cosmol"]
 
-search_radius = config_dict["DSET_CREATE"]["search_radius"]
-test_sims = config_dict["EVAL_MODEL"]["test_sims"]
-model_sims = config_dict["TRAIN_MODEL"]["model_sims"]
-model_type = config_dict["TRAIN_MODEL"]["model_type"]
+search_radius = dset_params["DSET_CREATE"]["search_radius"]
+test_sims = dset_params["EVAL_MODEL"]["test_sims"]
+model_sims = dset_params["TRAIN_MODEL"]["model_sims"]
+model_type = dset_params["TRAIN_MODEL"]["model_type"]
 
 sim_name, search_name = split_sparta_hdf5_name(curr_sparta_file)
 
@@ -49,7 +49,7 @@ sim = test_sims[0][0]
 
 comb_model_sims = get_combined_name(model_sims) 
         
-model_name = get_model_name(model_type, model_sims, hpo_done=config_dict["OPTIMIZE"]["hpo"], opt_param_dict=config_dict["OPTIMIZE"])    
+model_name = get_model_name(model_type, model_sims, hpo_done=dset_params["OPTIMIZE"]["hpo"], opt_param_dict=dset_params["OPTIMIZE"])    
 model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"
 gen_plot_save_loc = model_fldr_loc + "plots/"
 
@@ -72,15 +72,15 @@ if match:
     curr_snap_list = [match.group(1), match.group(2)]   
     p_snap = int(curr_snap_list[0])
 
-with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
-    config_dict = pickle.load(file)
+with open(ML_dset_path + sim + "/dset_params.pickle", "rb") as file:
+    dset_params = pickle.load(file)
     
-    curr_z = config_dict["p_snap_info"]["red_shift"][()]
-    curr_snap_dir_format = config_dict["snap_dir_format"]
-    curr_snap_format = config_dict["snap_format"]
-    p_scale_factor = config_dict["p_snap_info"]["scale_factor"][()]
-    p_sparta_snap = config_dict["p_snap_info"]["sparta_snap"]
-    p_box_size = config_dict["p_snap_info"]["box_size"]
+    curr_z = dset_params["p_snap_info"]["red_shift"][()]
+    curr_snap_dir_format = dset_params["snap_dir_format"]
+    curr_snap_format = dset_params["snap_format"]
+    p_scale_factor = dset_params["p_snap_info"]["scale_factor"][()]
+    p_sparta_snap = dset_params["p_snap_info"]["sparta_snap"]
+    p_box_size = dset_params["p_snap_info"]["box_size"]
     
 curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
 

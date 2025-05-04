@@ -436,11 +436,11 @@ def load_data(client, sims, dset_name, bin_edges = None, limit_files = False, sc
     all_weights = []
     
     for sim in sims:
-        with open(ML_dset_path + sim + "/config.pickle","rb") as f:
-            config_params = pickle.load(f)
+        with open(ML_dset_path + sim + "/dset_params.pickle","rb") as f:
+            dset_params = pickle.load(f)
         # Get mass and redshift for this simulation
-        ptl_mass, use_z = sim_mass_p_z(sim,config_params)
-        max_mem = int(np.floor(config_params["HDF5 Mem Size"] / 2))
+        ptl_mass, use_z = sim_mass_p_z(sim,dset_params)
+        max_mem = int(np.floor(dset_params["HDF5 Mem Size"] / 2))
         
         if dset_name == "Full":
             datasets = ["Train", "Test"]
@@ -489,10 +489,10 @@ def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         if match:
             curr_snap_list = [match.group(1), match.group(2)] 
         
-        with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
-            config_params = pickle.load(file)
+        with open(ML_dset_path + sim + "/dset_params.pickle", "rb") as file:
+            dset_params = pickle.load(file)
             
-        p_sparta_snap = config_params["p_snap_info"]["sparta_snap"]
+        p_sparta_snap = dset_params["p_snap_info"]["sparta_snap"]
         
         curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"      
         
@@ -559,12 +559,12 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, pl
         
         # Get the redshifts for each simulation's primary snapshot
         for i,sim in enumerate(use_sims):
-            with open(ML_dset_path + sim + "/config.pickle", "rb") as file:
-                config_dict = pickle.load(file)
-                curr_z = config_dict["p_snap_info"]["red_shift"][()]
+            with open(ML_dset_path + sim + "/dset_params.pickle", "rb") as file:
+                dset_params = pickle.load(file)
+                curr_z = dset_params["p_snap_info"]["red_shift"][()]
                 all_z.append(curr_z)
                 all_rhom.append(cosmol.rho_m(curr_z))
-                h = config_dict["p_snap_info"]["h"][()]
+                h = dset_params["p_snap_info"]["h"][()]
         
         tot_num_halos = halo_n.shape[0]
         min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
@@ -605,7 +605,6 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, pl
             # Compute the difference for each halo (using range: max - min)
             diff = np.nanmax(ratio, axis=1) - np.nanmin(ratio, axis=1)
 
-        
             # If you want the top k halos with the largest differences, use:
             k = 5  # Example value
             big_halo_loc = np.argsort(diff)[-k:]
@@ -626,14 +625,14 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, pl
         past_halos_r200m_list = []
         
         for sim in use_sims:
-            config_dict = load_pickle(ML_dset_path + sim + "/config.pickle")
-            p_snap = config_dict["p_snap_info"]["ptl_snap"][()]
-            curr_z = config_dict["p_snap_info"]["red_shift"][()]
+            dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
+            p_snap = dset_params["p_snap_info"]["ptl_snap"][()]
+            curr_z = dset_params["p_snap_info"]["red_shift"][()]
             # TODO make this generalizable to when the snapshot separation isn't just 1 dynamical time as needed for mass accretion calculation
             # we can just use the secondary snap here because we already chose to do 1 dynamical time for that snap
-            past_z = config_dict["c_snap_info"]["red_shift"][()] 
-            p_sparta_snap = config_dict["p_snap_info"]["sparta_snap"][()]
-            c_sparta_snap = config_dict["c_snap_info"]["sparta_snap"][()]
+            past_z = dset_params["c_snap_info"]["red_shift"][()] 
+            p_sparta_snap = dset_params["p_snap_info"]["sparta_snap"][()]
+            c_sparta_snap = dset_params["c_snap_info"]["sparta_snap"][()]
             
             sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
             

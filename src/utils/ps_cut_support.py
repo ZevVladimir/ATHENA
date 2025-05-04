@@ -69,12 +69,12 @@ def halo_select(sims, ptl_data):
         total_num_halos = match_halo_idxs.shape[0]
         
         # Load information about the simulation
-        config_dict = load_pickle(ML_dset_path + sim + "/config.pickle")
-        test_halos_ratio = config_dict["test_halos_ratio"]
-        curr_z = config_dict["p_snap_info"]["red_shift"][()]
-        p_snap = config_dict["p_snap_info"]["ptl_snap"][()]
-        p_box_size = config_dict["p_snap_info"]["box_size"][()]
-        p_scale_factor = config_dict["p_snap_info"]["scale_factor"][()]
+        dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
+        test_halos_ratio = dset_params["test_halos_ratio"]
+        curr_z = dset_params["p_snap_info"]["red_shift"][()]
+        p_snap = dset_params["p_snap_info"]["ptl_snap"][()]
+        p_box_size = dset_params["p_snap_info"]["box_size"][()]
+        p_scale_factor = dset_params["p_snap_info"]["scale_factor"][()]
         
         # split all indices into train and test groups
         split_pnt = int((1-test_halos_ratio) * total_num_halos)
@@ -90,8 +90,8 @@ def halo_select(sims, ptl_data):
         
         curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
         
-        config_dict = load_pickle(ML_dset_path + sim + "/config.pickle")
-        p_sparta_snap = config_dict["p_snap_info"]["sparta_snap"][()]
+        dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
+        p_sparta_snap = dset_params["p_snap_info"]["sparta_snap"][()]
 
         # Load the halo's positions and radii
         param_paths = [["halos","position"],["halos","R200m"]]

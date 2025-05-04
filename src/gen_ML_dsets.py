@@ -18,8 +18,7 @@ from sparta_tools import sparta
 from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z_snap, timed, clean_dir, load_pickle, save_pickle, get_num_snaps, load_config
 from utils.calculation_functions import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn, create_mass_prf, calculate_density
 from src.utils.vis_fxns import compare_prfs
-from utils.debug_check import check_string, check_list,check_or_create_directory
-from utils.ML_support import split_sparta_hdf5_name
+from utils.ML_support import split_calc_name
 ##################################################################################################################
 config_dict = load_config(os.getcwd() + "/config.ini")
 
@@ -49,7 +48,7 @@ lin_rticks = config_dict["EVAL_MODEL"]["lin_rticks"]
 ##################################################################################################################
 create_directory(pickled_path)
 create_directory(ML_dset_path)
-sim_name, search_name = split_sparta_hdf5_name(curr_sparta_file)
+sim_name, search_name = split_calc_name(curr_sparta_file)
 
 snap_path = snap_path + sim_name + "/"
 
@@ -416,7 +415,7 @@ with timed("Startup"):
     
     if reset_lvl <= 1 and len(known_snaps) > 0:
         save_location =  ML_dset_path + curr_sparta_file + "_" + str(known_snaps[0]) + "to" + str(known_snaps[1]) + "/"
-        config_params = load_pickle(save_location+"config.pickle")
+        dset_params = load_pickle(save_location+"dset_params.pickle")
         #TODO implement check that known_snaps correspond to what is stored in the config file
 
     with timed("p_snap information load"):
@@ -443,22 +442,23 @@ with timed("Startup"):
             p_box_size = sim_box_size * 10**3 * p_scale_factor #convert to Kpc/h physical
             little_h = dic_sim["h"]
         else:
-            p_snap = config_params["p_snap_info"]["ptl_snap"]
-            p_red_shift = config_params["p_snap_info"]["red_shift"]
-            p_sparta_snap = config_params["p_snap_info"]["sparta_snap"]
-            p_scale_factor = config_params["p_snap_info"]["scale_factor"]
-            p_hubble_const = config_params["p_snap_info"]["hubble_const"]
-            p_box_size = config_params["p_snap_info"]["box_size"]
-            little_h = config_params["p_snap_info"]["h"]
+            p_snap = dset_params["p_snap_info"]["ptl_snap"]
+            p_red_shift = dset_params["p_snap_info"]["red_shift"]
+            p_sparta_snap = dset_params["p_snap_info"]["sparta_snap"]
+            p_scale_factor = dset_params["p_snap_info"]["scale_factor"]
+            p_hubble_const = dset_params["p_snap_info"]["hubble_const"]
+            p_box_size = dset_params["p_snap_info"]["box_size"]
+            little_h = dset_params["p_snap_info"]["h"]
             #TODO remove this once this parameters is generated for all datasets
-            if "rho_m" not in config_params.get("p_snap_info", {}):
+            if "rho_m" not in dset_params.get("p_snap_info", {}):
                 p_rho_m = cosmol.rho_m(p_red_shift)
             else:
-                p_rho_m = config_params["p_snap_info"]["rho_m"]
+                p_rho_m = dset_params["p_snap_info"]["rho_m"]
 
         # Set constants
         p_snap_path = snap_path + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
         
+
         p_snap_dict = {
             "ptl_snap":p_snap,
             "sparta_snap":p_sparta_snap,
@@ -497,17 +497,17 @@ with timed("Startup"):
             c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_const = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
             c_box_size = sim_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
         else:
-            c_snap = config_params["c_snap_info"]["ptl_snap"]
-            c_sparta_snap = config_params["c_snap_info"]["sparta_snap"]
-            c_red_shift = config_params["c_snap_info"]["red_shift"]
-            c_scale_factor = config_params["c_snap_info"]["scale_factor"]
-            c_hubble_const = config_params["c_snap_info"]["hubble_const"]
-            c_box_size = config_params["c_snap_info"]["box_size"]
+            c_snap = dset_params["c_snap_info"]["ptl_snap"]
+            c_sparta_snap = dset_params["c_snap_info"]["sparta_snap"]
+            c_red_shift = dset_params["c_snap_info"]["red_shift"]
+            c_scale_factor = dset_params["c_snap_info"]["scale_factor"]
+            c_hubble_const = dset_params["c_snap_info"]["hubble_const"]
+            c_box_size = dset_params["c_snap_info"]["box_size"]
             #TODO remove this once this parameters is generated for all datasets
-            if "rho_m" not in config_params.get("c_snap_info", {}):
+            if "rho_m" not in dset_params.get("c_snap_info", {}):
                 c_rho_m = cosmol.rho_m(c_red_shift)
             else:
-                c_rho_m = config_params["c_snap_info"]["rho_m"]
+                c_rho_m = dset_params["c_snap_info"]["rho_m"]
         
         c_snap_path = snap_path + "/snapdir_" + snap_dir_format.format(c_snap) + "/snapshot_" + snap_format.format(c_snap)
         
@@ -620,7 +620,7 @@ with timed("Startup"):
 
     tot_num_snaps = get_num_snaps(snap_path)
     
-    config_params = {
+    dset_params = {
         "sparta_file": curr_sparta_file,
         "snap_dir_format":snap_dir_format,
         "snap_format": snap_format,
@@ -635,7 +635,7 @@ with timed("Startup"):
         "c_snap_info": c_snap_dict,
     }
 
-    save_pickle(config_params,save_location+"config.pickle")
+    save_pickle(dset_params,save_location+"dset_params.pickle")
 
     create_directory(save_location + "Train/halo_info/")
     create_directory(save_location + "Train/ptl_info/")
