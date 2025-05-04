@@ -16,7 +16,7 @@ from scipy.spatial import cKDTree
 import scipy.ndimage as ndimage
 from sparta_tools import sparta
 
-from utils.ML_support import load_data, get_combined_name, reform_dataset_dfs, parse_ranges, split_calc_name
+from utils.ML_support import load_data, get_combined_name, reform_dataset_dfs, parse_ranges, split_sparta_hdf5_name
 from utils.data_and_loading_functions import timed, load_pickle, load_SPARTA_data, load_config, load_RSTAR_data, depair_np
 
 config_dict = load_config(os.getcwd() + "/config.ini")
@@ -86,7 +86,7 @@ def halo_select(sims, ptl_data):
         test_idxs = test_idxs[test_idxs_inds]
         test_num_ptls = test_num_ptls[test_idxs_inds]
         
-        sparta_name, sparta_search_name = split_calc_name(sim)
+        sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
         
         curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
         

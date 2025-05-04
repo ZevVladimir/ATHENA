@@ -15,7 +15,7 @@ from colossus.cosmology import cosmology
 import pickle
 from sparta_tools import sparta
 
-from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, split_calc_name, load_SPARTA_data, reform_dataset_dfs, get_model_name
+from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, split_sparta_hdf5_name, load_SPARTA_data, reform_dataset_dfs, get_model_name
 from utils.data_and_loading_functions import create_directory, load_pickle, conv_halo_id_spid, load_config, save_pickle, load_pickle, timed
 from utils.ps_cut_support import load_ps_data
 from src.utils.vis_fxns import plt_SPARTA_KE_dist, compare_split_prfs
@@ -242,7 +242,7 @@ if __name__ == "__main__":
                 mask_r = r_fit < r_cut
                 
                 
-            sparta_name, sparta_search_name = split_calc_name(curr_test_sims[0])
+            sparta_name, sparta_search_name = split_sparta_hdf5_name(curr_test_sims[0])
             curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"      
             
             sparta_output = sparta.load(filename=curr_sparta_HDF5_path, log_level=0)
@@ -389,7 +389,7 @@ if __name__ == "__main__":
             p_sparta_snap = config_dict["p_snap_info"]["sparta_snap"][()]
             c_sparta_snap = config_dict["c_snap_info"]["sparta_snap"][()]
             
-            sparta_name, sparta_search_name = split_calc_name(sim)
+            sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
             
             curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
                     

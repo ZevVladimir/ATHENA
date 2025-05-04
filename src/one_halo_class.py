@@ -13,7 +13,7 @@ import multiprocessing as mp
 import h5py
 from sparta_tools import sparta
 
-from utils.ML_support import setup_client,get_combined_name,reform_dataset_dfs,split_calc_name,load_data,make_preds, get_model_name
+from utils.ML_support import setup_client,get_combined_name,reform_dataset_dfs,split_sparta_hdf5_name,load_data,make_preds, get_model_name
 from utils.data_and_loading_functions import create_directory,load_SPARTA_data,load_ptl_param, load_config
 from src.utils.vis_fxns import plot_halo_slice_class, plot_halo_3d_class
 ##################################################################################################################
@@ -43,6 +43,10 @@ reduce_rad = config_dict["OPTIMIZE"]["reduce_rad"]
 reduce_perc = config_dict["OPTIMIZE"]["reduce_perc"]
 weight_rad = config_dict["OPTIMIZE"]["weight_rad"]
 min_weight = config_dict["OPTIMIZE"]["min_weight"]
+
+sim_name, search_name = split_sparta_hdf5_name(curr_sparta_file)
+
+snap_path = snap_path + sim_name + "/"
 
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
@@ -101,7 +105,7 @@ if __name__ == "__main__":
     with open(ML_dset_path + sim + "/p_ptl_tree.pickle", "rb") as pickle_file:
         tree = pickle.load(pickle_file)
             
-    sparta_name, sparta_search_name = split_calc_name(sim)
+    sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
     # find the snapshots for this simulation
     snap_pat = r"(\d+)to(\d+)"
     match = re.search(snap_pat, sim)

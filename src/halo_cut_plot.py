@@ -7,7 +7,7 @@ from scipy.spatial import cKDTree
 import numpy as np
 from sparta_tools import sparta
 
-from utils.ML_support import get_combined_name,reform_dataset_dfs,split_calc_name,get_model_name
+from utils.ML_support import get_combined_name,reform_dataset_dfs,split_sparta_hdf5_name,get_model_name
 from src.utils.vis_fxns import plot_halo_slice
 from utils.data_and_loading_functions import create_directory,load_SPARTA_data,timed,load_ptl_param,load_config
 from utils.calculation_functions import calc_radius
@@ -28,6 +28,10 @@ search_radius = config_dict["DSET_CREATE"]["search_radius"]
 test_sims = config_dict["EVAL_MODEL"]["test_sims"]
 model_sims = config_dict["TRAIN_MODEL"]["model_sims"]
 model_type = config_dict["TRAIN_MODEL"]["model_type"]
+
+sim_name, search_name = split_sparta_hdf5_name(curr_sparta_file)
+
+snap_path = snap_path + sim_name + "/"
 
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
@@ -60,7 +64,7 @@ all_idxs = halo_ddf["Halo_indices"].values
 
 
         
-sparta_name, sparta_search_name = split_calc_name(sim)
+sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
 # find the snapshots for this simulation
 snap_pat = r"(\d+)to(\d+)"
 match = re.search(snap_pat, sim)
@@ -122,7 +126,7 @@ while len(used_numbers) < 25:
 
         num_new_ptls = curr_ptl_pos.shape[0]
         
-        if num_new_ptls > 500:
+        if num_new_ptls > 1000:
             used_numbers.add(num)
         else:
             continue
@@ -151,7 +155,7 @@ while len(used_numbers) < 25:
         matched_ids = np.intersect1d(curr_ptl_pids, sparta_tracer_ids, return_indices = True)
         curr_orb_assn[matched_ids[1]] = compare_sparta_assn[matched_ids[2]]
         
-        r, = calc_radius(use_halo_pos[:,0],use_halo_pos[:,1],use_halo_pos[:,2],curr_ptl_pos[:,0],curr_ptl_pos[:,1],curr_ptl_pos[:,2],curr_ptl_pos.shape[0],p_box_size)
+        r, = calc_radius(use_halo_pos[0],use_halo_pos[1],use_halo_pos[2],curr_ptl_pos[:,0],curr_ptl_pos[:,1],curr_ptl_pos[:,2],curr_ptl_pos.shape[0],p_box_size)
         r_scale = r/use_halo_r200m
 
         # Get the number of infalling particles within R200m and orbiting particles outside

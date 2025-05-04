@@ -19,6 +19,7 @@ from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, c
 from utils.calculation_functions import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn, create_mass_prf, calculate_density
 from src.utils.vis_fxns import compare_prfs
 from utils.debug_check import check_string, check_list,check_or_create_directory
+from utils.ML_support import split_sparta_hdf5_name
 ##################################################################################################################
 config_dict = load_config(os.getcwd() + "/config.ini")
 
@@ -48,6 +49,9 @@ lin_rticks = config_dict["EVAL_MODEL"]["lin_rticks"]
 ##################################################################################################################
 create_directory(pickled_path)
 create_directory(ML_dset_path)
+sim_name, search_name = split_sparta_hdf5_name(curr_sparta_file)
+
+snap_path = snap_path + sim_name + "/"
 
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
@@ -455,7 +459,6 @@ with timed("Startup"):
         # Set constants
         p_snap_path = snap_path + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
         
-
         p_snap_dict = {
             "ptl_snap":p_snap,
             "sparta_snap":p_sparta_snap,

@@ -126,18 +126,12 @@ if __name__ == "__main__":
         mask_vr_neg = (vr_test < 0)
         mask_vr_pos = ~mask_vr_neg
 
-        #TODO load this from pickle
-        ps_param_dict = {
-        "m_pos": -1.9973747688461672,
-        "b_pos": 2.730691113802748,
-        "m_neg": -1.601325049968688,
-        "b_neg": 1.5101195108968333,
-        }   
+        ps_param_dict = load_pickle(model_fldr_loc + "ps_optparam_dict.pickle")
         
-        mask_cut_pos = (lnv2_test < (ps_param_dict["m_pos"] * r_test + ps_param_dict["b_pos"])) & (r_test < 3.0)
+        mask_cut_pos = (lnv2_test < (ps_param_dict["m_pos"] * r_test + ps_param_dict["b_pos"])) & (r_test < 2.0)
 
         # Orbiting classification for vr < 0
-        mask_cut_neg = (lnv2_test < (ps_param_dict["m_neg"] * r_test + ps_param_dict["b_neg"])) & (r_test < 3.0)
+        mask_cut_neg = (lnv2_test < (ps_param_dict["m_neg"] * r_test + ps_param_dict["b_neg"])) & (r_test < 2.0)
 
         # Particle is infalling if it is below both lines and 2*R00
         mask_orb = \
