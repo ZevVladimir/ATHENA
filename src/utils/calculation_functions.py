@@ -397,17 +397,17 @@ def calc_halo_params(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_pt
     else:
         return fnd_HIPIDs, scaled_rad_vel, scaled_tang_vel, scaled_radii
 
+
+# Print the number of infalling particles within a multiple of R200m and the number of orbiting outside and the fraction of the total pop.
+# r_scale is the radius scaled by R200m, nr200m is the multiple of r200m to consider
+def nptl_inc_placement_r200m(r_scale, mult_r200m, orb_assn):
+    # Get the number of infalling particles within R200m and orbiting particles outside
+    n_inf_inside = np.where((r_scale < mult_r200m) & (orb_assn == 0))[0].shape[0]
+    n_orb_inside = np.where((r_scale > mult_r200m) & (orb_assn == 1))[0].shape[0]
     
-def plot_rad_dist(bin_edges,filter_radii,save_path):
-    #TODO make this into a function that says how many orbiting particles are out the halo and how many infalling are inside
-    fig,ax = plt.subplots(1,2,figsize=(25,10))
-    ax[0].hist(filter_radii)
-    ax[0].set_xlabel("Radius $r/R_{200m}$")
-    ax[0].set_ylabel("counts")
-    ax[1].hist(filter_radii,bins=bin_edges)
-    ax[1].set_xlabel("Radius $r/R_{200m}$")
-    ax[1].set_xscale("log")
-    print("num ptl within 2 R200m", np.where(filter_radii < 2)[0].shape)
-    print("num ptl outside 2 R200m", np.where(filter_radii > 2)[0].shape)
-    print("ratio in/out", np.where(filter_radii < 2)[0].shape[0] / np.where(filter_radii > 2)[0].shape[0])
-    fig.savefig(save_path + "radii_dist.png",bbox_inches="tight")
+    n_inf = np.where(orb_assn==0)[0].shape[0]
+    n_orb = np.where(orb_assn==1)[0].shape[0]
+
+    print("Number of infalling particles within R200m:",n_inf_inside,"Fraction of total infalling population:",n_inf_inside / n_inf)
+    print("Number of orbiting particles outside of R200m:",n_orb_inside, "Fraction of total orbiting population:",n_orb_inside / n_orb)
+        

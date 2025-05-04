@@ -10,7 +10,7 @@ from sparta_tools import sparta
 from utils.ML_support import get_combined_name,reform_dataset_dfs,split_sparta_hdf5_name,get_model_name
 from src.utils.vis_fxns import plot_halo_slice
 from utils.data_and_loading_functions import create_directory,load_SPARTA_data,timed,load_ptl_param,load_config
-from utils.calculation_functions import calc_radius
+from utils.calculation_functions import calc_radius, nptl_inc_placement_r200m
 
 dset_params = load_config(os.getcwd() + "/config.ini")
 
@@ -158,15 +158,7 @@ while len(used_numbers) < 25:
         r, = calc_radius(use_halo_pos[0],use_halo_pos[1],use_halo_pos[2],curr_ptl_pos[:,0],curr_ptl_pos[:,1],curr_ptl_pos[:,2],p_box_size)
         r_scale = r/use_halo_r200m
 
-        # Get the number of infalling particles within R200m and orbiting particles outside
-        n_inf_inside = np.where((r_scale < 1.0) & (curr_orb_assn == 0))[0].shape[0]
-        n_orb_inside = np.where((r_scale > 1.0) & (curr_orb_assn == 1))[0].shape[0]
-        
-        n_inf = np.where(curr_orb_assn==0)[0].shape[0]
-        n_orb = np.where(curr_orb_assn==1)[0].shape[0]
-        
         print("\nHalo:",str(num))
-        print("Number of infalling particles within R200m:",n_inf_inside,"Fraction of total infalling population:",n_inf_inside / n_inf)
-        print("Number of orbiting particles outside of R200m:",n_orb_inside, "Fraction of total orbiting population:",n_orb_inside / n_orb)
-        
+        nptl_inc_placement_r200m(r_scale, 1.0, curr_orb_assn)
+
         plot_halo_slice(curr_ptl_pos,curr_orb_assn,use_halo_pos,use_halo_r200m,plot_loc,search_rad=4,title=str(num)+"_")
