@@ -23,9 +23,9 @@ from skopt.space import Real
 from sklearn.metrics import accuracy_score
 from functools import partial
 
-from .data_and_loading_functions import load_SPARTA_data, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, load_pickle, load_config
+from .data_and_loading_functions import load_SPARTA_data, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, load_pickle, load_config, get_comp_snap
 from .vis_fxns import plot_full_ptl_dist, plot_miss_class_dist, compare_prfs, compare_split_prfs, inf_orb_frac
-from .calculation_functions import create_mass_prf, create_stack_mass_prf, filter_prf, calculate_density, calc_mass_acc_rate
+from .calculation_functions import create_mass_prf, create_stack_mass_prf, filter_prf, calculate_density, calc_mass_acc_rate, calc_t_dyn
 from sparta_tools import sparta 
 
 ##################################################################################################################
@@ -35,6 +35,8 @@ rand_seed = config_dict["MISC"]["random_seed"]
 curr_sparta_file = config_dict["SPARTA_DATA"]["curr_sparta_file"]
 sim_cosmol = config_dict["MISC"]["sim_cosmol"]
 debug_indiv_dens_prf = config_dict["MISC"]["debug_indiv_dens_prf"]
+
+snap_path = config_dict["SNAP_DATA"]["snap_path"]
 
 SPARTA_output_path = config_dict["SPARTA_DATA"]["sparta_output_path"]
 pickled_path = config_dict["PATHS"]["pickled_path"]
@@ -60,7 +62,7 @@ plt_nu_splits = parse_ranges(plt_nu_splits)
 
 plt_macc_splits = config_dict["EVAL_MODEL"]["plt_macc_splits"]
 plt_macc_splits = parse_ranges(plt_macc_splits)
-
+min_halo_nu_bin = config_dict["EVAL_MODEL"]["min_halo_nu_bin"]
 linthrsh = config_dict["EVAL_MODEL"]["linthrsh"]
 lin_nbin = config_dict["EVAL_MODEL"]["lin_nbin"]
 log_nbin = config_dict["EVAL_MODEL"]["log_nbin"]
@@ -71,6 +73,38 @@ log_tvticks = config_dict["EVAL_MODEL"]["log_tvticks"]
 lin_rticks = config_dict["EVAL_MODEL"]["lin_rticks"]
 log_rticks = config_dict["EVAL_MODEL"]["log_rticks"]
 
+# From the input simulation name extract the simulation name (ex: cbol_l0063_n0256) and the SPARTA hdf5 output name (ex: cbol_l0063_n0256_4r200m_1-5v200m)
+def split_sparta_hdf5_name(sim):
+    # Get just the sim name of the form cbol_ (or cpla_) then the size of the box lxxxx and the number of particles in it nxxxx
+    sim_pat = r"cbol_l(\d+)_n(\d+)"
+    match = re.search(sim_pat, sim)
+    if not match:
+        sim_pat = r"cpla_l(\d+)_n(\d+)"
+        match = re.search(sim_pat,sim)
+        
+    if match:
+        sim_name = match.group(0)
+           
+    # now get the full name that includes the search radius in R200m and the velocity limit in v200m
+    sim_search_pat = sim_pat + r"_(\d+)r200m_(\d+)v200m"
+    name_match = re.search(sim_search_pat, sim)
+    
+    # also check if there is a decimal for v200m
+    if not name_match:
+        sim_search_pat = sim_pat + r"_(\d+)r200m_(\d+)-(\d+)v200m"
+        name_match = re.search(sim_search_pat, sim)
+    
+    if name_match:
+        search_name = name_match.group(0)
+        
+    if not name_match and not match:
+        print("Couldn't read sim name correctly:",sim)
+        print(match)
+    
+    return sim_name, search_name
+
+sim_name, search_name = split_sparta_hdf5_name(curr_sparta_file)
+snap_path = snap_path + sim_name + "/"
 
 if sim_cosmol == "planck13-nbody":
     cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
@@ -170,37 +204,6 @@ def get_model_name(model_type, trained_on_sims, hpo_done=False, opt_param_dict=N
         model_name += f"_hpo_{param_str}"
         
     return model_name
-
-
-# From the input simulation name extract the simulation name (ex: cbol_l0063_n0256) and the SPARTA hdf5 output name (ex: cbol_l0063_n0256_4r200m_1-5v200m)
-def split_sparta_hdf5_name(sim):
-    # Get just the sim name of the form cbol_ (or cpla_) then the size of the box lxxxx and the number of particles in it nxxxx
-    sim_pat = r"cbol_l(\d+)_n(\d+)"
-    match = re.search(sim_pat, sim)
-    if not match:
-        sim_pat = r"cpla_l(\d+)_n(\d+)"
-        match = re.search(sim_pat,sim)
-        
-    if match:
-        sim_name = match.group(0)
-           
-    # now get the full name that includes the search radius in R200m and the velocity limit in v200m
-    sim_search_pat = sim_pat + r"_(\d+)r200m_(\d+)v200m"
-    name_match = re.search(sim_search_pat, sim)
-    
-    # also check if there is a decimal for v200m
-    if not name_match:
-        sim_search_pat = sim_pat + r"_(\d+)r200m_(\d+)-(\d+)v200m"
-        name_match = re.search(sim_search_pat, sim)
-    
-    if name_match:
-        search_name = name_match.group(0)
-        
-    if not name_match and not match:
-        print("Couldn't read sim name correctly:",sim)
-        print(match)
-    
-    return sim_name, search_name
 
 # Convert a simulation's name to where the primary snapshot location is in the pickled data (ex: cbol_l0063_n0256_4r200m_1-5v200m_190to166 -> 190_cbol_l0063_n0256_4r200m_1-5v200m)
 def get_pickle_path_for_sim(input_str):
@@ -628,21 +631,37 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, pl
             dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
             p_snap = dset_params["p_snap_info"]["ptl_snap"][()]
             curr_z = dset_params["p_snap_info"]["red_shift"][()]
-            # TODO make this generalizable to when the snapshot separation isn't just 1 dynamical time as needed for mass accretion calculation
-            # we can just use the secondary snap here because we already chose to do 1 dynamical time for that snap
-            past_z = dset_params["c_snap_info"]["red_shift"][()] 
-            p_sparta_snap = dset_params["p_snap_info"]["sparta_snap"][()]
-            c_sparta_snap = dset_params["c_snap_info"]["sparta_snap"][()]
+            snap_dir_format = dset_params["snap_dir_format"]
+            snap_format = dset_params["snap_format"]
             
             sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
-            
             curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
                     
             # Load the halo's positions and radii
             param_paths = [["halos","R200m"]]
             sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, p_snap)
+            p_halos_r200m = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
+            
+            if dset_params["t_dyn_step"][()] == 1:
+                # we can just use the secondary snap here because if it was already calculated for 1 dynamical time forago
+                past_z = dset_params["c_snap_info"]["red_shift"][()] 
+                p_sparta_snap = dset_params["p_snap_info"]["sparta_snap"][()]
+                c_sparta_snap = dset_params["c_snap_info"]["sparta_snap"][()]
+            else:
+                # If the prior secondary snap is not 1 dynamical time ago get that information
+                
+                with h5py.File(curr_sparta_HDF5_path,"r") as f:
+                    dic_sim = {}
+                    grp_sim = f['simulation']
+                    for f in grp_sim.attrs:
+                        dic_sim[f] = grp_sim.attrs[f]
+                    
+                all_sparta_z = dic_sim['snap_z']
+                
+                t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], curr_z)
+                c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_const = get_comp_snap(t_dyn=t_dyn, t_dyn_step=1, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=curr_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
 
-            curr_halos_r200m_list.append(sparta_params[sparta_param_names[0]][:,p_sparta_snap])
+            curr_halos_r200m_list.append(p_halos_r200m)
             past_halos_r200m_list.append(sparta_params[sparta_param_names[0]][:,c_sparta_snap])
             
         curr_halos_r200m = np.concatenate(curr_halos_r200m_list)
@@ -658,8 +677,8 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, pl
             for i,nu_split in enumerate(cpy_plt_nu_splits):
                 # Take the second element of the where to filter by the halos (?)
                 fltr = np.where((calc_nus > nu_split[0]) & (calc_nus < nu_split[1]))[0]
-                #TODO make the minimum number of halos a tunable parameter
-                if fltr.shape[0] > 25:
+
+                if fltr.shape[0] > min_halo_nu_bin:
                     nu_all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
                     nu_orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
                     nu_inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))

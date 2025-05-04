@@ -18,7 +18,7 @@ from sparta_tools import sparta
 from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z_snap, timed, clean_dir, load_pickle, save_pickle, get_num_snaps, load_config
 from utils.calculation_functions import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn, create_mass_prf, calculate_density
 from src.utils.vis_fxns import compare_prfs
-from utils.ML_support import split_calc_name
+from utils.ML_support import split_sparta_hdf5_name
 ##################################################################################################################
 config_dict = load_config(os.getcwd() + "/config.ini")
 
@@ -48,7 +48,7 @@ lin_rticks = config_dict["EVAL_MODEL"]["lin_rticks"]
 ##################################################################################################################
 create_directory(pickled_path)
 create_directory(ML_dset_path)
-sim_name, search_name = split_calc_name(curr_sparta_file)
+sim_name, search_name = split_sparta_hdf5_name(curr_sparta_file)
 
 snap_path = snap_path + sim_name + "/"
 
@@ -429,11 +429,11 @@ with timed("Startup"):
                 for f in grp_sim.attrs:
                     dic_sim[f] = grp_sim.attrs[f]
                 
-            all_red_shifts = dic_sim['snap_z']
-            p_sparta_snap = np.abs(all_red_shifts - p_red_shift).argmin()
+            all_sparta_z = dic_sim['snap_z']
+            p_sparta_snap = np.abs(all_sparta_z - p_red_shift).argmin()
             
             print("corresponding SPARTA snap num:", p_sparta_snap)
-            print("check sparta redshift:",all_red_shifts[p_sparta_snap])   
+            print("check sparta redshift:",all_sparta_z[p_sparta_snap])   
             
             p_scale_factor = 1/(1+p_red_shift)
             p_rho_m = cosmol.rho_m(p_red_shift)
@@ -494,7 +494,7 @@ with timed("Startup"):
     with timed("c_snap load"):
         if reset_lvl > 1 or len(known_snaps) == 0:
             t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], p_red_shift)
-            c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_const = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_red_shifts=all_red_shifts,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
+            c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_const = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
             c_box_size = sim_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
         else:
             c_snap = dset_params["c_snap_info"]["ptl_snap"]

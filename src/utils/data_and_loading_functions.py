@@ -294,7 +294,8 @@ def conv_halo_id_spid(my_halo_ids, sdata, snapshot):
         sparta_idx[i] = int(np.where(my_id == sdata['halos']['id'][:,snapshot])[0])
     return sparta_idx
 
-def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red_shifts, snap_dir_format, snap_format, snap_path):
+#TODO Clean up and separate into different functions, maybe just return a dictionary?
+def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_sparta_z, snap_dir_format, snap_format, snap_path):
     # calculate one dynamical time ago and set that as the comparison snap
     curr_time = cosmol.age(p_red_shift)
     past_time = curr_time - (t_dyn_step * t_dyn)
@@ -306,16 +307,13 @@ def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_red
         
     # get constants from pygadgetreader
     c_red_shift = readheader(c_snap_path, 'redshift')
-    c_sparta_snap = np.abs(all_red_shifts - c_red_shift).argmin()
+    c_sparta_snap = np.abs(all_sparta_z - c_red_shift).argmin()
     print("Complementary snapshot:", c_snap, "Complementary redshift:", c_red_shift)
-    print("Corresponding SPARTA loc:", c_sparta_snap, "SPARTA redshift:",all_red_shifts[c_sparta_snap])
+    print("Corresponding SPARTA loc:", c_sparta_snap, "SPARTA redshift:",all_sparta_z[c_sparta_snap])
 
     c_scale_factor = 1/(1+c_red_shift)
     c_rho_m = cosmol.rho_m(c_red_shift)
     c_hubble_constant = cosmol.Hz(c_red_shift) * 0.001 # convert to units km/s/kpc
-    # c_box_size = readheader(snapshot_path, 'boxsize') #units Mpc/h comoving
-    # c_box_size = c_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
-    # c_box_size = c_box_size + 0.001 # NEED TO MAKE WORK FOR PARTICLES ON THE VERY EDGE
 
     return c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant
 
