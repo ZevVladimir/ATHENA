@@ -10,7 +10,7 @@ import pickle
 
 from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, get_model_name
 from utils.data_and_loading_functions import create_directory, load_pickle, load_config, load_pickle, timed
-from utils.ps_cut_support import load_ps_data
+from utils.ps_cut_support import load_ps_data, fast_ps_predictor, opt_ps_predictor
 from src.utils.vis_fxns import compare_split_prfs_ps
 from utils.calculation_functions import calculate_density, filter_prf
 
@@ -120,35 +120,18 @@ if __name__ == "__main__":
         tot_num_halos = halo_n.shape[0]
         min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
         
-        bin_indices = np.digitize(r_test, bins) - 1  
-        preds_fit_ps = np.zeros(r_test.shape[0])
+    
         
         mask_vr_neg = (vr_test < 0)
         mask_vr_pos = ~mask_vr_neg
 
         ps_param_dict = load_pickle(model_fldr_loc + "ps_optparam_dict.pickle")
+    
         
-        mask_cut_pos = (lnv2_test < (ps_param_dict["m_pos"] * r_test + ps_param_dict["b_pos"])) & (r_test < 2.0)
-
-        # Orbiting classification for vr < 0
-        mask_cut_neg = (lnv2_test < (ps_param_dict["m_neg"] * r_test + ps_param_dict["b_neg"])) & (r_test < 2.0)
-
-        # Particle is infalling if it is below both lines and 2*R00
-        mask_orb = \
-        (mask_cut_pos & mask_vr_pos) ^ \
-        (mask_cut_neg & mask_vr_neg)
+        simp_mask_orb, preds_simp_ps = fast_ps_predictor(ps_param_dict,r_test,vr_test,lnv2_test,2.0)
         
-        preds_simp_ps = np.zeros(r_test.shape[0])
-        preds_simp_ps[mask_orb] = 1
+        preds_fit_ps = opt_ps_predictor(opt_param_dict, bins, r_test, vr_test, lnv2_test, 2.0)
         
-        for i in range(bins.shape[0]-1):
-            if bins[i] <= 3.0:
-                mask_pos = (bin_indices == i) & (vr_test > 0) & (lnv2_test <= opt_param_dict["inf_vr_pos"]["b"][i])
-                mask_neg = (bin_indices == i) & (vr_test < 0) & (lnv2_test <= opt_param_dict["inf_vr_neg"]["b"][i])
-            
-                preds_fit_ps[mask_pos] = 1
-                preds_fit_ps[mask_neg] = 1
-
         fit_calc_mass_prf_all, fit_calc_mass_prf_orb, fit_calc_mass_prf_inf, fit_calc_nus, fit_calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds_fit_ps, prf_bins=bins, use_mp=True, all_z=all_z)
         simp_calc_mass_prf_all, simp_calc_mass_prf_orb, simp_calc_mass_prf_inf, simp_calc_nus, simp_calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds_simp_ps, prf_bins=bins, use_mp=True, all_z=all_z)
 

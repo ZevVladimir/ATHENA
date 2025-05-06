@@ -21,7 +21,7 @@ from utils.calculation_functions import create_stack_mass_prf, filter_prf, calcu
 from src.utils.vis_fxns import compare_split_prfs
 from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, parse_ranges, load_sparta_mass_prf, split_sparta_hdf5_name, sim_mass_p_z, get_model_name
 from utils.data_and_loading_functions import create_directory, timed, save_pickle, load_pickle, load_SPARTA_data, conv_halo_id_spid, load_config, load_RSTAR_data, depair_np
-from utils.ps_cut_support import load_ps_data
+from utils.ps_cut_support import load_ps_data, fast_ps_predictor
 
 dset_params = load_config(os.getcwd() + "/config.ini")
 
@@ -294,6 +294,31 @@ if __name__ == "__main__":
     "inf_vr_pos": np.intersect1d(sparta_inf, np.where(mask_vr_pos)[0]),
     }
 
+    # Look for particles vr>0 that are above the phase space line (infalling) that SPARTA says should be below (orbiting)
+    wrong_vr_pos_orb = (lnv2[fltr_combs["orb_vr_pos"]] > (m_pos * r_r200m[fltr_combs["orb_vr_pos"]] + b_pos)) & (r_r200m[fltr_combs["orb_vr_pos"]] < 2.0)
+    # Look for particles vr>0 that are below the phase space line (orbiting) that SPARTA says should be above (infalling)
+    wrong_vr_pos_inf = (lnv2[fltr_combs["inf_vr_pos"]] < (m_pos * r_r200m[fltr_combs["inf_vr_pos"]] + b_pos)) & (r_r200m[fltr_combs["inf_vr_pos"]] < 2.0)
+
+    # Look for particles vr<0 that are above the phase space line (infalling) that SPARTA says should be below (orbiting)
+    wrong_vr_neg_orb = (lnv2[fltr_combs["orb_vr_neg"]] > (m_neg * r_r200m[fltr_combs["orb_vr_neg"]] + b_neg)) & (r_r200m[fltr_combs["orb_vr_neg"]] < 2.0)
+    # Look for particles vr<0 that are below the phase space line (orbiting) that SPARTA says should be above (infalling)
+    wrong_vr_neg_inf = (lnv2[fltr_combs["inf_vr_neg"]] < (m_neg * r_r200m[fltr_combs["inf_vr_neg"]] + b_neg)) & (r_r200m[fltr_combs["inf_vr_neg"]] < 2.0)
+
+    #total num wrong ptls
+    wrong_vr_pos_total = wrong_vr_pos_orb.sum() + wrong_vr_pos_inf.sum()
+    wrong_vr_neg_total = wrong_vr_neg_orb.sum() + wrong_vr_neg_inf.sum()
+
+    wrong_inf_total = wrong_vr_pos_inf.sum() + wrong_vr_neg_inf.sum()
+    wrong_orb_total = wrong_vr_pos_orb.sum() + wrong_vr_neg_orb.sum()
+
+    num_vr_neg = mask_vr_neg.sum()
+    num_vr_pos = mask_vr_pos.sum()
+    
+    print("Fraction of negative radial velocity particles incorrectly classified:", wrong_vr_neg_total / num_vr_neg)
+    print("Fraction of positive radial velocity particles incorrectly classified:", wrong_vr_pos_total / num_vr_pos)
+    print("Fraction of infalling particles incorrectly classified:", wrong_inf_total / sparta_inf.shape[0])
+    print("Fraction of orbiting particles incorrectly classified:", wrong_orb_total / sparta_orb.shape[0])
+
     split_scale_dict = {
             "linthrsh":linthrsh, 
             "lin_nbin":lin_nbin,
@@ -396,7 +421,7 @@ if __name__ == "__main__":
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
         plt.ylim(-2.2, 2.5)
-
+        
         plt.sca(axes[1])
         plt.title("Orbiting Particles: "r'$v_r < 0$',fontsize=title_fntsize)
         plt.hist2d(r_r200m[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, vmin=lin_vmin, vmax=vmax,
@@ -599,16 +624,8 @@ if __name__ == "__main__":
         plt.tight_layout();
         plt.savefig(plot_loc + "perc_" + str(perc) + "_" + grad_lims + "_KE_dist_cut.png")
         
-    # Orbiting classification for vr > 0
-    mask_cut_pos = (lnv2 < (m_pos * r_r200m + b_pos)) & (r_r200m < 2.0)
-
-    # Orbiting classification for vr < 0
-    mask_cut_neg = (lnv2 < (m_neg * r_r200m + b_neg)) & (r_r200m < 2.0)
-
-    # Particle is infalling if it is below both lines and 2*R00b
-    mask_orb = \
-    (mask_cut_pos & mask_vr_pos) ^ \
-    (mask_cut_neg & mask_vr_neg)
+    
+    mask_orb, ps_preds = fast_ps_predictor(ps_param_dict,r_r200m,vr,lnv2,2.0)
     
     with timed("Phase space dist of ptls plot"):
         fig, axes = plt.subplots(1, 2, figsize=(9, 4))
@@ -647,18 +664,8 @@ if __name__ == "__main__":
         vphys = my_data["p_phys_vel"]
         lnv2 = np.log(vphys**2)
         
-        mask_vr_neg = (vr < 0)
-        mask_vr_pos = ~mask_vr_neg
-
-        mask_cut_pos = (lnv2 < (m_pos * r_r200m + b_pos)) & (r_r200m < 2.0)
-
-        # Orbiting classification for vr < 0
-        mask_cut_neg = (lnv2 < (m_neg * r_r200m + b_neg)) & (r_r200m < 2.0)
-
-        # Particle is infalling if it is below both lines and 2*R00
-        mask_orb = \
-        (mask_cut_pos & mask_vr_pos) ^ \
-        (mask_cut_neg & mask_vr_neg)
+        #TODO rename the different masks and preds
+        mask_orb, ps_preds = fast_ps_predictor(ps_param_dict,r_r200m,vr,lnv2,2.0)
         
         X = my_data[feature_columns]
         y = my_data[target_column]

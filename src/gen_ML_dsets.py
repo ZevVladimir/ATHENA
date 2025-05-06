@@ -15,7 +15,7 @@ import psutil
 import json
 from sparta_tools import sparta 
 
-from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, conv_halo_id_spid, get_comp_snap, create_directory, find_closest_z_snap, timed, clean_dir, load_pickle, save_pickle, get_num_snaps, load_config
+from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, conv_halo_id_spid, get_comp_snap_info, create_directory, find_closest_z_snap, timed, clean_dir, load_pickle, save_pickle, get_num_snaps, load_config
 from utils.calculation_functions import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn, create_mass_prf, calculate_density
 from src.utils.vis_fxns import compare_prfs
 from utils.ML_support import split_sparta_hdf5_name
@@ -23,7 +23,7 @@ from utils.ML_support import split_sparta_hdf5_name
 config_dict = load_config(os.getcwd() + "/config.ini")
 
 curr_sparta_file = config_dict["SPARTA_DATA"]["curr_sparta_file"]
-known_snaps = config_dict.get("SNAP_DATA","known_snaps")
+known_snaps = config_dict["SNAP_DATA"]["known_snaps"]
 snap_path = config_dict["SNAP_DATA"]["snap_path"]
 SPARTA_output_path = config_dict["SPARTA_DATA"]["sparta_output_path"]
 pickled_path = config_dict["PATHS"]["pickled_path"]
@@ -494,7 +494,11 @@ with timed("Startup"):
     with timed("c_snap load"):
         if reset_lvl > 1 or len(known_snaps) == 0:
             t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], p_red_shift)
-            c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_const = get_comp_snap(t_dyn=t_dyn, t_dyn_step=t_dyn_step, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=p_red_shift, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
+            c_snap_dict = get_comp_snap_info(t_dyn=t_dyn, t_dyn_step=t_dyn_step, cosmol = cosmol, p_red_shift=p_red_shift, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
+            c_snap = c_snap_dict["ptl_snap"]
+            c_sparta_snap = c_snap_dict["sparta_snap"]
+            c_red_shift = c_snap_dict["red_shift"]
+            c_scale_factor = c_snap_dict["scale_factor"]
             c_box_size = sim_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
         else:
             c_snap = dset_params["c_snap_info"]["ptl_snap"]
@@ -539,8 +543,7 @@ with timed("Startup"):
         "rho_m":c_rho_m
     }
 
-    snapshot_list = [p_snap, c_snap]
-    save_location =  ML_dset_path + curr_sparta_file + "_" + str(snapshot_list[0]) + "to" + str(snapshot_list[1]) + "/"
+    save_location =  ML_dset_path + curr_sparta_file + "_" + str(p_snap) + "to" + str(c_snap) + "/"
 
     if os.path.exists(save_location) != True:
         os.makedirs(save_location)

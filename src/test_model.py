@@ -7,7 +7,7 @@ import json
 import multiprocessing as mp
 import pandas as pd
 
-from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, load_data, eval_model, get_model_name
+from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, load_data, eval_model, get_model_name, make_preds
 from utils.data_and_loading_functions import create_directory, timed, save_pickle, load_config
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -89,7 +89,10 @@ if __name__ == "__main__":
                 X = data[feature_columns]
                 y = data[target_column]
 
-                eval_model(model_info, client, bst, use_sims=curr_test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, plot_save_loc=plot_loc,dens_prf=dens_prf_plt,missclass=misclass_plt,\
+                with timed(f"Predictions for {y.size.compute():.3e} particles"):
+                    preds = make_preds(client, bst, X)
+                    
+                eval_model(model_info, preds, use_sims=curr_test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, plot_save_loc=plot_loc,dens_prf=dens_prf_plt,missclass=misclass_plt,\
                     full_dist=fulldist_plt,io_frac=io_frac_plt,split_nu=dens_prf_nu_split,split_macc=dens_prf_macc_split)
                 del data 
                 del X

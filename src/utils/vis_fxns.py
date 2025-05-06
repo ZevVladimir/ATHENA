@@ -62,7 +62,6 @@ def gen_ticks(bin_edges,spacing=6):
     
     return tick_loc, ticks
 
-# TODO add a configuration dictionary that can be passed instead
 def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xtick_labels=False, hide_ytick_labels=False,\
     xticks = None,yticks = None,xtick_color="white",ytick_color="white",xlinthrsh = None, ylinthrsh = None, xlim=None,ylim=None,\
         axisfontsize=28, number = None, return_img=False, kwargs=None):

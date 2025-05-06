@@ -181,22 +181,22 @@ def load_ps_data(client, curr_test_sims = ["cbol_l1000_n1024_4r200m_1-5v200m_99t
     
     return r, vr, lnv2, sparta_labels, samp_data, data, halo_df
 
-# For prediction we use the bound radius as OASIS does this
-def ps_predictor(feat_dict, r_r200b, vr, lnv2):
-    m_pos = feat_dict["m_pos"]
-    b_pos = feat_dict["b_pos"]
-    m_neg = feat_dict["m_neg"]
-    b_neg = feat_dict["b_neg"]
+# r200m_cut is the farthest radius (r/r200m) that a particle can be orbiting
+def fast_ps_predictor(fast_param_dict, r_r200m, vr, lnv2, r200m_cut):
+    m_pos = fast_param_dict["m_pos"]
+    b_pos = fast_param_dict["b_pos"]
+    m_neg = fast_param_dict["m_neg"]
+    b_neg = fast_param_dict["b_neg"]
     
-    preds = np.zeros(r_r200b.shape[0].compute())
+    preds = np.zeros(r_r200m.shape[0].compute())
     
     mask_vr_neg = (vr < 0)
     mask_vr_pos = ~mask_vr_neg
 
-    mask_cut_pos = (lnv2 < (m_pos * r_r200b + b_pos)) & (r_r200b < 2.0)
+    mask_cut_pos = (lnv2 < (m_pos * r_r200m + b_pos)) & (r_r200m < r200m_cut)
 
     # Orbiting classification for vr < 0
-    mask_cut_neg = (lnv2 < (m_neg * r_r200b + b_neg)) & (r_r200b < 2.0)
+    mask_cut_neg = (lnv2 < (m_neg * r_r200m + b_neg)) & (r_r200m < r200m_cut)
 
     # Particle is infalling if it is below both lines and 2*R00b
     mask_orb = \
@@ -205,4 +205,16 @@ def ps_predictor(feat_dict, r_r200b, vr, lnv2):
 
     preds[mask_orb] = 1
 
-    return preds
+    return mask_orb, preds
+
+def opt_ps_predictor(opt_param_dict, bins, r_r200m, vr, lnv2, r200m_cut):
+    bin_indices = np.digitize(r_r200m, bins) - 1  
+    preds_fit_ps = np.zeros(r_r200m.shape[0])
+    for i in range(bins.shape[0]-1):
+        if bins[i] <= r200m_cut:
+            mask_pos = (bin_indices == i) & (vr > 0) & (lnv2 <= opt_param_dict["inf_vr_pos"]["b"][i])
+            mask_neg = (bin_indices == i) & (vr < 0) & (lnv2 <= opt_param_dict["inf_vr_neg"]["b"][i])
+        
+            preds_fit_ps[mask_pos] = 1
+            preds_fit_ps[mask_neg] = 1
+    return preds_fit_ps

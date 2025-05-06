@@ -17,7 +17,7 @@ from sparta_tools import sparta
 
 from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, split_sparta_hdf5_name, load_SPARTA_data, reform_dataset_dfs, get_model_name
 from utils.data_and_loading_functions import create_directory, load_pickle, conv_halo_id_spid, load_config, save_pickle, load_pickle, timed
-from utils.ps_cut_support import load_ps_data
+from utils.ps_cut_support import load_ps_data, opt_ps_predictor
 from src.utils.vis_fxns import plt_SPARTA_KE_dist, compare_split_prfs
 from utils.calculation_functions import calculate_density, filter_prf, calc_mass_acc_rate
 
@@ -333,16 +333,8 @@ if __name__ == "__main__":
         tot_num_halos = halo_n.shape[0]
         min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
         
-        bin_indices = np.digitize(r_test, bins) - 1  
-        preds = np.zeros(r_test.shape[0])
-        for i in range(bins.shape[0]-1):
-            if bins[i] <= 2.0:
-                mask_pos = (bin_indices == i) & (vr_test > 0) & (lnv2_test <= opt_param_dict["inf_vr_pos"]["b"][i])
-                mask_neg = (bin_indices == i) & (vr_test < 0) & (lnv2_test <= opt_param_dict["inf_vr_neg"]["b"][i])
-            
-                preds[mask_pos] = 1
-                preds[mask_neg] = 1
-
+        preds_fit_ps = opt_ps_predictor(opt_param_dict, bins, r_test, vr_test, lnv2_test, 2.0)
+        
         calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds, prf_bins=bins, use_mp=True, all_z=all_z)
 
         # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 

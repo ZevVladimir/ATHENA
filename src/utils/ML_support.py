@@ -23,7 +23,7 @@ from skopt.space import Real
 from sklearn.metrics import accuracy_score
 from functools import partial
 
-from .data_and_loading_functions import load_SPARTA_data, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, load_pickle, load_config, get_comp_snap
+from .data_and_loading_functions import load_SPARTA_data, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, load_pickle, load_config, get_comp_snap_info, create_directory
 from .vis_fxns import plot_full_ptl_dist, plot_miss_class_dist, compare_prfs, compare_split_prfs, inf_orb_frac
 from .calculation_functions import create_mass_prf, create_stack_mass_prf, filter_prf, calculate_density, calc_mass_acc_rate, calc_t_dyn
 from sparta_tools import sparta 
@@ -35,6 +35,7 @@ rand_seed = config_dict["MISC"]["random_seed"]
 curr_sparta_file = config_dict["SPARTA_DATA"]["curr_sparta_file"]
 sim_cosmol = config_dict["MISC"]["sim_cosmol"]
 debug_indiv_dens_prf = config_dict["MISC"]["debug_indiv_dens_prf"]
+pickle_data = config_dict["MISC"]["pickle_data"]
 
 snap_path = config_dict["SNAP_DATA"]["snap_path"]
 
@@ -529,10 +530,12 @@ def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         return mass_prf_all,mass_prf_1halo,all_masses,bins
 
 # Evaluate an input model by generating plots of comparisons between the model's predictions and SPARTA
-def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, plot_save_loc, dens_prf = False,missclass=False,full_dist=False,io_frac=False,split_nu=False,split_macc=False): 
-    with timed(f"Predictions for {y.size.compute():.3e} particles"):
-        preds = make_preds(client, model, X)
+def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, plot_save_loc, dens_prf = False,missclass=False,full_dist=False,io_frac=False,split_nu=False,split_macc=False): 
 
+    if pickle_data:
+        plt_data_loc = plot_save_loc + "pickle_plt_data/"
+        create_directory(plt_data_loc)
+    
     num_bins = 50
 
     # Generate a comparative density profile
@@ -659,8 +662,8 @@ def eval_model(model_info, client, model, use_sims, dst_type, X, y, halo_ddf, pl
                 all_sparta_z = dic_sim['snap_z']
                 
                 t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], curr_z)
-                c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_const = get_comp_snap(t_dyn=t_dyn, t_dyn_step=1, snapshot_list=[p_snap], cosmol = cosmol, p_red_shift=curr_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
-
+                c_snap_dict = get_comp_snap_info(t_dyn=t_dyn, t_dyn_step=1, cosmol = cosmol, p_red_shift=curr_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
+                c_sparta_snap = c_snap_dict["sparta_snap"]
             curr_halos_r200m_list.append(p_halos_r200m)
             past_halos_r200m_list.append(sparta_params[sparta_param_names[0]][:,c_sparta_snap])
             

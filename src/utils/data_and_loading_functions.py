@@ -96,7 +96,7 @@ def get_num_snaps(path):
     folders = [d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
     numbers = [int(re.search(r'\d+', d).group()) for d in folders if re.search(r'\d+', d)]
     max_number = max(numbers, default=None)
-    return max_number
+    return (max_number+1)
 
 def save_pickle(data, path):
     with open(path, "wb") as pickle_file:
@@ -294,28 +294,35 @@ def conv_halo_id_spid(my_halo_ids, sdata, snapshot):
         sparta_idx[i] = int(np.where(my_id == sdata['halos']['id'][:,snapshot])[0])
     return sparta_idx
 
-#TODO Clean up and separate into different functions, maybe just return a dictionary?
-def get_comp_snap(t_dyn, t_dyn_step, snapshot_list, cosmol, p_red_shift, all_sparta_z, snap_dir_format, snap_format, snap_path):
+def get_comp_snap_info(t_dyn, t_dyn_step, cosmol, p_red_shift, all_sparta_z, snap_dir_format, snap_format, snap_path):
+    c_snap_dict = {}
     # calculate one dynamical time ago and set that as the comparison snap
     curr_time = cosmol.age(p_red_shift)
     past_time = curr_time - (t_dyn_step * t_dyn)
     c_snap = find_closest_snap(past_time, cosmol, snap_path, snap_dir_format, snap_format)
-    snapshot_list.append(c_snap)
-
+    
+    c_snap_dict["ptl_snap"] = c_snap
+    
     # switch to comparison snap
     c_snap_path = snap_path + "/snapdir_" + snap_dir_format.format(c_snap) + "/snapshot_" + snap_format.format(c_snap)
         
     # get constants from pygadgetreader
     c_red_shift = readheader(c_snap_path, 'redshift')
     c_sparta_snap = np.abs(all_sparta_z - c_red_shift).argmin()
+    c_snap_dict["sparta_snap"] = c_sparta_snap
+    
     print("Complementary snapshot:", c_snap, "Complementary redshift:", c_red_shift)
     print("Corresponding SPARTA loc:", c_sparta_snap, "SPARTA redshift:",all_sparta_z[c_sparta_snap])
 
     c_scale_factor = 1/(1+c_red_shift)
     c_rho_m = cosmol.rho_m(c_red_shift)
     c_hubble_constant = cosmol.Hz(c_red_shift) * 0.001 # convert to units km/s/kpc
+    
+    c_snap_dict["scale_factor"] = c_scale_factor
+    c_snap_dict["rho_m"] = c_rho_m
+    c_snap_dict["hubble_constant"] = c_hubble_constant
 
-    return c_snap, c_sparta_snap, c_rho_m, c_red_shift, c_scale_factor, c_hubble_constant
+    return c_snap_dict
 
 def split_orb_inf(data, labels):
     infall = data[np.where(labels == 0)[0]]
