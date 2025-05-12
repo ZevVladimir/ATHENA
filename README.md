@@ -159,15 +159,15 @@ All of the following evaluation plots are for a model trained solely on the cbol
 
 #### Density profile comparison
 
-![dens_prf][https://github.com/ZevVladimir/ATHENA/blob/main/imgs/test_dens_med_prfl_rat.png]
+![dens_prf](https://github.com/ZevVladimir/ATHENA/blob/main/imgs/test_dens_med_prfl_rat.png)
 
 #### Particle Distribution
 
-![dens_prf][https://github.com/ZevVladimir/ATHENA/blob/main/imgs/test_ptl_distr.png]
+![dens_prf](https://github.com/ZevVladimir/ATHENA/blob/main/imgs/test_ptl_distr.png)
 
 #### Scaled Misclassified Plot
 
-![dens_prf][https://github.com/ZevVladimir/ATHENA/blob/main/imgs/test_scaled_miss_class.png]
+![dens_prf](https://github.com/ZevVladimir/ATHENA/blob/main/imgs/test_scaled_miss_class.png)
 
 ### make_shap_plots.py
 
