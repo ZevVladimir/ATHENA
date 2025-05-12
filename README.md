@@ -2,7 +2,7 @@
 # Current State as of 04//2025
 
 ## Data Requirements
-You need the particle data from a GADGET simulation and the .hdf5 output file from SPARTA. We used the Erebos suite of simulations for our work.
+You need the particle data from a GADGET simulation and the .hdf5 output file from SPARTA. We used the Erebos suite of simulations for our work which is freely available at http://erebos.astro.umd.edu/erebos/. The snapshot files are found under snaps/ and the halo catalogues under rockstar_cats_200m_bnd. The naming scheme of of these simulations is what is expected for the code.
 
 ## Python Dependencies
 - I make use of a customized shap fork that is also publicly available at https://github.com/ZevVladimir/shap. This is done to just allow for ease of adjusting different fontsizes as well as adjusting certain features in the plots that I want hidden or not. This should only impact code run in make_shap_plots.py. 
