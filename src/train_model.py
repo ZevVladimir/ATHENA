@@ -259,7 +259,7 @@ if __name__ == "__main__":
             # Get accuracy at each boosting round
             # Extract training and validation error (1 - accuracy) at each round
             train_errors = history['train']['error']
-            test_errors = history['eval']['error']
+            test_errors = history['test']['error']
 
             # Calculate accuracies
             train_accuracies = [1 - error for error in train_errors]

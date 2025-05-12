@@ -316,11 +316,12 @@ def get_comp_snap_info(t_dyn, t_dyn_step, cosmol, p_red_shift, all_sparta_z, sna
 
     c_scale_factor = 1/(1+c_red_shift)
     c_rho_m = cosmol.rho_m(c_red_shift)
-    c_hubble_constant = cosmol.Hz(c_red_shift) * 0.001 # convert to units km/s/kpc
+    c_hubble_const = cosmol.Hz(c_red_shift) * 0.001 # convert to units km/s/kpc
     
+    c_snap_dict["red_shift"] = c_red_shift
     c_snap_dict["scale_factor"] = c_scale_factor
     c_snap_dict["rho_m"] = c_rho_m
-    c_snap_dict["hubble_constant"] = c_hubble_constant
+    c_snap_dict["hubble_const"] = c_hubble_const
 
     return c_snap_dict
 

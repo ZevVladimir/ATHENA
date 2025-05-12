@@ -634,6 +634,7 @@ def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, plot_save_
             dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
             p_snap = dset_params["p_snap_info"]["ptl_snap"][()]
             curr_z = dset_params["p_snap_info"]["red_shift"][()]
+            p_sparta_snap = dset_params["p_snap_info"]["sparta_snap"][()]
             snap_dir_format = dset_params["snap_dir_format"]
             snap_format = dset_params["snap_format"]
             
@@ -645,10 +646,11 @@ def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, plot_save_
             sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, p_snap)
             p_halos_r200m = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
             
-            if dset_params["t_dyn_step"][()] == 1:
+            p_halos_r200m = p_halos_r200m[all_idxs]
+            
+            if dset_params["t_dyn_step"] == 1:
                 # we can just use the secondary snap here because if it was already calculated for 1 dynamical time forago
                 past_z = dset_params["c_snap_info"]["red_shift"][()] 
-                p_sparta_snap = dset_params["p_snap_info"]["sparta_snap"][()]
                 c_sparta_snap = dset_params["c_snap_info"]["sparta_snap"][()]
             else:
                 # If the prior secondary snap is not 1 dynamical time ago get that information
@@ -664,8 +666,11 @@ def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, plot_save_
                 t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], curr_z)
                 c_snap_dict = get_comp_snap_info(t_dyn=t_dyn, t_dyn_step=1, cosmol = cosmol, p_red_shift=curr_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
                 c_sparta_snap = c_snap_dict["sparta_snap"]
+            c_halos_r200m = sparta_params[sparta_param_names[0]][:,c_sparta_snap]
+            c_halos_r200m = c_halos_r200m[all_idxs]
+            
             curr_halos_r200m_list.append(p_halos_r200m)
-            past_halos_r200m_list.append(sparta_params[sparta_param_names[0]][:,c_sparta_snap])
+            past_halos_r200m_list.append(c_halos_r200m)
             
         curr_halos_r200m = np.concatenate(curr_halos_r200m_list)
         past_halos_r200m = np.concatenate(past_halos_r200m_list)
@@ -694,7 +699,11 @@ def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, plot_save_
             macc_inf_prf_lst = []
             
             calc_maccs = calc_mass_acc_rate(curr_halos_r200m,past_halos_r200m,curr_z,past_z)
-
+            print(calc_maccs.shape)
+            print(curr_halos_r200m.shape)
+            print(past_halos_r200m.shape)
+            print(calc_dens_prf_all.shape)
+            print(calc_nus.shape)
             cpy_plt_macc_splits = plt_macc_splits.copy()
             for i,macc_split in enumerate(cpy_plt_macc_splits):
                 # Take the second element of the where to filter by the halos (?)

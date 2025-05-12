@@ -499,6 +499,8 @@ with timed("Startup"):
             c_sparta_snap = c_snap_dict["sparta_snap"]
             c_red_shift = c_snap_dict["red_shift"]
             c_scale_factor = c_snap_dict["scale_factor"]
+            c_hubble_const = c_snap_dict["hubble_const"]
+            c_rho_m = c_snap_dict["rho_m"]
             c_box_size = sim_box_size * 10**3 * c_scale_factor #convert to Kpc/h physical
         else:
             c_snap = dset_params["c_snap_info"]["ptl_snap"]

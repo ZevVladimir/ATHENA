@@ -17,12 +17,16 @@ You need the particle data from a GADGET simulation and the .hdf5 output file fr
 
 Currently only GADGET simulation data is usable by the code as we use Pygadget reader to load particle data
 
+To see an example of snapshot data formatting look at a simulatio in the snaps/ folder at http://erebos.astro.umd.edu/erebos/ 
+
 - GADGET simulation particle data with the path to the data indicated with the *snap_path* parameter
 - The particle data is expected to be stored in the format "/snapdir_*snap_dir_format*/snapshot_*snap_format*." 
 - The formats should be something like {:03d} and supplied in the config file
 - **If** you already have run the code **and** have the particle information pickled you can instead just use the *known_snaps* parameter.
 
 ### SPARTA Data Requirements \[SPARTA_DATA\]
+
+A SPARTA output file for the cbol_l0063_n0256 simulation is provided in this repo
 
 - The halo data is expected to be supplidd from the .hdf5 output file from SPARTA
 - The path to this file should be indicated with the *SPARTA_output_path* parameter
@@ -43,7 +47,7 @@ The halos are split into training and testing dataset based off *test_dset_frac*
 
 ### Running the code: gen_ML_dsets.py
 
-After the \[DSET_CREATE\], \[SNAP_DATA\], and \[SPARTA_DATA\] parameters are set (and potentially \[MISC\] parameters as well) you are ready to create the datasets. This is done by simply running the python code: `python3 ~/src/gen_ML_dsets.py`
+After the \[DSET_CREATE\], \[SNAP_DATA\], and \[SPARTA_DATA\] parameters are set (and potentially \[MISC\] parameters as well) you are ready to create the datasets. This is done by simply running the python code: `python3 ./src/gen_ML_dsets.py`
 
 ### Saved Information
 
@@ -105,11 +109,14 @@ The name of the folder where each model is saved is slightly complicated in orde
 If you use some of the additional optimization methods the path can be changed, see section: Optimization of Model for details
 
 ### Optimization of Model
+
+There are some elements within the code intended to provide ways to tune the dataset to optimize the accuracy of the model. We found that these ended up being unecessary for our data to train an accurate model. These might be potentially fully fleshed out and integrated in the future.
+
 #TODO finish this section
 
 ### Running the code: train_model.py
 
-After the \[TRAIN_MODEL\] parameters are set (and potentially \[MISC\] and \[DASK_CLIENT\] parameters as well) you are ready to create the datasets. This is done by simply running the python code: `python3 ~/src/train_model.py`
+After the \[TRAIN_MODEL\] parameters are set (and potentially \[MISC\] and \[DASK_CLIENT\] parameters as well) you are ready to create the datasets. This is done by simply running the python code: `python3 ./src/train_model.py`
 
 ### Saved Information
 
@@ -131,7 +138,7 @@ All plots from the evaluations of the model go within a subfolder of the model's
 
 ### Initial \[EVAL_MODEL\] Config Parameters
 
-To determine which simulations the model will be tested on set the *test_sims* parameter. This is a list of lists such that you can test on multiple simulations separately or all together or some mixture. For example: \[\[l0063_n1024,l1000_n1024\]\] is testing the model on two simulations combined while \[\[l0063_n1024\],\[l1000_n1024\]\] is testing the model on one simulation at a time. You can also test on the "Test" dataset, the "Train" dataset, or "Full" for both using the *eval_datasets* parameter.
+To determine which simulations the model will be tested on set the *test_sims* parameter. This is a list of lists such that you can test on multiple simulations separately or all together or some mixture. For example: \[\[l0063_n1024,l1000_n1024\]\] is testing the model on two simulations combined while \[\[l0063_n1024\],\[l1000_n1024\]\] is testing the model on one simulation at a time. You can also test on the "Test" dataset, the "Train" dataset, or "Full" (both the Train and Test dataset together) for both using the *eval_datasets* parameter.
 
 Generally to evaluate the model we look at plots which can be enabled or disabled using the following parameters:
 - *dens_prf_plt*: Plots the density profiles scaled by rho_m predicted by the model versus SPARTA's calculated profiles and the ratios between them. Can split the profiles by nu values using the *dens_prf_nu_split* parameter with the splits determined by *plt_nu_splits* where the splits are written like: 0.5-1.0,1.0-1.5. Or by mass accretion rate using *plt_macc_splits*
@@ -143,11 +150,29 @@ Both of the distribution plots make use of plotting linearly up to a threshold a
 
 ### test_xgboost.py
 
-This code will test the model on the supplied simulations using the chosen plots described above. To run simply do `python3 ~/src/test_model.py`
+This code will test the model on the supplied simulations using the chosen plots described above. To run simply do `python3 ./src/test_model.py`
+
+
+### Example Evaluation Plots
+
+All of the following evaluation plots are for a model trained solely on the cbol_l0063_n0256 simulation and tested solely on that simulation. For further plots with a more representative sample refer to our paper [1].
+
+#### Density profile comparison
+
+![dens_prf][logo]
+
+#### Particle Distribution
+
+![dens_prf][logo]
+
+#### Scaled Misclassified Plot
+
+![dens_prf][logo]
 
 ### make_shap_plots.py
 
-This creates the SHAP beeswarm plots which can be selected for by filling out the dictionary shown in the file to filter which particles are displayed. `python3 ~/src/make_shap_plots.py`
+This creates the SHAP beeswarm plots which can be selected for by filling out the dictionary shown in the file to filter which particles are displayed. `python3 ./src/make_shap_plots.py`
+These plots allow us to evaluate how the model classifies certain populations of particles. This is further explored in Section 4.1 of our paper [1].
 
 ## Phase Space Cut Method
 
