@@ -1,21 +1,22 @@
 # ATHENA: pArticle classificaTion with macHine lEarning N-body simulAtions
-# Current State as of 04//2025
 
 ## Data Requirements
 You need the particle data from a GADGET simulation and the .hdf5 output file from SPARTA. We used the Erebos suite of simulations for our work which is freely available at http://erebos.astro.umd.edu/erebos/. The snapshot files are found under snaps/ and the halo catalogues under rockstar_cats_200m_bnd. The naming scheme of of these simulations is what is expected for the code.
 
 ## Python Dependencies
 - I make use of a customized shap fork that is also publicly available at https://github.com/ZevVladimir/shap. This is done to just allow for ease of adjusting different fontsizes as well as adjusting certain features in the plots that I want hidden or not. This should only impact code run in make_shap_plots.py. 
-- https://docs.rapids.ai/install/ 
-- Use the requirements.txt
-- pygadgetreader: https://github.com/jveitchmichaelis/pygadgetreader
-- SPARTA: https://bdiemer.bitbucket.io/sparta/ 
+- We ue Python 3.10.10 and CUDA 12
+- For most of the python packages use the requirements.txt file to install
+- pygadgetreader needs to be cloned and installed from this repository: https://github.com/jveitchmichaelis/pygadgetreader
+- SPARTA needs to be cloned and installed from this repository: https://bdiemer.bitbucket.io/sparta/ 
+- For dask packages that make use of CUDA you can find alternative ways to install at: https://docs.rapids.ai/install/ 
+    - Requires Python 3.10, 3.11, or 3.12
 
 ## Creating the Datasets
 
 ### Snapshot Data Requirements \[SNAP_DATA\]
 
-Currently only GADGET simulation data is usable by the code as we use Pygadget reader to load particle data
+Currently only GADGET simulation data is usable by the code as we use Pygadgetreader to load particle data
 
 To see an example of snapshot data formatting look at a simulatio in the snaps/ folder at http://erebos.astro.umd.edu/erebos/ 
 
@@ -49,7 +50,8 @@ The halos are split into training and testing dataset based off *test_dset_frac*
 
 After the \[DSET_CREATE\], \[SNAP_DATA\], and \[SPARTA_DATA\] parameters are set (and potentially \[MISC\] parameters as well) you are ready to create the datasets. This is done by simply running the python code: `python3 ./src/gen_ML_dsets.py`
 
-### Saved Information
+<details>
+### Saved Dataset Information
 
 The code will generate several .h5 files of the saved information within the specified output location *ML_dset_path* in the subdirectory of ~/*ML_dset_path*/ + *curr_sparta_file*_\<primary snap number\>to\<secondary snap number\>/ and then there will be a Train/ and Test/ folder each of which contain folders for halo information and particle information.
 
@@ -90,6 +92,8 @@ Information from the config file and information generated about the snapshots u
     8. rho_m: The value of the mean density of the university at this snapshot (calculated from redshift with colossus)
 11. c_snap_info: The same parameters as in p_snap_info but for the secondary (comparison) snapshot
     
+</details>
+
 ## Training the Model
 
 ### Initial \[TRAIN_MODEL\] Config Parameters
@@ -106,19 +110,26 @@ The name of the folder where each model is saved is slightly complicated in orde
 
 /*path_path_to_models*/\<combined and shortened name of simulations\>/*model_type*/
 
-If you use some of the additional optimization methods the path can be changed, see section: Optimization of Model for details
+If *tree_err* is enabled plots will be created that show the accuracy of the model depending on the number of trees used as well as how fast predictions are made with the number of trees.
 
-### Optimization of Model
+<details>
+### Optimization of Model (WIP)
+
+#TODO make the name change optional and instead encourage manually changing the model's name
+If you use some of the additional optimization methods the path can be changed as they include information about the optimization parameters in the name to automatically differentiate the models. 
 
 There are some elements within the code intended to provide ways to tune the dataset to optimize the accuracy of the model. We found that these ended up being unecessary for our data to train an accurate model. These might be potentially fully fleshed out and integrated in the future.
 
 #TODO finish this section
 
+</details>
+
 ### Running the code: train_model.py
 
 After the \[TRAIN_MODEL\] parameters are set (and potentially \[MISC\] and \[DASK_CLIENT\] parameters as well) you are ready to create the datasets. This is done by simply running the python code: `python3 ./src/train_model.py`
 
-### Saved Information
+<details>
+### Saved Model Information
 
 As mentioned all saved information goes to the path for the specific model. The model's json file is saved as well as general information about the model is put in a model_info.pickle.
 
@@ -131,6 +142,8 @@ rdml(){
 ```
 
 To use this function you simply do `rdml /path/to/model_info.pickle`
+
+</details>
 
 ## Evaluating the Model
 
@@ -163,16 +176,20 @@ All of the following evaluation plots are for a model trained solely on the cbol
 
 #### Particle Distribution
 
-![dens_prf](https://github.com/ZevVladimir/ATHENA/blob/main/imgs/test_ptl_distr.png)
+![ptl_dist](https://github.com/ZevVladimir/ATHENA/blob/main/imgs/test_ptl_distr.png)
 
 #### Scaled Misclassified Plot
 
-![dens_prf](https://github.com/ZevVladimir/ATHENA/blob/main/imgs/test_scaled_miss_class.png)
+![scale_miss](https://github.com/ZevVladimir/ATHENA/blob/main/imgs/test_scaled_miss_class.png)
 
 ### make_shap_plots.py
 
 This creates the SHAP beeswarm plots which can be selected for by filling out the dictionary shown in the file to filter which particles are displayed. `python3 ./src/make_shap_plots.py`
 These plots allow us to evaluate how the model classifies certain populations of particles. This is further explored in Section 4.1 of our paper [1].
+
+This example plot compares the shap values for a random sample of particles in the entire dataset and particles that do not have a secondary snapshot.
+
+![comb_shap](https://github.com/ZevVladimir/ATHENA/blob/main/imgs/test_comb_shap.png)
 
 ## Phase Space Cut Method
 

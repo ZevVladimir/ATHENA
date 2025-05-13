@@ -30,13 +30,6 @@ model_type = config_dict["TRAIN_MODEL"]["model_type"]
 test_sims = config_dict["EVAL_MODEL"]["test_sims"]
 eval_datasets = config_dict["EVAL_MODEL"]["eval_datasets"]
 
-reduce_rad = config_dict["OPTIMIZE"]["reduce_rad"]
-reduce_perc = config_dict["OPTIMIZE"]["reduce_perc"]
-weight_rad = config_dict["OPTIMIZE"]["weight_rad"]
-min_weight = config_dict["OPTIMIZE"]["min_weight"]
-opt_wghts = config_dict["OPTIMIZE"]["opt_wghts"]
-opt_scale_rad = config_dict["OPTIMIZE"]["opt_scale_rad"]
-
 if sim_cosmol == "planck13-nbody":
     cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
 else:
@@ -54,9 +47,11 @@ if __name__ == '__main__':
         model_save_loc = model_fldr_loc + model_name + ".json"
         gen_plot_save_loc = model_fldr_loc + "plots/"
 
+        # Try loading the model if it can't be thats an error!
         try:
             bst = xgb.Booster()
             bst.load_model(model_save_loc)
+            bst.set_param({"device": "cuda:0"})
             print("Loaded Model Trained on:",model_sims)
         except:
             print("Couldn't load Booster Located at: " + model_save_loc)

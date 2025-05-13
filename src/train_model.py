@@ -27,6 +27,7 @@ feature_columns = config_dict["TRAIN_MODEL"]["feature_columns"]
 target_column = config_dict["TRAIN_MODEL"]["target_column"]
 model_sims = config_dict["TRAIN_MODEL"]["model_sims"]
 model_type = config_dict["TRAIN_MODEL"]["model_type"]
+tree_err = config_dict["TRAIN_MODEL"]["tree_err"]
 
 retrain = config_dict["MISC"]["retrain_model"]
 
@@ -254,57 +255,59 @@ if __name__ == "__main__":
             bst.save_model(model_save_loc)
             save_pickle(model_info,model_fldr_loc + "model_info.pickle")
             
-            #TODO make this optional and document evaluation of model
-            #TODO see if it is possible to save the history
-            # Get accuracy at each boosting round
-            # Extract training and validation error (1 - accuracy) at each round
-            train_errors = history['train']['error']
-            test_errors = history['test']['error']
+        if tree_err:
+            with timed("Evaluate Tree Error"):
+                #TODO make this optional and document evaluation of model
+                #TODO see if it is possible to save the history
+                # Get accuracy at each boosting round
+                # Extract training and validation error (1 - accuracy) at each round
+                train_errors = history['train']['error']
+                test_errors = history['test']['error']
 
-            # Calculate accuracies
-            train_accuracies = [1 - error for error in train_errors]
-            test_accuracies = [1 - error for error in test_errors]
+                # Calculate accuracies
+                train_accuracies = [1 - error for error in train_errors]
+                test_accuracies = [1 - error for error in test_errors]
 
-            # Plot or analyze accuracy vs. number of trees (boosting rounds)
-            plt.plot(range(len(train_accuracies)), train_accuracies, label='Train Accuracy')
-            plt.plot(range(len(test_accuracies)), test_accuracies, label='Test Accuracy')
-            plt.xlabel('Number of Trees')
-            plt.ylabel('Accuracy')
-            plt.legend()
-            plt.savefig(gen_plot_save_loc + "train_test_acc.png")
+                # Plot or analyze accuracy vs. number of trees (boosting rounds)
+                plt.plot(range(len(train_accuracies)), train_accuracies, label='Train Accuracy')
+                plt.plot(range(len(test_accuracies)), test_accuracies, label='Test Accuracy')
+                plt.xlabel('Number of Trees')
+                plt.ylabel('Accuracy')
+                plt.legend()
+                plt.savefig(gen_plot_save_loc + "train_test_acc.png")
 
-            # You can also inspect the final accuracy after training
-            final_train_accuracy = train_accuracies[-1]
-            final_test_accuracy = test_accuracies[-1]
-            print(f"Final train accuracy: {final_train_accuracy}")
-            print(f"Final test accuracy: {final_test_accuracy}")
-            
-            
-            X_test_local = X_test.compute()
-            y_test_local = y_test.compute()
-            dtest = xgb.DMatrix(X_test_local, label=y_test_local)
+                # You can also inspect the final accuracy after training
+                final_train_accuracy = train_accuracies[-1]
+                final_test_accuracy = test_accuracies[-1]
+                print(f"Final train accuracy: {final_train_accuracy}")
+                print(f"Final test accuracy: {final_test_accuracy}")
+                
+                
+                X_test_local = X_test.compute()
+                y_test_local = y_test.compute()
+                dtest = xgb.DMatrix(X_test_local, label=y_test_local)
 
-            accuracies, times = evaluate_accuracy_and_speed(bst, dtest, max_trees=num_trees)
+                accuracies, times = evaluate_accuracy_and_speed(bst, dtest, max_trees=num_trees)
 
-            # Plot accuracy vs number of trees
-            plt.figure(figsize=(12, 6))
+                # Plot accuracy vs number of trees
+                plt.figure(figsize=(12, 6))
 
-            # Subplot for accuracy
-            plt.subplot(1, 2, 1)
-            plt.plot(range(1, 101), accuracies, label='Test Accuracy', color='blue')
-            plt.xlabel('Number of Trees')
-            plt.ylabel('Accuracy')
-            plt.legend()
+                # Subplot for accuracy
+                plt.subplot(1, 2, 1)
+                plt.plot(range(1, 101), accuracies, label='Test Accuracy', color='blue')
+                plt.xlabel('Number of Trees')
+                plt.ylabel('Accuracy')
+                plt.legend()
 
-            # Subplot for time
-            plt.subplot(1, 2, 2)
-            plt.plot(range(1, 101), times, label='Prediction Time', color='red')
-            plt.xlabel('Number of Trees')
-            plt.ylabel('Time (seconds)')
-            plt.legend()
+                # Subplot for time
+                plt.subplot(1, 2, 2)
+                plt.plot(range(1, 101), times, label='Prediction Time', color='red')
+                plt.xlabel('Number of Trees')
+                plt.ylabel('Time (seconds)')
+                plt.legend()
 
-            plt.tight_layout()
-            plt.savefig(gen_plot_save_loc + "tree_time_acc.png")
+                plt.tight_layout()
+                plt.savefig(gen_plot_save_loc + "tree_time_acc.png")
 
     
     client.close()
