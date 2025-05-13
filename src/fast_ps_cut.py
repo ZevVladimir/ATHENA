@@ -33,8 +33,6 @@ SPARTA_output_path = dset_params["SPARTA_DATA"]["sparta_output_path"]
 
 feature_columns = dset_params["TRAIN_MODEL"]["feature_columns"]
 target_column = dset_params["TRAIN_MODEL"]["target_column"]
-model_sims = dset_params["TRAIN_MODEL"]["model_sims"]
-model_type = dset_params["TRAIN_MODEL"]["model_type"]
 
 test_sims = dset_params["EVAL_MODEL"]["test_sims"]
 eval_datasets = dset_params["EVAL_MODEL"]["eval_datasets"]
@@ -54,6 +52,13 @@ log_tvticks = dset_params["EVAL_MODEL"]["log_tvticks"]
 lin_rticks = dset_params["EVAL_MODEL"]["lin_rticks"]
 log_rticks = dset_params["EVAL_MODEL"]["log_rticks"]
 
+fast_ps_calib_sims = dset_params["PS_Cut"]["fast_ps_calib_sims"]
+n_points = dset_params["PS_Cut"]["n_points"]
+perc = dset_params["PS_Cut"]["perc"]
+width = dset_params["PS_Cut"]["width"]
+grad_lims = dset_params["PS_Cut"]["grad_lims"]
+r_cut_calib = dset_params["PS_Cut"]["r_cut_calib"]
+r_cut_pred = dset_params["PS_Cut"]["r_cut_pred"]
 
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
@@ -102,7 +107,7 @@ def gradient_minima(
         hist_yv, hist_edges = np.histogram(lnv2[mask_vr * r_mask], bins=200)
         hist_lnv2 = 0.5 * (hist_edges[:-1] + hist_edges[1:])
         hist_lnv2_grad = np.gradient(hist_yv, np.mean(np.diff(hist_edges)))
-        lnv2_mask = (1.0 < hist_lnv2) * (hist_lnv2 < 1.75)
+        lnv2_mask = (1.0 < hist_lnv2) * (hist_lnv2 < r_cut_calib)
         grad_min[i] = hist_lnv2[lnv2_mask][np.argmin(hist_lnv2_grad[lnv2_mask])]
 
     return grad_r, grad_min
@@ -150,10 +155,10 @@ def cost_perp_distance(b: float, *data) -> float:
     return -np.log(np.mean(d[(d < width)] ** 2))
 
 def calibrate_finder(
-    n_points: int = 20,
-    perc: float = 0.99,
-    width: float = 0.05,
-    grad_lims: tuple = (0.2, 0.5),
+    n_points: int = n_points,
+    perc: float = perc,
+    width: float = width,
+    grad_lims: tuple = grad_lims,
 ):
     """_summary_
 
@@ -172,13 +177,13 @@ def calibrate_finder(
         [0.2, 0.5]
     """
     # MODIFY this line if needed ======================
-    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client)
+    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client,fast_ps_calib_sims)
 
     # =================================================
 
     mask_vr_neg = (vr < 0)
     mask_vr_pos = ~mask_vr_neg
-    mask_r = r < 1.75
+    mask_r = r < r_cut_calib
 
     # For vr > 0 ===============================================================
     r_grad, min_grad = gradient_minima(r, lnv2, mask_vr_pos, n_points, *grad_lims)
@@ -220,11 +225,13 @@ def calibrate_finder(
 if __name__ == "__main__":
     client = setup_client()
     
-    comb_model_sims = get_combined_name(model_sims) 
-        
-    model_name = get_model_name(model_type, model_sims, hpo_done=dset_params["OPTIMIZE"]["hpo"], opt_param_dict=dset_params["OPTIMIZE"])    
+    comb_model_sims = get_combined_name(fast_ps_calib_sims) 
+    
+    model_type = "phase_space_cut"
+    model_name = get_model_name(model_type, fast_ps_calib_sims, hpo_done=False, opt_param_dict=dset_params["OPTIMIZE"])    
     model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"  
     
+    #TODO make this a loop for all the test sims
     curr_test_sims = test_sims[0]
     test_comb_name = get_combined_name(curr_test_sims) 
     dset_name = eval_datasets[0]
@@ -233,8 +240,8 @@ if __name__ == "__main__":
     
     ####################################################################################################################################################################################################################################
     
-    if os.path.exists(model_fldr_loc + "ps_optparam_dict.pickle"):
-        ps_param_dict = load_pickle(model_fldr_loc + "ps_optparam_dict.pickle")
+    if os.path.exists(model_fldr_loc + "ps_fastparam_dict.pickle"):
+        ps_param_dict = load_pickle(model_fldr_loc + "ps_fastparam_dict.pickle")
         m_pos = ps_param_dict["m_pos"]
         b_pos = ps_param_dict["b_pos"]
         m_neg = ps_param_dict["m_neg"]
@@ -248,25 +255,13 @@ if __name__ == "__main__":
             "m_neg":m_neg,
             "b_neg":b_neg
         }
-        save_pickle(ps_param_dict, model_fldr_loc + "ps_optparam_dict.pickle")
+        save_pickle(ps_param_dict, model_fldr_loc + "ps_fastparam_dict.pickle")
     
     print("\nCalibration Params")
     print(m_pos,b_pos,m_neg,b_neg)
     print("\n")
-    # These are the values I used for my dataset. Feel free to play around with them
-    # to improve results. 'perc' is the percent of particles expected below the line
-    # for vr > 0. 'width' is used for 
-    width = 0.05
-    perc = 0.99
-    grad_lims = "0.2_0.5"
-    r_cut = 1.75
 
     r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client, test_sims[0])
-    
-    # r = r.to_numpy()
-    # vr = vr.to_numpy()
-    # lnv2 = lnv2.to_numpy()
-    # sparta_labels = sparta_labels.to_numpy()
     
     r_r200m = my_data["p_Scaled_radii"].compute().to_numpy()
     vr = my_data["p_Radial_vel"].compute().to_numpy()
@@ -295,14 +290,14 @@ if __name__ == "__main__":
     }
 
     # Look for particles vr>0 that are above the phase space line (infalling) that SPARTA says should be below (orbiting)
-    wrong_vr_pos_orb = (lnv2[fltr_combs["orb_vr_pos"]] > (m_pos * r_r200m[fltr_combs["orb_vr_pos"]] + b_pos)) & (r_r200m[fltr_combs["orb_vr_pos"]] < 2.0)
+    wrong_vr_pos_orb = (lnv2[fltr_combs["orb_vr_pos"]] > (m_pos * r_r200m[fltr_combs["orb_vr_pos"]] + b_pos)) & (r_r200m[fltr_combs["orb_vr_pos"]] < r_cut_pred)
     # Look for particles vr>0 that are below the phase space line (orbiting) that SPARTA says should be above (infalling)
-    wrong_vr_pos_inf = (lnv2[fltr_combs["inf_vr_pos"]] < (m_pos * r_r200m[fltr_combs["inf_vr_pos"]] + b_pos)) & (r_r200m[fltr_combs["inf_vr_pos"]] < 2.0)
+    wrong_vr_pos_inf = (lnv2[fltr_combs["inf_vr_pos"]] < (m_pos * r_r200m[fltr_combs["inf_vr_pos"]] + b_pos)) & (r_r200m[fltr_combs["inf_vr_pos"]] < r_cut_pred)
 
     # Look for particles vr<0 that are above the phase space line (infalling) that SPARTA says should be below (orbiting)
-    wrong_vr_neg_orb = (lnv2[fltr_combs["orb_vr_neg"]] > (m_neg * r_r200m[fltr_combs["orb_vr_neg"]] + b_neg)) & (r_r200m[fltr_combs["orb_vr_neg"]] < 2.0)
+    wrong_vr_neg_orb = (lnv2[fltr_combs["orb_vr_neg"]] > (m_neg * r_r200m[fltr_combs["orb_vr_neg"]] + b_neg)) & (r_r200m[fltr_combs["orb_vr_neg"]] < r_cut_pred)
     # Look for particles vr<0 that are below the phase space line (orbiting) that SPARTA says should be above (infalling)
-    wrong_vr_neg_inf = (lnv2[fltr_combs["inf_vr_neg"]] < (m_neg * r_r200m[fltr_combs["inf_vr_neg"]] + b_neg)) & (r_r200m[fltr_combs["inf_vr_neg"]] < 2.0)
+    wrong_vr_neg_inf = (lnv2[fltr_combs["inf_vr_neg"]] < (m_neg * r_r200m[fltr_combs["inf_vr_neg"]] + b_neg)) & (r_r200m[fltr_combs["inf_vr_neg"]] < r_cut_pred)
 
     #total num wrong ptls
     wrong_vr_pos_total = wrong_vr_pos_orb.sum() + wrong_vr_pos_inf.sum()
@@ -417,7 +412,7 @@ if __name__ == "__main__":
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y12, lw=2.0, color="g",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.vlines(x=r_cut_calib,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
         plt.ylim(-2.2, 2.5)
@@ -428,7 +423,7 @@ if __name__ == "__main__":
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="g",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.vlines(x=r_cut_calib,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
         plt.ylim(-2.2, 2.5)
@@ -439,7 +434,7 @@ if __name__ == "__main__":
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y12, lw=2.0, color="g",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.vlines(x=r_cut_calib,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
         plt.ylim(-2.2, 2.5)
@@ -450,7 +445,7 @@ if __name__ == "__main__":
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="g",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.vlines(x=r_cut_calib,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         cbar_lin= plt.colorbar()
         cbar_lin.ax.tick_params(labelsize=cbar_tick_fntsize)
@@ -463,7 +458,7 @@ if __name__ == "__main__":
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y12, lw=2.0, color="g",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.vlines(x=r_cut_calib,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
         plt.ylim(-2.2, 2.5)
@@ -473,7 +468,7 @@ if __name__ == "__main__":
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="g",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.vlines(x=r_cut_calib,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
         plt.ylim(-2.2, 2.5)
@@ -483,7 +478,7 @@ if __name__ == "__main__":
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y12, lw=2.0, color="g",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.vlines(x=r_cut_calib,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
         plt.ylim(-2.2, 2.5)
@@ -493,7 +488,7 @@ if __name__ == "__main__":
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="g",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.vlines(x=r_cut_calib,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         cbar_log= plt.colorbar()
         cbar_log.ax.tick_params(labelsize=cbar_tick_fntsize)
@@ -526,7 +521,7 @@ if __name__ == "__main__":
                     cmap="terrain", range=(x_range, y_range))
         plt.plot(x, y12, lw=2.0, color="k",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.vlines(x=r_cut_calib,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.colorbar(label=r'$N$ (Counts)')
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
@@ -538,7 +533,7 @@ if __name__ == "__main__":
                     cmap="terrain", range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="k",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.vlines(x=r_cut_calib,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.colorbar(label=r'$N$ (Counts)')
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
@@ -549,7 +544,7 @@ if __name__ == "__main__":
                     cmap="terrain", range=(x_range, y_range))
         plt.plot(x, y12, lw=2.0, color="k",
                 label=fr"$m_p={m_pos:.3f}$"+"\n"+fr"$b_p={b_pos:.3f}$"+"\n"+fr"$p={perc:.3f}$")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.vlines(x=r_cut_calib,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.colorbar(h3[3], label=r'$N$ (Counts)')
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
@@ -560,7 +555,7 @@ if __name__ == "__main__":
                     cmap="terrain", range=(x_range, y_range))
         plt.plot(x, y22, lw=2.0, color="k",
                 label=fr"$m_n={m_neg:.3f}$"+"\n"+fr"$b_n={b_neg:.3f}$"+"\n"+fr"$w={width:.3f}$")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.vlines(x=r_cut_calib,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.colorbar(h4[3], label=r'$N$ (Counts)')
         plt.legend(loc="upper right",fontsize=legend_fntsize)
         plt.xlim(0, 2)
@@ -607,7 +602,7 @@ if __name__ == "__main__":
         plt.sca(axes[4])
         plt.title(r'$v_r > 0$',fontsize=title_fntsize)
         plt.contourf(hist_xp, hist_yp, hist_zp.T, levels=80, cmap='terrain')
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.vlines(x=r_cut_calib,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.colorbar(label="Smoothed Gradient Magnitude")
         plt.xlim(0, 2)
         
@@ -615,7 +610,7 @@ if __name__ == "__main__":
         plt.sca(axes[5])
         plt.title(r'$v_r < 0$',fontsize=title_fntsize)
         plt.contourf(hist_xn, hist_yn, hist_zn.T, levels=80, cmap='terrain')
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.vlines(x=r_cut_calib,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
         plt.colorbar(label="Smoothed Gradient Magnitude")
         plt.xlim(0, 2)
         
@@ -625,7 +620,7 @@ if __name__ == "__main__":
         plt.savefig(plot_loc + "perc_" + str(perc) + "_" + grad_lims + "_KE_dist_cut.png")
         
     
-    mask_orb, ps_preds = fast_ps_predictor(ps_param_dict,r_r200m,vr,lnv2,2.0)
+    mask_orb, ps_preds = fast_ps_predictor(ps_param_dict,r_r200m,vr,lnv2,r_cut_pred)
     
     with timed("Phase space dist of ptls plot"):
         fig, axes = plt.subplots(1, 2, figsize=(9, 4))
@@ -665,7 +660,7 @@ if __name__ == "__main__":
         lnv2 = np.log(vphys**2)
         
         #TODO rename the different masks and preds
-        mask_orb, ps_preds = fast_ps_predictor(ps_param_dict,r_r200m,vr,lnv2,2.0)
+        mask_orb, ps_preds = fast_ps_predictor(ps_param_dict,r_r200m,vr,lnv2,r_cut_pred)
         
         X = my_data[feature_columns]
         y = my_data[target_column]

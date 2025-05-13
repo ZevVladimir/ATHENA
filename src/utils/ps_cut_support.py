@@ -149,7 +149,7 @@ def halo_select(sims, ptl_data):
     subset_df = ptl_data.compute().loc[all_row_idxs]        
     return subset_df
 
-def load_ps_data(client, curr_test_sims = ["cbol_l1000_n1024_4r200m_1-5v200m_99to90"]):
+def load_ps_data(client, curr_test_sims):
     test_comb_name = get_combined_name(curr_test_sims) 
 
     # Loop through and/or for Train/Test/All datasets and evaluate the model
