@@ -1572,9 +1572,9 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         
         for i,ax in enumerate(axes):
             if i == 3:
-                ax.text(0.1, -3.7, "Orbiting According\nto Phase-space Cut", fontsize=txt_fntsize, color="r",
+                ax.text(0.1, -3.7, "Orbiting According\nto Kinetic Energy Cut", fontsize=txt_fntsize, color="r",
                     weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-                ax.text(0.9, 2.2, "Infalling According\nto Phase-space Cut", fontsize=txt_fntsize, color="b",
+                ax.text(0.9, 2.2, "Infalling According\nto Kinetic Energy Cut", fontsize=txt_fntsize, color="b",
                     weight="bold", bbox=dict(facecolor='w', alpha=0.75))
             ax.tick_params(axis='both',which='both',labelcolor="black",colors="white",direction="in",labelsize=tick_label_fntsize,length=8,width=2)
 
