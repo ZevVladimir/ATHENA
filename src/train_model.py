@@ -16,25 +16,25 @@ from utils.ML_support import setup_client, get_combined_name, load_data, reform_
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
-config_dict = load_config(os.getcwd() + "/config.ini")
+config_params = load_config(os.getcwd() + "/config.ini")
 
-ML_dset_path = config_dict["PATHS"]["ml_dset_path"]
-path_to_models = config_dict["PATHS"]["path_to_models"]
+ML_dset_path = config_params["PATHS"]["ml_dset_path"]
+path_to_models = config_params["PATHS"]["path_to_models"]
 
-test_dset_frac = config_dict["DSET_CREATE"]["test_dset_frac"]
+test_dset_frac = config_params["DSET_CREATE"]["test_dset_frac"]
 
-feature_columns = config_dict["TRAIN_MODEL"]["feature_columns"]
-target_column = config_dict["TRAIN_MODEL"]["target_column"]
-model_sims = config_dict["TRAIN_MODEL"]["model_sims"]
-model_type = config_dict["TRAIN_MODEL"]["model_type"]
-tree_err = config_dict["TRAIN_MODEL"]["tree_err"]
+feature_columns = config_params["TRAIN_MODEL"]["feature_columns"]
+target_column = config_params["TRAIN_MODEL"]["target_column"]
+model_sims = config_params["TRAIN_MODEL"]["model_sims"]
+model_type = config_params["TRAIN_MODEL"]["model_type"]
+tree_err = config_params["TRAIN_MODEL"]["tree_err"]
 
-retrain = config_dict["MISC"]["retrain_model"]
+retrain = config_params["MISC"]["retrain_model"]
 
-dens_prf_plt = config_dict["EVAL_MODEL"]["dens_prf_plt"]
-misclass_plt = config_dict["EVAL_MODEL"]["misclass_plt"]
-fulldist_plt = config_dict["EVAL_MODEL"]["fulldist_plt"]
-dens_prf_nu_split = config_dict["EVAL_MODEL"]["dens_prf_nu_split"]
+dens_prf_plt = config_params["EVAL_MODEL"]["dens_prf_plt"]
+misclass_plt = config_params["EVAL_MODEL"]["misclass_plt"]
+fulldist_plt = config_params["EVAL_MODEL"]["fulldist_plt"]
+dens_prf_nu_split = config_params["EVAL_MODEL"]["dens_prf_nu_split"]
 
 
 def evaluate_accuracy_and_speed(model, dtest, max_trees):
@@ -69,7 +69,7 @@ if __name__ == "__main__":
         
     comb_model_sims = get_combined_name(model_sims) 
         
-    model_name = get_model_name(model_type, model_sims, hpo_done=config_dict["OPTIMIZE"]["hpo"], opt_param_dict=config_dict["OPTIMIZE"])    
+    model_name = get_model_name(model_type, model_sims, hpo_done=config_params["OPTIMIZE"]["hpo"], opt_param_dict=config_params["OPTIMIZE"])    
     model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"
     model_save_loc = model_fldr_loc + model_name + ".json"
     gen_plot_save_loc = model_fldr_loc + "plots/"
@@ -99,14 +99,14 @@ if __name__ == "__main__":
     else:
         print("Making Datasets") 
         
-        use_scale_rad = config_dict["OPTIMIZE"]["opt_scale_rad"]
-        reduce_rad = config_dict["OPTIMIZE"]["reduce_rad"]
-        reduce_perc = config_dict["OPTIMIZE"]["reduce_perc"]
+        use_scale_rad = config_params["OPTIMIZE"]["opt_scale_rad"]
+        reduce_rad = config_params["OPTIMIZE"]["reduce_rad"]
+        reduce_perc = config_params["OPTIMIZE"]["reduce_perc"]
         
-        use_weights = config_dict["OPTIMIZE"]["opt_weights"]
-        weight_rad = config_dict["OPTIMIZE"]["weight_rad"]
-        min_weight = config_dict["OPTIMIZE"]["min_weight"]
-        weight_exp = config_dict["OPTIMIZE"]["weight_exp"]
+        use_weights = config_params["OPTIMIZE"]["opt_weights"]
+        weight_rad = config_params["OPTIMIZE"]["weight_rad"]
+        min_weight = config_params["OPTIMIZE"]["min_weight"]
+        weight_exp = config_params["OPTIMIZE"]["weight_exp"]
             
         scale_rad_info = {
             "Used scale_rad": use_scale_rad,
@@ -200,7 +200,7 @@ if __name__ == "__main__":
             "Reducing radius percent": opt_reduce_perc,
             }
             
-            model_name = get_model_name(model_type, model_sims, hpo_done=config_dict["OPTIMIZE"]["hpo"], opt_param_dict=config_dict["OPTIMIZE"])    
+            model_name = get_model_name(model_type, model_sims, hpo_done=config_params["OPTIMIZE"]["hpo"], opt_param_dict=config_params["OPTIMIZE"])    
             model_fldr_loc = path_to_models + comb_model_sims + "/" + model_name + "/"
             model_save_loc = model_fldr_loc + model_name + ".json"
             gen_plot_save_loc = model_fldr_loc + "plots/"

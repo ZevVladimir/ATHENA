@@ -20,31 +20,31 @@ from utils.calculation_functions import calc_radius, calc_pec_vel, calc_rad_vel,
 from src.utils.vis_fxns import compare_prfs
 from utils.ML_support import split_sparta_hdf5_name
 ##################################################################################################################
-config_dict = load_config(os.getcwd() + "/config.ini")
+config_params = load_config(os.getcwd() + "/config.ini")
 
-curr_sparta_file = config_dict["SPARTA_DATA"]["curr_sparta_file"]
-known_snaps = config_dict["SNAP_DATA"]["known_snaps"]
-snap_path = config_dict["SNAP_DATA"]["snap_path"]
-SPARTA_output_path = config_dict["SPARTA_DATA"]["sparta_output_path"]
-pickled_path = config_dict["PATHS"]["pickled_path"]
-ML_dset_path = config_dict["PATHS"]["ml_dset_path"]
-debug_plt_path = config_dict["PATHS"]["debug_plt_path"]
+curr_sparta_file = config_params["SPARTA_DATA"]["curr_sparta_file"]
+known_snaps = config_params["SNAP_DATA"]["known_snaps"]
+snap_path = config_params["SNAP_DATA"]["snap_path"]
+SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
+pickled_path = config_params["PATHS"]["pickled_path"]
+ML_dset_path = config_params["PATHS"]["ml_dset_path"]
+debug_plt_path = config_params["PATHS"]["debug_plt_path"]
 
-debug_mem = config_dict["MISC"]["debug_mem"]
-sim_cosmol = config_dict["MISC"]["sim_cosmol"]
-reset_lvl = config_dict["MISC"]["reset_search"]
-mp_chunk_size = config_dict["MISC"]["mp_chunk_size"]
+debug_mem = config_params["MISC"]["debug_mem"]
+sim_cosmol = config_params["MISC"]["sim_cosmol"]
+reset_lvl = config_params["MISC"]["reset_search"]
+mp_chunk_size = config_params["MISC"]["mp_chunk_size"]
 
-snap_dir_format = config_dict["SNAP_DATA"]["snap_dir_format"]
-snap_format = config_dict["SNAP_DATA"]["snap_format"]
+snap_dir_format = config_params["SNAP_DATA"]["snap_dir_format"]
+snap_format = config_params["SNAP_DATA"]["snap_format"]
 
-t_dyn_step = config_dict["DSET_CREATE"]["t_dyn_step"]
-p_red_shift = config_dict["DSET_CREATE"]["p_red_shift"]
-search_radius = config_dict["DSET_CREATE"]["search_radius"]
-sub_dset_mem_size = config_dict["DSET_CREATE"]["sub_dset_mem_size"]
+t_dyn_step = config_params["DSET_CREATE"]["t_dyn_step"]
+p_red_shift = config_params["DSET_CREATE"]["p_red_shift"]
+search_radius = config_params["DSET_CREATE"]["search_radius"]
+sub_dset_mem_size = config_params["DSET_CREATE"]["sub_dset_mem_size"]
 
-test_dset_frac = config_dict["DSET_CREATE"]["test_dset_frac"]
-lin_rticks = config_dict["EVAL_MODEL"]["lin_rticks"]
+test_dset_frac = config_params["DSET_CREATE"]["test_dset_frac"]
+lin_rticks = config_params["EVAL_MODEL"]["lin_rticks"]
 ##################################################################################################################
 create_directory(pickled_path)
 create_directory(ML_dset_path)

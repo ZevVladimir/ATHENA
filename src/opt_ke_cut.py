@@ -21,36 +21,37 @@ from src.utils.ke_cut_support import load_ke_data, opt_ke_predictor
 from src.utils.vis_fxns import plt_SPARTA_KE_dist, compare_split_prfs
 from utils.calculation_functions import calculate_density, filter_prf, calc_mass_acc_rate
 
-dset_params = load_config(os.getcwd() + "/config.ini")
+config_params = load_config(os.getcwd() + "/config.ini")
 
-ML_dset_path = dset_params["PATHS"]["ml_dset_path"]
-path_to_models = dset_params["PATHS"]["path_to_models"]
-SPARTA_output_path = dset_params["SPARTA_DATA"]["sparta_output_path"]
+ML_dset_path = config_params["PATHS"]["ml_dset_path"]
+path_to_models = config_params["PATHS"]["path_to_models"]
+SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 
-eval_datasets = dset_params["EVAL_MODEL"]["eval_datasets"]
+eval_datasets = config_params["EVAL_MODEL"]["eval_datasets"]
 
-sim_cosmol = dset_params["MISC"]["sim_cosmol"]
+sim_cosmol = config_params["MISC"]["sim_cosmol"]
 
-plt_nu_splits = parse_ranges(dset_params["EVAL_MODEL"]["plt_nu_splits"])
+plt_nu_splits = parse_ranges(config_params["EVAL_MODEL"]["plt_nu_splits"])
 
-plt_macc_splits = parse_ranges(dset_params["EVAL_MODEL"]["plt_macc_splits"])
+plt_macc_splits = parse_ranges(config_params["EVAL_MODEL"]["plt_macc_splits"])
 
-linthrsh = dset_params["EVAL_MODEL"]["linthrsh"]
-lin_nbin = dset_params["EVAL_MODEL"]["lin_nbin"]
-log_nbin = dset_params["EVAL_MODEL"]["log_nbin"]
-lin_rvticks = dset_params["EVAL_MODEL"]["lin_rvticks"]
-log_rvticks = dset_params["EVAL_MODEL"]["log_rvticks"]
-lin_tvticks = dset_params["EVAL_MODEL"]["lin_tvticks"]
-log_tvticks = dset_params["EVAL_MODEL"]["log_tvticks"]
-lin_rticks = dset_params["EVAL_MODEL"]["lin_rticks"]
-log_rticks = dset_params["EVAL_MODEL"]["log_rticks"]
+linthrsh = config_params["EVAL_MODEL"]["linthrsh"]
+lin_nbin = config_params["EVAL_MODEL"]["lin_nbin"]
+log_nbin = config_params["EVAL_MODEL"]["log_nbin"]
+lin_rvticks = config_params["EVAL_MODEL"]["lin_rvticks"]
+log_rvticks = config_params["EVAL_MODEL"]["log_rvticks"]
+lin_tvticks = config_params["EVAL_MODEL"]["lin_tvticks"]
+log_tvticks = config_params["EVAL_MODEL"]["log_tvticks"]
+lin_rticks = config_params["EVAL_MODEL"]["lin_rticks"]
+log_rticks = config_params["EVAL_MODEL"]["log_rticks"]
 
-opt_ke_calib_sims = dset_params["KE_CUT"]["opt_ke_calib_sims"]
-perc = dset_params["KE_CUT"]["perc"]
-width = dset_params["KE_CUT"]["width"]
-grad_lims = dset_params["KE_CUT"]["grad_lims"]
-r_cut_calib = dset_params["KE_CUT"]["r_cut_calib"]
-r_cut_pred = dset_params["KE_CUT"]["r_cut_pred"]
+opt_ke_calib_sims = config_params["KE_CUT"]["opt_ke_calib_sims"]
+perc = config_params["KE_CUT"]["perc"]
+width = config_params["KE_CUT"]["width"]
+grad_lims = config_params["KE_CUT"]["grad_lims"]
+r_cut_calib = config_params["KE_CUT"]["r_cut_calib"]
+r_cut_pred = config_params["KE_CUT"]["r_cut_pred"]
+ke_test_sims = config_params["KE_CUT"]["ke_test_sims"]
     
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
@@ -117,8 +118,9 @@ if __name__ == "__main__":
     
     comb_model_sims = get_combined_name(opt_ke_calib_sims) 
     model_type = "phase_space_cut"
-    model_name = get_model_name(model_type, opt_ke_calib_sims, hpo_done=dset_params["OPTIMIZE"]["hpo"], opt_param_dict=dset_params["OPTIMIZE"])    
+    model_name = get_model_name(model_type, opt_ke_calib_sims, hpo_done=config_params["OPTIMIZE"]["hpo"], opt_param_dict=config_params["OPTIMIZE"])    
     model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"  
+    create_directory(model_fldr_loc)
     
     split_scale_dict = {
             "linthrsh":linthrsh, 
@@ -133,7 +135,7 @@ if __name__ == "__main__":
     }
     
     #TODO make this check not necessary just if you want to have this plotted as well
-    param_path = model_fldr_loc + "ke_fastparam_dict.pickle"
+    param_path = model_fldr_loc + "ke_fastparams_dict.pickle"
     if os.path.exists(param_path):
         ke_param_dict = load_pickle(param_path)
         m_pos = ke_param_dict["m_pos"]
@@ -146,7 +148,7 @@ if __name__ == "__main__":
         )
     
     #TODO make this a loop
-    curr_test_sims = opt_ke_calib_sims[0]
+    curr_test_sims = ke_test_sims[0]
     test_comb_name = get_combined_name(curr_test_sims) 
     dset_name = eval_datasets[0]
     plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"

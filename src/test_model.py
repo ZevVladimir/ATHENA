@@ -11,24 +11,24 @@ from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs
 from utils.data_and_loading_functions import create_directory, timed, save_pickle, load_config
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
-config_dict = load_config(os.getcwd() + "/config.ini")
+config_params = load_config(os.getcwd() + "/config.ini")
 
-ML_dset_path = config_dict["PATHS"]["ml_dset_path"]
-path_to_models = config_dict["PATHS"]["path_to_models"]
+ML_dset_path = config_params["PATHS"]["ml_dset_path"]
+path_to_models = config_params["PATHS"]["path_to_models"]
 
-model_sims = config_dict["TRAIN_MODEL"]["model_sims"]
-model_type = config_dict["TRAIN_MODEL"]["model_type"]
-feature_columns = config_dict["TRAIN_MODEL"]["feature_columns"]
-target_column = config_dict["TRAIN_MODEL"]["target_column"]
+model_sims = config_params["TRAIN_MODEL"]["model_sims"]
+model_type = config_params["TRAIN_MODEL"]["model_type"]
+feature_columns = config_params["TRAIN_MODEL"]["feature_columns"]
+target_column = config_params["TRAIN_MODEL"]["target_column"]
 
-test_sims = config_dict["EVAL_MODEL"]["test_sims"]
-eval_datasets = config_dict["EVAL_MODEL"]["eval_datasets"]
-dens_prf_plt = config_dict["EVAL_MODEL"]["dens_prf_plt"]
-misclass_plt = config_dict["EVAL_MODEL"]["misclass_plt"]
-fulldist_plt = config_dict["EVAL_MODEL"]["fulldist_plt"]
-io_frac_plt = config_dict["EVAL_MODEL"]["io_frac_plt"]
-dens_prf_nu_split = config_dict["EVAL_MODEL"]["dens_prf_nu_split"]
-dens_prf_macc_split = config_dict["EVAL_MODEL"]["dens_prf_macc_split"]
+test_sims = config_params["EVAL_MODEL"]["test_sims"]
+eval_datasets = config_params["EVAL_MODEL"]["eval_datasets"]
+dens_prf_plt = config_params["EVAL_MODEL"]["dens_prf_plt"]
+misclass_plt = config_params["EVAL_MODEL"]["misclass_plt"]
+fulldist_plt = config_params["EVAL_MODEL"]["fulldist_plt"]
+io_frac_plt = config_params["EVAL_MODEL"]["io_frac_plt"]
+dens_prf_nu_split = config_params["EVAL_MODEL"]["dens_prf_nu_split"]
+dens_prf_macc_split = config_params["EVAL_MODEL"]["dens_prf_macc_split"]
 
 ###############################################################################################################
 
@@ -37,7 +37,7 @@ if __name__ == "__main__":
     
     comb_model_sims = get_combined_name(model_sims) 
         
-    model_name = get_model_name(model_type, model_sims, hpo_done=config_dict["OPTIMIZE"]["hpo"], opt_param_dict=config_dict["OPTIMIZE"])    
+    model_name = get_model_name(model_type, model_sims, hpo_done=config_params["OPTIMIZE"]["hpo"], opt_param_dict=config_params["OPTIMIZE"])    
     model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"
     model_save_loc = model_fldr_loc + model_name + ".json"
     gen_plot_save_loc = model_fldr_loc + "plots/"

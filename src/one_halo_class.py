@@ -18,31 +18,31 @@ from utils.data_and_loading_functions import create_directory,load_SPARTA_data,l
 from src.utils.vis_fxns import plot_halo_slice_class, plot_halo_3d_class
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
-dset_params = load_config(os.getcwd() + "/config.ini")
+config_params = load_config(os.getcwd() + "/config.ini")
 
-ML_dset_path = dset_params["PATHS"]["ml_dset_path"]
-path_to_models = dset_params["PATHS"]["path_to_models"]
+ML_dset_path = config_params["PATHS"]["ml_dset_path"]
+path_to_models = config_params["PATHS"]["path_to_models"]
 
-snap_path = dset_params["SNAP_DATA"]["snap_path"]
-SPARTA_output_path = dset_params["SPARTA_DATA"]["sparta_output_path"]
-curr_sparta_file = dset_params["SPARTA_DATA"]["curr_sparta_file"]
-snap_dir_format = dset_params["SNAP_DATA"]["snap_dir_format"]
-snap_format = dset_params["SNAP_DATA"]["snap_format"]
-sim_cosmol = dset_params["MISC"]["sim_cosmol"]
+snap_path = config_params["SNAP_DATA"]["snap_path"]
+SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
+curr_sparta_file = config_params["SPARTA_DATA"]["curr_sparta_file"]
+snap_dir_format = config_params["SNAP_DATA"]["snap_dir_format"]
+snap_format = config_params["SNAP_DATA"]["snap_format"]
+sim_cosmol = config_params["MISC"]["sim_cosmol"]
 
-search_rad = dset_params["DSET_CREATE"]["search_rad"]
+search_rad = config_params["DSET_CREATE"]["search_rad"]
 
-feature_columns = dset_params["TRAIN_MODEL"]["feature_columns"]
-target_column = dset_params["TRAIN_MODEL"]["target_column"]
-model_sims = dset_params["TRAIN_MODEL"]["model_sims"]
-model_type = dset_params["TRAIN_MODEL"]["model_type"]
+feature_columns = config_params["TRAIN_MODEL"]["feature_columns"]
+target_column = config_params["TRAIN_MODEL"]["target_column"]
+model_sims = config_params["TRAIN_MODEL"]["model_sims"]
+model_type = config_params["TRAIN_MODEL"]["model_type"]
 
-test_sims = dset_params["EVAL_MODEL"]["test_sims"]
+test_sims = config_params["EVAL_MODEL"]["test_sims"]
 
-reduce_rad = dset_params["OPTIMIZE"]["reduce_rad"]
-reduce_perc = dset_params["OPTIMIZE"]["reduce_perc"]
-weight_rad = dset_params["OPTIMIZE"]["weight_rad"]
-min_weight = dset_params["OPTIMIZE"]["min_weight"]
+reduce_rad = config_params["OPTIMIZE"]["reduce_rad"]
+reduce_perc = config_params["OPTIMIZE"]["reduce_perc"]
+weight_rad = config_params["OPTIMIZE"]["weight_rad"]
+min_weight = config_params["OPTIMIZE"]["min_weight"]
 
 sim_name, search_name = split_sparta_hdf5_name(curr_sparta_file)
 
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     
     comb_model_sims = get_combined_name(model_sims) 
         
-    model_name = get_model_name(model_type, model_sims, hpo_done=dset_params["OPTIMIZE"]["hpo"], opt_param_dict=dset_params["OPTIMIZE"])    
+    model_name = get_model_name(model_type, model_sims, hpo_done=config_params["OPTIMIZE"]["hpo"], opt_param_dict=config_params["OPTIMIZE"])    
     model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"
     model_save_loc = model_fldr_loc + model_name + ".json"
     gen_plot_save_loc = model_fldr_loc + "plots/"

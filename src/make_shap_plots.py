@@ -16,19 +16,19 @@ import multiprocessing as mp
 from utils.data_and_loading_functions import create_directory, timed, load_config
 from utils.ML_support import setup_client, get_combined_name, load_data, make_preds, shap_with_filter, get_model_name
 
-config_dict = load_config(os.getcwd() + "/config.ini")
+config_params = load_config(os.getcwd() + "/config.ini")
 
-sim_cosmol = config_dict["MISC"]["sim_cosmol"]
+sim_cosmol = config_params["MISC"]["sim_cosmol"]
 
-path_to_models = config_dict["PATHS"]["path_to_models"]
+path_to_models = config_params["PATHS"]["path_to_models"]
 
-feature_columns = config_dict["TRAIN_MODEL"]["feature_columns"]
-target_column = config_dict["TRAIN_MODEL"]["target_column"]
-model_sims = config_dict["TRAIN_MODEL"]["model_sims"]
-model_type = config_dict["TRAIN_MODEL"]["model_type"]
+feature_columns = config_params["TRAIN_MODEL"]["feature_columns"]
+target_column = config_params["TRAIN_MODEL"]["target_column"]
+model_sims = config_params["TRAIN_MODEL"]["model_sims"]
+model_type = config_params["TRAIN_MODEL"]["model_type"]
 
-test_sims = config_dict["EVAL_MODEL"]["test_sims"]
-eval_datasets = config_dict["EVAL_MODEL"]["eval_datasets"]
+test_sims = config_params["EVAL_MODEL"]["test_sims"]
+eval_datasets = config_params["EVAL_MODEL"]["eval_datasets"]
 
 if sim_cosmol == "planck13-nbody":
     cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
@@ -42,7 +42,7 @@ if __name__ == '__main__':
     with timed("Setup"): 
         comb_model_sims = get_combined_name(model_sims) 
         
-        model_name = get_model_name(model_type, model_sims, hpo_done=config_dict["OPTIMIZE"]["hpo"], opt_param_dict=config_dict["OPTIMIZE"])    
+        model_name = get_model_name(model_type, model_sims, hpo_done=config_params["OPTIMIZE"]["hpo"], opt_param_dict=config_params["OPTIMIZE"])    
         model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"
         model_save_loc = model_fldr_loc + model_name + ".json"
         gen_plot_save_loc = model_fldr_loc + "plots/"

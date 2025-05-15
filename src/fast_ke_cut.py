@@ -23,42 +23,42 @@ from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs
 from utils.data_and_loading_functions import create_directory, timed, save_pickle, load_pickle, load_SPARTA_data, conv_halo_id_spid, load_config, load_RSTAR_data, depair_np
 from src.utils.ke_cut_support import load_ke_data, fast_ke_predictor
 
-dset_params = load_config(os.getcwd() + "/config.ini")
+config_params = load_config(os.getcwd() + "/config.ini")
 
-ML_dset_path = dset_params["PATHS"]["ml_dset_path"]
-path_to_models = dset_params["PATHS"]["path_to_models"]
-rockstar_ctlgs_path = dset_params["PATHS"]["rockstar_ctlgs_path"]
+ML_dset_path = config_params["PATHS"]["ml_dset_path"]
+path_to_models = config_params["PATHS"]["path_to_models"]
+rockstar_ctlgs_path = config_params["PATHS"]["rockstar_ctlgs_path"]
 
-SPARTA_output_path = dset_params["SPARTA_DATA"]["sparta_output_path"]
+SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 
-feature_columns = dset_params["TRAIN_MODEL"]["feature_columns"]
-target_column = dset_params["TRAIN_MODEL"]["target_column"]
+feature_columns = config_params["TRAIN_MODEL"]["feature_columns"]
+target_column = config_params["TRAIN_MODEL"]["target_column"]
 
-test_sims = dset_params["EVAL_MODEL"]["test_sims"]
-eval_datasets = dset_params["EVAL_MODEL"]["eval_datasets"]
+eval_datasets = config_params["EVAL_MODEL"]["eval_datasets"]
 
-sim_cosmol = dset_params["MISC"]["sim_cosmol"]
+sim_cosmol = config_params["MISC"]["sim_cosmol"]
 
-plt_nu_splits = parse_ranges(dset_params["EVAL_MODEL"]["plt_nu_splits"])
-plt_macc_splits = parse_ranges(dset_params["EVAL_MODEL"]["plt_macc_splits"])
+plt_nu_splits = parse_ranges(config_params["EVAL_MODEL"]["plt_nu_splits"])
+plt_macc_splits = parse_ranges(config_params["EVAL_MODEL"]["plt_macc_splits"])
 
-linthrsh = dset_params["EVAL_MODEL"]["linthrsh"]
-lin_nbin = dset_params["EVAL_MODEL"]["lin_nbin"]
-log_nbin = dset_params["EVAL_MODEL"]["log_nbin"]
-lin_rvticks = dset_params["EVAL_MODEL"]["lin_rvticks"]
-log_rvticks = dset_params["EVAL_MODEL"]["log_rvticks"]
-lin_tvticks = dset_params["EVAL_MODEL"]["lin_tvticks"]
-log_tvticks = dset_params["EVAL_MODEL"]["log_tvticks"]
-lin_rticks = dset_params["EVAL_MODEL"]["lin_rticks"]
-log_rticks = dset_params["EVAL_MODEL"]["log_rticks"]
+linthrsh = config_params["EVAL_MODEL"]["linthrsh"]
+lin_nbin = config_params["EVAL_MODEL"]["lin_nbin"]
+log_nbin = config_params["EVAL_MODEL"]["log_nbin"]
+lin_rvticks = config_params["EVAL_MODEL"]["lin_rvticks"]
+log_rvticks = config_params["EVAL_MODEL"]["log_rvticks"]
+lin_tvticks = config_params["EVAL_MODEL"]["lin_tvticks"]
+log_tvticks = config_params["EVAL_MODEL"]["log_tvticks"]
+lin_rticks = config_params["EVAL_MODEL"]["lin_rticks"]
+log_rticks = config_params["EVAL_MODEL"]["log_rticks"]
 
-fast_ke_calib_sims = dset_params["KE_CUT"]["fast_ke_calib_sims"]
-n_points = dset_params["KE_CUT"]["n_points"]
-perc = dset_params["KE_CUT"]["perc"]
-width = dset_params["KE_CUT"]["width"]
-grad_lims = dset_params["KE_CUT"]["grad_lims"]
-r_cut_calib = dset_params["KE_CUT"]["r_cut_calib"]
-r_cut_pred = dset_params["KE_CUT"]["r_cut_pred"]
+fast_ke_calib_sims = config_params["KE_CUT"]["fast_ke_calib_sims"]
+n_points = config_params["KE_CUT"]["n_points"]
+perc = config_params["KE_CUT"]["perc"]
+width = config_params["KE_CUT"]["width"]
+grad_lims = config_params["KE_CUT"]["grad_lims"]
+r_cut_calib = config_params["KE_CUT"]["r_cut_calib"]
+r_cut_pred = config_params["KE_CUT"]["r_cut_pred"]
+ke_test_sims = config_params["KE_CUT"]["ke_test_sims"]
 
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
@@ -228,11 +228,12 @@ if __name__ == "__main__":
     comb_model_sims = get_combined_name(fast_ke_calib_sims) 
     
     model_type = "kinetic_energy_cut"
-    model_name = get_model_name(model_type, fast_ke_calib_sims, hpo_done=False, opt_param_dict=dset_params["OPTIMIZE"])    
+    model_name = get_model_name(model_type, fast_ke_calib_sims, hpo_done=False, opt_param_dict=config_params["OPTIMIZE"])    
     model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"  
+    create_directory(model_fldr_loc)
     
     #TODO make this a loop for all the test sims
-    curr_test_sims = test_sims[0]
+    curr_test_sims = ke_test_sims[0]
     test_comb_name = get_combined_name(curr_test_sims) 
     dset_name = eval_datasets[0]
     plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
