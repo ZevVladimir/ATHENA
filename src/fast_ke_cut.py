@@ -52,13 +52,13 @@ log_tvticks = dset_params["EVAL_MODEL"]["log_tvticks"]
 lin_rticks = dset_params["EVAL_MODEL"]["lin_rticks"]
 log_rticks = dset_params["EVAL_MODEL"]["log_rticks"]
 
-fast_ke_calib_sims = dset_params["KE_Cut"]["fast_ke_calib_sims"]
-n_points = dset_params["KE_Cut"]["n_points"]
-perc = dset_params["KE_Cut"]["perc"]
-width = dset_params["KE_Cut"]["width"]
-grad_lims = dset_params["KE_Cut"]["grad_lims"]
-r_cut_calib = dset_params["KE_Cut"]["r_cut_calib"]
-r_cut_pred = dset_params["KE_Cut"]["r_cut_pred"]
+fast_ke_calib_sims = dset_params["KE_CUT"]["fast_ke_calib_sims"]
+n_points = dset_params["KE_CUT"]["n_points"]
+perc = dset_params["KE_CUT"]["perc"]
+width = dset_params["KE_CUT"]["width"]
+grad_lims = dset_params["KE_CUT"]["grad_lims"]
+r_cut_calib = dset_params["KE_CUT"]["r_cut_calib"]
+r_cut_pred = dset_params["KE_CUT"]["r_cut_pred"]
 
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"

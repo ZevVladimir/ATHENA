@@ -46,11 +46,11 @@ lin_rticks = dset_params["EVAL_MODEL"]["lin_rticks"]
 log_rticks = dset_params["EVAL_MODEL"]["log_rticks"]
 
 opt_ke_calib_sims = dset_params["KE_CUT"]["opt_ke_calib_sims"]
-perc = dset_params["KE_Cut"]["perc"]
-width = dset_params["KE_Cut"]["width"]
-grad_lims = dset_params["KE_Cut"]["grad_lims"]
-r_cut_calib = dset_params["KE_Cut"]["r_cut_calib"]
-r_cut_pred = dset_params["KE_Cut"]["r_cut_pred"]
+perc = dset_params["KE_CUT"]["perc"]
+width = dset_params["KE_CUT"]["width"]
+grad_lims = dset_params["KE_CUT"]["grad_lims"]
+r_cut_calib = dset_params["KE_CUT"]["r_cut_calib"]
+r_cut_pred = dset_params["KE_CUT"]["r_cut_pred"]
     
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
@@ -152,9 +152,9 @@ if __name__ == "__main__":
     plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
     create_directory(plot_loc)
     
-    if os.path.isfile(model_fldr_loc + "opt_ke_params.pickle"):
+    if os.path.isfile(model_fldr_loc + "ke_optparams.pickle"):
         print("Loading parameters from saved file")
-        opt_param_dict = load_pickle(model_fldr_loc + "opt_ke_params.pickle")
+        opt_param_dict = load_pickle(model_fldr_loc + "ke_optparams.pickle")
         
         with timed("Loading Testing Data"):
             r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=curr_test_sims)
@@ -216,7 +216,7 @@ if __name__ == "__main__":
                 "inf_vr_pos": vr_pos,
             }
         
-            save_pickle(opt_param_dict,model_fldr_loc+"opt_ke_params.pickle")
+            save_pickle(opt_param_dict,model_fldr_loc+"ke_optparams.pickle")
             
             # if the testing simulations are the same as the model simulations we don't need to reload the data
             if sorted(curr_test_sims) == sorted(opt_ke_calib_sims):
