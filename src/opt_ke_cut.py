@@ -152,9 +152,9 @@ if __name__ == "__main__":
     plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
     create_directory(plot_loc)
     
-    if os.path.isfile(model_fldr_loc + "ke_optparams.pickle"):
+    if os.path.isfile(model_fldr_loc + "ke_optparams_dict.pickle"):
         print("Loading parameters from saved file")
-        opt_param_dict = load_pickle(model_fldr_loc + "ke_optparams.pickle")
+        opt_param_dict = load_pickle(model_fldr_loc + "ke_optparams_dict.pickle")
         
         with timed("Loading Testing Data"):
             r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=curr_test_sims)
@@ -216,7 +216,7 @@ if __name__ == "__main__":
                 "inf_vr_pos": vr_pos,
             }
         
-            save_pickle(opt_param_dict,model_fldr_loc+"ke_optparams.pickle")
+            save_pickle(opt_param_dict,model_fldr_loc+"ke_optparams_dict.pickle")
             
             # if the testing simulations are the same as the model simulations we don't need to reload the data
             if sorted(curr_test_sims) == sorted(opt_ke_calib_sims):

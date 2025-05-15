@@ -240,8 +240,8 @@ if __name__ == "__main__":
     
     ####################################################################################################################################################################################################################################
     
-    if os.path.exists(model_fldr_loc + "ke_fastparam_dict.pickle"):
-        ke_param_dict = load_pickle(model_fldr_loc + "ke_fastparam_dict.pickle")
+    if os.path.exists(model_fldr_loc + "ke_fastparams_dict.pickle"):
+        ke_param_dict = load_pickle(model_fldr_loc + "ke_fastparams_dict.pickle")
         m_pos = ke_param_dict["m_pos"]
         b_pos = ke_param_dict["b_pos"]
         m_neg = ke_param_dict["m_neg"]
@@ -255,7 +255,7 @@ if __name__ == "__main__":
             "m_neg":m_neg,
             "b_neg":b_neg
         }
-        save_pickle(ke_param_dict, model_fldr_loc + "ke_fastparam_dict.pickle")
+        save_pickle(ke_param_dict, model_fldr_loc + "ke_fastparams_dict.pickle")
     
     print("\nCalibration Params")
     print(m_pos,b_pos,m_neg,b_neg)

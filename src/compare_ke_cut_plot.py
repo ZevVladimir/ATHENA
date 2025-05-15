@@ -63,9 +63,9 @@ if __name__ == "__main__":
     plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
     create_directory(plot_loc)
     
-    if os.path.isfile(model_fldr_loc + "ke_optparams.pickle"):
+    if os.path.isfile(model_fldr_loc + "ke_optparams_dict.pickle"):
         print("Loading parameters from saved file")
-        opt_param_dict = load_pickle(model_fldr_loc + "ke_optparams.pickle")
+        opt_param_dict = load_pickle(model_fldr_loc + "ke_optparams_dict.pickle")
         
         with timed("Loading Testing Data"):
             r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=curr_test_sims)
@@ -84,7 +84,7 @@ if __name__ == "__main__":
             sparta_orb = np.where(sparta_labels_test == 1)[0]
             sparta_inf = np.where(sparta_labels_test == 0)[0]
     else:
-        raise FileNotFoundError(f"Expected to find optimized parameters at {os.path.join(model_fldr_loc, 'ke_optparams.pickle')}")
+        raise FileNotFoundError(f"Expected to find optimized parameters at {os.path.join(model_fldr_loc, 'ke_optparams_dict.pickle')}")
 
             
     act_mass_prf_all, act_mass_prf_orb, all_masses, bins = load_sparta_mass_prf(sim_splits,all_idxs,curr_test_sims)
@@ -125,7 +125,7 @@ if __name__ == "__main__":
         mask_vr_neg = (vr_test < 0)
         mask_vr_pos = ~mask_vr_neg
 
-        ke_fastparam_dict = load_pickle(model_fldr_loc + "ke_fastparam_dict.pickle")
+        ke_fastparam_dict = load_pickle(model_fldr_loc + "ke_fastparams_dict.pickle")
     
         
         simp_mask_orb, preds_simp_ke = fast_ke_predictor(ke_fastparam_dict,r_test,vr_test,lnv2_test,2.0)
