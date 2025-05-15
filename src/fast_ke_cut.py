@@ -21,7 +21,7 @@ from utils.calculation_functions import create_stack_mass_prf, filter_prf, calcu
 from src.utils.vis_fxns import compare_split_prfs
 from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, parse_ranges, load_sparta_mass_prf, split_sparta_hdf5_name, sim_mass_p_z, get_model_name
 from utils.data_and_loading_functions import create_directory, timed, save_pickle, load_pickle, load_SPARTA_data, conv_halo_id_spid, load_config, load_RSTAR_data, depair_np
-from utils.ps_cut_support import load_ps_data, fast_ps_predictor
+from src.utils.ke_cut_support import load_ke_data, fast_ke_predictor
 
 dset_params = load_config(os.getcwd() + "/config.ini")
 
@@ -52,13 +52,13 @@ log_tvticks = dset_params["EVAL_MODEL"]["log_tvticks"]
 lin_rticks = dset_params["EVAL_MODEL"]["lin_rticks"]
 log_rticks = dset_params["EVAL_MODEL"]["log_rticks"]
 
-fast_ps_calib_sims = dset_params["PS_Cut"]["fast_ps_calib_sims"]
-n_points = dset_params["PS_Cut"]["n_points"]
-perc = dset_params["PS_Cut"]["perc"]
-width = dset_params["PS_Cut"]["width"]
-grad_lims = dset_params["PS_Cut"]["grad_lims"]
-r_cut_calib = dset_params["PS_Cut"]["r_cut_calib"]
-r_cut_pred = dset_params["PS_Cut"]["r_cut_pred"]
+fast_ke_calib_sims = dset_params["KE_Cut"]["fast_ke_calib_sims"]
+n_points = dset_params["KE_Cut"]["n_points"]
+perc = dset_params["KE_Cut"]["perc"]
+width = dset_params["KE_Cut"]["width"]
+grad_lims = dset_params["KE_Cut"]["grad_lims"]
+r_cut_calib = dset_params["KE_Cut"]["r_cut_calib"]
+r_cut_pred = dset_params["KE_Cut"]["r_cut_pred"]
 
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
@@ -177,7 +177,7 @@ def calibrate_finder(
         [0.2, 0.5]
     """
     # MODIFY this line if needed ======================
-    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client,fast_ps_calib_sims)
+    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,fast_ke_calib_sims)
 
     # =================================================
 
@@ -225,10 +225,10 @@ def calibrate_finder(
 if __name__ == "__main__":
     client = setup_client()
     
-    comb_model_sims = get_combined_name(fast_ps_calib_sims) 
+    comb_model_sims = get_combined_name(fast_ke_calib_sims) 
     
-    model_type = "phase_space_cut"
-    model_name = get_model_name(model_type, fast_ps_calib_sims, hpo_done=False, opt_param_dict=dset_params["OPTIMIZE"])    
+    model_type = "kinetic_energy_cut"
+    model_name = get_model_name(model_type, fast_ke_calib_sims, hpo_done=False, opt_param_dict=dset_params["OPTIMIZE"])    
     model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"  
     
     #TODO make this a loop for all the test sims
@@ -240,28 +240,28 @@ if __name__ == "__main__":
     
     ####################################################################################################################################################################################################################################
     
-    if os.path.exists(model_fldr_loc + "ps_fastparam_dict.pickle"):
-        ps_param_dict = load_pickle(model_fldr_loc + "ps_fastparam_dict.pickle")
-        m_pos = ps_param_dict["m_pos"]
-        b_pos = ps_param_dict["b_pos"]
-        m_neg = ps_param_dict["m_neg"]
-        b_neg = ps_param_dict["b_neg"]
+    if os.path.exists(model_fldr_loc + "ke_fastparam_dict.pickle"):
+        ke_param_dict = load_pickle(model_fldr_loc + "ke_fastparam_dict.pickle")
+        m_pos = ke_param_dict["m_pos"]
+        b_pos = ke_param_dict["b_pos"]
+        m_neg = ke_param_dict["m_neg"]
+        b_neg = ke_param_dict["b_neg"]
     else:
         (m_pos, b_pos), (m_neg, b_neg) = calibrate_finder()
           
-        ps_param_dict = {
+        ke_param_dict = {
             "m_pos":m_pos,
             "b_pos":b_pos,
             "m_neg":m_neg,
             "b_neg":b_neg
         }
-        save_pickle(ps_param_dict, model_fldr_loc + "ps_fastparam_dict.pickle")
+        save_pickle(ke_param_dict, model_fldr_loc + "ke_fastparam_dict.pickle")
     
     print("\nCalibration Params")
     print(m_pos,b_pos,m_neg,b_neg)
     print("\n")
 
-    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client, test_sims[0])
+    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client, test_sims[0])
     
     r_r200m = my_data["p_Scaled_radii"].compute().to_numpy()
     vr = my_data["p_Radial_vel"].compute().to_numpy()
@@ -498,7 +498,7 @@ if __name__ == "__main__":
     
         plt.savefig(plot_loc + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=500)
     
-    with timed("PS KE Dist plot"):
+    with timed("KE Dist plot"):
         fig, axes = plt.subplots(3, 2, figsize=(12, 14))
         axes = axes.flatten()
         fig.suptitle(
@@ -620,7 +620,7 @@ if __name__ == "__main__":
         plt.savefig(plot_loc + "perc_" + str(perc) + "_" + grad_lims + "_KE_dist_cut.png")
         
     
-    mask_orb, ps_preds = fast_ps_predictor(ps_param_dict,r_r200m,vr,lnv2,r_cut_pred)
+    mask_orb, ke_cut_preds = fast_ke_predictor(ke_param_dict,r_r200m,vr,lnv2,r_cut_pred)
     
     with timed("Phase space dist of ptls plot"):
         fig, axes = plt.subplots(1, 2, figsize=(9, 4))
@@ -660,7 +660,7 @@ if __name__ == "__main__":
         lnv2 = np.log(vphys**2)
         
         #TODO rename the different masks and preds
-        mask_orb, ps_preds = fast_ps_predictor(ps_param_dict,r_r200m,vr,lnv2,r_cut_pred)
+        mask_orb, ke_cut_preds = fast_ke_predictor(ke_param_dict,r_r200m,vr,lnv2,r_cut_pred)
         
         X = my_data[feature_columns]
         y = my_data[target_column]
@@ -794,5 +794,5 @@ if __name__ == "__main__":
             else:
                 plt_macc_splits.remove(macc_split)
                 
-        compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "_ps_cut_dens_",prf_name_0="Phase Space Cut", prf_name_1="SPARTA")
-        compare_split_prfs(plt_macc_splits,len(cpy_plt_macc_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "_ps_cut_macc_dens_", split_name="\Gamma", prf_name_0="Phase Space Cut", prf_name_1="SPARTA")
+        compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "ke_cut_dens_",prf_name_0="Kinetic Energy Cut", prf_name_1="SPARTA")
+        compare_split_prfs(plt_macc_splits,len(cpy_plt_macc_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "_ke_cut_macc_dens_", split_name="\Gamma", prf_name_0="Kinetic Energy Cut", prf_name_1="SPARTA")

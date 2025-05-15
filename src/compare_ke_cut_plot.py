@@ -10,8 +10,8 @@ import pickle
 
 from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, get_model_name
 from utils.data_and_loading_functions import create_directory, load_pickle, load_config, load_pickle, timed
-from utils.ps_cut_support import load_ps_data, fast_ps_predictor, opt_ps_predictor
-from src.utils.vis_fxns import compare_split_prfs_ps
+from src.utils.ke_cut_support import load_ke_data, fast_ke_predictor, opt_ke_predictor
+from src.utils.vis_fxns import compare_split_prfs_ke
 from utils.calculation_functions import calculate_density, filter_prf
 
 dset_params = load_config(os.getcwd() + "/config.ini")
@@ -63,12 +63,12 @@ if __name__ == "__main__":
     plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
     create_directory(plot_loc)
     
-    if os.path.isfile(model_fldr_loc + "bin_fit_ps_cut_params.pickle"):
+    if os.path.isfile(model_fldr_loc + "bin_fit_ke_cut_params.pickle"):
         print("Loading parameters from saved file")
-        opt_param_dict = load_pickle(model_fldr_loc + "bin_fit_ps_cut_params.pickle")
+        opt_param_dict = load_pickle(model_fldr_loc + "bin_fit_ke_cut_params.pickle")
         
         with timed("Loading Testing Data"):
-            r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client,curr_test_sims=curr_test_sims)
+            r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=curr_test_sims)
             r_test = my_data["p_Scaled_radii"].compute().to_numpy()
             vr_test = my_data["p_Radial_vel"].compute().to_numpy()
             vphys_test = my_data["p_phys_vel"].compute().to_numpy()
@@ -84,7 +84,7 @@ if __name__ == "__main__":
             sparta_orb = np.where(sparta_labels_test == 1)[0]
             sparta_inf = np.where(sparta_labels_test == 0)[0]
     else:
-        raise FileNotFoundError(f"Expected to find optimized parameters at {os.path.join(model_fldr_loc, 'bin_fit_ps_cut_params.pickle')}")
+        raise FileNotFoundError(f"Expected to find optimized parameters at {os.path.join(model_fldr_loc, 'bin_fit_ke_cut_params.pickle')}")
 
             
     act_mass_prf_all, act_mass_prf_orb, all_masses, bins = load_sparta_mass_prf(sim_splits,all_idxs,curr_test_sims)
@@ -125,15 +125,15 @@ if __name__ == "__main__":
         mask_vr_neg = (vr_test < 0)
         mask_vr_pos = ~mask_vr_neg
 
-        ps_param_dict = load_pickle(model_fldr_loc + "ps_optparam_dict.pickle")
+        ke_param_dict = load_pickle(model_fldr_loc + "ke_optparam_dict.pickle")
     
         
-        simp_mask_orb, preds_simp_ps = fast_ps_predictor(ps_param_dict,r_test,vr_test,lnv2_test,2.0)
+        simp_mask_orb, preds_simp_ke = fast_ke_predictor(ke_param_dict,r_test,vr_test,lnv2_test,2.0)
         
-        preds_fit_ps = opt_ps_predictor(opt_param_dict, bins, r_test, vr_test, lnv2_test, 2.0)
+        preds_fit_ke = opt_ke_predictor(opt_param_dict, bins, r_test, vr_test, lnv2_test, 2.0)
         
-        fit_calc_mass_prf_all, fit_calc_mass_prf_orb, fit_calc_mass_prf_inf, fit_calc_nus, fit_calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds_fit_ps, prf_bins=bins, use_mp=True, all_z=all_z)
-        simp_calc_mass_prf_all, simp_calc_mass_prf_orb, simp_calc_mass_prf_inf, simp_calc_nus, simp_calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds_simp_ps, prf_bins=bins, use_mp=True, all_z=all_z)
+        fit_calc_mass_prf_all, fit_calc_mass_prf_orb, fit_calc_mass_prf_inf, fit_calc_nus, fit_calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds_fit_ke, prf_bins=bins, use_mp=True, all_z=all_z)
+        simp_calc_mass_prf_all, simp_calc_mass_prf_orb, simp_calc_mass_prf_inf, simp_calc_nus, simp_calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds_simp_ke, prf_bins=bins, use_mp=True, all_z=all_z)
 
         # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
         fit_small_halo_fltr = np.isnan(fit_calc_r200m)
@@ -174,4 +174,4 @@ if __name__ == "__main__":
                 simp_inf_prf_lst.append(filter_prf(simp_calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,simp_fltr))
             if fit_fltr.shape[0] < 25 and simp_fltr.shape[0] < 25:
                 plt_nu_splits.remove(nu_split)        
-        compare_split_prfs_ps(plt_nu_splits,len(cpy_plt_nu_splits),fit_orb_prf_lst,fit_inf_prf_lst,simp_orb_prf_lst,simp_inf_prf_lst,bins[1:],lin_rticks,plot_loc)
+        compare_split_prfs_ke(plt_nu_splits,len(cpy_plt_nu_splits),fit_orb_prf_lst,fit_inf_prf_lst,simp_orb_prf_lst,simp_inf_prf_lst,bins[1:],lin_rticks,plot_loc)

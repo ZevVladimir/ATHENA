@@ -149,7 +149,7 @@ def halo_select(sims, ptl_data):
     subset_df = ptl_data.compute().loc[all_row_idxs]        
     return subset_df
 
-def load_ps_data(client, curr_test_sims):
+def load_ke_data(client, curr_test_sims):
     test_comb_name = get_combined_name(curr_test_sims) 
 
     # Loop through and/or for Train/Test/All datasets and evaluate the model
@@ -182,7 +182,7 @@ def load_ps_data(client, curr_test_sims):
     return r, vr, lnv2, sparta_labels, samp_data, data, halo_df
 
 # r200m_cut is the farthest radius (r/r200m) that a particle can be orbiting
-def fast_ps_predictor(fast_param_dict, r_r200m, vr, lnv2, r200m_cut):
+def fast_ke_predictor(fast_param_dict, r_r200m, vr, lnv2, r200m_cut):
     m_pos = fast_param_dict["m_pos"]
     b_pos = fast_param_dict["b_pos"]
     m_neg = fast_param_dict["m_neg"]
@@ -207,14 +207,14 @@ def fast_ps_predictor(fast_param_dict, r_r200m, vr, lnv2, r200m_cut):
 
     return mask_orb, preds
 
-def opt_ps_predictor(opt_param_dict, bins, r_r200m, vr, lnv2, r200m_cut):
+def opt_ke_predictor(opt_param_dict, bins, r_r200m, vr, lnv2, r200m_cut):
     bin_indices = np.digitize(r_r200m, bins) - 1  
-    preds_fit_ps = np.zeros(r_r200m.shape[0])
+    preds_fit_ke = np.zeros(r_r200m.shape[0])
     for i in range(bins.shape[0]-1):
         if bins[i] <= r200m_cut:
             mask_pos = (bin_indices == i) & (vr > 0) & (lnv2 <= opt_param_dict["inf_vr_pos"]["b"][i])
             mask_neg = (bin_indices == i) & (vr < 0) & (lnv2 <= opt_param_dict["inf_vr_neg"]["b"][i])
         
-            preds_fit_ps[mask_pos] = 1
-            preds_fit_ps[mask_neg] = 1
-    return preds_fit_ps
+            preds_fit_ke[mask_pos] = 1
+            preds_fit_ke[mask_neg] = 1
+    return preds_fit_ke

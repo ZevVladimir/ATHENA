@@ -1447,7 +1447,7 @@ def plot_tree(bst,tree_num,save_loc):
     fig.savefig(save_loc + "/tree_plot.png")
 
 
-def plt_cust_ps_line(b,bins,linewidth):
+def plt_cust_ke_line(b,bins,linewidth):
     for i in range(bins.shape[0]-1):
         x1 = bins[i]
         x2 = bins[i+1]
@@ -1527,9 +1527,9 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y12, lw=line_width, color="k",
                 label="Simple Cut")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut",lw=line_width)
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Calibration Limit",lw=line_width)
         if cust_line_dict is not None:
-            plt_cust_ps_line(b = cust_line_dict["orb_vr_pos"]["b"], bins = bins,linewidth=line_width)
+            plt_cust_ke_line(b = cust_line_dict["orb_vr_pos"]["b"], bins = bins,linewidth=line_width)
         plt.text(0.05,3.6,r"Orbiting Particles $v_r>0$"+"\nAccording to SPARTA",fontsize=txt_fntsize,weight="bold", bbox=dict(facecolor='w', alpha=0.75))
         plt.xlim(0, 2)
         
@@ -1538,9 +1538,9 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y12, lw=line_width, color="k",
                 label="Simple Cut")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut",lw=line_width)
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Calibration Limit",lw=line_width)
         if cust_line_dict is not None:
-            plt_cust_ps_line(b = cust_line_dict["inf_vr_pos"]["b"], bins = bins,linewidth=line_width)
+            plt_cust_ke_line(b = cust_line_dict["inf_vr_pos"]["b"], bins = bins,linewidth=line_width)
         plt.text(0.05,3.6,r"Infalling Particles $v_r>0$"+"\nAccording to SPARTA",fontsize=txt_fntsize,weight="bold", bbox=dict(facecolor='w', alpha=0.75))
         plt.xlim(0, 2)
 
@@ -1549,9 +1549,9 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=line_width, color="k",
                 label="Simple Cut")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut",lw=line_width)
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Calibration Limit",lw=line_width)
         if cust_line_dict is not None:
-            plt_cust_ps_line(b = cust_line_dict["orb_vr_neg"]["b"], bins = bins,linewidth=line_width)
+            plt_cust_ke_line(b = cust_line_dict["orb_vr_neg"]["b"], bins = bins,linewidth=line_width)
         plt.text(0.05,3.6,r"Orbiting Particles $v_r<0$"+"\nAccording to SPARTA",fontsize=txt_fntsize,weight="bold", bbox=dict(facecolor='w', alpha=0.75))
         plt.xlim(0, 2)
         
@@ -1560,9 +1560,9 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
                     cmap=magma_cmap, range=(x_range, y_range))
         plt.plot(x, y22, lw=line_width, color="k",
                 label="Simple Cut")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Radius cut",lw=line_width)
+        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Calibration Limit",lw=line_width)
         if cust_line_dict is not None:
-            plt_cust_ps_line(b = cust_line_dict["inf_vr_neg"]["b"], bins = bins,linewidth=line_width)
+            plt_cust_ke_line(b = cust_line_dict["inf_vr_neg"]["b"], bins = bins,linewidth=line_width)
         plt.legend(loc="lower left",fontsize=legend_fntsize)
         plt.text(0.05,3.6,r"Infalling Particles $v_r<0$"+"\nAccording to SPARTA",fontsize=txt_fntsize,weight="bold", bbox=dict(facecolor='w', alpha=0.75))
         cbar_log= plt.colorbar()
@@ -1581,7 +1581,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         plt.savefig(plot_loc + title + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=400)    
         
 
-def compare_split_prfs_ps(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_orb_prfs, simp_inf_prfs, bins, lin_rticks, save_location, title="comb_ps_fits_", prf_func=np.nanmedian, split_name="\\nu", prf_name_0 = "Optimized Cut", prf_name_1 = "SPARTA", prf_name_2 = "Fast Cut", prf_name_3 = "SPARTA"): 
+def compare_split_prfs_ke(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_orb_prfs, simp_inf_prfs, bins, lin_rticks, save_location, title="comb_ke_fits_", prf_func=np.nanmedian, split_name="\\nu", prf_name_0 = "Optimized Cut", prf_name_1 = "SPARTA", prf_name_2 = "Fast Cut", prf_name_3 = "SPARTA"): 
     with timed("Compare Split Profiles"):
         # Parameters to tune sizes of plots and fonts
         widths = [1,1,1,1]

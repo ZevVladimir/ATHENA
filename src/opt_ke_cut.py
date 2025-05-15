@@ -17,7 +17,7 @@ from sparta_tools import sparta
 
 from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, split_sparta_hdf5_name, load_SPARTA_data, reform_dataset_dfs, get_model_name
 from utils.data_and_loading_functions import create_directory, load_pickle, conv_halo_id_spid, load_config, save_pickle, load_pickle, timed
-from utils.ps_cut_support import load_ps_data, opt_ps_predictor
+from src.utils.ke_cut_support import load_ke_data, opt_ke_predictor
 from src.utils.vis_fxns import plt_SPARTA_KE_dist, compare_split_prfs
 from utils.calculation_functions import calculate_density, filter_prf, calc_mass_acc_rate
 
@@ -45,12 +45,12 @@ log_tvticks = dset_params["EVAL_MODEL"]["log_tvticks"]
 lin_rticks = dset_params["EVAL_MODEL"]["lin_rticks"]
 log_rticks = dset_params["EVAL_MODEL"]["log_rticks"]
 
-opt_ps_calib_sims = dset_params["PS_CUT"]["opt_ps_calib_sims"]
-perc = dset_params["PS_Cut"]["perc"]
-width = dset_params["PS_Cut"]["width"]
-grad_lims = dset_params["PS_Cut"]["grad_lims"]
-r_cut_calib = dset_params["PS_Cut"]["r_cut_calib"]
-r_cut_pred = dset_params["PS_Cut"]["r_cut_pred"]
+opt_ke_calib_sims = dset_params["KE_CUT"]["opt_ke_calib_sims"]
+perc = dset_params["KE_Cut"]["perc"]
+width = dset_params["KE_Cut"]["width"]
+grad_lims = dset_params["KE_Cut"]["grad_lims"]
+r_cut_calib = dset_params["KE_Cut"]["r_cut_calib"]
+r_cut_pred = dset_params["KE_Cut"]["r_cut_pred"]
     
 if sim_cosmol == "planck13-nbody":
     sim_pat = r"cpla_l(\d+)_n(\d+)"
@@ -115,9 +115,9 @@ def opt_func(bins, r, lnv2, sparta_labels, def_b, plot_loc = "", title = ""):
 if __name__ == "__main__":
     client = setup_client()
     
-    comb_model_sims = get_combined_name(opt_ps_calib_sims) 
+    comb_model_sims = get_combined_name(opt_ke_calib_sims) 
     model_type = "phase_space_cut"
-    model_name = get_model_name(model_type, opt_ps_calib_sims, hpo_done=dset_params["OPTIMIZE"]["hpo"], opt_param_dict=dset_params["OPTIMIZE"])    
+    model_name = get_model_name(model_type, opt_ke_calib_sims, hpo_done=dset_params["OPTIMIZE"]["hpo"], opt_param_dict=dset_params["OPTIMIZE"])    
     model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"  
     
     split_scale_dict = {
@@ -133,31 +133,31 @@ if __name__ == "__main__":
     }
     
     #TODO make this check not necessary just if you want to have this plotted as well
-    param_path = model_fldr_loc + "ps_fastparam_dict.pickle"
+    param_path = model_fldr_loc + "ke_fastparam_dict.pickle"
     if os.path.exists(param_path):
-        ps_param_dict = load_pickle(param_path)
-        m_pos = ps_param_dict["m_pos"]
-        b_pos = ps_param_dict["b_pos"]
-        m_neg = ps_param_dict["m_neg"]
-        b_neg = ps_param_dict["b_neg"]
+        ke_param_dict = load_pickle(param_path)
+        m_pos = ke_param_dict["m_pos"]
+        b_pos = ke_param_dict["b_pos"]
+        m_neg = ke_param_dict["m_neg"]
+        b_neg = ke_param_dict["b_neg"]
     else:
         raise FileNotFoundError(
             f"Parameter file not found at {param_path}. Please run the fast phase-space cut code to generate it."
         )
     
     #TODO make this a loop
-    curr_test_sims = opt_ps_calib_sims[0]
+    curr_test_sims = opt_ke_calib_sims[0]
     test_comb_name = get_combined_name(curr_test_sims) 
     dset_name = eval_datasets[0]
     plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
     create_directory(plot_loc)
     
-    if os.path.isfile(model_fldr_loc + "opt_ps_params.pickle"):
+    if os.path.isfile(model_fldr_loc + "opt_ke_params.pickle"):
         print("Loading parameters from saved file")
-        opt_param_dict = load_pickle(model_fldr_loc + "opt_ps_params.pickle")
+        opt_param_dict = load_pickle(model_fldr_loc + "opt_ke_params.pickle")
         
         with timed("Loading Testing Data"):
-            r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client,curr_test_sims=curr_test_sims)
+            r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=curr_test_sims)
             r_test = my_data["p_Scaled_radii"].compute().to_numpy()
             vr_test = my_data["p_Radial_vel"].compute().to_numpy()
             vphys_test = my_data["p_phys_vel"].compute().to_numpy()
@@ -175,7 +175,7 @@ if __name__ == "__main__":
     else:        
         with timed("Optimizing phase-space cut"):
             with timed("Loading Fitting Data"):
-                r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client,curr_test_sims=opt_ps_calib_sims)
+                r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=opt_ke_calib_sims)
                 
                 # We use the full dataset since for our custom fitting it does not only specific halos (?)
                 r_fit = my_data["p_Scaled_radii"].compute().to_numpy()
@@ -206,8 +206,8 @@ if __name__ == "__main__":
             bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
             bins = np.insert(bins, 0, 0)
             
-            vr_pos = opt_func(bins, r_fit[mask_vr_pos], lnv2_fit[mask_vr_pos], sparta_labels_fit[mask_vr_pos], ps_param_dict["b_pos"], plot_loc = plot_loc, title = "pos")
-            vr_neg = opt_func(bins, r_fit[mask_vr_neg], lnv2_fit[mask_vr_neg], sparta_labels_fit[mask_vr_neg], ps_param_dict["b_neg"], plot_loc = plot_loc, title = "neg")
+            vr_pos = opt_func(bins, r_fit[mask_vr_pos], lnv2_fit[mask_vr_pos], sparta_labels_fit[mask_vr_pos], ke_param_dict["b_pos"], plot_loc = plot_loc, title = "pos")
+            vr_neg = opt_func(bins, r_fit[mask_vr_neg], lnv2_fit[mask_vr_neg], sparta_labels_fit[mask_vr_neg], ke_param_dict["b_neg"], plot_loc = plot_loc, title = "neg")
         
             opt_param_dict = {
                 "orb_vr_pos": vr_pos,
@@ -216,10 +216,10 @@ if __name__ == "__main__":
                 "inf_vr_pos": vr_pos,
             }
         
-            save_pickle(opt_param_dict,model_fldr_loc+"opt_ps_params.pickle")
+            save_pickle(opt_param_dict,model_fldr_loc+"opt_ke_params.pickle")
             
             # if the testing simulations are the same as the model simulations we don't need to reload the data
-            if sorted(curr_test_sims) == sorted(opt_ps_calib_sims):
+            if sorted(curr_test_sims) == sorted(opt_ke_calib_sims):
                 print("Using fitting simulations for testing")
                 r_test = r_fit
                 vr_test = vr_fit
@@ -228,7 +228,7 @@ if __name__ == "__main__":
                 lnv2_test = lnv2_fit
             else:
                 with timed("Loading Testing Data"):
-                    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ps_data(client,curr_test_sims=curr_test_sims)
+                    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=curr_test_sims)
                     r_test = my_data["p_Scaled_radii"].compute().to_numpy()
                     vr_test = my_data["p_Radial_vel"].compute().to_numpy()
                     vphys_test = my_data["p_phys_vel"].compute().to_numpy()
@@ -258,7 +258,7 @@ if __name__ == "__main__":
     act_mass_prf_all, act_mass_prf_orb, all_masses, bins = load_sparta_mass_prf(sim_splits,all_idxs,curr_test_sims)
     act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb 
     
-    plt_SPARTA_KE_dist(ps_param_dict, fltr_combs, bins, r_test, lnv2_test, perc = perc, width = width, r_cut = r_cut_calib, plot_loc = plot_loc, title = "bin_fit_", cust_line_dict = opt_param_dict)
+    plt_SPARTA_KE_dist(ke_param_dict, fltr_combs, bins, r_test, lnv2_test, perc = perc, width = width, r_cut = r_cut_calib, plot_loc = plot_loc, title = "bin_fit_", cust_line_dict = opt_param_dict)
 
 #######################################################################################################################################    
     all_z = []
@@ -289,9 +289,9 @@ if __name__ == "__main__":
         tot_num_halos = halo_n.shape[0]
         min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
         
-        preds_fit_ps = opt_ps_predictor(opt_param_dict, bins, r_test, vr_test, lnv2_test, r_cut_pred)
+        preds_fit_ke = opt_ke_predictor(opt_param_dict, bins, r_test, vr_test, lnv2_test, r_cut_pred)
         
-        calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds_fit_ps, prf_bins=bins, use_mp=True, all_z=all_z)
+        calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds_fit_ke, prf_bins=bins, use_mp=True, all_z=all_z)
 
         # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
         small_halo_fltr = np.isnan(calc_r200m)
@@ -377,5 +377,5 @@ if __name__ == "__main__":
                 plt_macc_splits.remove(macc_split)
         
         
-        compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "fit_ps_cut_dens_",prf_name_0="Optimized Cut", prf_name_1="SPARTA")
+        compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "fit_ke_cut_dens_",prf_name_0="Optimized Cut", prf_name_1="SPARTA")
         
