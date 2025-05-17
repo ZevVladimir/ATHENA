@@ -260,6 +260,29 @@ def scale_by_rad(data,bin_edges,use_red_rad=reduce_rad,use_red_perc=reduce_perc)
     
     return filter_data
 
+# Returns a simulation's mass used and the redshift of the primary snapshot
+def sim_mass_p_z(sim,config_params):
+    sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
+    
+    curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" +  sparta_search_name + ".hdf5"    
+    
+    with h5py.File(curr_sparta_HDF5_path,"r") as f:
+        dic_sim = {}
+        grp_sim = f['simulation']
+        for f in grp_sim.attrs:
+            dic_sim[f] = grp_sim.attrs[f]
+    
+    p_snap = config_params["all_snap_info"]["prime_snap_info"]["ptl_snap"]
+    p_red_shift = config_params["all_snap_info"]["prime_snap_info"]["red_shift"]
+    p_sparta_snap = config_params["all_snap_info"]["prime_snap_info"]["sparta_snap"][()]
+    
+    param_paths = [["simulation","particle_mass"]]
+            
+    sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, p_snap)
+    ptl_mass = sparta_params[sparta_param_names[0]]
+    
+    return ptl_mass, p_red_shift
+
 # Returns an inputted dataframe with only the halos that fit within the inputted ranges of nus (peak height)
 def filter_df_with_nus(df,nus,halo_first,halo_n, nu_splits):    
     # First masks which halos are within the inputted nu ranges
@@ -303,29 +326,6 @@ def sort_and_lim_files(folder_path,limit_files=False):
         hdf5_files = hdf5_files[:file_lim]
     return hdf5_files
     
-# Returns a simulation's mass used and the redshift of the primary snapshot
-def sim_mass_p_z(sim,config_params):
-    sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
-    
-    curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" +  sparta_search_name + ".hdf5"    
-    
-    with h5py.File(curr_sparta_HDF5_path,"r") as f:
-        dic_sim = {}
-        grp_sim = f['simulation']
-        for f in grp_sim.attrs:
-            dic_sim[f] = grp_sim.attrs[f]
-    
-    p_snap = config_params["p_snap_info"]["ptl_snap"]
-    p_red_shift = config_params["p_snap_info"]["red_shift"]
-    p_sparta_snap = config_params["p_snap_info"]["sparta_snap"][()]
-    
-    param_paths = [["simulation","particle_mass"]]
-            
-    sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, p_snap)
-    ptl_mass = sparta_params[sparta_param_names[0]]
-    
-    return ptl_mass, p_red_shift
-
 # Split a dataframe so that each one is below an inputted maximum memory size
 def split_dataframe(df, max_size, weights=None, use_weights = False):
     total_size = df.memory_usage(index=True).sum()
@@ -350,10 +350,24 @@ def split_dataframe(df, max_size, weights=None, use_weights = False):
 def process_file(folder_path, file_index, ptl_mass, use_z, bin_edges, max_mem, filter_nu, scale_rad, use_weights, nu_splits):
     @delayed
     def delayed_task():
-        ptl_path = f"{folder_path}/ptl_info/ptl_{file_index}.h5"
-        halo_path = f"{folder_path}/halo_info/halo_{file_index}.h5"
+        # Get all the snap folders being used
+        all_snap_fldrs = []
+        for snap_fldr in os.listdir(folder_path + "/ptl_info/"):
+            if os.path.isdir(os.path.join(folder_path + "/ptl_info/", snap_fldr)):
+                all_snap_fldrs.append(snap_fldr)
+        
+        # Since they are just numbers we can first sort them and then sort them in descending order (primary snaps should always be the largest value)
+        all_snap_fldrs.sort()
+        all_snap_fldrs.reverse()
+        
+        # Stack column wise all the snapshots for each particle file
+        ptl_df_list = []
+        for snap_fldr in all_snap_fldrs:
+            ptl_path = f"{folder_path}/ptl_info/{snap_fldr}/ptl_{file_index}.h5"
+            ptl_df_list.append(pd.read_hdf(ptl_path))
+        ptl_df = pd.concat(ptl_df_list,axis=1)
 
-        ptl_df = pd.read_hdf(ptl_path)
+        halo_path = f"{folder_path}/halo_info/halo_{file_index}.h5"
         halo_df = pd.read_hdf(halo_path)
 
         # reset indices for halo_first halo_n indexing
@@ -408,18 +422,17 @@ def combine_results(results, client, use_weights):
     return all_ddfs, scal_pos_weights
 
 # Combines all the files in a dataset's folder into one dask dataframe and a list for the scale position weights and an array of weights if desired 
-def reform_datasets(client,ptl_mass,use_z,max_mem,bin_edges,folder_path,scale_rad=False,use_weights=False,filter_nu=None,limit_files=False,nu_splits=None):
-    ptl_files = sort_and_lim_files(folder_path + "/ptl_info/",limit_files=limit_files)
+def reform_datasets_nested(client,ptl_mass,use_z,max_mem,bin_edges,folder_path,scale_rad=False,use_weights=False,filter_nu=None,limit_files=False,nu_splits=None):
+    snap_n_files = len(os.listdir(folder_path + "/ptl_info/"))
+    n_files = np.min([snap_n_files,file_lim]) 
     
-    # Create delayed tasks for each file
-    delayed_results = [
-        process_file(
-            folder_path, file_index, ptl_mass, use_z, bin_edges,
-            max_mem, filter_nu, scale_rad, use_weights, nu_splits
-        )
-        for file_index in range(len(ptl_files))
-    ]
-
+    delayed_results = []
+    for file_index in range(n_files):
+        # Create delayed tasks for each file
+        delayed_results.append(process_file(
+                folder_path, file_index, ptl_mass, use_z, bin_edges,
+                max_mem, filter_nu, scale_rad, use_weights, nu_splits))
+    
     # Compute the results in parallel
     results = client.compute(delayed_results, sync=True)
 
@@ -431,6 +444,8 @@ def calc_scal_pos_weight(df):
     count_positives = (df['Orbit_infall'] == 1).sum()
 
     scale_pos_weight = count_negatives / count_positives
+    print(count_negatives)
+    print(count_positives)
     return scale_pos_weight
 
 # Loads all the data for the inputted list of simulations into one dataframe. Finds the scale position weight for the dataset and any adjusted weighting for it if desired
@@ -455,10 +470,10 @@ def load_data(client, sims, dset_name, bin_edges = None, limit_files = False, sc
             with timed(f"Reformed {dataset} Dataset: {sim}"): 
                 dataset_path = f"{ML_dset_path}{sim}/{dataset}"
                 if use_weights:
-                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets(client,ptl_mass,use_z,max_mem,bin_edges,dataset_path,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files,nu_splits=nu_splits)  
+                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets_nested(client,ptl_mass,use_z,max_mem,bin_edges,dataset_path,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files,nu_splits=nu_splits)  
                     all_weights.append(weights)
                 else:
-                    ptl_ddf,sim_scal_pos_weight = reform_datasets(client,ptl_mass,use_z,max_mem,bin_edges,dataset_path,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files,nu_splits=nu_splits)  
+                    ptl_ddf,sim_scal_pos_weight = reform_datasets_nested(client,ptl_mass,use_z,max_mem,bin_edges,dataset_path,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files,nu_splits=nu_splits)  
                 all_scal_pos_weight.append(sim_scal_pos_weight)
                 dask_dfs.append(ptl_ddf)
                     
@@ -496,7 +511,7 @@ def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         with open(ML_dset_path + sim + "/dset_params.pickle", "rb") as file:
             dset_params = pickle.load(file)
             
-        p_sparta_snap = dset_params["p_snap_info"]["sparta_snap"]
+        p_sparta_snap = dset_params["all_snap_info"]["prime_snap_info"]["sparta_snap"]
         
         curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"      
         
@@ -567,10 +582,10 @@ def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, plot_save_
         for i,sim in enumerate(use_sims):
             with open(ML_dset_path + sim + "/dset_params.pickle", "rb") as file:
                 dset_params = pickle.load(file)
-                curr_z = dset_params["p_snap_info"]["red_shift"][()]
+                curr_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"][()]
                 all_z.append(curr_z)
                 all_rhom.append(cosmol.rho_m(curr_z))
-                h = dset_params["p_snap_info"]["h"][()]
+                h = dset_params["all_snap_info"]["prime_snap_info"]["h"][()]
         
         tot_num_halos = halo_n.shape[0]
         min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
@@ -632,9 +647,9 @@ def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, plot_save_
         
         for sim in use_sims:
             dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
-            p_snap = dset_params["p_snap_info"]["ptl_snap"][()]
-            curr_z = dset_params["p_snap_info"]["red_shift"][()]
-            p_sparta_snap = dset_params["p_snap_info"]["sparta_snap"][()]
+            p_snap = dset_params["all_snap_info"]["prime_snap_info"]["ptl_snap"][()]
+            curr_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"][()]
+            p_sparta_snap = dset_params["all_snap_info"]["prime_snap_info"]["sparta_snap"][()]
             snap_dir_format = dset_params["snap_dir_format"]
             snap_format = dset_params["snap_format"]
             

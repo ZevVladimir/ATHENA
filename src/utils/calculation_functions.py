@@ -62,13 +62,16 @@ def calc_radius(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, box_
 
 # Calculates density within sphere of given radius with given mass and calculating volume at each particle's radius
 # Also can scale by rho_m if supplied
-def calculate_density(masses, bins, r200m, sim_splits, rho_m = None):
+def calculate_density(masses, bins, r200m, sim_splits, rho_m = None,print_test=False):
     rho = np.zeros_like(masses)
     
     if r200m.size == 1:
         V = (bins * r200m)**3 * 4.0 * np.pi / 3.0
         dV = V[1:] - V[:-1]
         dM = masses[1:] - masses[:-1]
+        # if print_test:
+        #     print(dV)
+        #     print(dM)
         rho[0] = masses[0] / V[0]
         rho[1:] = dM / dV
     else:
