@@ -5,7 +5,6 @@ plt.rcParams.update({"text.usetex":True, "font.family": "serif", "figure.dpi": 1
 import os
 import matplotlib as mpl
 mpl.rcParams.update(mpl.rcParamsDefault)
-from colossus.cosmology import cosmology
 import pickle
 
 from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, get_model_name
@@ -25,8 +24,6 @@ model_type = config_params["TRAIN_MODEL"]["model_type"]
 test_sims = config_params["EVAL_MODEL"]["test_sims"]
 eval_datasets = config_params["EVAL_MODEL"]["eval_datasets"]
 
-sim_cosmol = config_params["MISC"]["sim_cosmol"]
-
 plt_nu_splits = parse_ranges(config_params["EVAL_MODEL"]["plt_nu_splits"])
 
 plt_macc_splits = parse_ranges(config_params["EVAL_MODEL"]["plt_macc_splits"])
@@ -40,13 +37,6 @@ lin_tvticks = config_params["EVAL_MODEL"]["lin_tvticks"]
 log_tvticks = config_params["EVAL_MODEL"]["log_tvticks"]
 lin_rticks = config_params["EVAL_MODEL"]["lin_rticks"]
 log_rticks = config_params["EVAL_MODEL"]["log_rticks"]
-    
-if sim_cosmol == "planck13-nbody":
-    sim_pat = r"cpla_l(\d+)_n(\d+)"
-    cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
-else:
-    cosmol = cosmology.setCosmology(sim_cosmol) 
-    sim_pat = r"cbol_l(\d+)_n(\d+)"    
     
     
 if __name__ == "__main__":
@@ -112,10 +102,11 @@ if __name__ == "__main__":
         for i,sim in enumerate(curr_test_sims):
             with open(ML_dset_path + sim + "/dset_params.pickle", "rb") as file:
                 dset_params = pickle.load(file)
-                curr_z = dset_params["p_snap_info"]["red_shift"][()]
+                curr_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"]
+                curr_rho_m = dset_params["all_snap_info"]["prime_snap_info"]["rho_m"]
                 all_z.append(curr_z)
-                all_rhom.append(cosmol.rho_m(curr_z))
-                h = dset_params["p_snap_info"]["h"][()]
+                all_rhom.append(curr_rho_m)
+                h = dset_params["all_snap_info"]["prime_snap_info"]["h"][()]
 
         tot_num_halos = halo_n.shape[0]
         min_disp_halos = int(np.ceil(0.3 * tot_num_halos))

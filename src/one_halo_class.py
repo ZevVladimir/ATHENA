@@ -28,7 +28,6 @@ SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 curr_sparta_file = config_params["SPARTA_DATA"]["curr_sparta_file"]
 snap_dir_format = config_params["SNAP_DATA"]["snap_dir_format"]
 snap_format = config_params["SNAP_DATA"]["snap_format"]
-sim_cosmol = config_params["MISC"]["sim_cosmol"]
 
 search_rad = config_params["DSET_CREATE"]["search_rad"]
 
@@ -48,16 +47,7 @@ sim_name, search_name = split_sparta_hdf5_name(curr_sparta_file)
 
 snap_path = snap_path + sim_name + "/"
 
-if sim_cosmol == "planck13-nbody":
-    sim_pat = r"cpla_l(\d+)_n(\d+)"
-else:
-    sim_pat = r"cbol_l(\d+)_n(\d+)"
-match = re.search(sim_pat, curr_sparta_file)
-if match:
-    sparta_name = match.group(0)
-else:
-    sparta_name = curr_sparta_file
-
+sparta_name, sparta_search_name = split_sparta_hdf5_name(curr_sparta_file)
 # Set up exact paths
 sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
 

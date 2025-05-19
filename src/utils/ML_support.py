@@ -13,7 +13,6 @@ import h5py
 import re
 import pandas as pd
 from colossus.lss import peaks
-from colossus.cosmology import cosmology
 import warnings
 from dask.distributed import Client
 import multiprocessing as mp
@@ -23,7 +22,7 @@ from skopt.space import Real
 from sklearn.metrics import accuracy_score
 from functools import partial
 
-from .data_and_loading_functions import load_SPARTA_data, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, load_pickle, load_config, get_comp_snap_info, create_directory
+from .data_and_loading_functions import load_SPARTA_data, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, load_pickle, load_config, get_comp_snap_info, create_directory, set_cosmology
 from .vis_fxns import plot_full_ptl_dist, plot_miss_class_dist, compare_prfs, compare_split_prfs, inf_orb_frac
 from .calculation_functions import create_mass_prf, create_stack_mass_prf, filter_prf, calculate_density, calc_mass_acc_rate, calc_t_dyn
 from sparta_tools import sparta 
@@ -33,7 +32,6 @@ from sparta_tools import sparta
 config_dict = load_config(os.getcwd() + "/config.ini")
 rand_seed = config_dict["MISC"]["random_seed"]
 curr_sparta_file = config_dict["SPARTA_DATA"]["curr_sparta_file"]
-sim_cosmol = config_dict["MISC"]["sim_cosmol"]
 debug_indiv_dens_prf = config_dict["MISC"]["debug_indiv_dens_prf"]
 pickle_data = config_dict["MISC"]["pickle_data"]
 
@@ -106,11 +104,6 @@ def split_sparta_hdf5_name(sim):
 
 sim_name, search_name = split_sparta_hdf5_name(curr_sparta_file)
 snap_path = snap_path + sim_name + "/"
-
-if sim_cosmol == "planck13-nbody":
-    cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
-else:
-    cosmol = cosmology.setCosmology(sim_cosmol) 
 
 ###############################################################################################################
 if on_zaratan:
@@ -363,9 +356,10 @@ def split_dataframe(df, max_size, weights=None, use_weights = False):
 
 # Function to process a file in a dataset's folder: combines them all, performs any desired filtering, calculates weights if desired, and calculates scaled position weight
 # Also splits the dataframe into smaller dataframes based of inputted maximum memory size
-def process_file(folder_path, file_index, ptl_mass, use_z, bin_edges, max_mem, filter_nu, scale_rad, use_weights, nu_splits):
+def process_file(folder_path, file_index, ptl_mass, use_z, bin_edges, max_mem, sim_cosmol, filter_nu, scale_rad, use_weights, nu_splits):
     @delayed
     def delayed_task():
+        cosmol = set_cosmology(sim_cosmol)
         # Get all the snap folders being used
         all_snap_fldrs = []
         for snap_fldr in os.listdir(folder_path + "/ptl_info/"):
@@ -438,7 +432,7 @@ def combine_results(results, client, use_weights):
     return all_ddfs, scal_pos_weights
 
 # Combines all the files in a dataset's folder into one dask dataframe and a list for the scale position weights and an array of weights if desired 
-def reform_datasets_nested(client,ptl_mass,use_z,max_mem,bin_edges,folder_path,scale_rad=False,use_weights=False,filter_nu=None,limit_files=False,nu_splits=None):
+def reform_datasets_nested(client,ptl_mass,use_z,max_mem,bin_edges,sim_cosmol,folder_path,scale_rad=False,use_weights=False,filter_nu=None,limit_files=False,nu_splits=None):
     snap_n_files = len(os.listdir(folder_path + "/ptl_info/"))
     n_files = np.min([snap_n_files,file_lim]) 
     
@@ -447,7 +441,7 @@ def reform_datasets_nested(client,ptl_mass,use_z,max_mem,bin_edges,folder_path,s
         # Create delayed tasks for each file
         delayed_results.append(process_file(
                 folder_path, file_index, ptl_mass, use_z, bin_edges,
-                max_mem, filter_nu, scale_rad, use_weights, nu_splits))
+                max_mem, sim_cosmol, filter_nu, scale_rad, use_weights, nu_splits))
     
     # Compute the results in parallel
     results = client.compute(delayed_results, sync=True)
@@ -463,11 +457,11 @@ def calc_scal_pos_weight(df):
     return scale_pos_weight
 
 # Loads all the data for the inputted list of simulations into one dataframe. Finds the scale position weight for the dataset and any adjusted weighting for it if desired
-def load_data(client, sims, dset_name, bin_edges = None, limit_files = False, scale_rad=False, use_weights=False, filter_nu=False, nu_splits=None):
+def load_data(client, sims, dset_name, sim_cosmol, bin_edges = None, limit_files = False, scale_rad=False, use_weights=False, filter_nu=False, nu_splits=None):
     dask_dfs = []
     all_scal_pos_weight = []
     all_weights = []
-    
+        
     for sim in sims:
         with open(ML_dset_path + sim + "/dset_params.pickle","rb") as f:
             dset_params = pickle.load(f)
@@ -484,10 +478,10 @@ def load_data(client, sims, dset_name, bin_edges = None, limit_files = False, sc
             with timed(f"Reformed {dataset} Dataset: {sim}"): 
                 dataset_path = f"{ML_dset_path}{sim}/{dataset}"
                 if use_weights:
-                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets_nested(client,ptl_mass,use_z,max_mem,bin_edges,dataset_path,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files,nu_splits=nu_splits)  
+                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets_nested(client,ptl_mass,use_z,max_mem,bin_edges,sim_cosmol,dataset_path,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files,nu_splits=nu_splits)  
                     all_weights.append(weights)
                 else:
-                    ptl_ddf,sim_scal_pos_weight = reform_datasets_nested(client,ptl_mass,use_z,max_mem,bin_edges,dataset_path,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files,nu_splits=nu_splits)  
+                    ptl_ddf,sim_scal_pos_weight = reform_datasets_nested(client,ptl_mass,use_z,max_mem,bin_edges,sim_cosmol,dataset_path,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files,nu_splits=nu_splits)  
                 all_scal_pos_weight.append(sim_scal_pos_weight)
                 dask_dfs.append(ptl_ddf)
                     
@@ -556,8 +550,9 @@ def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         return mass_prf_all,mass_prf_1halo,all_masses,bins
 
 # Evaluate an input model by generating plots of comparisons between the model's predictions and SPARTA
-def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, plot_save_loc, dens_prf = False,missclass=False,full_dist=False,io_frac=False,split_nu=False,split_macc=False): 
-
+def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, sim_cosmol, plot_save_loc, dens_prf = False,missclass=False,full_dist=False,io_frac=False,split_nu=False,split_macc=False): 
+    cosmol = set_cosmology(sim_cosmol)        
+        
     if pickle_data:
         plt_data_loc = plot_save_loc + "pickle_plt_data/"
         create_directory(plt_data_loc)

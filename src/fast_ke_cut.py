@@ -12,8 +12,6 @@ import pandas as pd
 import matplotlib as mpl
 mpl.rcParams.update(mpl.rcParamsDefault)
 import pickle
-from colossus.cosmology import cosmology
-from scipy.spatial import cKDTree
 import scipy.ndimage as ndimage
 from sparta_tools import sparta
 
@@ -60,12 +58,6 @@ r_cut_calib = config_params["KE_CUT"]["r_cut_calib"]
 r_cut_pred = config_params["KE_CUT"]["r_cut_pred"]
 ke_test_sims = config_params["KE_CUT"]["ke_test_sims"]
 
-if sim_cosmol == "planck13-nbody":
-    sim_pat = r"cpla_l(\d+)_n(\d+)"
-    cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
-else:
-    cosmol = cosmology.setCosmology(sim_cosmol) 
-    sim_pat = r"cbol_l(\d+)_n(\d+)"
 ####################################################################################################################################################################################################################################
     
 def gradient_minima(
@@ -694,10 +686,11 @@ if __name__ == "__main__":
         for i,sim in enumerate(use_sims):
             with open(ML_dset_path + sim + "/dset_params.pickle", "rb") as file:
                 dset_params = pickle.load(file)
-                curr_z = dset_params["p_snap_info"]["red_shift"][()]
+                curr_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"]
+                curr_rho_m = dset_params["all_snap_info"]["prime_snap_info"]["rho_m"]
                 all_z.append(curr_z)
-                all_rhom.append(cosmol.rho_m(curr_z))
-                h = dset_params["p_snap_info"]["h"][()]
+                all_rhom.append(curr_rho_m)
+                h = dset_params["all_snap_info"]["prime_snap_info"]["h"]
 
         tot_num_halos = halo_n.shape[0]
         min_disp_halos = int(np.ceil(0.3 * tot_num_halos))

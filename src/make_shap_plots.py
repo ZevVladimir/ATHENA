@@ -1,24 +1,13 @@
 import os
-from dask.distributed import Client
-import json
-import configparser
 import matplotlib.pyplot as plt
-import matplotlib as mpl
 import xgboost as xgb
 
-from colossus.cosmology import cosmology
 import shap
-import matplotlib.cm as cm
-from  shap.plots import colors
-from shap.plots._utils import convert_color
-import multiprocessing as mp
 
 from utils.data_and_loading_functions import create_directory, timed, load_config
 from utils.ML_support import setup_client, get_combined_name, load_data, make_preds, shap_with_filter, get_model_name
 
 config_params = load_config(os.getcwd() + "/config.ini")
-
-sim_cosmol = config_params["MISC"]["sim_cosmol"]
 
 path_to_models = config_params["PATHS"]["path_to_models"]
 
@@ -30,10 +19,6 @@ model_type = config_params["TRAIN_MODEL"]["model_type"]
 test_sims = config_params["EVAL_MODEL"]["test_sims"]
 eval_datasets = config_params["EVAL_MODEL"]["eval_datasets"]
 
-if sim_cosmol == "planck13-nbody":
-    cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
-else:
-    cosmol = cosmology.setCosmology(sim_cosmol)
 
 
 if __name__ == '__main__':

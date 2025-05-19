@@ -4,14 +4,8 @@ from scipy.optimize import minimize
 
 plt.rcParams.update({"text.usetex":True, "font.family": "serif", "figure.dpi": 150})
 import os
-import multiprocessing as mp
-from dask.distributed import Client
-import json
-import pandas as pd
 import matplotlib as mpl
-import scipy.ndimage as ndimage
 mpl.rcParams.update(mpl.rcParamsDefault)
-from colossus.cosmology import cosmology
 import pickle
 from sparta_tools import sparta
 
@@ -28,13 +22,8 @@ path_to_models = config_params["PATHS"]["path_to_models"]
 SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 
 eval_datasets = config_params["EVAL_MODEL"]["eval_datasets"]
-
-sim_cosmol = config_params["MISC"]["sim_cosmol"]
-
 plt_nu_splits = parse_ranges(config_params["EVAL_MODEL"]["plt_nu_splits"])
-
 plt_macc_splits = parse_ranges(config_params["EVAL_MODEL"]["plt_macc_splits"])
-
 linthrsh = config_params["EVAL_MODEL"]["linthrsh"]
 lin_nbin = config_params["EVAL_MODEL"]["lin_nbin"]
 log_nbin = config_params["EVAL_MODEL"]["log_nbin"]
@@ -52,13 +41,6 @@ grad_lims = config_params["KE_CUT"]["grad_lims"]
 r_cut_calib = config_params["KE_CUT"]["r_cut_calib"]
 r_cut_pred = config_params["KE_CUT"]["r_cut_pred"]
 ke_test_sims = config_params["KE_CUT"]["ke_test_sims"]
-    
-if sim_cosmol == "planck13-nbody":
-    sim_pat = r"cpla_l(\d+)_n(\d+)"
-    cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
-else:
-    cosmol = cosmology.setCosmology(sim_cosmol) 
-    sim_pat = r"cbol_l(\d+)_n(\d+)"
     
 def overlap_loss(params, lnv2_bin, sparta_labels_bin):
     decision_boundary = params[0]
@@ -283,10 +265,11 @@ if __name__ == "__main__":
         for i,sim in enumerate(curr_test_sims):
             with open(ML_dset_path + sim + "/dset_params.pickle", "rb") as file:
                 dset_params = pickle.load(file)
-                curr_z = dset_params["p_snap_info"]["red_shift"][()]
+                curr_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"]
+                curr_rho_m = dset_params["all_snap_info"]["prime_snap_info"]["rho_m"]
                 all_z.append(curr_z)
-                all_rhom.append(cosmol.rho_m(curr_z))
-                h = dset_params["p_snap_info"]["h"][()]
+                all_rhom.append(curr_rho_m)
+                h = dset_params["all_snap_info"]["prime_snap_info"]["h"][()]
 
         tot_num_halos = halo_n.shape[0]
         min_disp_halos = int(np.ceil(0.3 * tot_num_halos))

@@ -12,6 +12,7 @@ from sparta_tools import sparta
 from functools import reduce
 import ast
 import configparser
+from colossus.cosmology import cosmology
 
 def parse_value(value):
     """Convert value to appropriate type (list, int, float, bool, str)."""
@@ -276,13 +277,13 @@ def find_closest_a_rstar(z,rockstar_loc):
     print(rockstar_loc + "/hlist_" + str(all_a[idx]) + ".list")
     return rockstar_loc + "/hlist_" + str(all_a[idx]) + ".list"
 
-def find_closest_snap(value, cosmology, snap_loc, snap_dir_format, snap_format):
+def find_closest_snap(value, cosmol, snap_loc, snap_dir_format, snap_format):
     tot_num_snaps = get_num_snaps(snap_loc)
     all_times = np.ones(tot_num_snaps) * -1000
     for i in range(tot_num_snaps):
         # Sometimes not all snaps exist
         if os.path.isdir(snap_loc + "snapdir_" + snap_dir_format.format(i)):
-            all_times[i] = cosmology.age(readheader(snap_loc + "snapdir_" + snap_dir_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift'))
+            all_times[i] = cosmol.age(readheader(snap_loc + "snapdir_" + snap_dir_format.format(i) + "/snapshot_" + snap_format.format(i), 'redshift'))
     idx = (np.abs(all_times - value)).argmin()
     return idx
 
@@ -337,4 +338,9 @@ def parse_ranges(ranges_str):
 def create_nu_string(nu_list):
     return '_'.join('-'.join(map(str, tup)) for tup in nu_list)
 
-
+def set_cosmology(sim_cosmol):
+    if sim_cosmol == "planck13-nbody":
+        cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
+    else:
+        cosmol = cosmology.setCosmology(sim_cosmol)
+    return cosmol

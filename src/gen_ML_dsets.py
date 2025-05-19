@@ -12,8 +12,6 @@ from itertools import repeat
 import re
 import pandas as pd
 import psutil
-import json
-from sparta_tools import sparta 
 
 from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, conv_halo_id_spid, get_comp_snap_info, create_directory, find_closest_z_snap, timed, clean_dir, load_pickle, save_pickle, get_num_snaps, load_config
 from utils.calculation_functions import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn, create_mass_prf, calculate_density
@@ -314,106 +312,155 @@ def halo_loop(ptl_idx, curr_iter, num_iter, indices, halo_splits, snap_dict, use
                 return all_HIPIDs, all_orb_assn, all_rad_vel, all_tang_vel, all_scal_rad, all_phys_vel, start_num_ptls, use_num_ptls, use_indices, use_halos_r200m
             else:
                 return all_HIPIDs, all_rad_vel, all_tang_vel, all_scal_rad, all_phys_vel
-                            
-with timed("Startup"):
-    if sim_cosmol == "planck13-nbody":
-        cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
-    else:
-        cosmol = cosmology.setCosmology(sim_cosmol) 
-    
-    if reset_lvl <= 1 and len(known_snaps) > 0:
-        save_location = ML_dset_path + curr_sparta_file + "_" + "_".join(str(x) for x in known_snaps) + "/"
 
-        dset_params = load_pickle(save_location+"dset_params.pickle")
-        #TODO implement check that known_snaps correspond to what is stored in the config file
+with timed("Generating Datasets for " + curr_sparta_file):
+    with timed("Startup"):
+            
+            
+        if reset_lvl <= 1 and len(known_snaps) > 0:
+            save_location = ML_dset_path + curr_sparta_file + "_" + "_".join(str(x) for x in known_snaps) + "/"
 
-    all_snap_info = {}
-    all_ptl_snap_list = []
-    
-    with timed("Primary Snapshot Information Load"):
-        if reset_lvl > 1 or len(known_snaps) == 0:
-            prime_snap_dict = {}
-            p_snap, prime_z = find_closest_z_snap(prime_z,snap_path,snap_dir_format,snap_format)
-            print("Snapshot number found:", p_snap, "Closest redshift found:", prime_z)
-            
-            with h5py.File(sparta_HDF5_path,"r") as f:
-                dic_sim = {}
-                grp_sim = f['simulation']
-                for f in grp_sim.attrs:
-                    dic_sim[f] = grp_sim.attrs[f]
-                
-            all_sparta_z = dic_sim['snap_z']
-            p_sparta_snap = np.abs(all_sparta_z - prime_z).argmin()
-            
-            print("corresponding SPARTA snap num:", p_sparta_snap)
-            print("check sparta redshift:",all_sparta_z[p_sparta_snap])   
-            
-            prime_a = 1/(1+prime_z)
-            p_rho_m = cosmol.rho_m(prime_z)
-            p_hubble_const = cosmol.Hz(prime_z) * 0.001 # convert to units km/s/kpc
-            sim_box_size = dic_sim["box_size"] #units Mpc/h comoving
-            p_box_size = sim_box_size * 10**3 * prime_a #convert to Kpc/h physical
-            little_h = dic_sim["h"]
-            prime_snap_dict = {
-                "ptl_snap":p_snap,
-                "sparta_snap":p_sparta_snap,
-                "red_shift":prime_z,
-                "scale_factor": prime_a,
-                "hubble_const": p_hubble_const,
-                "box_size": p_box_size,
-                "h":little_h,
-                "rho_m":p_rho_m
-            }
+            dset_params = load_pickle(save_location+"dset_params.pickle")
+            #TODO implement check that known_snaps correspond to what is stored in the config file
+
+        if reset_lvl <= 1:
+            sim_cosmol = dset_params["cosmology"]
+        if sim_cosmol == "planck13-nbody":
+            cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
         else:
-            prime_snap_dict = dset_params["all_snap_info"]["prime_snap_info"]
-            p_snap = dset_params["all_snap_info"]["prime_snap_info"]["ptl_snap"]
-            prime_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"]
-            p_sparta_snap = dset_params["all_snap_info"]["prime_snap_info"]["sparta_snap"]
-            prime_a = dset_params["all_snap_info"]["prime_snap_info"]["scale_factor"]
-            p_hubble_const = dset_params["all_snap_info"]["prime_snap_info"]["hubble_const"]
-            p_box_size = dset_params["all_snap_info"]["prime_snap_info"]["box_size"]
-            little_h = dset_params["all_snap_info"]["prime_snap_info"]["h"]
+            cosmol = cosmology.setCosmology(sim_cosmol) 
 
-        # Set constants
-        all_ptl_snap_list.append(p_snap)
-        p_snap_path = snap_path + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
-        all_snap_info["prime_snap_info"] = prime_snap_dict
+        all_snap_info = {}
+        all_ptl_snap_list = []
         
-    if reset_lvl == 3:
-        clean_dir(pickled_path + str(p_snap) + "_" + curr_sparta_file + "/")
+        with timed("Primary Snapshot Information Load"):
+            if reset_lvl > 1 or len(known_snaps) == 0:
+                prime_snap_dict = {}
+                p_snap, prime_z = find_closest_z_snap(prime_z,snap_path,snap_dir_format,snap_format)
+                print("Snapshot number found:", p_snap, "Closest redshift found:", prime_z)
+                
+                with h5py.File(sparta_HDF5_path,"r") as f:
+                    dic_sim = {}
+                    grp_sim = f['simulation']
+                    for f in grp_sim.attrs:
+                        dic_sim[f] = grp_sim.attrs[f]
+                    
+                all_sparta_z = dic_sim['snap_z']
+                p_sparta_snap = np.abs(all_sparta_z - prime_z).argmin()
+                
+                print("corresponding SPARTA snap num:", p_sparta_snap)
+                print("check sparta redshift:",all_sparta_z[p_sparta_snap])   
+                
+                prime_a = 1/(1+prime_z)
+                p_rho_m = cosmol.rho_m(prime_z)
+                p_hubble_const = cosmol.Hz(prime_z) * 0.001 # convert to units km/s/kpc
+                sim_box_size = dic_sim["box_size"] #units Mpc/h comoving
+                p_box_size = sim_box_size * 10**3 * prime_a #convert to Kpc/h physical
+                little_h = dic_sim["h"]
+                prime_snap_dict = {
+                    "ptl_snap":p_snap,
+                    "sparta_snap":p_sparta_snap,
+                    "red_shift":prime_z,
+                    "scale_factor": prime_a,
+                    "hubble_const": p_hubble_const,
+                    "box_size": p_box_size,
+                    "h":little_h,
+                    "rho_m":p_rho_m
+                }
+            else:
+                prime_snap_dict = dset_params["all_snap_info"]["prime_snap_info"]
+                p_snap = dset_params["all_snap_info"]["prime_snap_info"]["ptl_snap"]
+                prime_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"]
+                p_sparta_snap = dset_params["all_snap_info"]["prime_snap_info"]["sparta_snap"]
+                prime_a = dset_params["all_snap_info"]["prime_snap_info"]["scale_factor"]
+                p_hubble_const = dset_params["all_snap_info"]["prime_snap_info"]["hubble_const"]
+                p_box_size = dset_params["all_snap_info"]["prime_snap_info"]["box_size"]
+                little_h = dset_params["all_snap_info"]["prime_snap_info"]["h"]
 
-    # load all information needed for the primary snap
-    with timed("p_snap ptl load"):
-        p_ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(p_snap), p_snap_path) 
-        p_ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(p_snap), p_snap_path) # km/s
-        p_ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(p_snap), p_snap_path) * 10**3 * prime_a # kpc/h
-    
-    with timed("p_snap SPARTA load"):
-        param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"],["simulation","particle_mass"]]
+            # Set constants
+            all_ptl_snap_list.append(p_snap)
+            p_snap_path = snap_path + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
+            all_snap_info["prime_snap_info"] = prime_snap_dict
             
-        sparta_params, sparta_param_names = load_SPARTA_data(sparta_HDF5_path, param_paths, curr_sparta_file)
+        if reset_lvl == 3:
+            clean_dir(pickled_path + str(p_snap) + "_" + curr_sparta_file + "/")
 
-        p_halos_pos = sparta_params[sparta_param_names[0]][:,p_sparta_snap,:] * 10**3 * prime_a # convert to kpc/h
-        p_halos_r200m = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
-        p_halos_ids = sparta_params[sparta_param_names[2]][:,p_sparta_snap]
-        p_halos_status = sparta_params[sparta_param_names[3]][:,p_sparta_snap]
-        p_halos_last_snap = sparta_params[sparta_param_names[4]][:]
-        ptl_mass = sparta_params[sparta_param_names[5]]
+        # load all information needed for the primary snap
+        with timed("p_snap ptl load"):
+            p_ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(p_snap), p_snap_path) 
+            p_ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(p_snap), p_snap_path) # km/s
+            p_ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(p_snap), p_snap_path) * 10**3 * prime_a # kpc/h
         
-    with timed("Load Complementary Snapshots"):
-        #TODO adjust this check to instead look the dictionary?
-        if reset_lvl > 1 or len(known_snaps) == 0:
-            for t_dyn_step in all_t_dyn_step:
-                t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], prime_z)
-                c_snap_dict = get_comp_snap_info(t_dyn=t_dyn, t_dyn_step=t_dyn_step, cosmol = cosmol, p_red_shift=prime_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
-                c_snap = c_snap_dict["ptl_snap"]
-                c_sparta_snap = c_snap_dict["sparta_snap"]
-                comp_z = c_snap_dict["red_shift"]
-                comp_a = c_snap_dict["scale_factor"]
-                c_hubble_const = c_snap_dict["hubble_const"]
-                c_rho_m = c_snap_dict["rho_m"]
-                c_box_size = sim_box_size * 10**3 * comp_a #convert to Kpc/h physical
-                if comp_z not in all_input_z:
+        with timed("p_snap SPARTA load"):
+            param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"],["simulation","particle_mass"]]
+                
+            sparta_params, sparta_param_names = load_SPARTA_data(sparta_HDF5_path, param_paths, curr_sparta_file)
+
+            p_halos_pos = sparta_params[sparta_param_names[0]][:,p_sparta_snap,:] * 10**3 * prime_a # convert to kpc/h
+            p_halos_r200m = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
+            p_halos_ids = sparta_params[sparta_param_names[2]][:,p_sparta_snap]
+            p_halos_status = sparta_params[sparta_param_names[3]][:,p_sparta_snap]
+            p_halos_last_snap = sparta_params[sparta_param_names[4]][:]
+            ptl_mass = sparta_params[sparta_param_names[5]]
+            
+        with timed("Load Complementary Snapshots"):
+            #TODO adjust this check to instead look the dictionary?
+            if reset_lvl > 1 or len(known_snaps) == 0:
+                for t_dyn_step in all_t_dyn_step:
+                    t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], prime_z)
+                    c_snap_dict = get_comp_snap_info(t_dyn=t_dyn, t_dyn_step=t_dyn_step, cosmol = cosmol, p_red_shift=prime_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
+                    c_snap = c_snap_dict["ptl_snap"]
+                    c_sparta_snap = c_snap_dict["sparta_snap"]
+                    comp_z = c_snap_dict["red_shift"]
+                    comp_a = c_snap_dict["scale_factor"]
+                    c_hubble_const = c_snap_dict["hubble_const"]
+                    c_rho_m = c_snap_dict["rho_m"]
+                    c_box_size = sim_box_size * 10**3 * comp_a #convert to Kpc/h physical
+                    if comp_z not in all_input_z:
+                        c_snap_dict = {
+                            "ptl_snap":c_snap,
+                            "sparta_snap":c_sparta_snap,
+                            "red_shift":comp_z,
+                            "scale_factor": comp_a,
+                            "hubble_const": c_hubble_const,
+                            "box_size": c_box_size,
+                            "h":little_h,
+                            "rho_m":c_rho_m
+                        }
+                    all_ptl_snap_list.append(c_snap)
+                    all_snap_info["comp_" + str(c_snap) + "_snap_info"] = c_snap_dict
+            else:
+                for key, c_snap_dict in dset_params["all_snap_info"].items():
+                    if key == "prime_snap_info":
+                        continue
+                    c_snap = c_snap_dict["ptl_snap"]
+                    c_sparta_snap = c_snap_dict["sparta_snap"]
+                    comp_z = c_snap_dict["red_shift"]
+                    comp_a = c_snap_dict["scale_factor"]
+                    c_hubble_const = c_snap_dict["hubble_const"]
+                    c_box_size = c_snap_dict["box_size"]
+                    
+                    all_ptl_snap_list.append(c_snap)
+                    all_snap_info["comp_" + str(c_snap) + "_snap_info"] = c_snap_dict
+        c_halos_status = sparta_params[sparta_param_names[3]][:,c_sparta_snap]
+        # Search for config parameters for complementary snapshot in the redshift first manner
+        if len(all_input_z) > 1:
+            if reset_lvl > 1 or len(known_snaps) == 0:
+                for comp_z in all_input_z[1:]:
+                    c_snap, comp_z = find_closest_z_snap(comp_z,snap_path,snap_dir_format,snap_format)
+                    print("Snapshot number found:", c_snap, "Closest redshift found:", comp_z)
+                    
+                    c_sparta_snap = np.abs(all_sparta_z - comp_z).argmin()
+                    
+                    print("corresponding SPARTA snap num:", c_sparta_snap)
+                    print("check sparta redshift:",all_sparta_z[c_sparta_snap])   
+                    
+                    comp_a = 1/(1+comp_z)
+                    c_rho_m = cosmol.rho_m(comp_z)
+                    c_hubble_const = cosmol.Hz(comp_z) * 0.001 # convert to units km/s/kpc
+                    sim_box_size = dic_sim["box_size"] #units Mpc/h comoving
+                    c_box_size = sim_box_size * 10**3 * comp_a #convert to Kpc/h physical
+                    little_h = dic_sim["h"]
                     c_snap_dict = {
                         "ptl_snap":c_snap,
                         "sparta_snap":c_sparta_snap,
@@ -424,353 +471,309 @@ with timed("Startup"):
                         "h":little_h,
                         "rho_m":c_rho_m
                     }
-                all_ptl_snap_list.append(c_snap)
-                all_snap_info["comp_" + str(c_snap) + "_snap_info"] = c_snap_dict
-        else:
-            for key, c_snap_dict in dset_params["all_snap_info"].items():
-                if key == "prime_snap_info":
-                    continue
-                c_snap = c_snap_dict["ptl_snap"]
-                c_sparta_snap = c_snap_dict["sparta_snap"]
-                comp_z = c_snap_dict["red_shift"]
-                comp_a = c_snap_dict["scale_factor"]
-                c_hubble_const = c_snap_dict["hubble_const"]
-                c_box_size = c_snap_dict["box_size"]
-                
-                all_ptl_snap_list.append(c_snap)
-                all_snap_info["comp_" + str(c_snap) + "_snap_info"] = c_snap_dict
-    c_halos_status = sparta_params[sparta_param_names[3]][:,c_sparta_snap]
-    # Search for config parameters for complementary snapshot in the redshift first manner
-    if len(all_input_z) > 1:
-        if reset_lvl > 1 or len(known_snaps) == 0:
-            for comp_z in all_input_z[1:]:
-                c_snap, comp_z = find_closest_z_snap(comp_z,snap_path,snap_dir_format,snap_format)
-                print("Snapshot number found:", c_snap, "Closest redshift found:", comp_z)
-                
-                c_sparta_snap = np.abs(all_sparta_z - comp_z).argmin()
-                
-                print("corresponding SPARTA snap num:", c_sparta_snap)
-                print("check sparta redshift:",all_sparta_z[c_sparta_snap])   
-                
-                comp_a = 1/(1+comp_z)
-                c_rho_m = cosmol.rho_m(comp_z)
-                c_hubble_const = cosmol.Hz(comp_z) * 0.001 # convert to units km/s/kpc
-                sim_box_size = dic_sim["box_size"] #units Mpc/h comoving
-                c_box_size = sim_box_size * 10**3 * comp_a #convert to Kpc/h physical
-                little_h = dic_sim["h"]
-                c_snap_dict = {
-                    "ptl_snap":c_snap,
-                    "sparta_snap":c_sparta_snap,
-                    "red_shift":comp_z,
-                    "scale_factor": comp_a,
-                    "hubble_const": c_hubble_const,
-                    "box_size": c_box_size,
-                    "h":little_h,
-                    "rho_m":c_rho_m
-                }
-                all_ptl_snap_list.append(c_snap)
-                all_snap_info["comp_" + str(c_snap) + "_snap_info"] = c_snap_dict
-            else:
-                for key, c_snap_dict in dset_params["all_snap_info"].items(): 
-                    if key == "prime_snap_dict":
-                        continue
-                    c_snap = c_snap_dict["ptl_snap"]
-                    c_sparta_snap = c_snap_dict["sparta_snap"]
-                    comp_z = c_snap_dict["red_shift"]
-                    comp_a = c_snap_dict["scale_factor"]
-                    c_hubble_const = c_snap_dict["hubble_const"]
-                    c_box_size = c_snap_dict["box_size"]
-
                     all_ptl_snap_list.append(c_snap)
                     all_snap_info["comp_" + str(c_snap) + "_snap_info"] = c_snap_dict
+                else:
+                    for key, c_snap_dict in dset_params["all_snap_info"].items(): 
+                        if key == "prime_snap_dict":
+                            continue
+                        c_snap = c_snap_dict["ptl_snap"]
+                        c_sparta_snap = c_snap_dict["sparta_snap"]
+                        comp_z = c_snap_dict["red_shift"]
+                        comp_a = c_snap_dict["scale_factor"]
+                        c_hubble_const = c_snap_dict["hubble_const"]
+                        c_box_size = c_snap_dict["box_size"]
 
-    all_ptl_snap_list.sort()
-    all_ptl_snap_list.reverse()
+                        all_ptl_snap_list.append(c_snap)
+                        all_snap_info["comp_" + str(c_snap) + "_snap_info"] = c_snap_dict
 
-    save_location = ML_dset_path + curr_sparta_file + "_" + "_".join(str(x) for x in all_ptl_snap_list) + "/"
-    
-    create_directory(save_location)
+        all_ptl_snap_list.sort()
+        all_ptl_snap_list.reverse()
 
-    if os.path.isfile(save_location + "p_ptl_tree.pickle") and reset_lvl < 2:
-            p_ptl_tree = load_pickle(save_location + "p_ptl_tree.pickle")
-    else:
-        p_ptl_tree = cKDTree(data = p_ptls_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size) # construct search trees for primary snap
-        if pickle_data:
-            save_pickle(p_ptl_tree,save_location + "p_ptl_tree.pickle")
+        save_location = ML_dset_path + curr_sparta_file + "_" + "_".join(str(x) for x in all_ptl_snap_list) + "/"
+        
+        create_directory(save_location)
 
-    if os.path.isfile(save_location + "num_ptls.pickle") and os.path.isfile(save_location + "match_halo_idxs.pickle") and reset_lvl < 2:
-        num_ptls = load_pickle(save_location + "num_ptls.pickle")
-        match_halo_idxs = load_pickle(save_location + "match_halo_idxs.pickle")
-    else:
-        # only take halos that are hosts in primary snap and exist past the p_snap 
-        orig_match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap) & (c_halos_status > 0))[0]
-        match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap))[0]
-        
-        with mp.Pool(processes=num_processes) as p:           
-            # halo position, halo r200m, if comparison snap, want mass?, want indices?
-            num_ptls = p.starmap(init_search, zip(repeat(True), p_halos_pos[match_halo_idxs], p_halos_r200m[match_halo_idxs], repeat(1.0), repeat(False), repeat(False)), chunksize=mp_chunk_size)
-            
-            # We want to remove any halos that have less than 200 particles as they are too noisy
-            num_ptls = np.array(num_ptls)
-            res_mask = np.where(num_ptls >= 200)[0]
-
-            if res_mask.size > 0:
-                num_ptls = num_ptls[res_mask]
-                match_halo_idxs = match_halo_idxs[res_mask]
-            
-            save_pickle(num_ptls,save_location + "num_ptls.pickle")
-            save_pickle(match_halo_idxs,save_location + "match_halo_idxs.pickle")
-            
-        with mp.Pool(processes=num_processes) as p:           
-            # halo position, halo r200m, if comparison snap, want mass?, want indices?
-            test_num_ptls = p.starmap(init_search, zip(repeat(True), p_halos_pos[orig_match_halo_idxs], p_halos_r200m[orig_match_halo_idxs], repeat(1.0), repeat(False), repeat(False)), chunksize=mp_chunk_size)
-            
-            # We want to remove any halos that have less than 200 particles as they are too noisy
-            test_num_ptls = np.array(test_num_ptls)
-            test_res_mask = np.where(test_num_ptls >= 200)[0]
-
-            if test_res_mask.size > 0:
-                orig_match_halo_idxs = orig_match_halo_idxs[test_res_mask]
-        
-        symmetric_diff = np.setxor1d(orig_match_halo_idxs, match_halo_idxs)
-        print("Num of halos that didn't exist before:", symmetric_diff.shape)
-        
-        p.close()
-        p.join() 
-        
-    tot_num_ptls = np.sum(num_ptls)   
-    total_num_halos = match_halo_idxs.shape[0]
-    
-    #TODO split the halos more intelligently so that halo sizes are evenly distributed
-    # split all indices into train and test groups
-    split_pnt = int((1-test_dset_frac) * total_num_halos)
-    train_idxs = match_halo_idxs[:split_pnt]
-    test_idxs = match_halo_idxs[split_pnt:]
-    train_num_ptls = num_ptls[:split_pnt]
-    test_num_ptls = num_ptls[split_pnt:]
-
-    # need to sort indices otherwise sparta.load breaks...
-    train_idxs_inds = train_idxs.argsort()
-    train_idxs = train_idxs[train_idxs_inds]
-    train_num_ptls = train_num_ptls[train_idxs_inds]
-    
-    test_idxs_inds = test_idxs.argsort()
-    test_idxs = test_idxs[test_idxs_inds]
-    test_num_ptls = test_num_ptls[test_idxs_inds]
-    
-    train_halo_mem = calc_halo_mem(train_num_ptls)
-    test_halo_mem = calc_halo_mem(test_num_ptls)
-
-    train_halo_splits = det_halo_splits(train_halo_mem, sub_dset_mem_size)
-    test_halo_splits = det_halo_splits(test_halo_mem, sub_dset_mem_size)
-        
-    print(f"Total num halos: {total_num_halos:.3e}")
-    print(f"Total num ptls: {tot_num_ptls:.3e}")
-
-    tot_num_snaps = get_num_snaps(snap_path)
-    
-    #TODO move t_dyn_steps to within their respective snap?
-    dset_params = {
-        "sparta_file": curr_sparta_file,
-        "snap_dir_format":snap_dir_format,
-        "snap_format": snap_format,
-        "cosmology": sim_cosmol,
-        "t_dyn_steps": all_t_dyn_step,
-        "search_rad": search_radius,
-        "total_num_snaps": tot_num_snaps,
-        "test_halos_ratio": test_dset_frac,
-        "chunk_size": mp_chunk_size,
-        "HDF5 Mem Size": sub_dset_mem_size,
-        "all_snap_info": all_snap_info,
-    }
-
-    save_pickle(dset_params,save_location+"dset_params.pickle")
-        
-with timed("Creating Datasets"):   
-    create_directory(save_location + "Train/halo_info/")
-    create_directory(save_location + "Test/halo_info/")
-    
-    for i,curr_ptl_snap in enumerate(all_ptl_snap_list):
-        ptl_idx = 0
-        
-        create_directory(save_location + "Train/ptl_info/"+str(curr_ptl_snap)+"/")
-        create_directory(save_location + "Test/ptl_info/"+str(curr_ptl_snap)+"/")
-        if reset_lvl > 0: # At any level of reset we delete the calculated info for particles
-            clean_dir(save_location + "Train/ptl_info/"+str(curr_ptl_snap)+"/")
-            clean_dir(save_location + "Test/ptl_info/"+str(curr_ptl_snap)+"/")
-            train_start_pnt=0
-            test_start_pnt=0
-        else: #Otherwise check to see where we were and then continue the calculations from there.
-            train_start_pnt = find_start_pnt(save_location + "Train/ptl_info/"+str(curr_ptl_snap)+"/")
-            test_start_pnt = find_start_pnt(save_location + "Test/ptl_info/"+str(curr_ptl_snap)+"/")
-            train_halo_splits = train_halo_splits[train_start_pnt:]
-            test_halo_splits = test_halo_splits[test_start_pnt:]
-            
-        prnt_halo_splits = train_halo_splits.copy()
-        prnt_halo_splits.append(len(train_idxs))        
-        
-        for k in range(len(prnt_halo_splits)):
-            if k < len(prnt_halo_splits) - 1:
-                print(((np.sum(train_halo_mem[prnt_halo_splits[k]:prnt_halo_splits[k+1]])) + 128 )*1e-9,"GB")
-        
-        
-        curr_snap_path = snap_path + "/snapdir_" + snap_dir_format.format(curr_ptl_snap) + "/snapshot_" + snap_format.format(curr_ptl_snap)
-        
-        if i == 0:
-            curr_snap_dict = dset_params["all_snap_info"]["prime_snap_info"]
-            curr_ptls_pid = p_ptls_pid
-            curr_ptls_vel = p_ptls_vel
-            curr_ptls_pos = p_ptls_pos
-            curr_ptl_tree = p_ptl_tree
+        if os.path.isfile(save_location + "p_ptl_tree.pickle") and reset_lvl < 2:
+                p_ptl_tree = load_pickle(save_location + "p_ptl_tree.pickle")
         else:
-            curr_snap_dict = dset_params["all_snap_info"]["comp_" + str(curr_ptl_snap) + "_snap_info"]
-        curr_sparta_snap = curr_snap_dict["sparta_snap"]
-        curr_z = curr_snap_dict["red_shift"]
-        curr_a = curr_snap_dict["scale_factor"]
-        curr_hubble_const = curr_snap_dict["hubble_const"]
-        curr_box_size = curr_snap_dict["box_size"]
-    
-        if reset_lvl == 3:
-            clean_dir(pickled_path + str(curr_ptl_snap) + "_" + curr_sparta_file + "/")       
+            p_ptl_tree = cKDTree(data = p_ptls_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size) # construct search trees for primary snap
+            if pickle_data:
+                save_pickle(p_ptl_tree,save_location + "p_ptl_tree.pickle")
+
+        if os.path.isfile(save_location + "num_ptls.pickle") and os.path.isfile(save_location + "match_halo_idxs.pickle") and reset_lvl < 2:
+            num_ptls = load_pickle(save_location + "num_ptls.pickle")
+            match_halo_idxs = load_pickle(save_location + "match_halo_idxs.pickle")
+        else:
+            # only take halos that are hosts in primary snap and exist past the p_snap 
+            orig_match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap) & (c_halos_status > 0))[0]
+            match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap))[0]
             
-        if i > 0:
-            # load particle data for the comparison snap
-            with timed("c_snap ptl load"):
-                curr_ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(curr_ptl_snap), curr_snap_path) 
-                curr_ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(curr_ptl_snap), curr_snap_path) # km/s
-                curr_ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(curr_ptl_snap), curr_snap_path) * 10**3 * curr_a # kpc/h
+            with mp.Pool(processes=num_processes) as p:           
+                # halo position, halo r200m, if comparison snap, want mass?, want indices?
+                num_ptls = p.starmap(init_search, zip(repeat(True), p_halos_pos[match_halo_idxs], p_halos_r200m[match_halo_idxs], repeat(1.0), repeat(False), repeat(False)), chunksize=mp_chunk_size)
+                
+                # We want to remove any halos that have less than 200 particles as they are too noisy
+                num_ptls = np.array(num_ptls)
+                res_mask = np.where(num_ptls >= 200)[0]
+
+                if res_mask.size > 0:
+                    num_ptls = num_ptls[res_mask]
+                    match_halo_idxs = match_halo_idxs[res_mask]
+                
+                save_pickle(num_ptls,save_location + "num_ptls.pickle")
+                save_pickle(match_halo_idxs,save_location + "match_halo_idxs.pickle")
+                
+            with mp.Pool(processes=num_processes) as p:           
+                # halo position, halo r200m, if comparison snap, want mass?, want indices?
+                test_num_ptls = p.starmap(init_search, zip(repeat(True), p_halos_pos[orig_match_halo_idxs], p_halos_r200m[orig_match_halo_idxs], repeat(1.0), repeat(False), repeat(False)), chunksize=mp_chunk_size)
+                
+                # We want to remove any halos that have less than 200 particles as they are too noisy
+                test_num_ptls = np.array(test_num_ptls)
+                test_res_mask = np.where(test_num_ptls >= 200)[0]
+
+                if test_res_mask.size > 0:
+                    orig_match_halo_idxs = orig_match_halo_idxs[test_res_mask]
+            
+            symmetric_diff = np.setxor1d(orig_match_halo_idxs, match_halo_idxs)
+            print("Num of halos that didn't exist before:", symmetric_diff.shape)
+            
+            p.close()
+            p.join() 
+            
+        tot_num_ptls = np.sum(num_ptls)   
+        total_num_halos = match_halo_idxs.shape[0]
         
-            if os.path.isfile(save_location + str(curr_ptl_snap) + "_ptl_tree.pickle") and reset_lvl < 2:
-                curr_ptl_tree = load_pickle(save_location + str(curr_ptl_snap) + "_ptl_tree.pickle")
-            else:
-                curr_ptl_tree = cKDTree(data = curr_ptls_pos, leafsize = 3, balanced_tree = False, boxsize = curr_box_size)
-                if pickle_data:
-                    save_pickle(curr_ptl_tree, save_location +  str(curr_ptl_snap) + "_ptl_tree.pickle")        
-   
-        train_num_iter = len(train_halo_splits)
-        train_prnt_halo_splits = train_halo_splits.copy()
-        train_prnt_halo_splits.append(train_idxs.size)
-        print("Train Splits")
-        print("Num halos in each split:", ", ".join(map(str, np.diff(train_prnt_halo_splits))) + ".", train_num_iter, "splits")
-    
-        for j in range(train_num_iter):
-            if i == 0:
-                ret_labels = True
-                train_p_HIPIDs, p_orb_assn, p_rad_vel, p_tang_vel, p_scale_rad, p_phys_vel, p_start_num_ptls, p_use_num_ptls, use_indices, use_halos_r200m = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=train_num_iter, \
-                    indices=train_idxs, halo_splits=train_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=True, ptls_pid=curr_ptls_pid, \
-                    ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels)
-                p_train_num_use_ptls = train_p_HIPIDs.shape[0]
-                
-                halo_df = pd.DataFrame({
-                    "Halo_first":p_start_num_ptls,
-                    "Halo_n":p_use_num_ptls,
-                    "Halo_indices":use_indices,
-                    "Halo_R200m":use_halos_r200m,
-                })
-                halo_df.to_hdf(save_location + "Train/halo_info/halo_" + str(i+train_start_pnt) + ".h5", key='data', mode='w',format='table')  
-                
-                ptl_df = pd.DataFrame({
-                    "HIPIDS":train_p_HIPIDs,
-                    "Orbit_infall":p_orb_assn,
-                    str(curr_ptl_snap) + "_Scaled_radii":p_scale_rad,
-                    str(curr_ptl_snap) + "_Radial_vel":p_rad_vel,
-                    str(curr_ptl_snap) + "_Tangential_vel":p_tang_vel,
-                    str(curr_ptl_snap) + "_phys_vel":p_phys_vel
-                })
-            else:
-                ret_labels = False
-                c_HIPIDs, c_rad_vel, c_tang_vel, c_scale_rad, c_phys_vel = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=train_num_iter, indices=train_idxs, \
-                    halo_splits=train_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=False, ptls_pid=curr_ptls_pid, ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels)
+        #TODO split the halos more intelligently so that halo sizes are evenly distributed
+        # split all indices into train and test groups
+        split_pnt = int((1-test_dset_frac) * total_num_halos)
+        train_idxs = match_halo_idxs[:split_pnt]
+        test_idxs = match_halo_idxs[split_pnt:]
+        train_num_ptls = num_ptls[:split_pnt]
+        test_num_ptls = num_ptls[split_pnt:]
 
-                match_hipid_idx = np.intersect1d(train_p_HIPIDs, c_HIPIDs, return_indices=True)
-
-                save_scale_rad = np.zeros((p_train_num_use_ptls,), dtype = np.float32)
-                save_rad_vel = np.zeros((p_train_num_use_ptls,), dtype = np.float32)
-                save_tang_vel = np.zeros((p_train_num_use_ptls,), dtype = np.float32)
-                save_phys_vel = np.zeros((p_train_num_use_ptls,), dtype = np.float32)
-                save_scale_rad[match_hipid_idx[1]] = c_scale_rad[match_hipid_idx[2]]
-                save_rad_vel[match_hipid_idx[1]] = c_rad_vel[match_hipid_idx[2]]
-                save_tang_vel[match_hipid_idx[1]] = c_tang_vel[match_hipid_idx[2]]
-                save_phys_vel[match_hipid_idx[1]] = c_phys_vel[match_hipid_idx[2]]
-                
-                save_scale_rad[save_scale_rad == 0] = np.nan
-                save_rad_vel[save_rad_vel == 0] = np.nan
-                save_tang_vel[save_tang_vel == 0] = np.nan
-                save_phys_vel[save_phys_vel == 0] = np.nan
-                        
-                ptl_df = pd.DataFrame({
-                    str(curr_ptl_snap) + "_Scaled_radii":save_scale_rad,
-                    str(curr_ptl_snap) + "_Radial_vel":save_rad_vel,
-                    str(curr_ptl_snap) + "_Tangential_vel":save_tang_vel,
-                    str(curr_ptl_snap) + "_phys_vel":save_phys_vel
-                })
-            
-            ptl_df.to_hdf(save_location + "Train/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+train_start_pnt) + ".h5", key='data', mode='w',format='table')  
-            ptl_idx += p_train_num_use_ptls
-            if debug_mem == 1:
-                print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
-      
-        test_num_iter = len(test_halo_splits)
-        test_prnt_halo_splits = test_halo_splits.copy()
-        test_prnt_halo_splits.append(test_idxs.size)
-        print("Test Splits")
-        print("Num halos in each split:", ", ".join(map(str, np.diff(test_prnt_halo_splits))) + ".", test_num_iter, "splits")
-        ptl_idx = 0
+        # need to sort indices otherwise sparta.load breaks...
+        train_idxs_inds = train_idxs.argsort()
+        train_idxs = train_idxs[train_idxs_inds]
+        train_num_ptls = train_num_ptls[train_idxs_inds]
         
-        for j in range(test_num_iter):
-            if i == 0:
-                ret_labels = True
-                test_p_HIPIDs, p_orb_assn, p_rad_vel, p_tang_vel, p_scale_rad, p_phys_vel, p_start_num_ptls, p_use_num_ptls, use_indices, use_halos_r200m = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=test_num_iter, \
-                    indices=test_idxs, halo_splits=test_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=True, ptls_pid=curr_ptls_pid, \
-                    ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels)
-                p_test_num_use_ptls = test_p_HIPIDs.shape[0]
-                
-                halo_df = pd.DataFrame({
-                    "Halo_first":p_start_num_ptls,
-                    "Halo_n":p_use_num_ptls,
-                    "Halo_indices":use_indices,
-                    "Halo_R200m":use_halos_r200m,
-                })
-                halo_df.to_hdf(save_location + "Test/halo_info/halo_" + str(i+test_start_pnt) + ".h5", key='data', mode='w',format='table')  
-                
-                ptl_df = pd.DataFrame({
-                    "HIPIDS":test_p_HIPIDs,
-                    "Orbit_infall":p_orb_assn,
-                    str(curr_ptl_snap) + "_Scaled_radii":p_scale_rad,
-                    str(curr_ptl_snap) + "_Radial_vel":p_rad_vel,
-                    str(curr_ptl_snap) + "_Tangential_vel":p_tang_vel,
-                    str(curr_ptl_snap) + "_phys_vel":p_phys_vel
-                })
-            else:
-                ret_labels = False
-                c_HIPIDs, c_rad_vel, c_tang_vel, c_scale_rad, c_phys_vel = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=test_num_iter, indices=test_idxs, \
-                    halo_splits=test_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=False, ptls_pid=curr_ptls_pid, ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels)
+        test_idxs_inds = test_idxs.argsort()
+        test_idxs = test_idxs[test_idxs_inds]
+        test_num_ptls = test_num_ptls[test_idxs_inds]
+        
+        train_halo_mem = calc_halo_mem(train_num_ptls)
+        test_halo_mem = calc_halo_mem(test_num_ptls)
 
-                match_hipid_idx = np.intersect1d(test_p_HIPIDs, c_HIPIDs, return_indices=True)
-                
-                save_scale_rad = np.zeros((p_test_num_use_ptls,), dtype = np.float32)
-                save_rad_vel = np.zeros((p_test_num_use_ptls,), dtype = np.float32)
-                save_tang_vel = np.zeros((p_test_num_use_ptls,), dtype = np.float32)
-                save_phys_vel = np.zeros((p_test_num_use_ptls,), dtype = np.float32)
-                save_scale_rad[match_hipid_idx[1]] = c_scale_rad[match_hipid_idx[2]]
-                save_rad_vel[match_hipid_idx[1]] = c_rad_vel[match_hipid_idx[2]]
-                save_tang_vel[match_hipid_idx[1]] = c_tang_vel[match_hipid_idx[2]]
-                save_phys_vel[match_hipid_idx[1]] = c_phys_vel[match_hipid_idx[2]]
-                
-                save_scale_rad[save_scale_rad == 0] = np.nan
-                save_rad_vel[save_rad_vel == 0] = np.nan
-                save_tang_vel[save_tang_vel == 0] = np.nan
-                save_phys_vel[save_phys_vel == 0] = np.nan
-                        
-                ptl_df = pd.DataFrame({
-                    str(curr_ptl_snap) + "_Scaled_radii":save_scale_rad,
-                    str(curr_ptl_snap) + "_Radial_vel":save_rad_vel,
-                    str(curr_ptl_snap) + "_Tangential_vel":save_tang_vel,
-                    str(curr_ptl_snap) + "_phys_vel":save_phys_vel
-                })
+        train_halo_splits = det_halo_splits(train_halo_mem, sub_dset_mem_size)
+        test_halo_splits = det_halo_splits(test_halo_mem, sub_dset_mem_size)
             
-            ptl_df.to_hdf(save_location + "Test/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+test_start_pnt) + ".h5", key='data', mode='w',format='table')  
-            ptl_idx += p_test_num_use_ptls
-            if debug_mem == 1:
-                print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
+        print(f"Total num halos: {total_num_halos:.3e}")
+        print(f"Total num ptls: {tot_num_ptls:.3e}")
+
+        tot_num_snaps = get_num_snaps(snap_path)
+        
+        #TODO move t_dyn_steps to within their respective snap?
+        dset_params = {
+            "sparta_file": curr_sparta_file,
+            "snap_dir_format":snap_dir_format,
+            "snap_format": snap_format,
+            "cosmology": sim_cosmol,
+            "t_dyn_steps": all_t_dyn_step,
+            "search_rad": search_radius,
+            "total_num_snaps": tot_num_snaps,
+            "test_halos_ratio": test_dset_frac,
+            "chunk_size": mp_chunk_size,
+            "HDF5 Mem Size": sub_dset_mem_size,
+            "all_snap_info": all_snap_info,
+        }
+
+        save_pickle(dset_params,save_location+"dset_params.pickle")
             
+    with timed("Creating Datasets"):   
+        create_directory(save_location + "Train/halo_info/")
+        create_directory(save_location + "Test/halo_info/")
+        
+        for i,curr_ptl_snap in enumerate(all_ptl_snap_list):
+            ptl_idx = 0
+            
+            create_directory(save_location + "Train/ptl_info/"+str(curr_ptl_snap)+"/")
+            create_directory(save_location + "Test/ptl_info/"+str(curr_ptl_snap)+"/")
+            if reset_lvl > 0: # At any level of reset we delete the calculated info for particles
+                clean_dir(save_location + "Train/ptl_info/"+str(curr_ptl_snap)+"/")
+                clean_dir(save_location + "Test/ptl_info/"+str(curr_ptl_snap)+"/")
+                train_start_pnt=0
+                test_start_pnt=0
+            else: #Otherwise check to see where we were and then continue the calculations from there.
+                train_start_pnt = find_start_pnt(save_location + "Train/ptl_info/"+str(curr_ptl_snap)+"/")
+                test_start_pnt = find_start_pnt(save_location + "Test/ptl_info/"+str(curr_ptl_snap)+"/")
+                train_halo_splits = train_halo_splits[train_start_pnt:]
+                test_halo_splits = test_halo_splits[test_start_pnt:]
+                
+            prnt_halo_splits = train_halo_splits.copy()
+            prnt_halo_splits.append(len(train_idxs))        
+            
+            for k in range(len(prnt_halo_splits)):
+                if k < len(prnt_halo_splits) - 1:
+                    print(((np.sum(train_halo_mem[prnt_halo_splits[k]:prnt_halo_splits[k+1]])) + 128 )*1e-9,"GB")
+            
+            
+            curr_snap_path = snap_path + "/snapdir_" + snap_dir_format.format(curr_ptl_snap) + "/snapshot_" + snap_format.format(curr_ptl_snap)
+            
+            if i == 0:
+                curr_snap_dict = dset_params["all_snap_info"]["prime_snap_info"]
+                curr_ptls_pid = p_ptls_pid
+                curr_ptls_vel = p_ptls_vel
+                curr_ptls_pos = p_ptls_pos
+                curr_ptl_tree = p_ptl_tree
+            else:
+                curr_snap_dict = dset_params["all_snap_info"]["comp_" + str(curr_ptl_snap) + "_snap_info"]
+            curr_sparta_snap = curr_snap_dict["sparta_snap"]
+            curr_z = curr_snap_dict["red_shift"]
+            curr_a = curr_snap_dict["scale_factor"]
+            curr_hubble_const = curr_snap_dict["hubble_const"]
+            curr_box_size = curr_snap_dict["box_size"]
+        
+            if reset_lvl == 3:
+                clean_dir(pickled_path + str(curr_ptl_snap) + "_" + curr_sparta_file + "/")       
+                
+            if i > 0:
+                # load particle data for the comparison snap
+                with timed("c_snap ptl load"):
+                    curr_ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(curr_ptl_snap), curr_snap_path) 
+                    curr_ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(curr_ptl_snap), curr_snap_path) # km/s
+                    curr_ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(curr_ptl_snap), curr_snap_path) * 10**3 * curr_a # kpc/h
+            
+                if os.path.isfile(save_location + str(curr_ptl_snap) + "_ptl_tree.pickle") and reset_lvl < 2:
+                    curr_ptl_tree = load_pickle(save_location + str(curr_ptl_snap) + "_ptl_tree.pickle")
+                else:
+                    curr_ptl_tree = cKDTree(data = curr_ptls_pos, leafsize = 3, balanced_tree = False, boxsize = curr_box_size)
+                    if pickle_data:
+                        save_pickle(curr_ptl_tree, save_location +  str(curr_ptl_snap) + "_ptl_tree.pickle")        
+    
+            train_num_iter = len(train_halo_splits)
+            train_prnt_halo_splits = train_halo_splits.copy()
+            train_prnt_halo_splits.append(train_idxs.size)
+            print("Train Splits")
+            print("Num halos in each split:", ", ".join(map(str, np.diff(train_prnt_halo_splits))) + ".", train_num_iter, "splits")
+        
+            for j in range(train_num_iter):
+                if i == 0:
+                    ret_labels = True
+                    train_p_HIPIDs, p_orb_assn, p_rad_vel, p_tang_vel, p_scale_rad, p_phys_vel, p_start_num_ptls, p_use_num_ptls, use_indices, use_halos_r200m = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=train_num_iter, \
+                        indices=train_idxs, halo_splits=train_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=True, ptls_pid=curr_ptls_pid, \
+                        ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels)
+                    p_train_num_use_ptls = train_p_HIPIDs.shape[0]
+                    
+                    halo_df = pd.DataFrame({
+                        "Halo_first":p_start_num_ptls,
+                        "Halo_n":p_use_num_ptls,
+                        "Halo_indices":use_indices,
+                        "Halo_R200m":use_halos_r200m,
+                    })
+                    halo_df.to_hdf(save_location + "Train/halo_info/halo_" + str(i+train_start_pnt) + ".h5", key='data', mode='w',format='table')  
+                    
+                    ptl_df = pd.DataFrame({
+                        "HIPIDS":train_p_HIPIDs,
+                        "Orbit_infall":p_orb_assn,
+                        str(curr_ptl_snap) + "_Scaled_radii":p_scale_rad,
+                        str(curr_ptl_snap) + "_Radial_vel":p_rad_vel,
+                        str(curr_ptl_snap) + "_Tangential_vel":p_tang_vel,
+                        str(curr_ptl_snap) + "_phys_vel":p_phys_vel
+                    })
+                else:
+                    ret_labels = False
+                    c_HIPIDs, c_rad_vel, c_tang_vel, c_scale_rad, c_phys_vel = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=train_num_iter, indices=train_idxs, \
+                        halo_splits=train_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=False, ptls_pid=curr_ptls_pid, ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels)
+
+                    match_hipid_idx = np.intersect1d(train_p_HIPIDs, c_HIPIDs, return_indices=True)
+
+                    save_scale_rad = np.zeros((p_train_num_use_ptls,), dtype = np.float32)
+                    save_rad_vel = np.zeros((p_train_num_use_ptls,), dtype = np.float32)
+                    save_tang_vel = np.zeros((p_train_num_use_ptls,), dtype = np.float32)
+                    save_phys_vel = np.zeros((p_train_num_use_ptls,), dtype = np.float32)
+                    save_scale_rad[match_hipid_idx[1]] = c_scale_rad[match_hipid_idx[2]]
+                    save_rad_vel[match_hipid_idx[1]] = c_rad_vel[match_hipid_idx[2]]
+                    save_tang_vel[match_hipid_idx[1]] = c_tang_vel[match_hipid_idx[2]]
+                    save_phys_vel[match_hipid_idx[1]] = c_phys_vel[match_hipid_idx[2]]
+                    
+                    save_scale_rad[save_scale_rad == 0] = np.nan
+                    save_rad_vel[save_rad_vel == 0] = np.nan
+                    save_tang_vel[save_tang_vel == 0] = np.nan
+                    save_phys_vel[save_phys_vel == 0] = np.nan
+                            
+                    ptl_df = pd.DataFrame({
+                        str(curr_ptl_snap) + "_Scaled_radii":save_scale_rad,
+                        str(curr_ptl_snap) + "_Radial_vel":save_rad_vel,
+                        str(curr_ptl_snap) + "_Tangential_vel":save_tang_vel,
+                        str(curr_ptl_snap) + "_phys_vel":save_phys_vel
+                    })
+                
+                ptl_df.to_hdf(save_location + "Train/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+train_start_pnt) + ".h5", key='data', mode='w',format='table')  
+                ptl_idx += p_train_num_use_ptls
+                if debug_mem == 1:
+                    print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
+        
+            test_num_iter = len(test_halo_splits)
+            test_prnt_halo_splits = test_halo_splits.copy()
+            test_prnt_halo_splits.append(test_idxs.size)
+            print("Test Splits")
+            print("Num halos in each split:", ", ".join(map(str, np.diff(test_prnt_halo_splits))) + ".", test_num_iter, "splits")
+            ptl_idx = 0
+            
+            for j in range(test_num_iter):
+                if i == 0:
+                    ret_labels = True
+                    test_p_HIPIDs, p_orb_assn, p_rad_vel, p_tang_vel, p_scale_rad, p_phys_vel, p_start_num_ptls, p_use_num_ptls, use_indices, use_halos_r200m = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=test_num_iter, \
+                        indices=test_idxs, halo_splits=test_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=True, ptls_pid=curr_ptls_pid, \
+                        ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels)
+                    p_test_num_use_ptls = test_p_HIPIDs.shape[0]
+                    
+                    halo_df = pd.DataFrame({
+                        "Halo_first":p_start_num_ptls,
+                        "Halo_n":p_use_num_ptls,
+                        "Halo_indices":use_indices,
+                        "Halo_R200m":use_halos_r200m,
+                    })
+                    halo_df.to_hdf(save_location + "Test/halo_info/halo_" + str(i+test_start_pnt) + ".h5", key='data', mode='w',format='table')  
+                    
+                    ptl_df = pd.DataFrame({
+                        "HIPIDS":test_p_HIPIDs,
+                        "Orbit_infall":p_orb_assn,
+                        str(curr_ptl_snap) + "_Scaled_radii":p_scale_rad,
+                        str(curr_ptl_snap) + "_Radial_vel":p_rad_vel,
+                        str(curr_ptl_snap) + "_Tangential_vel":p_tang_vel,
+                        str(curr_ptl_snap) + "_phys_vel":p_phys_vel
+                    })
+                else:
+                    ret_labels = False
+                    c_HIPIDs, c_rad_vel, c_tang_vel, c_scale_rad, c_phys_vel = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=test_num_iter, indices=test_idxs, \
+                        halo_splits=test_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=False, ptls_pid=curr_ptls_pid, ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels)
+
+                    match_hipid_idx = np.intersect1d(test_p_HIPIDs, c_HIPIDs, return_indices=True)
+                    
+                    save_scale_rad = np.zeros((p_test_num_use_ptls,), dtype = np.float32)
+                    save_rad_vel = np.zeros((p_test_num_use_ptls,), dtype = np.float32)
+                    save_tang_vel = np.zeros((p_test_num_use_ptls,), dtype = np.float32)
+                    save_phys_vel = np.zeros((p_test_num_use_ptls,), dtype = np.float32)
+                    save_scale_rad[match_hipid_idx[1]] = c_scale_rad[match_hipid_idx[2]]
+                    save_rad_vel[match_hipid_idx[1]] = c_rad_vel[match_hipid_idx[2]]
+                    save_tang_vel[match_hipid_idx[1]] = c_tang_vel[match_hipid_idx[2]]
+                    save_phys_vel[match_hipid_idx[1]] = c_phys_vel[match_hipid_idx[2]]
+                    
+                    save_scale_rad[save_scale_rad == 0] = np.nan
+                    save_rad_vel[save_rad_vel == 0] = np.nan
+                    save_tang_vel[save_tang_vel == 0] = np.nan
+                    save_phys_vel[save_phys_vel == 0] = np.nan
+                            
+                    ptl_df = pd.DataFrame({
+                        str(curr_ptl_snap) + "_Scaled_radii":save_scale_rad,
+                        str(curr_ptl_snap) + "_Radial_vel":save_rad_vel,
+                        str(curr_ptl_snap) + "_Tangential_vel":save_tang_vel,
+                        str(curr_ptl_snap) + "_phys_vel":save_phys_vel
+                    })
+                
+                ptl_df.to_hdf(save_location + "Test/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+test_start_pnt) + ".h5", key='data', mode='w',format='table')  
+                ptl_idx += p_test_num_use_ptls
+                if debug_mem == 1:
+                    print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
+                

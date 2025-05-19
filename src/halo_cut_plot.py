@@ -22,7 +22,6 @@ path_to_models = config_params["PATHS"]["path_to_models"]
 curr_sparta_file = config_params["SPARTA_DATA"]["curr_sparta_file"]
 snap_dir_format = config_params["SNAP_DATA"]["snap_dir_format"]
 snap_format = config_params["SNAP_DATA"]["snap_format"]
-sim_cosmol = config_params["MISC"]["sim_cosmol"]
 
 search_radius = config_params["DSET_CREATE"]["search_radius"]
 test_sims = config_params["EVAL_MODEL"]["test_sims"]
@@ -33,15 +32,7 @@ sim_name, search_name = split_sparta_hdf5_name(curr_sparta_file)
 
 snap_path = snap_path + sim_name + "/"
 
-if sim_cosmol == "planck13-nbody":
-    sim_pat = r"cpla_l(\d+)_n(\d+)"
-else:
-    sim_pat = r"cbol_l(\d+)_n(\d+)"
-match = re.search(sim_pat, curr_sparta_file)
-if match:
-    sparta_name = match.group(0)
-else:
-    sparta_name = curr_sparta_file
+sparta_name, sparta_search_name = split_sparta_hdf5_name(curr_sparta_file)
     
 SPARTA_hdf5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
 
@@ -103,8 +94,6 @@ used_numbers = set()
 while len(used_numbers) < 25:
     with timed("Halo Slice Plot"):
         num = random.randint(0, all_idxs.shape[0])
-        if 237 not in used_numbers:
-            num = 237
         if num not in used_numbers:
             use_idx = all_idxs[num]
 
