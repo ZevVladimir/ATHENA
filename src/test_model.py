@@ -7,7 +7,7 @@ import json
 import multiprocessing as mp
 import pandas as pd
 
-from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, load_data, eval_model, get_model_name, make_preds
+from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, load_data, eval_model, get_model_name, make_preds, get_feature_labels
 from utils.data_and_loading_functions import create_directory, timed, save_pickle, load_config
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -16,9 +16,11 @@ config_params = load_config(os.getcwd() + "/config.ini")
 ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 path_to_models = config_params["PATHS"]["path_to_models"]
 
+use_gpu = config_params["DASK_CLIENT"]["use_gpu"]
+
 model_sims = config_params["TRAIN_MODEL"]["model_sims"]
 model_type = config_params["TRAIN_MODEL"]["model_type"]
-feature_columns = config_params["TRAIN_MODEL"]["feature_columns"]
+features = config_params["TRAIN_MODEL"]["features"]
 target_column = config_params["TRAIN_MODEL"]["target_column"]
 
 test_sims = config_params["EVAL_MODEL"]["test_sims"]
@@ -35,6 +37,8 @@ dens_prf_macc_split = config_params["EVAL_MODEL"]["dens_prf_macc_split"]
 if __name__ == "__main__":    
     client = setup_client()
     
+    feature_columns = get_feature_labels(model_sims[0],features)
+    
     comb_model_sims = get_combined_name(model_sims) 
         
     model_name = get_model_name(model_type, model_sims, hpo_done=config_params["OPTIMIZE"]["hpo"], opt_param_dict=config_params["OPTIMIZE"])    
@@ -46,7 +50,9 @@ if __name__ == "__main__":
     try:
         bst = xgb.Booster()
         bst.load_model(model_save_loc)
-        bst.set_param({"device": "cuda:0"})
+        if use_gpu:
+            bst.set_param({"device": "cuda:0"})
+        print(bst.feature_names)
         print("Loaded Model Trained on:",model_sims)
     except:
         print("Couldn't load Booster Located at: " + model_save_loc)
@@ -69,7 +75,7 @@ if __name__ == "__main__":
             with timed("Model Evaluation on " + dset_name + " dataset"):             
                 plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
                 create_directory(plot_loc)
-                
+
                 # Load the halo information
                 halo_files = []
                 halo_dfs = []
@@ -88,9 +94,16 @@ if __name__ == "__main__":
 
                 X = data[feature_columns]
                 y = data[target_column]
-
+                
                 with timed(f"Predictions for {y.size.compute():.3e} particles"):
                     preds = make_preds(client, bst, X)
+                
+                matches = np.sum(preds.values == np.array(y.values.compute()).flatten())
+                total = len(preds)
+                percentage = 100 * matches / total
+
+                print(f"Percentage match: {percentage:.2f}%")
+
                     
                 eval_model(model_info, preds, use_sims=curr_test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, plot_save_loc=plot_loc,dens_prf=dens_prf_plt,missclass=misclass_plt,\
                     full_dist=fulldist_plt,io_frac=io_frac_plt,split_nu=dens_prf_nu_split,split_macc=dens_prf_macc_split)

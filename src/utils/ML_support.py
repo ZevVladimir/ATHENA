@@ -178,6 +178,24 @@ def make_preds(client, bst, X, dask = False, threshold = 0.5):
     
     return preds
 
+def extract_snaps(sim_name):
+    match = re.search(r'((?:_\d+)+)$', sim_name)
+    if not match:
+        return []
+    number_strs = match.group(1).split('_')[1:]  # First split is an empty string
+    return [int(num) for num in number_strs]
+
+def get_feature_labels(sim_name, features):
+    snap_list = extract_snaps(sim_name)
+
+    all_features = []
+    
+    for snap in snap_list:
+        for feature in features:
+            all_features.append(str(snap) + "_" + feature)
+    
+    return all_features
+
 # This function prints out all the model information such as the training simulations, training parameters, and results
 # The results are split by simulation that the model was tested on and reports the misclassification rate on each population
 def print_model_prop(model_dict, indent=''):
@@ -272,13 +290,11 @@ def sim_mass_p_z(sim,config_params):
         for f in grp_sim.attrs:
             dic_sim[f] = grp_sim.attrs[f]
     
-    p_snap = config_params["all_snap_info"]["prime_snap_info"]["ptl_snap"]
     p_red_shift = config_params["all_snap_info"]["prime_snap_info"]["red_shift"]
-    p_sparta_snap = config_params["all_snap_info"]["prime_snap_info"]["sparta_snap"][()]
     
     param_paths = [["simulation","particle_mass"]]
             
-    sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, p_snap)
+    sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name)
     ptl_mass = sparta_params[sparta_param_names[0]]
     
     return ptl_mass, p_red_shift
@@ -444,8 +460,6 @@ def calc_scal_pos_weight(df):
     count_positives = (df['Orbit_infall'] == 1).sum()
 
     scale_pos_weight = count_negatives / count_positives
-    print(count_negatives)
-    print(count_positives)
     return scale_pos_weight
 
 # Loads all the data for the inputted list of simulations into one dataframe. Finds the scale position weight for the dataset and any adjusted weighting for it if desired
@@ -503,10 +517,7 @@ def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         
         sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
         # find the snapshots for this simulation
-        snap_pat = r"(\d+)to(\d+)"
-        match = re.search(snap_pat, sim)
-        if match:
-            curr_snap_list = [match.group(1), match.group(2)] 
+        curr_snap_list = extract_snaps(sim)
         
         with open(ML_dset_path + sim + "/dset_params.pickle", "rb") as file:
             dset_params = pickle.load(file)
@@ -516,12 +527,12 @@ def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"      
         
         param_paths = [["halos","id"],["simulation","particle_mass"]]
-        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, curr_snap_list[0])
+        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name)
         halos_ids = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
         ptl_mass = sparta_params[sparta_param_names[1]]
  
         use_halo_ids = halos_ids[use_idxs]
-        
+        #TODO don't use sparta.load anymore
         sparta_output = sparta.load(filename=curr_sparta_HDF5_path, halo_ids=use_halo_ids, log_level=0)
         new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta re-sort the indices
         
@@ -594,9 +605,12 @@ def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, plot_save_
         act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sparta_mass_prf(sim_splits,all_idxs,use_sims)
         act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
         
+        snap_list = extract_snaps(use_sims[0])
+        
         # Create mass profiles from the model's predictions
-        calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, use_mp=True, all_z=all_z)
-        my_mass_prf_all, my_mass_prf_orb, my_mass_prf_inf, my_nus, my_r200m = create_stack_mass_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=y.compute().values.flatten(), prf_bins=bins, use_mp=True, all_z=all_z)
+        prime_radii = X[str(snap_list[0]) + "_Scaled_radii"].values.compute()
+        calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=prime_radii, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, use_mp=True, all_z=all_z)
+        my_mass_prf_all, my_mass_prf_orb, my_mass_prf_inf, my_nus, my_r200m = create_stack_mass_prf(sim_splits,radii=prime_radii, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=y.compute().values.flatten(), prf_bins=bins, use_mp=True, all_z=all_z)
         # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
         small_halo_fltr = np.isnan(calc_r200m)
         act_mass_prf_all[small_halo_fltr,:] = np.nan
@@ -647,7 +661,6 @@ def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, plot_save_
         
         for sim in use_sims:
             dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
-            p_snap = dset_params["all_snap_info"]["prime_snap_info"]["ptl_snap"][()]
             curr_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"][()]
             p_sparta_snap = dset_params["all_snap_info"]["prime_snap_info"]["sparta_snap"][()]
             snap_dir_format = dset_params["snap_dir_format"]
@@ -658,38 +671,12 @@ def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, plot_save_
                     
             # Load the halo's positions and radii
             param_paths = [["halos","R200m"]]
-            sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, p_snap)
+            sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name)
             p_halos_r200m = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
             
             p_halos_r200m = p_halos_r200m[all_idxs]
             
-            if dset_params["t_dyn_step"] == 1:
-                # we can just use the secondary snap here because if it was already calculated for 1 dynamical time forago
-                past_z = dset_params["c_snap_info"]["red_shift"][()] 
-                c_sparta_snap = dset_params["c_snap_info"]["sparta_snap"][()]
-            else:
-                # If the prior secondary snap is not 1 dynamical time ago get that information
-                
-                with h5py.File(curr_sparta_HDF5_path,"r") as f:
-                    dic_sim = {}
-                    grp_sim = f['simulation']
-                    for f in grp_sim.attrs:
-                        dic_sim[f] = grp_sim.attrs[f]
-                    
-                all_sparta_z = dic_sim['snap_z']
-                
-                t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], curr_z)
-                c_snap_dict = get_comp_snap_info(t_dyn=t_dyn, t_dyn_step=1, cosmol = cosmol, p_red_shift=curr_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
-                c_sparta_snap = c_snap_dict["sparta_snap"]
-            c_halos_r200m = sparta_params[sparta_param_names[0]][:,c_sparta_snap]
-            c_halos_r200m = c_halos_r200m[all_idxs]
-            
-            curr_halos_r200m_list.append(p_halos_r200m)
-            past_halos_r200m_list.append(c_halos_r200m)
-            
-        curr_halos_r200m = np.concatenate(curr_halos_r200m_list)
-        past_halos_r200m = np.concatenate(past_halos_r200m_list)
-        
+
         # If we want the density profiles to only consist of halos of a specific peak height (nu) bin 
         if split_nu:
             nu_all_prf_lst = []
@@ -708,17 +695,39 @@ def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, plot_save_
                 else:
                     plt_nu_splits.remove(nu_split)
             compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),nu_all_prf_lst,nu_orb_prf_lst,nu_inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="nu_dens_med_",prf_func=np.nanmedian, prf_name_0="ML Model", prf_name_1="SPARTA")
-        if split_macc:
+        if split_macc and len(snap_list) > 1:
+            if dset_params["t_dyn_steps"] :
+                if dset_params["t_dyn_steps"][0] == 1:
+                    # we can just use the secondary snap here because if it was already calculated for 1 dynamical time forago
+                    past_z = dset_params["all_snap_info"]["comp_"+str(snap_list[1])+"_snap_info"]["red_shift"][()] 
+                    c_sparta_snap = dset_params["all_snap_info"]["comp_"+str(snap_list[1])+"_snap_info"]["sparta_snap"][()]
+                else:
+                    # If the prior secondary snap is not 1 dynamical time ago get that information
+                    
+                    with h5py.File(curr_sparta_HDF5_path,"r") as f:
+                        dic_sim = {}
+                        grp_sim = f['simulation']
+                        for f in grp_sim.attrs:
+                            dic_sim[f] = grp_sim.attrs[f]
+                        
+                    all_sparta_z = dic_sim['snap_z']
+                    
+                    t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], curr_z)
+                    c_snap_dict = get_comp_snap_info(t_dyn=t_dyn, t_dyn_step=1, cosmol = cosmol, p_red_shift=curr_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
+                    c_sparta_snap = c_snap_dict["sparta_snap"]
+                c_halos_r200m = sparta_params[sparta_param_names[0]][:,c_sparta_snap]
+                c_halos_r200m = c_halos_r200m[all_idxs]
+                
+                curr_halos_r200m_list.append(p_halos_r200m)
+                past_halos_r200m_list.append(c_halos_r200m)
+                
+            curr_halos_r200m = np.concatenate(curr_halos_r200m_list)
+            past_halos_r200m = np.concatenate(past_halos_r200m_list)
             macc_all_prf_lst = []
             macc_orb_prf_lst = []
             macc_inf_prf_lst = []
             
             calc_maccs = calc_mass_acc_rate(curr_halos_r200m,past_halos_r200m,curr_z,past_z)
-            print(calc_maccs.shape)
-            print(curr_halos_r200m.shape)
-            print(past_halos_r200m.shape)
-            print(calc_dens_prf_all.shape)
-            print(calc_nus.shape)
             cpy_plt_macc_splits = plt_macc_splits.copy()
             for i,macc_split in enumerate(cpy_plt_macc_splits):
                 # Take the second element of the where to filter by the halos (?)
@@ -742,16 +751,16 @@ def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, plot_save_
                 warnings.simplefilter("ignore", category=RuntimeWarning)
                 compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_med_",prf_func=np.nanmedian)
                 compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_avg_",prf_func=np.nanmean)
-    
+    #TODO generalize this to any number of snapshots?
     # Both the missclassification and distribution and infalling orbiting ratio plots are 2D histograms and the model parameters and allow for linear-log split scaling
     if missclass or full_dist or io_frac:       
         p_corr_labels=y.compute().values.flatten()
         p_ml_labels=preds.values
-        p_r=X["p_Scaled_radii"].values.compute()
-        p_rv=X["p_Radial_vel"].values.compute()
-        p_tv=X["p_Tangential_vel"].values.compute()
-        c_r=X["c_Scaled_radii"].values.compute()
-        c_rv=X["c_Radial_vel"].values.compute()
+        p_r=X[str(snap_list[0])+"_Scaled_radii"].values.compute()
+        p_rv=X[str(snap_list[0])+"_Radial_vel"].values.compute()
+        p_tv=X[str(snap_list[0])+"_Tangential_vel"].values.compute()
+        c_r=X[str(snap_list[1])+"_Scaled_radii"].values.compute()
+        c_rv=X[str(snap_list[1])+"_Radial_vel"].values.compute()
         
         split_scale_dict = {
             "linthrsh":linthrsh, 
@@ -976,6 +985,7 @@ def get_combined_name(model_sims):
     combined_name = ""
     for i,sim in enumerate(model_sims):
         split_string = sim.split('_')
+        snap_list = extract_snaps(sim)
         
         r_patt = r'(\d+-\d+|\d+)r'
         r_match = re.search(r_patt,split_string[3])
@@ -985,7 +995,8 @@ def get_combined_name(model_sims):
         v_match = re.search(v_patt, split_string[4])
 
 
-        cond_string = split_string[0] + split_string[1] + split_string[2] + "s" + split_string[5]
+        cond_string = split_string[0] + split_string[1] + split_string[2] + "s" 
+        cond_string = cond_string + "_".join(str(x) for x in snap_list)
         # can add these for more information per name
         #+ "r" + r_match.group(1) + "v" + v_match.group(1) + "s" + split_string[5]
         

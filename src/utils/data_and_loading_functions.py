@@ -123,26 +123,26 @@ def load_ptl_param(sparta_name, param_name, snap, snap_path):
 
     return ptl_param
 
-def load_SPARTA_data(sparta_HDF5_path, param_path_list, sparta_name, ptl_snap):
-    create_directory(pickled_path + str(ptl_snap) +  "_" + str(sparta_name) + "/")
+def load_SPARTA_data(sparta_HDF5_path, param_path_list, sparta_name):
+    create_directory(pickled_path + str(sparta_name) + "/")
     
     reload_sparta = False
     param_dict = {}
-    #TODO anything use all_save_names?
+
     all_save_names = []
     
     for param_path in param_path_list:
         save_name = "_".join(map(str, param_path))
         all_save_names.append(save_name)
         try:
-            param = load_pickle(pickled_path + str(ptl_snap) + "_" + str(sparta_name) + "/" + save_name + ".pickle")
+            param = load_pickle(pickled_path + str(sparta_name) + "/" + save_name + ".pickle")
         except FileNotFoundError:
             if not reload_sparta:
                 sparta_output = sparta.load(filename=sparta_HDF5_path, log_level= 0)
                 reload_sparta = True
         
             param = reduce(lambda dct, key: dct[key], param_path, sparta_output)
-            save_pickle(param,pickled_path + str(ptl_snap) + "_" + str(sparta_name) +  "/" + save_name + ".pickle")
+            save_pickle(param,pickled_path + str(sparta_name) +  "/" + save_name + ".pickle")
 
         param_dict[save_name] = param
 

@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from utils.data_and_loading_functions import create_directory, timed, save_pickle, load_config
-from utils.ML_support import setup_client, get_combined_name, load_data, reform_dataset_dfs, optimize_weights, optimize_scale_rad, weight_by_rad, scale_by_rad, eval_model, get_model_name
+from utils.ML_support import setup_client, get_combined_name, load_data, reform_dataset_dfs, optimize_weights, optimize_scale_rad, weight_by_rad, scale_by_rad, get_model_name, get_feature_labels
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -23,7 +23,7 @@ path_to_models = config_params["PATHS"]["path_to_models"]
 
 test_dset_frac = config_params["DSET_CREATE"]["test_dset_frac"]
 
-feature_columns = config_params["TRAIN_MODEL"]["feature_columns"]
+features = config_params["TRAIN_MODEL"]["features"]
 target_column = config_params["TRAIN_MODEL"]["target_column"]
 model_sims = config_params["TRAIN_MODEL"]["model_sims"]
 model_type = config_params["TRAIN_MODEL"]["model_type"]
@@ -35,7 +35,6 @@ dens_prf_plt = config_params["EVAL_MODEL"]["dens_prf_plt"]
 misclass_plt = config_params["EVAL_MODEL"]["misclass_plt"]
 fulldist_plt = config_params["EVAL_MODEL"]["fulldist_plt"]
 dens_prf_nu_split = config_params["EVAL_MODEL"]["dens_prf_nu_split"]
-
 
 def evaluate_accuracy_and_speed(model, dtest, max_trees):
     accuracies = []
@@ -63,10 +62,11 @@ def evaluate_accuracy_and_speed(model, dtest, max_trees):
     
     return accuracies, times
 
-
 if __name__ == "__main__":        
     client = setup_client()
-        
+    
+    feature_columns = get_feature_labels(model_sims[0],features)
+    
     comb_model_sims = get_combined_name(model_sims) 
         
     model_name = get_model_name(model_type, model_sims, hpo_done=config_params["OPTIMIZE"]["hpo"], opt_param_dict=config_params["OPTIMIZE"])    
@@ -236,7 +236,7 @@ if __name__ == "__main__":
             model_info['Training Info']={
                 'Fraction of Training Data Used': test_dset_frac,
                 'Training Params': params}
-        
+
         # Train and save the model
         #TODO make params selectable params?
         num_trees = 100
