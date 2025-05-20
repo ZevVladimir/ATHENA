@@ -97,13 +97,7 @@ if __name__ == "__main__":
                 
                 with timed(f"Predictions for {y.size.compute():.3e} particles"):
                     preds = make_preds(client, bst, X)
-                
-                matches = np.sum(preds.values == np.array(y.values.compute()).flatten())
-                total = len(preds)
-                percentage = 100 * matches / total
-
-                print(f"Percentage match: {percentage:.2f}%")
-                    
+    
                 eval_model(model_info, preds, use_sims=curr_test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, sim_cosmol=sim_cosmol, plot_save_loc=plot_loc,dens_prf=dens_prf_plt,missclass=misclass_plt,\
                     full_dist=fulldist_plt,io_frac=io_frac_plt,split_nu=dens_prf_nu_split,split_macc=dens_prf_macc_split)
                 del data 

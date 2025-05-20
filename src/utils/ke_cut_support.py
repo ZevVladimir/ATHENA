@@ -46,7 +46,7 @@ def halo_select(sims, ptl_data):
     hipids = ptl_data["HIPIDS"].compute().to_numpy()
     all_pids, ptl_halo_idxs = depair_np(hipids)
     # For each simulation we will search through the largest halos and determine if they dominate their region and only choose those ones
-    for sim in sims:
+    for i,sim in enumerate(sims):
         # Get the numnber of particles per halo and use this to sort the halos such that the largest is first
         n_ptls = load_pickle(ML_dset_path + sim + "/num_ptls.pickle")   
         match_halo_idxs = load_pickle(ML_dset_path + sim + "/match_halo_idxs.pickle")    
@@ -56,10 +56,8 @@ def halo_select(sims, ptl_data):
         # Load information about the simulation
         dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
         test_halos_ratio = dset_params["test_halos_ratio"]
-        curr_z = dset_params["p_snap_info"]["red_shift"][()]
-        p_snap = dset_params["p_snap_info"]["ptl_snap"][()]
-        p_box_size = dset_params["p_snap_info"]["box_size"][()]
-        p_scale_factor = dset_params["p_snap_info"]["scale_factor"][()]
+        p_box_size = dset_params["all_snap_info"]["prime_snap_info"]["box_size"][()]
+        p_scale_factor = dset_params["all_snap_info"]["prime_snap_info"]["scale_factor"][()]
         
         # split all indices into train and test groups
         split_pnt = int((1-test_halos_ratio) * total_num_halos)
@@ -76,11 +74,11 @@ def halo_select(sims, ptl_data):
         curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
         
         dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
-        p_sparta_snap = dset_params["p_snap_info"]["sparta_snap"][()]
+        p_sparta_snap = dset_params["all_snap_info"]["prime_snap_info"]["sparta_snap"][()]
 
         # Load the halo's positions and radii
         param_paths = [["halos","position"],["halos","R200m"]]
-        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, p_snap)
+        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name)
 
         halos_pos = sparta_params[sparta_param_names[0]][:,p_sparta_snap,:] * 10**3 * p_scale_factor # convert to kpc/h physical
         halos_r200m = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
@@ -90,6 +88,9 @@ def halo_select(sims, ptl_data):
         all_idxs = halo_ddf["Halo_indices"].values
         halo_first = halo_ddf["Halo_first"].values
         halo_n = halo_ddf["Halo_n"].values
+        
+        sim_splits = np.where(halo_first == 0)[0]
+        
         curr_halo_start = curr_halo_start + np.sum(halo_n) # always increment even if this halo isn't going to be counted
         
         max_nhalo = 500
@@ -98,14 +99,19 @@ def halo_select(sims, ptl_data):
         n_ptls = test_num_ptls[order_halo]
         if order_halo.shape[0] < max_nhalo:
             max_nhalo = order_halo.shape[0]
-        
+            
+        if i < len(sims) - 1:
+            curr_idxs = all_idxs[sim_splits[i]:sim_splits[i+1]]
+        else:
+            curr_idxs = all_idxs[sim_splits[i]:]
+                
         # Load which particles belong to which halo and then sort them corresponding to the size of the halos again
-        all_idxs = all_idxs[order_halo]
+        curr_idxs = curr_idxs[order_halo]
         halo_n = halo_n[order_halo]
         halo_first = halo_first[order_halo]
         
-        use_halo_pos = halos_pos[all_idxs]
-        use_halo_r200m = halos_r200m[all_idxs]
+        use_halo_pos = halos_pos[curr_idxs]
+        use_halo_r200m = halos_r200m[curr_idxs]
         # Construct a search tree of halo positions
         curr_halo_tree = cKDTree(data = use_halo_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size)
         
@@ -134,15 +140,12 @@ def halo_select(sims, ptl_data):
     subset_df = ptl_data.compute().loc[all_row_idxs]        
     return subset_df
 
-def load_ke_data(client, curr_test_sims):
-    test_comb_name = get_combined_name(curr_test_sims) 
-
+def load_ke_data(client, curr_test_sims, sim_cosmol, snap_list):
     # Loop through and/or for Train/Test/All datasets and evaluate the model
     dset_name = eval_datasets[0]
 
     with timed("Loading data"):             
         # Load the halo information
-        halo_files = []
         halo_dfs = []
         if dset_name == "Full":    
             for sim in curr_test_sims:
@@ -155,12 +158,11 @@ def load_ke_data(client, curr_test_sims):
         halo_df = pd.concat(halo_dfs)
         
         # Load the particle information
-        data,scale_pos_weight = load_data(client,curr_test_sims,dset_name,limit_files=False)
-        nptl = data.shape[0].compute()
+        data,scale_pos_weight = load_data(client,curr_test_sims,dset_name,sim_cosmol,limit_files=False)
         samp_data = halo_select(curr_test_sims,data)
-    r = samp_data["p_Scaled_radii"]
-    vr = samp_data["p_Radial_vel"]
-    vphys = samp_data["p_phys_vel"]
+    r = samp_data[str(snap_list[0]) + "_Scaled_radii"]
+    vr = samp_data[str(snap_list[0]) + "_Radial_vel"]
+    vphys = samp_data[str(snap_list[0]) + "_phys_vel"]
     lnv2 = np.log(vphys**2)
     sparta_labels = samp_data["Orbit_infall"]
     
@@ -173,7 +175,7 @@ def fast_ke_predictor(fast_param_dict, r_r200m, vr, lnv2, r200m_cut):
     m_neg = fast_param_dict["m_neg"]
     b_neg = fast_param_dict["b_neg"]
     
-    preds = np.zeros(r_r200m.shape[0].compute())
+    preds = np.zeros(r_r200m.shape[0])
     
     mask_vr_neg = (vr < 0)
     mask_vr_pos = ~mask_vr_neg

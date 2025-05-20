@@ -37,6 +37,8 @@ lin_tvticks = config_params["EVAL_MODEL"]["lin_tvticks"]
 log_tvticks = config_params["EVAL_MODEL"]["log_tvticks"]
 lin_rticks = config_params["EVAL_MODEL"]["lin_rticks"]
 log_rticks = config_params["EVAL_MODEL"]["log_rticks"]
+
+r_cut_calib = config_params["KE_CUT"]["r_cut_calib"]
     
     
 if __name__ == "__main__":
@@ -119,9 +121,9 @@ if __name__ == "__main__":
         ke_fastparam_dict = load_pickle(model_fldr_loc + "ke_fastparams_dict.pickle")
     
         
-        simp_mask_orb, preds_simp_ke = fast_ke_predictor(ke_fastparam_dict,r_test,vr_test,lnv2_test,2.0)
+        simp_mask_orb, preds_simp_ke = fast_ke_predictor(ke_fastparam_dict,r_test.compute(),vr_test,lnv2_test,r_cut_calib)
         
-        preds_fit_ke = opt_ke_predictor(opt_param_dict, bins, r_test, vr_test, lnv2_test, 2.0)
+        preds_fit_ke = opt_ke_predictor(opt_param_dict, bins, r_test, vr_test, lnv2_test, r_cut_calib)
         
         fit_calc_mass_prf_all, fit_calc_mass_prf_orb, fit_calc_mass_prf_inf, fit_calc_nus, fit_calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds_fit_ke, prf_bins=bins, use_mp=True, all_z=all_z)
         simp_calc_mass_prf_all, simp_calc_mass_prf_orb, simp_calc_mass_prf_inf, simp_calc_nus, simp_calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds_simp_ke, prf_bins=bins, use_mp=True, all_z=all_z)

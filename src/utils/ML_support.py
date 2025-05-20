@@ -589,8 +589,9 @@ def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, sim_cosmol
             with open(ML_dset_path + sim + "/dset_params.pickle", "rb") as file:
                 dset_params = pickle.load(file)
                 curr_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"][()]
+                curr_rho_m = dset_params["all_snap_info"]["prime_snap_info"]["rho_m"][()]
                 all_z.append(curr_z)
-                all_rhom.append(cosmol.rho_m(curr_z))
+                all_rhom.append(curr_rho_m)
                 h = dset_params["all_snap_info"]["prime_snap_info"]["h"][()]
         
         tot_num_halos = halo_n.shape[0]
@@ -654,7 +655,11 @@ def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, sim_cosmol
         curr_halos_r200m_list = []
         past_halos_r200m_list = []
         
-        for sim in use_sims:
+        for i,sim in enumerate(use_sims):
+            if i < len(use_sims) - 1:
+                curr_idxs = all_idxs[sim_splits[i]:sim_splits[i+1]]
+            else:
+                curr_idxs = all_idxs[sim_splits[i]:]
             dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
             curr_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"][()]
             p_sparta_snap = dset_params["all_snap_info"]["prime_snap_info"]["sparta_snap"][()]
@@ -668,84 +673,83 @@ def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, sim_cosmol
             param_paths = [["halos","R200m"]]
             sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name)
             p_halos_r200m = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
-            
-            p_halos_r200m = p_halos_r200m[all_idxs]
-            
 
-        # If we want the density profiles to only consist of halos of a specific peak height (nu) bin 
-        if split_nu:
-            nu_all_prf_lst = []
-            nu_orb_prf_lst = []
-            nu_inf_prf_lst = []
-        
-            cpy_plt_nu_splits = plt_nu_splits.copy()
-            for i,nu_split in enumerate(cpy_plt_nu_splits):
-                # Take the second element of the where to filter by the halos (?)
-                fltr = np.where((calc_nus > nu_split[0]) & (calc_nus < nu_split[1]))[0]
+            p_halos_r200m = p_halos_r200m[curr_idxs]
 
-                if fltr.shape[0] > min_halo_nu_bin:
-                    nu_all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
-                    nu_orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
-                    nu_inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
-                else:
-                    plt_nu_splits.remove(nu_split)
-            compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),nu_all_prf_lst,nu_orb_prf_lst,nu_inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="nu_dens_med_",prf_func=np.nanmedian, prf_name_0="ML Model", prf_name_1="SPARTA")
-        if split_macc and len(snap_list) > 1:
-            if dset_params["t_dyn_steps"] :
-                if dset_params["t_dyn_steps"][0] == 1:
-                    # we can just use the secondary snap here because if it was already calculated for 1 dynamical time forago
-                    past_z = dset_params["all_snap_info"]["comp_"+str(snap_list[1])+"_snap_info"]["red_shift"][()] 
-                    c_sparta_snap = dset_params["all_snap_info"]["comp_"+str(snap_list[1])+"_snap_info"]["sparta_snap"][()]
-                else:
-                    # If the prior secondary snap is not 1 dynamical time ago get that information
-                    
-                    with h5py.File(curr_sparta_HDF5_path,"r") as f:
-                        dic_sim = {}
-                        grp_sim = f['simulation']
-                        for f in grp_sim.attrs:
-                            dic_sim[f] = grp_sim.attrs[f]
+            # If we want the density profiles to only consist of halos of a specific peak height (nu) bin 
+            if split_nu:
+                nu_all_prf_lst = []
+                nu_orb_prf_lst = []
+                nu_inf_prf_lst = []
+            
+                cpy_plt_nu_splits = plt_nu_splits.copy()
+                for i,nu_split in enumerate(cpy_plt_nu_splits):
+                    # Take the second element of the where to filter by the halos (?)
+                    fltr = np.where((calc_nus > nu_split[0]) & (calc_nus < nu_split[1]))[0]
+
+                    if fltr.shape[0] > min_halo_nu_bin:
+                        nu_all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
+                        nu_orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
+                        nu_inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
+                    else:
+                        plt_nu_splits.remove(nu_split)
+                compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),nu_all_prf_lst,nu_orb_prf_lst,nu_inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="nu_dens_med_",prf_func=np.nanmedian, prf_name_0="ML Model", prf_name_1="SPARTA")
+            if split_macc and len(snap_list) > 1:
+                if dset_params["t_dyn_steps"] :
+                    if dset_params["t_dyn_steps"][0] == 1:
+                        # we can just use the secondary snap here because if it was already calculated for 1 dynamical time forago
+                        past_z = dset_params["all_snap_info"]["comp_"+str(snap_list[1])+"_snap_info"]["red_shift"][()] 
+                        c_sparta_snap = dset_params["all_snap_info"]["comp_"+str(snap_list[1])+"_snap_info"]["sparta_snap"][()]
+                    else:
+                        # If the prior secondary snap is not 1 dynamical time ago get that information
                         
-                    all_sparta_z = dic_sim['snap_z']
+                        with h5py.File(curr_sparta_HDF5_path,"r") as f:
+                            dic_sim = {}
+                            grp_sim = f['simulation']
+                            for f in grp_sim.attrs:
+                                dic_sim[f] = grp_sim.attrs[f]
+                            
+                        all_sparta_z = dic_sim['snap_z']
+                        
+                        t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], curr_z)
+                        c_snap_dict = get_comp_snap_info(t_dyn=t_dyn, t_dyn_step=1, cosmol = cosmol, p_red_shift=curr_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
+                        c_sparta_snap = c_snap_dict["sparta_snap"]
+                    c_halos_r200m = sparta_params[sparta_param_names[0]][:,c_sparta_snap]
+                    c_halos_r200m = c_halos_r200m[curr_idxs]
                     
-                    t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], curr_z)
-                    c_snap_dict = get_comp_snap_info(t_dyn=t_dyn, t_dyn_step=1, cosmol = cosmol, p_red_shift=curr_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
-                    c_sparta_snap = c_snap_dict["sparta_snap"]
-                c_halos_r200m = sparta_params[sparta_param_names[0]][:,c_sparta_snap]
-                c_halos_r200m = c_halos_r200m[all_idxs]
+                    curr_halos_r200m_list.append(p_halos_r200m)
+                    past_halos_r200m_list.append(c_halos_r200m)
+                    
+                curr_halos_r200m = np.concatenate(curr_halos_r200m_list)
+                past_halos_r200m = np.concatenate(past_halos_r200m_list)
+                macc_all_prf_lst = []
+                macc_orb_prf_lst = []
+                macc_inf_prf_lst = []
                 
-                curr_halos_r200m_list.append(p_halos_r200m)
-                past_halos_r200m_list.append(c_halos_r200m)
-                
-            curr_halos_r200m = np.concatenate(curr_halos_r200m_list)
-            past_halos_r200m = np.concatenate(past_halos_r200m_list)
-            macc_all_prf_lst = []
-            macc_orb_prf_lst = []
-            macc_inf_prf_lst = []
-            
-            calc_maccs = calc_mass_acc_rate(curr_halos_r200m,past_halos_r200m,curr_z,past_z)
-            cpy_plt_macc_splits = plt_macc_splits.copy()
-            for i,macc_split in enumerate(cpy_plt_macc_splits):
-                # Take the second element of the where to filter by the halos (?)
-                fltr = np.where((calc_maccs > macc_split[0]) & (calc_maccs < macc_split[1]))[0]
-                if fltr.shape[0] > 25:
-                    macc_all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
-                    macc_orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
-                    macc_inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
-                else:
-                    plt_macc_splits.remove(macc_split)
+                calc_maccs = calc_mass_acc_rate(curr_halos_r200m,past_halos_r200m,curr_z,past_z)
+                cpy_plt_macc_splits = plt_macc_splits.copy()
+                for i,macc_split in enumerate(cpy_plt_macc_splits):
+                    # Take the second element of the where to filter by the halos (?)
+                    fltr = np.where((calc_maccs > macc_split[0]) & (calc_maccs < macc_split[1]))[0]
+                    if fltr.shape[0] > 25:
+                        macc_all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
+                        macc_orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
+                        macc_inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
+                    else:
+                        plt_macc_splits.remove(macc_split)
 
-            
-            compare_split_prfs(plt_macc_splits,len(cpy_plt_macc_splits),macc_all_prf_lst,macc_orb_prf_lst,macc_inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title= "macc_dens_", split_name="\Gamma", prf_name_0="ML Model", prf_name_1="SPARTA")
-        if not split_nu and not split_macc:
-            all_prf_lst = filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos)
-            orb_prf_lst = filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos)
-            inf_prf_lst = filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos)
-            
-            # Ignore warnigns about taking mean/median of empty slices and division by 0 that are expected with how the profiles are handled
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", category=RuntimeWarning)
-                compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_med_",prf_func=np.nanmedian)
-                compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_avg_",prf_func=np.nanmean)
+                
+                compare_split_prfs(plt_macc_splits,len(cpy_plt_macc_splits),macc_all_prf_lst,macc_orb_prf_lst,macc_inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title= "macc_dens_", split_name="\Gamma", prf_name_0="ML Model", prf_name_1="SPARTA")
+            if not split_nu and not split_macc:
+                all_prf_lst = filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos)
+                orb_prf_lst = filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos)
+                inf_prf_lst = filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos)
+                
+                # Ignore warnigns about taking mean/median of empty slices and division by 0 that are expected with how the profiles are handled
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", category=RuntimeWarning)
+                    compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_med_",prf_func=np.nanmedian)
+                    compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_avg_",prf_func=np.nanmean)
     #TODO generalize this to any number of snapshots?
     # Both the missclassification and distribution and infalling orbiting ratio plots are 2D histograms and the model parameters and allow for linear-log split scaling
     if missclass or full_dist or io_frac:       

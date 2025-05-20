@@ -334,10 +334,10 @@ if __name__ == "__main__":
             curr_halos_ids = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
             
             halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
-            all_idxs = halo_ddf["Halo_indices"].values
+            curr_idxs = halo_ddf["Halo_indices"].values
             
-            use_halo_r200m = curr_halos_r200m[all_idxs]
-            use_halo_ids = curr_halos_ids[all_idxs]
+            use_halo_r200m = curr_halos_r200m[curr_idxs]
+            use_halo_ids = curr_halos_ids[curr_idxs]
             
             sparta_output = sparta.load(filename=curr_sparta_HDF5_path, halo_ids=use_halo_ids, log_level=0)
             new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta re-sort the indices

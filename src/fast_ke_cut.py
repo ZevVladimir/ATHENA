@@ -17,8 +17,8 @@ from sparta_tools import sparta
 
 from utils.calculation_functions import create_stack_mass_prf, filter_prf, calculate_density, calc_mass_acc_rate
 from src.utils.vis_fxns import compare_split_prfs
-from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, parse_ranges, load_sparta_mass_prf, split_sparta_hdf5_name, sim_mass_p_z, get_model_name
-from utils.data_and_loading_functions import create_directory, timed, save_pickle, load_pickle, load_SPARTA_data, conv_halo_id_spid, load_config, load_RSTAR_data, depair_np
+from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, parse_ranges, load_sparta_mass_prf, split_sparta_hdf5_name, get_feature_labels, get_model_name, extract_snaps
+from utils.data_and_loading_functions import create_directory, timed, save_pickle, load_pickle, load_SPARTA_data, conv_halo_id_spid, load_config, depair_np
 from src.utils.ke_cut_support import load_ke_data, fast_ke_predictor
 
 config_params = load_config(os.getcwd() + "/config.ini")
@@ -29,7 +29,7 @@ rockstar_ctlgs_path = config_params["PATHS"]["rockstar_ctlgs_path"]
 
 SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 
-feature_columns = config_params["TRAIN_MODEL"]["feature_columns"]
+features = config_params["TRAIN_MODEL"]["features"]
 target_column = config_params["TRAIN_MODEL"]["target_column"]
 
 eval_datasets = config_params["EVAL_MODEL"]["eval_datasets"]
@@ -169,7 +169,7 @@ def calibrate_finder(
         [0.2, 0.5]
     """
     # MODIFY this line if needed ======================
-    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,fast_ke_calib_sims)
+    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,fast_ke_calib_sims,sim_cosmol,snap_list)
 
     # =================================================
 
@@ -231,6 +231,11 @@ if __name__ == "__main__":
     plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
     create_directory(plot_loc)
     
+    dset_params = load_pickle(ML_dset_path + curr_test_sims[0] + "/dset_params.pickle")
+    sim_cosmol = dset_params["cosmology"]
+    
+    feature_columns = get_feature_labels(fast_ke_calib_sims[0],features)
+    snap_list = extract_snaps(fast_ke_calib_sims[0])
     ####################################################################################################################################################################################################################################
     
     if os.path.exists(model_fldr_loc + "ke_fastparams_dict.pickle"):
@@ -253,21 +258,17 @@ if __name__ == "__main__":
     print("\nCalibration Params")
     print(m_pos,b_pos,m_neg,b_neg)
     print("\n")
-
-    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client, test_sims[0])
     
-    r_r200m = my_data["p_Scaled_radii"].compute().to_numpy()
-    vr = my_data["p_Radial_vel"].compute().to_numpy()
-    vt = my_data["p_Tangential_vel"].compute().to_numpy()
-    vphys = my_data["p_phys_vel"].compute().to_numpy()
+    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client, curr_test_sims,sim_cosmol,snap_list)
+    
+    r_r200m = my_data[str(snap_list[0]) + "_Scaled_radii"].compute().to_numpy()
+    vr = my_data[str(snap_list[0]) + "_Radial_vel"].compute().to_numpy()
+    vt = my_data[str(snap_list[0]) + "_Tangential_vel"].compute().to_numpy()
+    vphys = my_data[str(snap_list[0]) + "_phys_vel"].compute().to_numpy()
     sparta_labels = my_data["Orbit_infall"].compute().to_numpy()
     hipids = my_data["HIPIDS"].compute().to_numpy()
     all_pids, ptl_halo_idxs = depair_np(hipids)
     lnv2 = np.log(vphys**2)
-    
-    c_r = my_data["c_Scaled_radii"].compute().to_numpy()
-    c_vr = my_data["c_Radial_vel"].compute().to_numpy()
-    c_vt = my_data["c_Tangential_vel"].compute().to_numpy()
     
     sparta_orb = np.where(sparta_labels == 1)[0]
     sparta_inf = np.where(sparta_labels == 0)[0]
@@ -610,7 +611,7 @@ if __name__ == "__main__":
         
 
         plt.tight_layout();
-        plt.savefig(plot_loc + "perc_" + str(perc) + "_" + grad_lims + "_KE_dist_cut.png")
+        plt.savefig(plot_loc + "perc_" + str(perc) + "_grd_" + str(grad_lims[0]) + str(grad_lims[1]) + "_KE_dist_cut.png")
         
     
     mask_orb, ke_cut_preds = fast_ke_predictor(ke_param_dict,r_r200m,vr,lnv2,r_cut_pred)
@@ -638,7 +639,7 @@ if __name__ == "__main__":
         plt.colorbar(label=r'$N$ (Counts)')
 
         plt.tight_layout()
-        plt.savefig(plot_loc + "perc_" + str(perc) + "_" + grad_lims + "_ps_dist.png")
+        plt.savefig(plot_loc + "perc_" + str(perc) + "_grd_" + str(grad_lims[0]) + str(grad_lims[1]) + "_ps_dist.png")
     
     
 ####################################################################################################################################################################################################################################
@@ -647,9 +648,9 @@ if __name__ == "__main__":
         print("Testing on:", curr_test_sims)
         # Loop through and/or for Train/Test/All datasets and evaluate the model
         
-        r_r200m = my_data["p_Scaled_radii"]
-        vr = my_data["p_Radial_vel"]
-        vphys = my_data["p_phys_vel"]
+        r_r200m = my_data[str(snap_list[0]) + "_Scaled_radii"]
+        vr = my_data[str(snap_list[0]) + "_Radial_vel"]
+        vphys = my_data[str(snap_list[0]) + "_phys_vel"]
         lnv2 = np.log(vphys**2)
         
         #TODO rename the different masks and preds
@@ -703,7 +704,7 @@ if __name__ == "__main__":
         preds = np.zeros(X.shape[0].compute())
         preds[mask_orb] = 1
 
-        calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds, prf_bins=bins, use_mp=True, all_z=all_z)
+        calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=X[str(snap_list[0]) + "_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds, prf_bins=bins, use_mp=True, all_z=all_z)
 
         # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
         small_halo_fltr = np.isnan(calc_r200m)
@@ -741,13 +742,13 @@ if __name__ == "__main__":
                 
         for sim in use_sims:
             dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
-            p_snap = dset_params["p_snap_info"]["ptl_snap"][()]
-            curr_z = dset_params["p_snap_info"]["red_shift"][()]
+            p_snap = dset_params["all_snap_info"]["prime_snap_info"]["ptl_snap"][()]
+            curr_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"][()]
             # TODO make this generalizable to when the snapshot separation isn't just 1 dynamical time as needed for mass accretion calculation
             # we can just use the secondary snap here because we already chose to do 1 dynamical time for that snap
-            past_z = dset_params["c_snap_info"]["red_shift"][()] 
-            p_sparta_snap = dset_params["p_snap_info"]["sparta_snap"][()]
-            c_sparta_snap = dset_params["c_snap_info"]["sparta_snap"][()]
+            past_z = dset_params["all_snap_info"][snap_list[1] + "_snap_info"]["red_shift"][()] 
+            p_sparta_snap = dset_params["all_snap_info"]["prime_snap_info"]["sparta_snap"][()]
+            c_sparta_snap = dset_params["all_snap_info"][snap_list[1] + "_snap_info"]["sparta_snap"][()]
             
             sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
             
@@ -761,10 +762,10 @@ if __name__ == "__main__":
             curr_halos_ids = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
             
             halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
-            all_idxs = halo_ddf["Halo_indices"].values
+            curr_idxs = halo_ddf["Halo_indices"].values
             
-            use_halo_r200m = curr_halos_r200m[all_idxs]
-            use_halo_ids = curr_halos_ids[all_idxs]
+            use_halo_r200m = curr_halos_r200m[curr_idxs]
+            use_halo_ids = curr_halos_ids[curr_idxs]
             
             sparta_output = sparta.load(filename=curr_sparta_HDF5_path, halo_ids=use_halo_ids, log_level=0)
             new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta re-sort the indices
