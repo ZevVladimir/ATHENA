@@ -162,8 +162,8 @@ def calc_t_dyn(halo_r200m, red_shift):
     halo_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200m")
     curr_v200m = calc_v200m(halo_m200m, halo_r200m)
     t_dyn = (2*halo_r200m)/curr_v200m
-
-    return t_dyn
+ 
+    return np.average(t_dyn)
 
 def calc_mass_acc_rate(curr_r200m, past_r200m, curr_z, past_z):
     curr_m200m = mass_so.R_to_M(curr_r200m, curr_z, "200m")

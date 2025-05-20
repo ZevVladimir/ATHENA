@@ -178,14 +178,13 @@ def extract_snaps(sim_name):
     number_strs = match.group(1).split('_')[1:]  # First split is an empty string
     return [int(num) for num in number_strs]
 
-def get_feature_labels(sim_name, features):
-    snap_list = extract_snaps(sim_name)
-
+def get_feature_labels(features, tdyn_steps):
     all_features = []
-    
-    for snap in snap_list:
+    for feature in features:
+        all_features.append("p_" + feature)
+    for t_dyn_step in tdyn_steps:
         for feature in features:
-            all_features.append(str(snap) + "_" + feature)
+            all_features.append(str(t_dyn_step) + "_" + feature)
     
     return all_features
 
@@ -550,7 +549,7 @@ def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         return mass_prf_all,mass_prf_1halo,all_masses,bins
 
 # Evaluate an input model by generating plots of comparisons between the model's predictions and SPARTA
-def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, sim_cosmol, plot_save_loc, dens_prf = False,missclass=False,full_dist=False,io_frac=False,split_nu=False,split_macc=False): 
+def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, sim_cosmol, plot_save_loc, all_tdyn_steps, dens_prf = False,missclass=False,full_dist=False,io_frac=False,split_nu=False,split_macc=False): 
     cosmol = set_cosmology(sim_cosmol)        
         
     if pickle_data:
@@ -604,7 +603,7 @@ def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, sim_cosmol
         snap_list = extract_snaps(use_sims[0])
         
         # Create mass profiles from the model's predictions
-        prime_radii = X[str(snap_list[0]) + "_Scaled_radii"].values.compute()
+        prime_radii = X["p_Scaled_radii"].values.compute()
         calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=prime_radii, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, use_mp=True, all_z=all_z)
         my_mass_prf_all, my_mass_prf_orb, my_mass_prf_inf, my_nus, my_r200m = create_stack_mass_prf(sim_splits,radii=prime_radii, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=y.compute().values.flatten(), prf_bins=bins, use_mp=True, all_z=all_z)
         # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
@@ -694,12 +693,12 @@ def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, sim_cosmol
                     else:
                         plt_nu_splits.remove(nu_split)
                 compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),nu_all_prf_lst,nu_orb_prf_lst,nu_inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="nu_dens_med_",prf_func=np.nanmedian, prf_name_0="ML Model", prf_name_1="SPARTA")
-            if split_macc and len(snap_list) > 1:
+            if split_macc and len(all_tdyn_steps) >= 1:
                 if dset_params["t_dyn_steps"] :
                     if dset_params["t_dyn_steps"][0] == 1:
                         # we can just use the secondary snap here because if it was already calculated for 1 dynamical time forago
-                        past_z = dset_params["all_snap_info"]["comp_"+str(snap_list[1])+"_snap_info"]["red_shift"][()] 
-                        c_sparta_snap = dset_params["all_snap_info"]["comp_"+str(snap_list[1])+"_snap_info"]["sparta_snap"][()]
+                        past_z = dset_params["all_snap_info"]["comp_"+str(all_tdyn_steps[0]) + "_tdstp_snap_info"]["red_shift"][()] 
+                        c_sparta_snap = dset_params["all_snap_info"]["comp_"+str(all_tdyn_steps[0]) + "_tdstp_snap_info"]["sparta_snap"][()]
                     else:
                         # If the prior secondary snap is not 1 dynamical time ago get that information
                         
@@ -755,11 +754,11 @@ def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, sim_cosmol
     if missclass or full_dist or io_frac:       
         p_corr_labels=y.compute().values.flatten()
         p_ml_labels=preds.values
-        p_r=X[str(snap_list[0])+"_Scaled_radii"].values.compute()
-        p_rv=X[str(snap_list[0])+"_Radial_vel"].values.compute()
-        p_tv=X[str(snap_list[0])+"_Tangential_vel"].values.compute()
-        c_r=X[str(snap_list[1])+"_Scaled_radii"].values.compute()
-        c_rv=X[str(snap_list[1])+"_Radial_vel"].values.compute()
+        p_r=X["p_Scaled_radii"].values.compute()
+        p_rv=X["p_Radial_vel"].values.compute()
+        p_tv=X["p_Tangential_vel"].values.compute()
+        c_r=X[str(all_tdyn_steps[0]) + "_Scaled_radii"].values.compute()
+        c_rv=X[str(all_tdyn_steps[0]) +"_Radial_vel"].values.compute()
         
         split_scale_dict = {
             "linthrsh":linthrsh, 

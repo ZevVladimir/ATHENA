@@ -38,8 +38,8 @@ pickle_data = config_params["MISC"]["pickle_data"]
 snap_dir_format = config_params["SNAP_DATA"]["snap_dir_format"]
 snap_format = config_params["SNAP_DATA"]["snap_format"]
 
-all_input_z = config_params["DSET_CREATE"]["input_z"]
-all_t_dyn_step = config_params["DSET_CREATE"]["t_dyn_step"]
+input_z = config_params["DSET_CREATE"]["input_z"]
+all_tdyn_step = config_params["DSET_CREATE"]["tdyn_steps"]
 search_radius = config_params["DSET_CREATE"]["search_radius"]
 sub_dset_mem_size = config_params["DSET_CREATE"]["sub_dset_mem_size"]
 
@@ -54,8 +54,6 @@ snap_path = snap_path + sparta_name + "/"
 
 # Set up exact paths
 sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
-
-prime_z = all_input_z[0]
 
 num_processes = mp.cpu_count()
 
@@ -336,8 +334,8 @@ with timed("Generating Datasets for " + curr_sparta_file):
         with timed("Primary Snapshot Information Load"):
             if reset_lvl > 1 or len(known_snaps) == 0:
                 prime_snap_dict = {}
-                p_snap, prime_z = find_closest_z_snap(prime_z,snap_path,snap_dir_format,snap_format)
-                print("Snapshot number found:", p_snap, "Closest redshift found:", prime_z)
+                p_snap, input_z = find_closest_z_snap(input_z,snap_path,snap_dir_format,snap_format)
+                print("Snapshot number found:", p_snap, "Closest redshift found:", input_z)
                 
                 with h5py.File(sparta_HDF5_path,"r") as f:
                     dic_sim = {}
@@ -346,21 +344,21 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         dic_sim[f] = grp_sim.attrs[f]
                     
                 all_sparta_z = dic_sim['snap_z']
-                p_sparta_snap = np.abs(all_sparta_z - prime_z).argmin()
+                p_sparta_snap = np.abs(all_sparta_z - input_z).argmin()
                 
                 print("corresponding SPARTA snap num:", p_sparta_snap)
                 print("check sparta redshift:",all_sparta_z[p_sparta_snap])   
                 
-                prime_a = 1/(1+prime_z)
-                p_rho_m = cosmol.rho_m(prime_z)
-                p_hubble_const = cosmol.Hz(prime_z) * 0.001 # convert to units km/s/kpc
+                prime_a = 1/(1+input_z)
+                p_rho_m = cosmol.rho_m(input_z)
+                p_hubble_const = cosmol.Hz(input_z) * 0.001 # convert to units km/s/kpc
                 sim_box_size = dic_sim["box_size"] #units Mpc/h comoving
                 p_box_size = sim_box_size * 10**3 * prime_a #convert to Kpc/h physical
                 little_h = dic_sim["h"]
                 prime_snap_dict = {
                     "ptl_snap":p_snap,
                     "sparta_snap":p_sparta_snap,
-                    "red_shift":prime_z,
+                    "red_shift":input_z,
                     "scale_factor": prime_a,
                     "hubble_const": p_hubble_const,
                     "box_size": p_box_size,
@@ -370,7 +368,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
             else:
                 prime_snap_dict = dset_params["all_snap_info"]["prime_snap_info"]
                 p_snap = dset_params["all_snap_info"]["prime_snap_info"]["ptl_snap"]
-                prime_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"]
+                input_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"]
                 p_sparta_snap = dset_params["all_snap_info"]["prime_snap_info"]["sparta_snap"]
                 prime_a = dset_params["all_snap_info"]["prime_snap_info"]["scale_factor"]
                 p_hubble_const = dset_params["all_snap_info"]["prime_snap_info"]["hubble_const"]
@@ -406,9 +404,9 @@ with timed("Generating Datasets for " + curr_sparta_file):
         with timed("Load Complementary Snapshots"):
             #TODO adjust this check to instead look the dictionary?
             if reset_lvl > 1 or len(known_snaps) == 0:
-                for t_dyn_step in all_t_dyn_step:
-                    t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], prime_z)
-                    c_snap_dict = get_comp_snap_info(t_dyn=t_dyn, t_dyn_step=t_dyn_step, cosmol = cosmol, p_red_shift=prime_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
+                for t_dyn_step in all_tdyn_step:
+                    t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0]], input_z)
+                    c_snap_dict = get_comp_snap_info(t_dyn=t_dyn, t_dyn_step=t_dyn_step, cosmol = cosmol, p_red_shift=input_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
                     c_snap = c_snap_dict["ptl_snap"]
                     c_sparta_snap = c_snap_dict["sparta_snap"]
                     comp_z = c_snap_dict["red_shift"]
@@ -416,55 +414,12 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     c_hubble_const = c_snap_dict["hubble_const"]
                     c_rho_m = c_snap_dict["rho_m"]
                     c_box_size = sim_box_size * 10**3 * comp_a #convert to Kpc/h physical
-                    if comp_z not in all_input_z:
-                        c_snap_dict = {
-                            "ptl_snap":c_snap,
-                            "sparta_snap":c_sparta_snap,
-                            "red_shift":comp_z,
-                            "scale_factor": comp_a,
-                            "hubble_const": c_hubble_const,
-                            "box_size": c_box_size,
-                            "h":little_h,
-                            "rho_m":c_rho_m
-                        }
-                    all_ptl_snap_list.append(c_snap)
-                    all_snap_info["comp_" + str(c_snap) + "_snap_info"] = c_snap_dict
-            else:
-                for key, c_snap_dict in dset_params["all_snap_info"].items():
-                    if key == "prime_snap_info":
-                        continue
-                    c_snap = c_snap_dict["ptl_snap"]
-                    c_sparta_snap = c_snap_dict["sparta_snap"]
-                    comp_z = c_snap_dict["red_shift"]
-                    comp_a = c_snap_dict["scale_factor"]
-                    c_hubble_const = c_snap_dict["hubble_const"]
-                    c_box_size = c_snap_dict["box_size"]
                     
-                    all_ptl_snap_list.append(c_snap)
-                    all_snap_info["comp_" + str(c_snap) + "_snap_info"] = c_snap_dict
-        c_halos_status = sparta_params[sparta_param_names[3]][:,c_sparta_snap]
-        # Search for config parameters for complementary snapshot in the redshift first manner
-        if len(all_input_z) > 1:
-            if reset_lvl > 1 or len(known_snaps) == 0:
-                for comp_z in all_input_z[1:]:
-                    c_snap, comp_z = find_closest_z_snap(comp_z,snap_path,snap_dir_format,snap_format)
-                    print("Snapshot number found:", c_snap, "Closest redshift found:", comp_z)
-                    
-                    c_sparta_snap = np.abs(all_sparta_z - comp_z).argmin()
-                    
-                    print("corresponding SPARTA snap num:", c_sparta_snap)
-                    print("check sparta redshift:",all_sparta_z[c_sparta_snap])   
-                    
-                    comp_a = 1/(1+comp_z)
-                    c_rho_m = cosmol.rho_m(comp_z)
-                    c_hubble_const = cosmol.Hz(comp_z) * 0.001 # convert to units km/s/kpc
-                    sim_box_size = dic_sim["box_size"] #units Mpc/h comoving
-                    c_box_size = sim_box_size * 10**3 * comp_a #convert to Kpc/h physical
-                    little_h = dic_sim["h"]
                     c_snap_dict = {
                         "ptl_snap":c_snap,
                         "sparta_snap":c_sparta_snap,
                         "red_shift":comp_z,
+                        "t_dyn_step":t_dyn_step,
                         "scale_factor": comp_a,
                         "hubble_const": c_hubble_const,
                         "box_size": c_box_size,
@@ -472,20 +427,22 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         "rho_m":c_rho_m
                     }
                     all_ptl_snap_list.append(c_snap)
-                    all_snap_info["comp_" + str(c_snap) + "_snap_info"] = c_snap_dict
-                else:
-                    for key, c_snap_dict in dset_params["all_snap_info"].items(): 
-                        if key == "prime_snap_dict":
-                            continue
-                        c_snap = c_snap_dict["ptl_snap"]
-                        c_sparta_snap = c_snap_dict["sparta_snap"]
-                        comp_z = c_snap_dict["red_shift"]
-                        comp_a = c_snap_dict["scale_factor"]
-                        c_hubble_const = c_snap_dict["hubble_const"]
-                        c_box_size = c_snap_dict["box_size"]
-
-                        all_ptl_snap_list.append(c_snap)
-                        all_snap_info["comp_" + str(c_snap) + "_snap_info"] = c_snap_dict
+                    all_snap_info["comp_" + str(t_dyn_step) + "_tdstp_snap_info"] = c_snap_dict
+            else:
+                for key, c_snap_dict in dset_params["all_snap_info"].items():
+                    if key == "prime_snap_info":
+                        continue
+                    c_snap = c_snap_dict["ptl_snap"]
+                    c_sparta_snap = c_snap_dict["sparta_snap"]
+                    t_dyn_step = c_snap_dict["t_dyn_step"],
+                    comp_z = c_snap_dict["red_shift"]
+                    comp_a = c_snap_dict["scale_factor"]
+                    c_hubble_const = c_snap_dict["hubble_const"]
+                    c_box_size = c_snap_dict["box_size"]
+                    
+                    all_ptl_snap_list.append(c_snap)
+                    all_snap_info["comp_" + str(t_dyn_step) + "tdstp_snap_info"] = c_snap_dict
+        c_halos_status = sparta_params[sparta_param_names[3]][:,c_sparta_snap]
 
         all_ptl_snap_list.sort()
         all_ptl_snap_list.reverse()
@@ -578,7 +535,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
             "snap_dir_format":snap_dir_format,
             "snap_format": snap_format,
             "cosmology": sim_cosmol,
-            "t_dyn_steps": all_t_dyn_step,
+            "t_dyn_steps": all_tdyn_step,
             "search_rad": search_radius,
             "total_num_snaps": tot_num_snaps,
             "test_halos_ratio": test_dset_frac,
@@ -626,7 +583,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                 curr_ptls_pos = p_ptls_pos
                 curr_ptl_tree = p_ptl_tree
             else:
-                curr_snap_dict = dset_params["all_snap_info"]["comp_" + str(curr_ptl_snap) + "_snap_info"]
+                curr_snap_dict = dset_params["all_snap_info"]["comp_" + str(all_tdyn_step[i-1]) + "_tdstp_snap_info"]
             curr_sparta_snap = curr_snap_dict["sparta_snap"]
             curr_z = curr_snap_dict["red_shift"]
             curr_a = curr_snap_dict["scale_factor"]
@@ -675,10 +632,10 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     ptl_df = pd.DataFrame({
                         "HIPIDS":train_p_HIPIDs,
                         "Orbit_infall":p_orb_assn,
-                        str(curr_ptl_snap) + "_Scaled_radii":p_scale_rad,
-                        str(curr_ptl_snap) + "_Radial_vel":p_rad_vel,
-                        str(curr_ptl_snap) + "_Tangential_vel":p_tang_vel,
-                        str(curr_ptl_snap) + "_phys_vel":p_phys_vel
+                        "p_Scaled_radii":p_scale_rad,
+                        "p_Radial_vel":p_rad_vel,
+                        "p_Tangential_vel":p_tang_vel,
+                        "p_phys_vel":p_phys_vel
                     })
                 else:
                     ret_labels = False
@@ -702,10 +659,10 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     save_phys_vel[save_phys_vel == 0] = np.nan
                             
                     ptl_df = pd.DataFrame({
-                        str(curr_ptl_snap) + "_Scaled_radii":save_scale_rad,
-                        str(curr_ptl_snap) + "_Radial_vel":save_rad_vel,
-                        str(curr_ptl_snap) + "_Tangential_vel":save_tang_vel,
-                        str(curr_ptl_snap) + "_phys_vel":save_phys_vel
+                        str(all_tdyn_step[i-1]) + "_Scaled_radii":save_scale_rad,
+                        str(all_tdyn_step[i-1]) + "_Radial_vel":save_rad_vel,
+                        str(all_tdyn_step[i-1]) + "_Tangential_vel":save_tang_vel,
+                        str(all_tdyn_step[i-1]) + "_phys_vel":save_phys_vel
                     })
                 
                 ptl_df.to_hdf(save_location + "Train/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+train_start_pnt) + ".h5", key='data', mode='w',format='table')  
@@ -739,10 +696,10 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     ptl_df = pd.DataFrame({
                         "HIPIDS":test_p_HIPIDs,
                         "Orbit_infall":p_orb_assn,
-                        str(curr_ptl_snap) + "_Scaled_radii":p_scale_rad,
-                        str(curr_ptl_snap) + "_Radial_vel":p_rad_vel,
-                        str(curr_ptl_snap) + "_Tangential_vel":p_tang_vel,
-                        str(curr_ptl_snap) + "_phys_vel":p_phys_vel
+                        "p_Scaled_radii":p_scale_rad,
+                        "p_Radial_vel":p_rad_vel,
+                        "p_Tangential_vel":p_tang_vel,
+                        "p_phys_vel":p_phys_vel
                     })
                 else:
                     ret_labels = False
@@ -766,10 +723,10 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     save_phys_vel[save_phys_vel == 0] = np.nan
                             
                     ptl_df = pd.DataFrame({
-                        str(curr_ptl_snap) + "_Scaled_radii":save_scale_rad,
-                        str(curr_ptl_snap) + "_Radial_vel":save_rad_vel,
-                        str(curr_ptl_snap) + "_Tangential_vel":save_tang_vel,
-                        str(curr_ptl_snap) + "_phys_vel":save_phys_vel
+                        str(all_tdyn_step[i-1]) + "_Scaled_radii":save_scale_rad,
+                        str(all_tdyn_step[i-1]) + "_Radial_vel":save_rad_vel,
+                        str(all_tdyn_step[i-1]) + "_Tangential_vel":save_tang_vel,
+                        str(all_tdyn_step[i-1]) + "_phys_vel":save_phys_vel
                     })
                 
                 ptl_df.to_hdf(save_location + "Test/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+test_start_pnt) + ".h5", key='data', mode='w',format='table')  

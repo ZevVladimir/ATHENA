@@ -11,7 +11,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from utils.data_and_loading_functions import create_directory, timed, save_pickle, load_config
+from utils.data_and_loading_functions import create_directory, timed, load_pickle, save_pickle, load_config
 from utils.ML_support import setup_client, get_combined_name, load_data, reform_dataset_dfs, optimize_weights, optimize_scale_rad, weight_by_rad, scale_by_rad, get_model_name, get_feature_labels
 
 ##################################################################################################################
@@ -65,7 +65,10 @@ def evaluate_accuracy_and_speed(model, dtest, max_trees):
 if __name__ == "__main__":        
     client = setup_client()
     
-    feature_columns = get_feature_labels(model_sims[0],features)
+    dset_params = load_pickle(ML_dset_path + model_sims[0] + "/dset_params.pickle")
+    sim_cosmol = dset_params["cosmology"]
+    all_tdyn_steps = dset_params["t_dyn_steps"]
+    feature_columns = get_feature_labels(features,all_tdyn_steps)
     
     comb_model_sims = get_combined_name(model_sims) 
         
@@ -123,14 +126,14 @@ if __name__ == "__main__":
             
         # Do desired adjustments to data if selected, otherwise just load the data normally
         if use_scale_rad and use_weights:
-            train_data,scale_pos_weight,train_weights,bin_edges = load_data(client,model_sims,"Train",scale_rad=use_scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
+            train_data,scale_pos_weight,train_weights,bin_edges = load_data(client,model_sims,"Train",sim_cosmol,scale_rad=use_scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
         elif use_scale_rad and not use_weights:
-            train_data,scale_pos_weight,bin_edges = load_data(client,model_sims,"Train",scale_rad=use_scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
+            train_data,scale_pos_weight,bin_edges = load_data(client,model_sims,"Train",sim_cosmol,scale_rad=use_scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
         elif not use_scale_rad and use_weights:
-            train_data,scale_pos_weight,train_weights = load_data(client,model_sims,"Train",scale_rad=use_scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
+            train_data,scale_pos_weight,train_weights = load_data(client,model_sims,"Train",sim_cosmol,scale_rad=use_scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
         else:
-            train_data,scale_pos_weight = load_data(client,model_sims,"Train",scale_rad=use_scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
-        test_data,scale_pos_weight = load_data(client,model_sims,"Test",scale_rad=False,use_weights=False,filter_nu=False,limit_files=False)
+            train_data,scale_pos_weight = load_data(client,model_sims,"Train",sim_cosmol,scale_rad=use_scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
+        test_data,scale_pos_weight = load_data(client,model_sims,"Test",sim_cosmol,scale_rad=False,use_weights=False,filter_nu=False,limit_files=False)
             
         X_test = test_data[feature_columns]
         y_test = test_data[target_column]

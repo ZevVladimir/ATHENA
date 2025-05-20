@@ -33,9 +33,10 @@ dens_prf_macc_split = config_params["EVAL_MODEL"]["dens_prf_macc_split"]
 
 if __name__ == "__main__":    
     client = setup_client()
-    
-    feature_columns = get_feature_labels(model_sims[0],features)
-    
+    dset_params = load_pickle(ML_dset_path + model_sims[0] + "/dset_params.pickle")
+    all_tdyn_steps = dset_params["t_dyn_steps"]
+    feature_columns = get_feature_labels(features,all_tdyn_steps)
+
     comb_model_sims = get_combined_name(model_sims) 
         
     model_name = get_model_name(model_type, model_sims, hpo_done=config_params["OPTIMIZE"]["hpo"], opt_param_dict=config_params["OPTIMIZE"])    
@@ -98,7 +99,7 @@ if __name__ == "__main__":
                 with timed(f"Predictions for {y.size.compute():.3e} particles"):
                     preds = make_preds(client, bst, X)
     
-                eval_model(model_info, preds, use_sims=curr_test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, sim_cosmol=sim_cosmol, plot_save_loc=plot_loc,dens_prf=dens_prf_plt,missclass=misclass_plt,\
+                eval_model(model_info, preds, use_sims=curr_test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, sim_cosmol=sim_cosmol, all_tdyn_steps=all_tdyn_steps, plot_save_loc=plot_loc,dens_prf=dens_prf_plt,missclass=misclass_plt,\
                     full_dist=fulldist_plt,io_frac=io_frac_plt,split_nu=dens_prf_nu_split,split_macc=dens_prf_macc_split)
                 del data 
                 del X
