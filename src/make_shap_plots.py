@@ -5,7 +5,7 @@ import xgboost as xgb
 import shap
 
 from utils.data_and_loading_functions import create_directory, timed, load_config
-from utils.ML_support import setup_client, get_combined_name, load_data, make_preds, shap_with_filter, get_model_name
+from utils.ML_support import setup_client, get_combined_name, load_data, make_preds, shap_with_filter, get_model_name, extract_snaps
 
 config_params = load_config(os.getcwd() + "/config.ini")
 
@@ -27,7 +27,7 @@ if __name__ == '__main__':
     with timed("Setup"): 
         comb_model_sims = get_combined_name(model_sims) 
         
-        model_name = get_model_name(model_type, model_sims, hpo_done=config_params["OPTIMIZE"]["hpo"], opt_param_dict=config_params["OPTIMIZE"])    
+        model_name = get_model_name(model_type, model_sims)    
         model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"
         model_save_loc = model_fldr_loc + model_name + ".json"
         gen_plot_save_loc = model_fldr_loc + "plots/"
@@ -46,8 +46,8 @@ if __name__ == '__main__':
             for dset_name in eval_datasets:
                 plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
                 create_directory(plot_loc)
-                
-                data,scale_pos_weight = load_data(client,curr_test_sims,dset_name,limit_files=False)
+                all_snaps = extract_snaps(model_sims[0])
+                data,scale_pos_weight = load_data(client,curr_test_sims,dset_name,all_snaps[0],limit_files=False)
                 X_df = data[feature_columns]
                 y_df = data[target_column]
                 

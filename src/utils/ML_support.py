@@ -48,14 +48,6 @@ dask_task_ncpus = config_dict["DASK_CLIENT"]["dask_task_ncpus"]
 
 file_lim = config_dict["TRAIN_MODEL"]["file_lim"]
 
-reduce_rad = config_dict["OPTIMIZE"]["reduce_rad"]
-reduce_perc = config_dict["OPTIMIZE"]["reduce_perc"]
-
-weight_rad = config_dict["OPTIMIZE"]["weight_rad"]
-min_weight = config_dict["OPTIMIZE"]["min_weight"]
-weight_exp = config_dict["OPTIMIZE"]["weight_exp"]
-
-hpo_loss = config_dict["OPTIMIZE"]["hpo_loss"]
 plt_nu_splits = config_dict["EVAL_MODEL"]["plt_nu_splits"]
 plt_nu_splits = parse_ranges(plt_nu_splits)
 
@@ -176,7 +168,10 @@ def extract_snaps(sim_name):
     if not match:
         return []
     number_strs = match.group(1).split('_')[1:]  # First split is an empty string
-    return [int(num) for num in number_strs]
+    snap_list = [int(num) for num in number_strs]
+    snap_list.sort()
+    snap_list.reverse()
+    return snap_list
 
 def get_feature_labels(features, tdyn_steps):
     all_features = []
@@ -207,13 +202,8 @@ def print_model_prop(model_dict, indent=''):
         else:
             print(f"{indent}{key}: {value}")
 
-def get_model_name(model_type, trained_on_sims, hpo_done=False, opt_param_dict=None):
-    model_name = f"{model_type}_{get_combined_name(trained_on_sims)}"
-    
-    if hpo_done and opt_param_dict:
-        param_str = "_".join(f"{k}_{v}" for k, v in opt_param_dict.items())
-        model_name += f"_hpo_{param_str}"
-        
+def get_model_name(model_type, trained_on_sims):
+    model_name = f"{model_type}_{get_combined_name(trained_on_sims)}"        
     return model_name
 
 # Convert a simulation's name to where the primary snapshot location is in the pickled data (ex: cbol_l0063_n0256_4r200m_1-5v200m_190to166 -> 190_cbol_l0063_n0256_4r200m_1-5v200m)
@@ -301,7 +291,7 @@ def sort_and_lim_files(folder_path,limit_files=False):
     return hdf5_files
     
 # Split a dataframe so that each one is below an inputted maximum memory size
-def split_dataframe(df, max_size, weights=None, use_weights = False):
+def split_dataframe(df, max_size):
     total_size = df.memory_usage(index=True).sum()
     num_splits = int(np.ceil(total_size / max_size))
     chunk_size = int(np.ceil(len(df) / num_splits))
@@ -311,17 +301,12 @@ def split_dataframe(df, max_size, weights=None, use_weights = False):
     split_weights = []
     for i in range(0, len(df), chunk_size):
         split_dfs.append(df.iloc[i:i + chunk_size])
-        if use_weights:
-            split_weights.append(weights[i:i+chunk_size])
-    
-    if use_weights:
-        return split_dfs, split_weights
-    else:
-        return split_dfs
+
+    return split_dfs
 
 # Function to process a file in a dataset's folder: combines them all, performs any desired filtering, calculates weights if desired, and calculates scaled position weight
 # Also splits the dataframe into smaller dataframes based of inputted maximum memory size
-def process_file(folder_path, file_index, ptl_mass, use_z, bin_edges, max_mem, sim_cosmol, filter_nu, nu_splits):
+def process_file(folder_path, file_index, ptl_mass, use_z, max_mem, sim_cosmol, filter_nu, nu_splits):
     @delayed
     def delayed_task():
         cosmol = set_cosmology(sim_cosmol)
@@ -381,16 +366,18 @@ def combine_results(results, client):
     return all_ddfs, scal_pos_weights
 
 # Combines all the files in a dataset's folder into one dask dataframe and a list for the scale position weights and an array of weights if desired 
-def reform_datasets_nested(client,ptl_mass,use_z,max_mem,bin_edges,sim_cosmol,folder_path,scale_rad=False,use_weights=False,filter_nu=None,limit_files=False,nu_splits=None):
-    snap_n_files = len(os.listdir(folder_path + "/ptl_info/"))
-    n_files = np.min([snap_n_files,file_lim]) 
+def reform_datasets_nested(client, ptl_mass, use_z, max_mem, sim_cosmol, folder_path, prime_snap, filter_nu=None, limit_files=False, nu_splits=None):
+    snap_n_files = len(os.listdir(folder_path + "/ptl_info/" + str(prime_snap)+"/"))
+    n_files = snap_n_files
+    if limit_files:
+        n_files = np.min([snap_n_files,file_lim]) 
     
     delayed_results = []
     for file_index in range(n_files):
         # Create delayed tasks for each file
         delayed_results.append(process_file(
-                folder_path, file_index, ptl_mass, use_z, bin_edges,
-                max_mem, sim_cosmol, filter_nu, scale_rad, use_weights, nu_splits))
+                folder_path, file_index, ptl_mass, use_z,
+                max_mem, sim_cosmol, filter_nu, nu_splits))
     
     # Compute the results in parallel
     results = client.compute(delayed_results, sync=True)
@@ -406,7 +393,7 @@ def calc_scal_pos_weight(df):
     return scale_pos_weight
 
 # Loads all the data for the inputted list of simulations into one dataframe. Finds the scale position weight for the dataset and any adjusted weighting for it if desired
-def load_data(client, sims, dset_name, sim_cosmol, bin_edges = None, limit_files = False, filter_nu=False, nu_splits=None):
+def load_data(client, sims, dset_name, sim_cosmol, prime_snap, limit_files = False, filter_nu=False, nu_splits=None):
     dask_dfs = []
     all_scal_pos_weight = []
         
@@ -425,7 +412,7 @@ def load_data(client, sims, dset_name, sim_cosmol, bin_edges = None, limit_files
         for dataset in datasets:
             with timed(f"Reformed {dataset} Dataset: {sim}"): 
                 dataset_path = f"{ML_dset_path}{sim}/{dataset}"
-                ptl_ddf,sim_scal_pos_weight = reform_datasets_nested(client,ptl_mass,use_z,max_mem,bin_edges,sim_cosmol,dataset_path,filter_nu=filter_nu,limit_files=limit_files,nu_splits=nu_splits)  
+                ptl_ddf,sim_scal_pos_weight = reform_datasets_nested(client,ptl_mass,use_z,max_mem,sim_cosmol,dataset_path,prime_snap,filter_nu=filter_nu,limit_files=limit_files,nu_splits=nu_splits)  
                 all_scal_pos_weight.append(sim_scal_pos_weight)
                 dask_dfs.append(ptl_ddf)
                     

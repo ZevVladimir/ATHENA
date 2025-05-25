@@ -4,7 +4,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, load_data, eval_model, get_model_name, make_preds, get_feature_labels
+from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, load_data, eval_model, get_model_name, extract_snaps, make_preds, get_feature_labels
 from utils.data_and_loading_functions import create_directory, timed, load_pickle, save_pickle, load_config
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
     comb_model_sims = get_combined_name(model_sims) 
         
-    model_name = get_model_name(model_type, model_sims, hpo_done=config_params["OPTIMIZE"]["hpo"], opt_param_dict=config_params["OPTIMIZE"])    
+    model_name = get_model_name(model_type, model_sims)    
     model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"
     model_save_loc = model_fldr_loc + model_name + ".json"
     gen_plot_save_loc = model_fldr_loc + "plots/"
@@ -91,7 +91,8 @@ if __name__ == "__main__":
                 halo_df = pd.concat(halo_dfs)
                 
                 # Load the particle information
-                data,scale_pos_weight = load_data(client,curr_test_sims,dset_name,sim_cosmol,limit_files=False)
+                all_snaps = extract_snaps(model_sims[0])
+                data,scale_pos_weight = load_data(client,curr_test_sims,dset_name,sim_cosmol,all_snaps[0],limit_files=False)
 
                 X = data[feature_columns]
                 y = data[target_column]

@@ -319,7 +319,6 @@ with timed("Generating Datasets for " + curr_sparta_file):
             save_location = ML_dset_path + curr_sparta_file + "_" + "_".join(str(x) for x in known_snaps) + "/"
 
             dset_params = load_pickle(save_location+"dset_params.pickle")
-            #TODO implement check that known_snaps correspond to what is stored in the config file
 
         if reset_lvl <= 1:
             sim_cosmol = dset_params["cosmology"]
@@ -332,7 +331,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
         all_ptl_snap_list = []
         
         with timed("Primary Snapshot Information Load"):
-            if reset_lvl > 1 or len(known_snaps) == 0:
+            if reset_lvl > 1:
                 prime_snap_dict = {}
                 p_snap, input_z = find_closest_z_snap(input_z,snap_path,snap_dir_format,snap_format)
                 print("Snapshot number found:", p_snap, "Closest redshift found:", input_z)
