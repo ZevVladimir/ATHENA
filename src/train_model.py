@@ -125,14 +125,7 @@ if __name__ == "__main__":
         }
             
         # Do desired adjustments to data if selected, otherwise just load the data normally
-        if use_scale_rad and use_weights:
-            train_data,scale_pos_weight,train_weights,bin_edges = load_data(client,model_sims,"Train",sim_cosmol,scale_rad=use_scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
-        elif use_scale_rad and not use_weights:
-            train_data,scale_pos_weight,bin_edges = load_data(client,model_sims,"Train",sim_cosmol,scale_rad=use_scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
-        elif not use_scale_rad and use_weights:
-            train_data,scale_pos_weight,train_weights = load_data(client,model_sims,"Train",sim_cosmol,scale_rad=use_scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
-        else:
-            train_data,scale_pos_weight = load_data(client,model_sims,"Train",sim_cosmol,scale_rad=use_scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
+        train_data,scale_pos_weight = load_data(client,model_sims,"Train",sim_cosmol,scale_rad=use_scale_rad,use_weights=use_weights,filter_nu=False,limit_files=True)
         test_data,scale_pos_weight = load_data(client,model_sims,"Test",sim_cosmol,scale_rad=False,use_weights=False,filter_nu=False,limit_files=False)
             
         X_test = test_data[feature_columns]
@@ -162,65 +155,12 @@ if __name__ == "__main__":
                 halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/Train/halo_info/"))
 
             halo_df = pd.concat(halo_dfs)
-
-        # Optimize the weighting of particles
-        if use_weights:          
-            opt_weight_rad, opt_min_weight, opt_weight_exp = optimize_weights(client,params,train_data,halo_df,model_sims,feature_columns,target_column)
-            
-            train_weights = weight_by_rad(X_train["p_Scaled_radii"].values.compute(),y_train.compute().values.flatten(), opt_weight_rad, opt_min_weight)
-            dask_weights = []
-            scatter_weight = client.scatter(train_weights)
-            dask_weight = dd.from_delayed(scatter_weight) 
-            dask_weights.append(dask_weight)
-                
-            train_weights = dd.concat(dask_weights)
-            
-            train_weights = train_weights.repartition(npartitions=X_train.npartitions)
-            
-            weight_rad_info = {
-                "Used weighting by radius": use_weights,
-                "Start for weighting": opt_weight_rad,
-                "Minimum weight assign": opt_min_weight,
-                "Weight exponent": opt_weight_exp
-            }
-        
-        # Optimize the scaling of the number of particles at each radius 
-        if use_scale_rad:
-            num_bins=100
-            bin_edges = np.logspace(np.log10(0.001),np.log10(10),num_bins)
-            opt_reduce_rad, opt_reduce_perc = optimize_scale_rad(client,params,train_data,halo_df,model_sims,feature_columns,target_column)
-            scld_data = scale_by_rad(train_data.compute(),bin_edges,opt_reduce_rad,opt_reduce_perc)
-            
-            scatter_train = client.scatter(scld_data)
-            scld_train_data = dd.from_delayed(scatter_train)
-            
-            X_train = scld_train_data[feature_columns]
-            y_train = scld_train_data[target_column]
-            
-            scale_rad_info = {
-            "Used scale_rad": use_scale_rad,
-            "Reducing radius start": opt_reduce_rad,
-            "Reducing radius percent": opt_reduce_perc,
-            }
-            
-            model_name = get_model_name(model_type, model_sims, hpo_done=config_params["OPTIMIZE"]["hpo"], opt_param_dict=config_params["OPTIMIZE"])    
-            model_fldr_loc = path_to_models + comb_model_sims + "/" + model_name + "/"
-            model_save_loc = model_fldr_loc + model_name + ".json"
-            gen_plot_save_loc = model_fldr_loc + "plots/"
-        
-        model_info["Training Data Adjustments"] = {
-            "Scaling by Radii": scale_rad_info,
-            "Weighting by Radii": weight_rad_info,
-        }
         
         create_directory(model_fldr_loc)
         create_directory(gen_plot_save_loc)
         
-        # Construct the DaskDMatrix used for training (if using different weights input those as well)
-        if use_weights:
-            dtrain = xgb.dask.DaskDMatrix(client, X_train, y_train, weight=train_weights)
-        else:
-            dtrain = xgb.dask.DaskDMatrix(client, X_train, y_train)
+        # Construct the DaskDMatrix used for training
+        dtrain = xgb.dask.DaskDMatrix(client, X_train, y_train)
         dtest = xgb.dask.DaskDMatrix(client, X_test, y_test)
         
         if 'Training Info' in model_info: 

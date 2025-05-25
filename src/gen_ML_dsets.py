@@ -39,7 +39,7 @@ snap_dir_format = config_params["SNAP_DATA"]["snap_dir_format"]
 snap_format = config_params["SNAP_DATA"]["snap_format"]
 
 input_z = config_params["DSET_CREATE"]["input_z"]
-all_tdyn_step = config_params["DSET_CREATE"]["tdyn_steps"]
+all_tdyn_steps = config_params["DSET_CREATE"]["tdyn_steps"]
 search_radius = config_params["DSET_CREATE"]["search_radius"]
 sub_dset_mem_size = config_params["DSET_CREATE"]["sub_dset_mem_size"]
 
@@ -404,7 +404,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
         with timed("Load Complementary Snapshots"):
             #TODO adjust this check to instead look the dictionary?
             if reset_lvl > 1 or len(known_snaps) == 0:
-                for t_dyn_step in all_tdyn_step:
+                for t_dyn_step in all_tdyn_steps:
                     t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0]], input_z)
                     c_snap_dict = get_comp_snap_info(t_dyn=t_dyn, t_dyn_step=t_dyn_step, cosmol = cosmol, p_red_shift=input_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
                     c_snap = c_snap_dict["ptl_snap"]
@@ -535,7 +535,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
             "snap_dir_format":snap_dir_format,
             "snap_format": snap_format,
             "cosmology": sim_cosmol,
-            "t_dyn_steps": all_tdyn_step,
+            "t_dyn_steps": all_tdyn_steps,
             "search_rad": search_radius,
             "total_num_snaps": tot_num_snaps,
             "test_halos_ratio": test_dset_frac,
@@ -583,7 +583,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                 curr_ptls_pos = p_ptls_pos
                 curr_ptl_tree = p_ptl_tree
             else:
-                curr_snap_dict = dset_params["all_snap_info"]["comp_" + str(all_tdyn_step[i-1]) + "_tdstp_snap_info"]
+                curr_snap_dict = dset_params["all_snap_info"]["comp_" + str(all_tdyn_steps[i-1]) + "_tdstp_snap_info"]
             curr_sparta_snap = curr_snap_dict["sparta_snap"]
             curr_z = curr_snap_dict["red_shift"]
             curr_a = curr_snap_dict["scale_factor"]
@@ -659,10 +659,10 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     save_phys_vel[save_phys_vel == 0] = np.nan
                             
                     ptl_df = pd.DataFrame({
-                        str(all_tdyn_step[i-1]) + "_Scaled_radii":save_scale_rad,
-                        str(all_tdyn_step[i-1]) + "_Radial_vel":save_rad_vel,
-                        str(all_tdyn_step[i-1]) + "_Tangential_vel":save_tang_vel,
-                        str(all_tdyn_step[i-1]) + "_phys_vel":save_phys_vel
+                        str(all_tdyn_steps[i-1]) + "_Scaled_radii":save_scale_rad,
+                        str(all_tdyn_steps[i-1]) + "_Radial_vel":save_rad_vel,
+                        str(all_tdyn_steps[i-1]) + "_Tangential_vel":save_tang_vel,
+                        str(all_tdyn_steps[i-1]) + "_phys_vel":save_phys_vel
                     })
                 
                 ptl_df.to_hdf(save_location + "Train/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+train_start_pnt) + ".h5", key='data', mode='w',format='table')  
@@ -723,10 +723,10 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     save_phys_vel[save_phys_vel == 0] = np.nan
                             
                     ptl_df = pd.DataFrame({
-                        str(all_tdyn_step[i-1]) + "_Scaled_radii":save_scale_rad,
-                        str(all_tdyn_step[i-1]) + "_Radial_vel":save_rad_vel,
-                        str(all_tdyn_step[i-1]) + "_Tangential_vel":save_tang_vel,
-                        str(all_tdyn_step[i-1]) + "_phys_vel":save_phys_vel
+                        str(all_tdyn_steps[i-1]) + "_Scaled_radii":save_scale_rad,
+                        str(all_tdyn_steps[i-1]) + "_Radial_vel":save_rad_vel,
+                        str(all_tdyn_steps[i-1]) + "_Tangential_vel":save_tang_vel,
+                        str(all_tdyn_steps[i-1]) + "_phys_vel":save_phys_vel
                     })
                 
                 ptl_df.to_hdf(save_location + "Test/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+test_start_pnt) + ".h5", key='data', mode='w',format='table')  

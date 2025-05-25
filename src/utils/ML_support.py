@@ -236,40 +236,6 @@ def get_pickle_path_for_sim(input_str):
     
     return new_string
 
-# Use a function to assign weights for XGBoost training for each particle based on their radii
-def weight_by_rad(radii,orb_inf,use_weight_rad=weight_rad,use_min_weight=min_weight,use_weight_exp=weight_exp,weight_inf=False,weight_orb=True):
-    weights = np.ones(radii.shape[0])
-
-    if weight_inf and weight_orb:
-        mask = (radii > use_weight_rad)
-    elif weight_orb:
-        mask = (radii > use_weight_rad) & (orb_inf == 1)
-    elif weight_inf:
-        mask = (radii > use_weight_rad) & (orb_inf == 0)
-    else:
-        print("No weights calculated. Make sure to set weight_inf and/or weight_orb = True")
-        return pd.DataFrame(weights)
-    weights[mask] = (np.exp((np.log(use_min_weight)/(np.max(radii)-use_weight_rad)) * (radii[mask]-use_weight_rad)))**use_weight_exp
-
-    return pd.DataFrame(weights)
-
-# For each radial bin beyond an inputted radius randomly reduce the number of particles present to a certain percentage of the number of particles within that inptuted radius
-def scale_by_rad(data,bin_edges,use_red_rad=reduce_rad,use_red_perc=reduce_perc):
-    radii = data["p_Scaled_radii"].values
-    max_ptl = int(np.floor(np.where(radii<use_red_rad)[0].shape[0] * use_red_perc))
-    filter_data = []
-    
-    for i in range(len(bin_edges) - 1):
-        bin_mask = (radii >= bin_edges[i]) & (radii < bin_edges[i+1])
-        bin_data = data[bin_mask]
-        if len(bin_data) > int(max_ptl) and bin_edges[i] > 1:
-            bin_data = bin_data.sample(n=max_ptl,replace=False)
-        filter_data.append(bin_data)
-    
-    filter_data = pd.concat(filter_data) 
-    
-    return filter_data
-
 # Returns a simulation's mass used and the redshift of the primary snapshot
 def sim_mass_p_z(sim,config_params):
     sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
@@ -355,7 +321,7 @@ def split_dataframe(df, max_size, weights=None, use_weights = False):
 
 # Function to process a file in a dataset's folder: combines them all, performs any desired filtering, calculates weights if desired, and calculates scaled position weight
 # Also splits the dataframe into smaller dataframes based of inputted maximum memory size
-def process_file(folder_path, file_index, ptl_mass, use_z, bin_edges, max_mem, sim_cosmol, filter_nu, scale_rad, use_weights, nu_splits):
+def process_file(folder_path, file_index, ptl_mass, use_z, bin_edges, max_mem, sim_cosmol, filter_nu, nu_splits):
     @delayed
     def delayed_task():
         cosmol = set_cosmology(sim_cosmol)
@@ -388,13 +354,6 @@ def process_file(folder_path, file_index, ptl_mass, use_z, bin_edges, max_mem, s
         # Filter by nu and/or by radius
         if filter_nu:
             ptl_df, upd_halo_n, upd_halo_first = filter_df_with_nus(ptl_df, nus, halo_df["Halo_first"], halo_df["Halo_n"], nu_splits)
-        if scale_rad:
-            ptl_df = scale_by_rad(ptl_df,bin_edges)
-            
-        weights = (
-            weight_by_rad(ptl_df["p_Scaled_radii"].values, ptl_df["Orbit_infall"].values, 
-                          weight_inf=False, weight_orb=True) if use_weights else None
-        )
 
         # Calculate scale position weight
         scal_pos_weight = calc_scal_pos_weight(ptl_df)
@@ -402,31 +361,22 @@ def process_file(folder_path, file_index, ptl_mass, use_z, bin_edges, max_mem, s
         # If the dataframe is too large split it up
         if ptl_df.memory_usage(index=True).sum() > max_mem:
             ptl_dfs = split_dataframe(ptl_df, max_mem)
-            if use_weights:
-                ptl_dfs, weights = split_dataframe(ptl_df,max_mem,weights,use_weights=True)
         else:
             ptl_dfs = [ptl_df]
-            if use_weights:
-                weights = [weights]
         
-        return ptl_dfs,scal_pos_weight,weights
+        return ptl_dfs,scal_pos_weight
     return delayed_task()
 
 # Combines the results of the processing of each file in the folder into one dataframe for the data and list for the scale position weights and an array of weights if desired
-def combine_results(results, client, use_weights):
+def combine_results(results, client):
     # Unpack the results
-    ddfs,scal_pos_weights,dask_weights = [], [], []
+    ddfs,scal_pos_weights = [], []
     
     for res in results:
         ddfs.extend(res[0])
         scal_pos_weights.append(res[1]) # We append since scale position weight is just a number
-        if use_weights:
-            dask_weights.extend(res[2])
             
     all_ddfs = dd.concat([dd.from_delayed(client.scatter(df)) for df in ddfs])
-    if use_weights:
-        all_weights = dd.concat([dd.from_delayed(client.scatter(w)) for w in dask_weights])
-        return all_ddfs, scal_pos_weights, all_weights
 
     return all_ddfs, scal_pos_weights
 
@@ -445,7 +395,7 @@ def reform_datasets_nested(client,ptl_mass,use_z,max_mem,bin_edges,sim_cosmol,fo
     # Compute the results in parallel
     results = client.compute(delayed_results, sync=True)
 
-    return combine_results(results, client, use_weights)
+    return combine_results(results, client)
     
 # Calculates the scaled position weight for a dataset. Which is used to weight the model towards the population with less particles (should be the orbiting population)
 def calc_scal_pos_weight(df):
@@ -456,10 +406,9 @@ def calc_scal_pos_weight(df):
     return scale_pos_weight
 
 # Loads all the data for the inputted list of simulations into one dataframe. Finds the scale position weight for the dataset and any adjusted weighting for it if desired
-def load_data(client, sims, dset_name, sim_cosmol, bin_edges = None, limit_files = False, scale_rad=False, use_weights=False, filter_nu=False, nu_splits=None):
+def load_data(client, sims, dset_name, sim_cosmol, bin_edges = None, limit_files = False, filter_nu=False, nu_splits=None):
     dask_dfs = []
     all_scal_pos_weight = []
-    all_weights = []
         
     for sim in sims:
         with open(ML_dset_path + sim + "/dset_params.pickle","rb") as f:
@@ -476,11 +425,7 @@ def load_data(client, sims, dset_name, sim_cosmol, bin_edges = None, limit_files
         for dataset in datasets:
             with timed(f"Reformed {dataset} Dataset: {sim}"): 
                 dataset_path = f"{ML_dset_path}{sim}/{dataset}"
-                if use_weights:
-                    ptl_ddf,sim_scal_pos_weight, weights = reform_datasets_nested(client,ptl_mass,use_z,max_mem,bin_edges,sim_cosmol,dataset_path,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files,nu_splits=nu_splits)  
-                    all_weights.append(weights)
-                else:
-                    ptl_ddf,sim_scal_pos_weight = reform_datasets_nested(client,ptl_mass,use_z,max_mem,bin_edges,sim_cosmol,dataset_path,scale_rad=scale_rad,use_weights=use_weights,filter_nu=filter_nu,limit_files=limit_files,nu_splits=nu_splits)  
+                ptl_ddf,sim_scal_pos_weight = reform_datasets_nested(client,ptl_mass,use_z,max_mem,bin_edges,sim_cosmol,dataset_path,filter_nu=filter_nu,limit_files=limit_files,nu_splits=nu_splits)  
                 all_scal_pos_weight.append(sim_scal_pos_weight)
                 dask_dfs.append(ptl_ddf)
                     
@@ -489,10 +434,7 @@ def load_data(client, sims, dset_name, sim_cosmol, bin_edges = None, limit_files
 
     all_dask_dfs = dd.concat(dask_dfs)
     
-    if use_weights:
-        return all_dask_dfs,act_scale_pos_weight, dd.concat(all_weights)
-    else:
-        return all_dask_dfs,act_scale_pos_weight
+    return all_dask_dfs,act_scale_pos_weight
 
 # Reconstruct SPARTA's mass profiles and stack them together for a list of sims
 def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):                
@@ -787,197 +729,6 @@ def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, sim_cosmol
     # All parameter Distribution of the ratio between the number of infalling and number of orbiting particlesin 2D histograms
     if io_frac:
         inf_orb_frac(p_corr_labels=p_corr_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,split_scale_dict=split_scale_dict,num_bins=num_bins,save_loc=plot_save_loc)
-       
-# Loss function based off how close the reproduced density profile is to the actual profile
-# Can use either only the orbiting profile, only the infalling one, or both
-def dens_prf_loss(halo_ddf,use_sims,radii,labels,use_orb_prf,use_inf_prf):
-    halo_first = halo_ddf["Halo_first"].values
-    halo_n = halo_ddf["Halo_n"].values
-    all_idxs = halo_ddf["Halo_indices"].values
-
-    # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
-    sim_splits = np.where(halo_first == 0)[0]
-    # if there are multiple simulations, to correctly index the dataset we need to update the starting values for the 
-    # stacked simulations such that they correspond to the larger dataset and not one specific simulation
-    if len(use_sims) != 1:
-        for i in range(1,len(use_sims)):
-            if i < len(use_sims) - 1:
-                halo_first[sim_splits[i]:sim_splits[i+1]] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
-            else:
-                halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
-               
-    sparta_mass_prf_all,sparta_mass_prf_orb,all_masses,bins = load_sparta_mass_prf(sim_splits,all_idxs,use_sims)
-    sparta_mass_prf_inf = sparta_mass_prf_all - sparta_mass_prf_orb
-    sparta_mass_prf_orb = np.sum(sparta_mass_prf_orb,axis=0)
-    sparta_mass_prf_inf = np.sum(sparta_mass_prf_inf,axis=0)
-    #TODO make this robust for multiple sims
-    calc_mass_prf_all,calc_mass_prf_orb,calc_mass_prf_inf = create_mass_prf(radii,labels,bins,all_masses[0]) 
-    
-    if use_orb_prf:
-        use_orb = np.where(sparta_mass_prf_orb > 0)[0]
-        orb_loss = np.sum(np.abs((sparta_mass_prf_orb[use_orb] - calc_mass_prf_orb[use_orb]) / sparta_mass_prf_orb[use_orb])) / bins.size
-        if orb_loss == np.nan:
-            orb_loss = 50
-        elif orb_loss == np.inf:
-            orb_loss == 50
-    
-    if use_inf_prf:
-        use_inf = np.where(sparta_mass_prf_inf > 0)[0]
-        inf_loss = np.sum(np.abs((sparta_mass_prf_inf[use_inf] - calc_mass_prf_inf[use_inf]) / sparta_mass_prf_inf[use_inf])) / bins.size
-        if inf_loss == np.nan:
-            inf_loss = 50
-        elif inf_loss == np.inf:
-            inf_loss == 50
-    
-    if use_orb_prf and use_inf_prf:
-        print(orb_loss,inf_loss,orb_loss+inf_loss)
-        return orb_loss+inf_loss
-    elif use_orb_prf:
-        print(orb_loss)
-        return orb_loss
-    elif use_inf_prf:
-        print(inf_loss)
-        return inf_loss
-
-# Objective function for the optimization of a model that is adjusting the weighting of particles based on radius
-def weight_objective(params,client,model_params,ptl_ddf,halo_ddf,use_sims,feat_cols,tar_col):
-    train_dst,val_dst,train_halos,val_halos = split_data_by_halo(0.6,halo_ddf,ptl_ddf,return_halo=True)
-
-    X_train = train_dst[feat_cols]
-    y_train = train_dst[tar_col]
-    
-    X_val = val_dst[feat_cols]
-    y_val = val_dst[tar_col]
-    
-    curr_weight_rad, curr_min_weight, curr_weight_exp = params
-
-    train_radii = X_train["p_Scaled_radii"].values.compute()
-
-    weights = weight_by_rad(train_radii,y_train.compute().values.flatten(), curr_weight_rad, curr_min_weight, curr_weight_exp)
-
-    dask_weights = []
-    scatter_weight = client.scatter(weights)
-    dask_weight = dd.from_delayed(scatter_weight) 
-    dask_weights.append(dask_weight)
-        
-    train_weights = dd.concat(dask_weights)
-    
-    train_weights = train_weights.repartition(npartitions=X_train.npartitions)
-
-        
-    dtrain = xgb.dask.DaskDMatrix(client, X_train, y_train, weight=train_weights)
-    
-    output = dxgb.train(
-                client,
-                model_params,
-                dtrain,
-                num_boost_round=50,
-                # evals=[(dtrain, "train"),(dtest, "test")],
-                evals=[(dtrain, "train")],
-                early_stopping_rounds=5,      
-                )
-    bst = output["booster"]
-
-    y_pred = make_preds(client, bst, X_val, report_name="Report", print_report=False)
-    y_val = y_val.compute().values.flatten()
-    
-    # multiply the accuracies by -1 because we want to maximize them but we are using minimization
-    if hpo_loss == "all":
-        accuracy = -1 * accuracy_score(y_val, y_pred)
-    elif hpo_loss == "orb":
-        only_orb = np.where(y_val == 1)[0]
-        accuracy = -1 * accuracy_score(y_val[only_orb], y_pred.iloc[only_orb].values)
-    elif hpo_loss == "inf":
-        only_inf = np.where(y_val == 0)[0]
-        accuracy = -1 * accuracy_score(y_val[only_inf], y_pred.iloc[only_inf].values)
-    elif hpo_loss == "mprf_all":
-        val_radii = X_val["p_Scaled_radii"].values.compute()
-        accuracy = dens_prf_loss(val_halos,use_sims,val_radii,y_pred,use_orb_prf=True,use_inf_prf=True)
-    elif hpo_loss == "mprf_orb":
-        val_radii = X_val["p_Scaled_radii"].values.compute()
-        accuracy = dens_prf_loss(val_halos,use_sims,val_radii,y_pred,use_orb_prf=True,use_inf_prf=False)
-    elif hpo_loss == "mprf_inf":
-        val_radii = X_val["p_Scaled_radii"].values.compute()
-        accuracy = dens_prf_loss(val_halos,use_sims,val_radii,y_pred,use_orb_prf=False,use_inf_prf=True)
-
-    return accuracy
-
-# Objective function for the optimization of a model that is adjusting the number of particles beyond a certain radius based on a percetnage of particles within that radius
-def scal_rad_objective(params,client,model_params,ptl_ddf,halo_ddf,use_sims,feat_cols,tar_col):
-    train_dst,val_dst,train_halos,val_halos = split_data_by_halo(client,0.5,halo_ddf,ptl_ddf,return_halo=True)
-    
-    X_val = val_dst[feat_cols]
-    y_val = val_dst[tar_col]
-    
-    data_pd = train_dst.compute()
-    num_bins=100
-    bin_edges = np.logspace(np.log10(0.001),np.log10(10),num_bins)
-    scld_data = scale_by_rad(data_pd,bin_edges,params[0],params[1])
-    
-    scatter_scld = client.scatter(scld_data)
-    scld_data_ddf = dd.from_delayed(scatter_scld)
-
-    X_train = scld_data_ddf[feat_cols]
-    y_train = scld_data_ddf[tar_col]
-    
-    dtrain = xgb.dask.DaskDMatrix(client, X_train, y_train)
-    
-    output = dxgb.train(
-                client,
-                model_params,
-                dtrain,
-                num_boost_round=50,
-                # evals=[(dtrain, "train"),(dtest, "test")],
-                evals=[(dtrain, "train")],
-                early_stopping_rounds=5,      
-                )
-    bst = output["booster"]
-
-    y_pred = make_preds(client, bst, X_val, report_name="Report", print_report=False)
-    y_val = y_val.compute().values.flatten()
-    only_orb = np.where(y_val == 1)[0]
-    only_inf = np.where(y_val == 0)[0]
-
-    accuracy = accuracy_score(y_val, y_pred)
-    # accuracy = accuracy_score(y[only_orb], y_pred.iloc[only_orb].values)
-    # accuracy = accuracy_score(y[only_inf], y_pred.iloc[only_inf].values)
-    
-    # val_radii = X_val["p_Scaled_radii"].values.compute()
-    # accuracy = -1 * dens_prf_loss(val_halos,use_sims,val_radii,y_pred)
-    
-    return -accuracy
-
-# Prints which iteration of optimization and the current parameters
-def print_iteration(res):
-    iteration = len(res.x_iters)
-    print(f"Iteration {iteration}: Current params: {res.x_iters[-1]}, Current score: {res.func_vals[-1]}")
-
-def optimize_weights(client,model_params,ptl_ddf,halo_ddf,use_sims,feat_cols,tar_col):
-    print("Start Optimization of Weights")
-    space  = [Real(0.1, 5.0, name='weight_rad'),
-            Real(0.001, 0.2, name='min_weight'),
-            Real(0.1,10,name='weight_exp')]
-
-    objective_with_params = partial(weight_objective,client=client,model_params=model_params,ptl_ddf=ptl_ddf,halo_ddf=halo_ddf,use_sims=use_sims,feat_cols=feat_cols,tar_col=tar_col)
-    res = gp_minimize(objective_with_params, space, n_calls=50, random_state=0, callback=[print_iteration])
-
-    print("Best parameters: ", res.x)
-    print("Best accuracy: ", -res.fun)
-    
-    return res.x[0],res.x[1],res.x[2]
-    
-def optimize_scale_rad(client,model_params,ptl_ddf,halo_ddf,use_sims,feat_cols,tar_col):    
-    print("Start Optimization of Scaling Radii")
-    space  = [Real(0.1, 5.0, name='reduce_rad'),
-            Real(0.0001, 0.25, name='reduce_perc')]
-
-    objective_with_params = partial(scal_rad_objective,client=client,model_params=model_params,ptl_ddf=ptl_ddf,halo_ddf=halo_ddf,use_sims=use_sims,feat_cols=feat_cols,tar_col=tar_col)
-    res = gp_minimize(objective_with_params, space, n_calls=50, random_state=0, callback=[print_iteration])
-
-    print("Best parameters: ", res.x)
-    print("Best accuracy: ", -res.fun)
-    
-    return res.x[0],res.x[1]
     
 def get_combined_name(model_sims):
     combined_name = ""
