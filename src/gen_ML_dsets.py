@@ -12,13 +12,23 @@ from itertools import repeat
 import re
 import pandas as pd
 import psutil
+import argparse
 
 from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, conv_halo_id_spid, get_comp_snap_info, create_directory, find_closest_z_snap, timed, clean_dir, load_pickle, save_pickle, get_num_snaps, load_config
 from utils.calculation_functions import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn, create_mass_prf, calculate_density
 from src.utils.vis_fxns import compare_prfs
 from utils.ML_support import split_sparta_hdf5_name
 ##################################################################################################################
-config_params = load_config(os.getcwd() + "/config.ini")
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    '--config',
+    type=str,
+    default='config.ini', 
+    help='Path to config file (default: config.ini)'
+)
+
+args = parser.parse_args()
+config_params = load_config(os.getcwd() + "/" + args.config)
 
 curr_sparta_file = config_params["SPARTA_DATA"]["curr_sparta_file"]
 known_snaps = config_params["SNAP_DATA"]["known_snaps"]
