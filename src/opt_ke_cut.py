@@ -9,8 +9,8 @@ mpl.rcParams.update(mpl.rcParamsDefault)
 import pickle
 from sparta_tools import sparta
 
-from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, split_sparta_hdf5_name, load_SPARTA_data, reform_dataset_dfs, get_model_name
-from utils.data_and_loading_functions import create_directory, load_pickle, conv_halo_id_spid, load_config, save_pickle, load_pickle, timed
+from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, split_sparta_hdf5_name, load_SPARTA_data, reform_dataset_dfs, get_model_name, get_feature_labels, extract_snaps
+from utils.data_and_loading_functions import create_directory, load_pickle, conv_halo_id_spid, load_config, save_pickle, load_pickle, timed, set_cosmology
 from src.utils.ke_cut_support import load_ke_data, opt_ke_predictor
 from src.utils.vis_fxns import plt_SPARTA_KE_dist, compare_split_prfs
 from utils.calculation_functions import calculate_density, filter_prf, calc_mass_acc_rate
@@ -33,6 +33,8 @@ lin_tvticks = config_params["EVAL_MODEL"]["lin_tvticks"]
 log_tvticks = config_params["EVAL_MODEL"]["log_tvticks"]
 lin_rticks = config_params["EVAL_MODEL"]["lin_rticks"]
 log_rticks = config_params["EVAL_MODEL"]["log_rticks"]
+
+features = config_params["TRAIN_MODEL"]["features"]
 
 opt_ke_calib_sims = config_params["KE_CUT"]["opt_ke_calib_sims"]
 perc = config_params["KE_CUT"]["perc"]
@@ -99,10 +101,19 @@ if __name__ == "__main__":
     client = setup_client()
     
     comb_model_sims = get_combined_name(opt_ke_calib_sims) 
-    model_type = "phase_space_cut"
-    model_name = get_model_name(model_type, opt_ke_calib_sims, hpo_done=config_params["OPTIMIZE"]["hpo"], opt_param_dict=config_params["OPTIMIZE"])    
+    model_type = "kinetic_energy_cut"
+    model_name = get_model_name(model_type, opt_ke_calib_sims)    
     model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"  
     create_directory(model_fldr_loc)
+    
+    #TODO loop the test sims
+    dset_params = load_pickle(ML_dset_path + ke_test_sims[0][0] + "/dset_params.pickle")
+    sim_cosmol = dset_params["cosmology"]
+    all_tdyn_steps = dset_params["t_dyn_steps"]
+    
+    feature_columns = get_feature_labels(features,all_tdyn_steps)
+    snap_list = extract_snaps(opt_ke_calib_sims[0])
+    cosmol = set_cosmology(sim_cosmol)
     
     split_scale_dict = {
             "linthrsh":linthrsh, 
@@ -141,7 +152,7 @@ if __name__ == "__main__":
         opt_param_dict = load_pickle(model_fldr_loc + "ke_optparams_dict.pickle")
         
         with timed("Loading Testing Data"):
-            r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=curr_test_sims)
+            r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=curr_test_sims,sim_cosmol=sim_cosmol,snap_list=snap_list)
             r_test = my_data["p_Scaled_radii"].compute().to_numpy()
             vr_test = my_data["p_Radial_vel"].compute().to_numpy()
             vphys_test = my_data["p_phys_vel"].compute().to_numpy()
@@ -159,7 +170,7 @@ if __name__ == "__main__":
     else:        
         with timed("Optimizing phase-space cut"):
             with timed("Loading Fitting Data"):
-                r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=opt_ke_calib_sims)
+                r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=opt_ke_calib_sims,sim_cosmol=sim_cosmol,snap_list=snap_list)
                 
                 # We use the full dataset since for our custom fitting it does not only specific halos (?)
                 r_fit = my_data["p_Scaled_radii"].compute().to_numpy()
@@ -314,13 +325,13 @@ if __name__ == "__main__":
                 
         for sim in curr_test_sims:
             dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
-            p_snap = dset_params["p_snap_info"]["ptl_snap"][()]
-            curr_z = dset_params["p_snap_info"]["red_shift"][()]
+            p_snap = dset_params["all_snap_info"]["prime_snap_info"]["ptl_snap"][()]
+            curr_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"][()]
             # TODO make this generalizable to when the snapshot separation isn't just 1 dynamical time as needed for mass accretion calculation
             # we can just use the secondary snap here because we already chose to do 1 dynamical time for that snap
-            past_z = dset_params["c_snap_info"]["red_shift"][()] 
-            p_sparta_snap = dset_params["p_snap_info"]["sparta_snap"][()]
-            c_sparta_snap = dset_params["c_snap_info"]["sparta_snap"][()]
+            past_z = dset_params["all_snap_info"]["comp_" + str(all_tdyn_steps[0]) + "_tdstp_snap_info"]["red_shift"][()] 
+            p_sparta_snap = dset_params["all_snap_info"]["prime_snap_info"]["sparta_snap"][()]
+            c_sparta_snap = dset_params["all_snap_info"]["comp_" + str(all_tdyn_steps[0]) + "_tdstp_snap_info"]["sparta_snap"][()]
             
             sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
             
@@ -328,7 +339,7 @@ if __name__ == "__main__":
                     
             # Load the halo's positions and radii
             param_paths = [["halos","R200m"],["halos","id"]]
-            sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, p_snap)
+            sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name)
 
             curr_halos_r200m = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
             curr_halos_ids = sparta_params[sparta_param_names[1]][:,p_sparta_snap]

@@ -1,8 +1,6 @@
-from dask import array as da
 import dask.dataframe as dd
 from dask import delayed
 from dask.distributed import Client
-import xgboost as xgb
 from xgboost import dask as dxgb
 
 import numpy as np
@@ -16,11 +14,6 @@ from colossus.lss import peaks
 import warnings
 from dask.distributed import Client
 import multiprocessing as mp
-
-from skopt import gp_minimize
-from skopt.space import Real
-from sklearn.metrics import accuracy_score
-from functools import partial
 
 from .data_and_loading_functions import load_SPARTA_data, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, load_pickle, load_config, get_comp_snap_info, create_directory, set_cosmology
 from .vis_fxns import plot_full_ptl_dist, plot_miss_class_dist, compare_prfs, compare_split_prfs, inf_orb_frac

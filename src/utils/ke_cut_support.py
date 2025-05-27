@@ -85,12 +85,10 @@ def halo_select(sims, ptl_data):
         
         
         halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
-        all_idxs = halo_ddf["Halo_indices"].values
+        curr_idxs = halo_ddf["Halo_indices"].values
         halo_first = halo_ddf["Halo_first"].values
         halo_n = halo_ddf["Halo_n"].values
-        
-        sim_splits = np.where(halo_first == 0)[0]
-        
+
         curr_halo_start = curr_halo_start + np.sum(halo_n) # always increment even if this halo isn't going to be counted
         
         max_nhalo = 500
@@ -99,11 +97,6 @@ def halo_select(sims, ptl_data):
         n_ptls = test_num_ptls[order_halo]
         if order_halo.shape[0] < max_nhalo:
             max_nhalo = order_halo.shape[0]
-            
-        if i < len(sims) - 1:
-            curr_idxs = all_idxs[sim_splits[i]:sim_splits[i+1]]
-        else:
-            curr_idxs = all_idxs[sim_splits[i]:]
                 
         # Load which particles belong to which halo and then sort them corresponding to the size of the halos again
         curr_idxs = curr_idxs[order_halo]
@@ -158,11 +151,11 @@ def load_ke_data(client, curr_test_sims, sim_cosmol, snap_list):
         halo_df = pd.concat(halo_dfs)
         
         # Load the particle information
-        data,scale_pos_weight = load_data(client,curr_test_sims,dset_name,sim_cosmol,limit_files=False)
+        data,scale_pos_weight = load_data(client,curr_test_sims,dset_name,sim_cosmol,prime_snap=snap_list[0],limit_files=False)
         samp_data = halo_select(curr_test_sims,data)
-    r = samp_data[str(snap_list[0]) + "_Scaled_radii"]
-    vr = samp_data[str(snap_list[0]) + "_Radial_vel"]
-    vphys = samp_data[str(snap_list[0]) + "_phys_vel"]
+    r = samp_data["p_Scaled_radii"]
+    vr = samp_data["p_Radial_vel"]
+    vphys = samp_data["p_phys_vel"]
     lnv2 = np.log(vphys**2)
     sparta_labels = samp_data["Orbit_infall"]
     

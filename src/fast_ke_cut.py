@@ -18,7 +18,7 @@ from sparta_tools import sparta
 from utils.calculation_functions import create_stack_mass_prf, filter_prf, calculate_density, calc_mass_acc_rate
 from src.utils.vis_fxns import compare_split_prfs
 from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, parse_ranges, load_sparta_mass_prf, split_sparta_hdf5_name, get_feature_labels, get_model_name, extract_snaps
-from utils.data_and_loading_functions import create_directory, timed, save_pickle, load_pickle, load_SPARTA_data, conv_halo_id_spid, load_config, depair_np
+from utils.data_and_loading_functions import create_directory, timed, save_pickle, load_pickle, load_SPARTA_data, conv_halo_id_spid, load_config, depair_np, set_cosmology
 from src.utils.ke_cut_support import load_ke_data, fast_ke_predictor
 
 config_params = load_config(os.getcwd() + "/config.ini")
@@ -220,7 +220,7 @@ if __name__ == "__main__":
     comb_model_sims = get_combined_name(fast_ke_calib_sims) 
     
     model_type = "kinetic_energy_cut"
-    model_name = get_model_name(model_type, fast_ke_calib_sims, hpo_done=False, opt_param_dict=config_params["OPTIMIZE"])    
+    model_name = get_model_name(model_type, fast_ke_calib_sims)    
     model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"  
     create_directory(model_fldr_loc)
     
@@ -233,9 +233,12 @@ if __name__ == "__main__":
     
     dset_params = load_pickle(ML_dset_path + curr_test_sims[0] + "/dset_params.pickle")
     sim_cosmol = dset_params["cosmology"]
+    all_tdyn_steps = dset_params["t_dyn_steps"]
     
-    feature_columns = get_feature_labels(fast_ke_calib_sims[0],features)
+    feature_columns = get_feature_labels(features,all_tdyn_steps)
     snap_list = extract_snaps(fast_ke_calib_sims[0])
+    cosmol = set_cosmology(sim_cosmol)
+    
     ####################################################################################################################################################################################################################################
     
     if os.path.exists(model_fldr_loc + "ke_fastparams_dict.pickle"):
@@ -261,10 +264,10 @@ if __name__ == "__main__":
     
     r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client, curr_test_sims,sim_cosmol,snap_list)
     
-    r_r200m = my_data[str(snap_list[0]) + "_Scaled_radii"].compute().to_numpy()
-    vr = my_data[str(snap_list[0]) + "_Radial_vel"].compute().to_numpy()
-    vt = my_data[str(snap_list[0]) + "_Tangential_vel"].compute().to_numpy()
-    vphys = my_data[str(snap_list[0]) + "_phys_vel"].compute().to_numpy()
+    r_r200m = my_data["p_Scaled_radii"].compute().to_numpy()
+    vr = my_data["p_Radial_vel"].compute().to_numpy()
+    vt = my_data["p_Tangential_vel"].compute().to_numpy()
+    vphys = my_data["p_phys_vel"].compute().to_numpy()
     sparta_labels = my_data["Orbit_infall"].compute().to_numpy()
     hipids = my_data["HIPIDS"].compute().to_numpy()
     all_pids, ptl_halo_idxs = depair_np(hipids)
@@ -648,13 +651,13 @@ if __name__ == "__main__":
         print("Testing on:", curr_test_sims)
         # Loop through and/or for Train/Test/All datasets and evaluate the model
         
-        r_r200m = my_data[str(snap_list[0]) + "_Scaled_radii"]
-        vr = my_data[str(snap_list[0]) + "_Radial_vel"]
-        vphys = my_data[str(snap_list[0]) + "_phys_vel"]
+        r_r200m = my_data["p_Scaled_radii"]
+        vr = my_data["p_Radial_vel"]
+        vphys = my_data["p_phys_vel"]
         lnv2 = np.log(vphys**2)
         
         #TODO rename the different masks and preds
-        mask_orb, ke_cut_preds = fast_ke_predictor(ke_param_dict,r_r200m,vr,lnv2,r_cut_pred)
+        mask_orb, ke_cut_preds = fast_ke_predictor(ke_param_dict,r_r200m.values.compute(),vr.values.compute(),lnv2.values.compute(),r_cut_pred)
         
         X = my_data[feature_columns]
         y = my_data[target_column]
@@ -704,7 +707,7 @@ if __name__ == "__main__":
         preds = np.zeros(X.shape[0].compute())
         preds[mask_orb] = 1
 
-        calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=X[str(snap_list[0]) + "_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds, prf_bins=bins, use_mp=True, all_z=all_z)
+        calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=X["p_Scaled_radii"].values.compute(), halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds, prf_bins=bins, use_mp=True, all_z=all_z)
 
         # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
         small_halo_fltr = np.isnan(calc_r200m)
@@ -746,9 +749,9 @@ if __name__ == "__main__":
             curr_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"][()]
             # TODO make this generalizable to when the snapshot separation isn't just 1 dynamical time as needed for mass accretion calculation
             # we can just use the secondary snap here because we already chose to do 1 dynamical time for that snap
-            past_z = dset_params["all_snap_info"][snap_list[1] + "_snap_info"]["red_shift"][()] 
+            past_z = dset_params["all_snap_info"]["comp_" + str(all_tdyn_steps[0]) + "_tdstp_snap_info"]["red_shift"][()] 
             p_sparta_snap = dset_params["all_snap_info"]["prime_snap_info"]["sparta_snap"][()]
-            c_sparta_snap = dset_params["all_snap_info"][snap_list[1] + "_snap_info"]["sparta_snap"][()]
+            c_sparta_snap = dset_params["all_snap_info"]["comp_" + str(all_tdyn_steps[0]) + "_tdstp_snap_info"]["sparta_snap"][()]
             
             sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
             
@@ -756,7 +759,7 @@ if __name__ == "__main__":
                     
             # Load the halo's positions and radii
             param_paths = [["halos","R200m"],["halos","id"]]
-            sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, p_snap)
+            sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name)
 
             curr_halos_r200m = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
             curr_halos_ids = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
@@ -789,5 +792,5 @@ if __name__ == "__main__":
             else:
                 plt_macc_splits.remove(macc_split)
                 
-        compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "ke_cut_dens_",prf_name_0="Kinetic Energy Cut", prf_name_1="SPARTA")
-        compare_split_prfs(plt_macc_splits,len(cpy_plt_macc_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + grad_lims + "_ke_cut_macc_dens_", split_name="\Gamma", prf_name_0="Kinetic Energy Cut", prf_name_1="SPARTA")
+        compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + "_grd_" + str(grad_lims[0]) + str(grad_lims[1]) + "_ke_cut_dens_",prf_name_0="Kinetic Energy Cut", prf_name_1="SPARTA")
+        compare_split_prfs(plt_macc_splits,len(cpy_plt_macc_splits),all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_loc,title= "perc_" + str(perc) + "_" + "_grd_" + str(grad_lims[0]) + str(grad_lims[1]) + "_ke_cut_macc_dens_", split_name="\Gamma", prf_name_0="Kinetic Energy Cut", prf_name_1="SPARTA")
