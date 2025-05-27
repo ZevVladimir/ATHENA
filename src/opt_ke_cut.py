@@ -9,7 +9,7 @@ mpl.rcParams.update(mpl.rcParamsDefault)
 import pickle
 from sparta_tools import sparta
 
-from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, split_sparta_hdf5_name, load_SPARTA_data, reform_dataset_dfs, get_model_name, get_feature_labels, extract_snaps
+from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, split_sparta_hdf5_name, load_SPARTA_data, reform_dataset_dfs, get_feature_labels, extract_snaps
 from utils.data_and_loading_functions import create_directory, load_pickle, conv_halo_id_spid, load_config, save_pickle, load_pickle, timed, set_cosmology
 from src.utils.ke_cut_support import load_ke_data, opt_ke_predictor
 from src.utils.vis_fxns import plt_SPARTA_KE_dist, compare_split_prfs
@@ -36,6 +36,7 @@ log_rticks = config_params["EVAL_MODEL"]["log_rticks"]
 
 features = config_params["TRAIN_MODEL"]["features"]
 
+fast_ke_calib_sims = config_params["KE_CUT"]["fast_ke_calib_sims"]
 opt_ke_calib_sims = config_params["KE_CUT"]["opt_ke_calib_sims"]
 perc = config_params["KE_CUT"]["perc"]
 width = config_params["KE_CUT"]["width"]
@@ -99,12 +100,14 @@ def opt_func(bins, r, lnv2, sparta_labels, def_b, plot_loc = "", title = ""):
     
 if __name__ == "__main__":
     client = setup_client()
-    
-    comb_model_sims = get_combined_name(opt_ke_calib_sims) 
     model_type = "kinetic_energy_cut"
-    model_name = get_model_name(model_type, opt_ke_calib_sims)    
-    model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"  
-    create_directory(model_fldr_loc)
+    
+    comb_fast_model_sims = get_combined_name(fast_ke_calib_sims) 
+    comb_opt_model_sims = get_combined_name(opt_ke_calib_sims)   
+     
+    fast_model_fldr_loc = path_to_models + comb_fast_model_sims + "/" + model_type + "/"
+    opt_model_fldr_loc = path_to_models + comb_opt_model_sims + "/" + model_type + "/"  
+    create_directory(opt_model_fldr_loc)
     
     #TODO loop the test sims
     dset_params = load_pickle(ML_dset_path + ke_test_sims[0][0] + "/dset_params.pickle")
@@ -128,7 +131,7 @@ if __name__ == "__main__":
     }
     
     #TODO make this check not necessary just if you want to have this plotted as well
-    param_path = model_fldr_loc + "ke_fastparams_dict.pickle"
+    param_path = fast_model_fldr_loc + "ke_fastparams_dict.pickle"
     if os.path.exists(param_path):
         ke_param_dict = load_pickle(param_path)
         m_pos = ke_param_dict["m_pos"]
@@ -144,12 +147,12 @@ if __name__ == "__main__":
     curr_test_sims = ke_test_sims[0]
     test_comb_name = get_combined_name(curr_test_sims) 
     dset_name = eval_datasets[0]
-    plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
+    plot_loc = opt_model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
     create_directory(plot_loc)
     
-    if os.path.isfile(model_fldr_loc + "ke_optparams_dict.pickle"):
+    if os.path.isfile(opt_model_fldr_loc + "ke_optparams_dict.pickle"):
         print("Loading parameters from saved file")
-        opt_param_dict = load_pickle(model_fldr_loc + "ke_optparams_dict.pickle")
+        opt_param_dict = load_pickle(opt_model_fldr_loc + "ke_optparams_dict.pickle")
         
         with timed("Loading Testing Data"):
             r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=curr_test_sims,sim_cosmol=sim_cosmol,snap_list=snap_list)
@@ -211,7 +214,7 @@ if __name__ == "__main__":
                 "inf_vr_pos": vr_pos,
             }
         
-            save_pickle(opt_param_dict,model_fldr_loc+"ke_optparams_dict.pickle")
+            save_pickle(opt_param_dict,opt_model_fldr_loc+"ke_optparams_dict.pickle")
             
             # if the testing simulations are the same as the model simulations we don't need to reload the data
             if sorted(curr_test_sims) == sorted(opt_ke_calib_sims):

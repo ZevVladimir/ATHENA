@@ -7,7 +7,7 @@ import matplotlib as mpl
 mpl.rcParams.update(mpl.rcParamsDefault)
 import pickle
 
-from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, get_model_name, extract_snaps, get_feature_labels, set_cosmology
+from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, extract_snaps, get_feature_labels, set_cosmology
 from utils.data_and_loading_functions import create_directory, load_pickle, load_config, load_pickle, timed
 from src.utils.ke_cut_support import load_ke_data, fast_ke_predictor, opt_ke_predictor
 from src.utils.vis_fxns import compare_split_prfs_ke
@@ -21,7 +21,6 @@ SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 
 features = config_params["TRAIN_MODEL"]["features"]
 
-model_sims = config_params["TRAIN_MODEL"]["model_sims"]
 eval_datasets = config_params["EVAL_MODEL"]["eval_datasets"]
 plt_nu_splits = parse_ranges(config_params["EVAL_MODEL"]["plt_nu_splits"])
 plt_macc_splits = parse_ranges(config_params["EVAL_MODEL"]["plt_macc_splits"])
@@ -36,23 +35,27 @@ log_tvticks = config_params["EVAL_MODEL"]["log_tvticks"]
 lin_rticks = config_params["EVAL_MODEL"]["lin_rticks"]
 log_rticks = config_params["EVAL_MODEL"]["log_rticks"]
 
+fast_ke_calib_sims = config_params["KE_CUT"]["fast_ke_calib_sims"]
+opt_ke_calib_sims = config_params["KE_CUT"]["opt_ke_calib_sims"]
 r_cut_calib = config_params["KE_CUT"]["r_cut_calib"]
 ke_test_sims = config_params["KE_CUT"]["ke_test_sims"]
     
     
 if __name__ == "__main__":
     client = setup_client()
-    
-    comb_model_sims = get_combined_name(model_sims) 
-    
+
     model_type = "kinetic_energy_cut"
-    model_name = get_model_name(model_type, model_sims)    
-    model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"
+    
+    comb_fast_model_sims = get_combined_name(fast_ke_calib_sims) 
+    comb_opt_model_sims = get_combined_name(opt_ke_calib_sims)   
+      
+    fast_model_fldr_loc = path_to_models + comb_fast_model_sims + "/" + model_type + "/"
+    opt_model_fldr_loc = path_to_models + comb_opt_model_sims + "/" + model_type + "/" 
     
     curr_test_sims = ke_test_sims[0]
     test_comb_name = get_combined_name(curr_test_sims) 
     dset_name = eval_datasets[0]
-    plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
+    plot_loc = opt_model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
     create_directory(plot_loc)
     
     dset_params = load_pickle(ML_dset_path + curr_test_sims[0] + "/dset_params.pickle")
@@ -63,9 +66,9 @@ if __name__ == "__main__":
     snap_list = extract_snaps(curr_test_sims[0])
     cosmol = set_cosmology(sim_cosmol)
     
-    if os.path.isfile(model_fldr_loc + "ke_optparams_dict.pickle"):
+    if os.path.isfile(opt_model_fldr_loc + "ke_optparams_dict.pickle"):
         print("Loading parameters from saved file")
-        opt_param_dict = load_pickle(model_fldr_loc + "ke_optparams_dict.pickle")
+        opt_param_dict = load_pickle(opt_model_fldr_loc + "ke_optparams_dict.pickle")
         
         with timed("Loading Testing Data"):
             r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=curr_test_sims,sim_cosmol=sim_cosmol,snap_list=snap_list)
@@ -84,7 +87,7 @@ if __name__ == "__main__":
             sparta_orb = np.where(sparta_labels_test == 1)[0]
             sparta_inf = np.where(sparta_labels_test == 0)[0]
     else:
-        raise FileNotFoundError(f"Expected to find optimized parameters at {os.path.join(model_fldr_loc, 'ke_optparams_dict.pickle')}")
+        raise FileNotFoundError(f"Expected to find optimized parameters at {os.path.join(opt_model_fldr_loc, 'ke_optparams_dict.pickle')}")
 
             
     act_mass_prf_all, act_mass_prf_orb, all_masses, bins = load_sparta_mass_prf(sim_splits,all_idxs,curr_test_sims)
@@ -121,12 +124,10 @@ if __name__ == "__main__":
         tot_num_halos = halo_n.shape[0]
         min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
         
-    
-        
         mask_vr_neg = (vr_test < 0)
         mask_vr_pos = ~mask_vr_neg
 
-        ke_fastparam_dict = load_pickle(model_fldr_loc + "ke_fastparams_dict.pickle")
+        ke_fastparam_dict = load_pickle(fast_model_fldr_loc + "ke_fastparams_dict.pickle")
     
         
         simp_mask_orb, preds_simp_ke = fast_ke_predictor(ke_fastparam_dict,r_test,vr_test,lnv2_test,r_cut_calib)
