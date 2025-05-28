@@ -27,6 +27,8 @@ ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 path_to_models = config_params["PATHS"]["path_to_models"]
 rockstar_ctlgs_path = config_params["PATHS"]["rockstar_ctlgs_path"]
 
+pickle_data = config_params["MISC"]["pickle_data"]
+
 SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 
 features = config_params["TRAIN_MODEL"]["features"]
@@ -759,7 +761,7 @@ if __name__ == "__main__":
                     
             # Load the halo's positions and radii
             param_paths = [["halos","R200m"],["halos","id"]]
-            sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name)
+            sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, pickle_data=pickle_data)
 
             curr_halos_r200m = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
             curr_halos_ids = sparta_params[sparta_param_names[1]][:,p_sparta_snap]

@@ -243,7 +243,7 @@ def halo_loop(ptl_idx, curr_iter, num_iter, indices, halo_splits, snap_dict, use
             # Load the halo information for the ids within this range
             param_paths = [["halos","R200m"],["halos","position"],["halos","ptl_oct_first"],["halos","ptl_oct_n"],["halos","velocity"],["tcr_ptl","res_oct","last_pericenter_snap"],\
                 ["tcr_ptl","res_oct","n_pericenter"],["tcr_ptl","res_oct","tracer_id"],["tcr_ptl","res_oct","n_is_lower_limit"],["anl_prf","M_all"],["anl_prf","M_1halo"],["config","anl_prf","r_bins_lin"]]
-            sparta_params, sparta_param_names = load_SPARTA_data(sparta_HDF5_path, param_paths, sparta_search_name)
+            sparta_params, sparta_param_names = load_SPARTA_data(sparta_HDF5_path, param_paths, sparta_search_name ,pickle_data=pickle_data)
 
             use_halos_r200m = sparta_params[sparta_param_names[0]][use_indices,curr_sparta_snap]
             use_halos_pos = sparta_params[sparta_param_names[1]][use_indices,curr_sparta_snap] * 10**3 * curr_a
@@ -458,7 +458,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
         with timed("p_snap SPARTA load"):
             param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"],["simulation","particle_mass"]]
                 
-            sparta_params, sparta_param_names = load_SPARTA_data(sparta_HDF5_path, param_paths, curr_sparta_file)
+            sparta_params, sparta_param_names = load_SPARTA_data(sparta_HDF5_path, param_paths, curr_sparta_file, pickle_data=pickle_data)
 
             p_halos_pos = sparta_params[sparta_param_names[0]][:,p_sparta_snap,:] * 10**3 * prime_a # convert to kpc/h
             p_halos_r200m = sparta_params[sparta_param_names[1]][:,p_sparta_snap]

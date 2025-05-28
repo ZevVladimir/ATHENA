@@ -235,7 +235,7 @@ def sim_mass_p_z(sim,config_params):
     
     param_paths = [["simulation","particle_mass"]]
             
-    sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name)
+    sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, pickle_data=pickle_data)
     ptl_mass = sparta_params[sparta_param_names[0]]
     
     return ptl_mass, p_red_shift
@@ -442,7 +442,7 @@ def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"      
         
         param_paths = [["halos","id"],["simulation","particle_mass"]]
-        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name)
+        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, pickle_data=pickle_data)
         halos_ids = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
         ptl_mass = sparta_params[sparta_param_names[1]]
  
@@ -592,7 +592,7 @@ def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, sim_cosmol
                     
             # Load the halo's positions and radii
             param_paths = [["halos","R200m"]]
-            sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name)
+            sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, pickle_data=pickle_data)
             p_halos_r200m = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
 
             p_halos_r200m = p_halos_r200m[curr_idxs]

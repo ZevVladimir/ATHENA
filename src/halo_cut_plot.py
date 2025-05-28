@@ -19,6 +19,8 @@ SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 path_to_models = config_params["PATHS"]["path_to_models"]
 
+pickle_data = config_params["MISC"]["pickle_data"]
+
 curr_sparta_file = config_params["SPARTA_DATA"]["curr_sparta_file"]
 snap_dir_format = config_params["SNAP_DATA"]["snap_dir_format"]
 snap_format = config_params["SNAP_DATA"]["snap_format"]
@@ -68,7 +70,7 @@ with open(ML_dset_path + sim + "/dset_params.pickle", "rb") as file:
 curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
 
 param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"],["simulation","particle_mass"]]
-sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, curr_sparta_file)
+sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, curr_sparta_file, pickle_data=pickle_data)
 
 halos_pos = sparta_params[sparta_param_names[0]][:,p_sparta_snap,:] * 10**3 * p_scale_factor # convert to kpc/h
 halos_r200m = sparta_params[sparta_param_names[1]][:,p_sparta_snap]

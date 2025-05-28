@@ -12,6 +12,8 @@ config_params = load_config(os.getcwd() + "/config.ini")
 path_to_models = config_params["PATHS"]["path_to_models"]
 ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 
+pickle_data = config_params["MISC"]["pickle_data"]
+
 features = config_params["TRAIN_MODEL"]["features"]
 target_column = config_params["TRAIN_MODEL"]["target_column"]
 model_sims = config_params["TRAIN_MODEL"]["model_sims"]

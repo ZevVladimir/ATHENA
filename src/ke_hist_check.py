@@ -20,6 +20,8 @@ path_to_models = config_params["PATHS"]["path_to_models"]
 SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 debug_plt_path = config_params["PATHS"]["debug_plt_path"]
 
+pickle_data = config_params["MISC"]["pickle_data"]
+
 features = config_params["TRAIN_MODEL"]["features"]
 target_column = config_params["TRAIN_MODEL"]["target_column"]
 
@@ -106,7 +108,7 @@ if __name__ == "__main__":
         curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5" 
         
         param_paths = [["config","anl_prf","r_bins_lin"]]
-        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name)
+        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, pickle_data=pickle_data)
         bins = sparta_params[sparta_param_names[0]]
         bins = np.insert(bins, 0, 0)
         

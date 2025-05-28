@@ -23,6 +23,8 @@ config_params = load_config(os.getcwd() + "/config.ini")
 ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 path_to_models = config_params["PATHS"]["path_to_models"]
 
+pickle_data = config_params["MISC"]["pickle_data"]
+
 snap_path = config_params["SNAP_DATA"]["snap_path"]
 SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 curr_sparta_file = config_params["SPARTA_DATA"]["curr_sparta_file"]
@@ -112,7 +114,7 @@ if __name__ == "__main__":
         p_scale_factor = dset_params["p_snap_info"]["scale_factor"][()]
         p_sparta_snap = dset_params["p_snap_info"]["sparta_snap"]
 
-    halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_SPARTA_data(sparta_HDF5_path,sparta_search_name, p_scale_factor, p_snap, p_sparta_snap)
+    halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_SPARTA_data(sparta_HDF5_path,sparta_search_name, p_scale_factor, p_snap, p_sparta_snap, pickle_data=pickle_data)
 
     p_snap_path = snap_path + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
 

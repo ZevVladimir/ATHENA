@@ -124,7 +124,7 @@ def load_ptl_param(sparta_name, param_name, snap, snap_path):
 
     return ptl_param
 
-def load_SPARTA_data(sparta_HDF5_path, param_path_list, sparta_name):
+def load_SPARTA_data(sparta_HDF5_path, param_path_list, sparta_name, pickle_data=False):
     create_directory(pickled_path + str(sparta_name) + "/")
     
     reload_sparta = False
@@ -143,7 +143,8 @@ def load_SPARTA_data(sparta_HDF5_path, param_path_list, sparta_name):
                 reload_sparta = True
         
             param = reduce(lambda dct, key: dct[key], param_path, sparta_output)
-            save_pickle(param,pickled_path + str(sparta_name) +  "/" + save_name + ".pickle")
+            if pickle_data:
+                save_pickle(param,pickled_path + str(sparta_name) +  "/" + save_name + ".pickle")
 
         param_dict[save_name] = param
 
