@@ -23,12 +23,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
     '--config',
     type=str,
-    default='config.ini', 
+    default=os.getcwd() + "/config.ini", 
     help='Path to config file (default: config.ini)'
 )
 
 args = parser.parse_args()
-config_params = load_config(os.getcwd() + "/" + args.config)
+config_params = load_config(args.config)
 
 curr_sparta_file = config_params["SPARTA_DATA"]["curr_sparta_file"]
 known_snaps = config_params["SNAP_DATA"]["known_snaps"]
@@ -382,6 +382,7 @@ def halo_loop(ptl_idx, curr_iter, num_iter, indices, halo_splits, snap_dict, use
 
 with timed("Generating Datasets for " + curr_sparta_file):
     with timed("Startup"):
+        #TODO check if dset_params exists with right number of snaps
         if reset_lvl <= 1 and len(known_snaps) > 0:
             save_location = ML_dset_path + curr_sparta_file + "_" + "_".join(str(x) for x in known_snaps) + "/"
             dset_params = load_pickle(save_location+"dset_params.pickle")
@@ -507,7 +508,8 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     all_ptl_snap_list.append(c_snap)
 
                     all_snap_info["comp_" + str(t_dyn_step[0]) + "_tdstp_snap_info"] = c_snap_dict
-        c_halos_status = sparta_params[sparta_param_names[3]][:,c_sparta_snap]
+        if len(all_tdyn_steps) > 0:
+            c_halos_status = sparta_params[sparta_param_names[3]][:,c_sparta_snap]
 
         all_ptl_snap_list.sort()
         all_ptl_snap_list.reverse()
@@ -528,7 +530,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
             match_halo_idxs = load_pickle(save_location + "match_halo_idxs.pickle")
         else:
             # only take halos that are hosts in primary snap and exist past the p_snap 
-            orig_match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap) & (c_halos_status > 0))[0]
+            
             match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap))[0]
             
             with mp.Pool(processes=num_processes) as p:           
@@ -545,23 +547,25 @@ with timed("Generating Datasets for " + curr_sparta_file):
                 
                 save_pickle(num_ptls,save_location + "num_ptls.pickle")
                 save_pickle(match_halo_idxs,save_location + "match_halo_idxs.pickle")
-                
-            with mp.Pool(processes=num_processes) as p:           
-                # halo position, halo r200m, if comparison snap, want mass?, want indices?
-                test_num_ptls = p.starmap(init_search, zip(repeat(True), p_halos_pos[orig_match_halo_idxs], p_halos_r200m[orig_match_halo_idxs], repeat(1.0), repeat(False), repeat(False)), chunksize=mp_chunk_size)
-                
-                # We want to remove any halos that have less than 200 particles as they are too noisy
-                test_num_ptls = np.array(test_num_ptls)
-                test_res_mask = np.where(test_num_ptls >= 200)[0]
+            
+            if len(all_tdyn_steps) > 0:
+                orig_match_halo_idxs = np.where((p_halos_status == 10) & (p_halos_last_snap >= p_sparta_snap) & (c_halos_status > 0))[0]
+                with mp.Pool(processes=num_processes) as p:           
+                    # halo position, halo r200m, if comparison snap, want mass?, want indices?
+                    test_num_ptls = p.starmap(init_search, zip(repeat(True), p_halos_pos[orig_match_halo_idxs], p_halos_r200m[orig_match_halo_idxs], repeat(1.0), repeat(False), repeat(False)), chunksize=mp_chunk_size)
+                    
+                    # We want to remove any halos that have less than 200 particles as they are too noisy
+                    test_num_ptls = np.array(test_num_ptls)
+                    test_res_mask = np.where(test_num_ptls >= 200)[0]
 
-                if test_res_mask.size > 0:
-                    orig_match_halo_idxs = orig_match_halo_idxs[test_res_mask]
-            
-            symmetric_diff = np.setxor1d(orig_match_halo_idxs, match_halo_idxs)
-            print("Num of halos that didn't exist before:", symmetric_diff.shape)
-            
-            p.close()
-            p.join() 
+                    if test_res_mask.size > 0:
+                        orig_match_halo_idxs = orig_match_halo_idxs[test_res_mask]
+                
+                symmetric_diff = np.setxor1d(orig_match_halo_idxs, match_halo_idxs)
+                print("Num of halos that didn't exist before:", symmetric_diff.shape)
+                
+                p.close()
+                p.join() 
             
         tot_num_ptls = np.sum(num_ptls)   
         total_num_halos = match_halo_idxs.shape[0]
