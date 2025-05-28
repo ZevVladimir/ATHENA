@@ -5,7 +5,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 from colossus.cosmology import cosmology
 import h5py
-import pickle
+import matplotlib.pyplot as plt
 import os
 import multiprocessing as mp
 from itertools import repeat
@@ -111,7 +111,7 @@ def init_search(use_prim_tree, halo_positions, halo_r200m, search_rad, find_mass
         ptl_tree = p_ptl_tree
     else:
         ptl_tree = curr_ptl_tree
-    
+
     if halo_r200m > 0:
         #find how many particles we are finding
         indices = ptl_tree.query_ball_point(halo_positions, r = search_rad * halo_r200m)
@@ -178,6 +178,17 @@ def search_halos(ret_labels, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_p
     scaled_tang_vel = fnd_tang_vel / curr_v200m
     scaled_radii = ptl_rad / halo_r200m
     scaled_phys_vel = phys_vel / curr_v200m
+    if not ret_labels:
+        if np.where(scaled_radii > 4)[0].shape[0] > 0:
+            print(ptl_rad[:10])
+            print(halo_r200m)
+            print(np.where(scaled_radii > 4)[0].shape)
+            fig,ax = plt.subplots(1)
+            ax.scatter(curr_ptl_pos[:,0],curr_ptl_pos[:,1],c="blue")
+            ax.scatter(halo_pos[0],halo_pos[1],c="red",s=10)
+            circle = plt.Circle((halo_pos[0],halo_pos[1]), halo_r200m, color='green', fill=False, linewidth=4)
+            ax.add_patch(circle)
+            fig.savefig(debug_plt_path + str(curr_halo_idx) + ".png")
     
     scaled_radii_inds = scaled_radii.argsort()
     scaled_radii = scaled_radii[scaled_radii_inds]
@@ -185,7 +196,7 @@ def search_halos(ret_labels, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_p
     scaled_rad_vel = scaled_rad_vel[scaled_radii_inds]
     scaled_tang_vel = scaled_tang_vel[scaled_radii_inds]
     scaled_phys_vel = scaled_phys_vel[scaled_radii_inds]
-
+    
     if ret_labels:
         curr_orb_assn = curr_orb_assn[scaled_radii_inds]
     
@@ -213,21 +224,22 @@ def search_halos(ret_labels, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_p
     else:
         return fnd_HIPIDs, scaled_rad_vel, scaled_tang_vel, scaled_radii, scaled_phys_vel
 
-def halo_loop(ptl_idx, curr_iter, num_iter, indices, halo_splits, snap_dict, use_prim_tree, ptls_pid, ptls_pos, ptls_vel, ret_labels):
+def halo_loop(ptl_idx, curr_iter, num_iter, indices, halo_splits, snap_dict, use_prim_tree, ptls_pid, ptls_pos, ptls_vel, ret_labels, name = "Train"):
         if debug_mem == 1:
             print(f"Initial memory usage: {memory_usage() / 1024**3:.2f} GB")
         
         curr_snap = snap_dict["ptl_snap"]
         curr_sparta_snap = snap_dict["sparta_snap"]
         curr_a = snap_dict["scale_factor"]
-            
+        
+        #TODO move use_indices finding outside the function?
         with timed("Split "+str(curr_iter+1)+"/"+str(num_iter)):
             # Get the indices corresponding to where we are in the number of iterations (0:num_halo_persplit) -> (num_halo_persplit:2*num_halo_persplit) etc
             if curr_iter < (num_iter - 1):
                 use_indices = indices[halo_splits[curr_iter]:halo_splits[curr_iter+1]]
             else:
                 use_indices = indices[halo_splits[curr_iter]:]
-            
+
             # Load the halo information for the ids within this range
             param_paths = [["halos","R200m"],["halos","position"],["halos","ptl_oct_first"],["halos","ptl_oct_n"],["halos","velocity"],["tcr_ptl","res_oct","last_pericenter_snap"],\
                 ["tcr_ptl","res_oct","n_pericenter"],["tcr_ptl","res_oct","tracer_id"],["tcr_ptl","res_oct","n_is_lower_limit"],["anl_prf","M_all"],["anl_prf","M_1halo"],["config","anl_prf","r_bins_lin"]]
@@ -246,7 +258,7 @@ def halo_loop(ptl_idx, curr_iter, num_iter, indices, halo_splits, snap_dict, use
             mass_prf_orb = sparta_params[sparta_param_names[10]][use_indices,curr_sparta_snap]
             bins = sparta_params[sparta_param_names[11]]
             bins = np.insert(bins, 0, 0)
-            
+
             with mp.Pool(processes=num_processes) as p:
                 # halo position, halo r200m, if comparison snap, want mass?, want indices?
                 use_num_ptls, curr_ptl_indices = zip(*p.starmap(init_search, zip(repeat(use_prim_tree), use_halos_pos, use_halos_r200m, \
@@ -257,10 +269,10 @@ def halo_loop(ptl_idx, curr_iter, num_iter, indices, halo_splits, snap_dict, use
             # Remove halos with 0 ptls around them
             use_num_ptls = np.array(use_num_ptls)
             curr_ptl_indices = np.array(curr_ptl_indices, dtype=object)
-            has_ptls = np.where(use_num_ptls > 0)[0]
-            use_num_ptls = use_num_ptls[has_ptls]
-            curr_ptl_indices = curr_ptl_indices[has_ptls]
-            use_indices = use_indices[has_ptls]
+            # has_ptls = np.where(use_num_ptls > 0)[0]
+            # use_num_ptls = use_num_ptls[has_ptls]
+            # curr_ptl_indices = curr_ptl_indices[has_ptls]
+            # use_indices = use_indices[has_ptls]
             curr_num_halos = curr_ptl_indices.shape[0]
 
             # We need to correct for having previous halos being searched so the final halo_first quantity is for all halos
@@ -274,33 +286,80 @@ def halo_loop(ptl_idx, curr_iter, num_iter, indices, halo_splits, snap_dict, use
             create_dens_prfs = np.zeros(curr_num_halos)
             if debug_indiv_dens_prf:
                 create_dens_prfs[:1] = 1
-            with mp.Pool(processes=num_processes) as p:
-                results = tuple(zip(*p.starmap(search_halos, 
-                               zip(repeat(ret_labels), repeat(snap_dict), use_indices,
-                                   (ptls_pid[curr_ptl_indices[i].astype(int)] for i in range(curr_num_halos)), 
-                                   (ptls_pos[curr_ptl_indices[j].astype(int)] for j in range(curr_num_halos)),
-                                   (ptls_vel[curr_ptl_indices[k].astype(int)] for k in range(curr_num_halos)),
-                                   (use_halos_pos[l,:] for l in range(curr_num_halos)),
-                                   (use_halos_v[l,:] for l in range(curr_num_halos)),
-                                   (use_halos_r200m[l] for l in range(curr_num_halos)),
-                                   (last_peri_snap[halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
-                                   (n_peri[halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
-                                   (tracer_id[halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
-                                   (n_lower_lim[halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
-                                   (mass_prf_all[l,:] for l in range(curr_num_halos)),
-                                   (mass_prf_orb[l,:] for l in range(curr_num_halos)),
-                                   repeat(bins),
-                                   (create_dens_prfs[i] for i in range(curr_num_halos)),
-                                   ),
-                               chunksize=mp_chunk_size)))
+                
+            # with mp.Pool(processes=num_processes) as p:
+            #     results = tuple(zip(*p.starmap(search_halos, 
+            #                    zip(repeat(ret_labels), repeat(snap_dict), use_indices,
+            #                        (ptls_pid[curr_ptl_indices[i].astype(int)] for i in range(curr_num_halos)), 
+            #                        (ptls_pos[curr_ptl_indices[j].astype(int)] for j in range(curr_num_halos)),
+            #                        (ptls_vel[curr_ptl_indices[k].astype(int)] for k in range(curr_num_halos)),
+            #                        (use_halos_pos[l,:] for l in range(curr_num_halos)),
+            #                        (use_halos_v[l,:] for l in range(curr_num_halos)),
+            #                        (use_halos_r200m[l] for l in range(curr_num_halos)),
+            #                        (last_peri_snap[halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
+            #                        (n_peri[halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
+            #                        (tracer_id[halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
+            #                        (n_lower_lim[halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
+            #                        (mass_prf_all[l,:] for l in range(curr_num_halos)),
+            #                        (mass_prf_orb[l,:] for l in range(curr_num_halos)),
+            #                        repeat(bins),
+            #                        (create_dens_prfs[l] for l in range(curr_num_halos)),
+            #                        ),
+            #                    chunksize=mp_chunk_size)))
 
-                if ret_labels:
-                    (all_HIPIDs, all_orb_assn, all_rad_vel, all_tang_vel, all_scal_rad, all_phys_vel) = results
-                else:
-                    (all_HIPIDs, all_rad_vel, all_tang_vel, all_scal_rad, all_phys_vel) = results
+            #     if ret_labels:
+            #         (all_HIPIDs, all_orb_assn, all_rad_vel, all_tang_vel, all_scal_rad, all_phys_vel) = results
+            #     else:
+            #         (all_HIPIDs, all_rad_vel, all_tang_vel, all_scal_rad, all_phys_vel) = results
 
-            p.close()
-            p.join()
+            # p.close()
+            # p.join()
+            
+            results_list = []
+            for i in range(curr_num_halos):
+                result = search_halos(
+                    ret_labels,
+                    snap_dict,
+                    use_indices[i],
+                    ptls_pid[curr_ptl_indices[i].astype(int)],
+                    ptls_pos[curr_ptl_indices[i].astype(int)],
+                    ptls_vel[curr_ptl_indices[i].astype(int)],
+                    use_halos_pos[i, :],
+                    use_halos_v[i, :],
+                    use_halos_r200m[i],
+                    last_peri_snap[halo_first[i]:halo_first[i]+halo_n[i]],
+                    n_peri[halo_first[i]:halo_first[i]+halo_n[i]],
+                    tracer_id[halo_first[i]:halo_first[i]+halo_n[i]],
+                    n_lower_lim[halo_first[i]:halo_first[i]+halo_n[i]],
+                    mass_prf_all[i, :],
+                    mass_prf_orb[i, :],
+                    bins,
+                    create_dens_prfs[i],
+                )
+                results_list.append(result)
+
+            # Unzip results
+            results = tuple(zip(*results_list))
+
+            if ret_labels:
+                all_HIPIDs, all_orb_assn, all_rad_vel, all_tang_vel, all_scal_rad, all_phys_vel = results
+            else:
+                all_HIPIDs, all_rad_vel, all_tang_vel, all_scal_rad, all_phys_vel = results
+            
+            # if not ret_labels:
+            #     box_size = snap_dict["box_size"]
+            #     for i in range(5):
+            #         fig,ax = plt.subplots(1)
+            #         ax.scatter(ptls_pos[curr_ptl_indices[i].astype(int),0],ptls_pos[curr_ptl_indices[i].astype(int),1],c="blue")
+            #         ax.scatter(use_halos_pos[i,0],use_halos_pos[i,1],c="red",s=10)
+            #         circle = plt.Circle((use_halos_pos[i,0],use_halos_pos[i,1]), use_halos_r200m[i], color='green', fill=False, linewidth=4)
+            #         ax.add_patch(circle)
+            #         fig.savefig(debug_plt_path + str(i) + "_" + name + ".png")
+            #         ptl_rad, coord_dist = calc_radius(use_halos_pos[i,0], use_halos_pos[i,1], use_halos_pos[i,2], ptls_pos[curr_ptl_indices[i].astype(int),0], ptls_pos[curr_ptl_indices[i].astype(int),1], ptls_pos[curr_ptl_indices[i].astype(int),2], box_size)
+            #         print(ptl_rad[:10])
+            #         print(use_halos_r200m[i])
+            #         print(np.where(ptl_rad/use_halos_r200m[i] > 4)[0].shape)
+            #         # print(all_scal_rad[start_num_ptls[i]: start_num_ptls[i] + use_num_ptls[i]])
             
             all_HIPIDs = np.concatenate(all_HIPIDs, axis = 0)
             all_rad_vel = np.concatenate(all_rad_vel, axis = 0)
@@ -323,11 +382,8 @@ def halo_loop(ptl_idx, curr_iter, num_iter, indices, halo_splits, snap_dict, use
 
 with timed("Generating Datasets for " + curr_sparta_file):
     with timed("Startup"):
-            
-            
         if reset_lvl <= 1 and len(known_snaps) > 0:
             save_location = ML_dset_path + curr_sparta_file + "_" + "_".join(str(x) for x in known_snaps) + "/"
-
             dset_params = load_pickle(save_location+"dset_params.pickle")
 
         if reset_lvl <= 1:
@@ -448,9 +504,9 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     comp_a = c_snap_dict["scale_factor"]
                     c_hubble_const = c_snap_dict["hubble_const"]
                     c_box_size = c_snap_dict["box_size"]
-                    
                     all_ptl_snap_list.append(c_snap)
-                    all_snap_info["comp_" + str(t_dyn_step) + "tdstp_snap_info"] = c_snap_dict
+
+                    all_snap_info["comp_" + str(t_dyn_step[0]) + "_tdstp_snap_info"] = c_snap_dict
         c_halos_status = sparta_params[sparta_param_names[3]][:,c_sparta_snap]
 
         all_ptl_snap_list.sort()
@@ -637,7 +693,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         "Halo_R200m":use_halos_r200m,
                     })
                     halo_df.to_hdf(save_location + "Train/halo_info/halo_" + str(i+train_start_pnt) + ".h5", key='data', mode='w',format='table')  
-                    
+
                     ptl_df = pd.DataFrame({
                         "HIPIDS":train_p_HIPIDs,
                         "Orbit_infall":p_orb_assn,
@@ -666,7 +722,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     save_rad_vel[save_rad_vel == 0] = np.nan
                     save_tang_vel[save_tang_vel == 0] = np.nan
                     save_phys_vel[save_phys_vel == 0] = np.nan
-                            
+
                     ptl_df = pd.DataFrame({
                         str(all_tdyn_steps[i-1]) + "_Scaled_radii":save_scale_rad,
                         str(all_tdyn_steps[i-1]) + "_Radial_vel":save_rad_vel,
@@ -701,7 +757,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         "Halo_R200m":use_halos_r200m,
                     })
                     halo_df.to_hdf(save_location + "Test/halo_info/halo_" + str(i+test_start_pnt) + ".h5", key='data', mode='w',format='table')  
-                    
+
                     ptl_df = pd.DataFrame({
                         "HIPIDS":test_p_HIPIDs,
                         "Orbit_infall":p_orb_assn,
@@ -713,7 +769,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                 else:
                     ret_labels = False
                     c_HIPIDs, c_rad_vel, c_tang_vel, c_scale_rad, c_phys_vel = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=test_num_iter, indices=test_idxs, \
-                        halo_splits=test_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=False, ptls_pid=curr_ptls_pid, ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels)
+                        halo_splits=test_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=False, ptls_pid=curr_ptls_pid, ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels,name="Test")
 
                     match_hipid_idx = np.intersect1d(test_p_HIPIDs, c_HIPIDs, return_indices=True)
                     
@@ -730,7 +786,8 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     save_rad_vel[save_rad_vel == 0] = np.nan
                     save_tang_vel[save_tang_vel == 0] = np.nan
                     save_phys_vel[save_phys_vel == 0] = np.nan
-                            
+                    print(save_scale_rad)
+                    print(np.where(save_scale_rad > 4)[0].shape)
                     ptl_df = pd.DataFrame({
                         str(all_tdyn_steps[i-1]) + "_Scaled_radii":save_scale_rad,
                         str(all_tdyn_steps[i-1]) + "_Radial_vel":save_rad_vel,

@@ -168,7 +168,7 @@ def fast_ke_predictor(fast_param_dict, r_r200m, vr, lnv2, r200m_cut):
     m_neg = fast_param_dict["m_neg"]
     b_neg = fast_param_dict["b_neg"]
     
-    preds = np.zeros(r_r200m.shape[0])
+    preds = np.zeros(r_r200m.shape[0],dtype=np.int8)
     
     mask_vr_neg = (vr < 0)
     mask_vr_pos = ~mask_vr_neg
@@ -189,7 +189,7 @@ def fast_ke_predictor(fast_param_dict, r_r200m, vr, lnv2, r200m_cut):
 
 def opt_ke_predictor(opt_param_dict, bins, r_r200m, vr, lnv2, r200m_cut):
     bin_indices = np.digitize(r_r200m, bins) - 1  
-    preds_fit_ke = np.zeros(r_r200m.shape[0])
+    preds_fit_ke = np.zeros(r_r200m.shape[0],dtype=np.int8)
     for i in range(bins.shape[0]-1):
         if bins[i] <= r200m_cut:
             mask_pos = (bin_indices == i) & (vr > 0) & (lnv2 <= opt_param_dict["inf_vr_pos"]["b"][i])

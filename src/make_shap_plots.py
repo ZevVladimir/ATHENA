@@ -29,7 +29,6 @@ if __name__ == '__main__':
         model_name = get_model_name(model_type, model_sims)    
         model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"
         model_save_loc = model_fldr_loc + model_name + ".json"
-        gen_plot_save_loc = model_fldr_loc + "plots/"
         
         dset_params = load_pickle(ML_dset_path + model_sims[0] + "/dset_params.pickle")
         sim_cosmol = dset_params["cosmology"]
@@ -85,67 +84,58 @@ if __name__ == '__main__':
             orb_in_dict = {
                 'X_filter': {
                     "p_Scaled_radii": ('<',0.2),
-                    "p_Radial_vel": ('<',0.6),
-                    "p_Radial_vel": ('>',-0.6)
+                    "p_Radial_vel": [('<',0.6),('>',-0.6)]
                 },
                 'label_filter': {
-                    'act':1,
-                    'pred':0
+                    "sparta":1,
+                    "pred":0
                 }
             }
             
             orb_out_dict = {
                 'X_filter': {
-                    "p_Scaled_radii": ('>',0.5),
-                    "p_Scaled_radii": ('<',1),
-                    "p_Radial_vel": ('<',0.6),
-                    "p_Radial_vel": ('>',0)
+                    "p_Scaled_radii": [('>',0.5),('<',1)],
+                    "p_Radial_vel": [('<',0.6),('>',0)]
                 },
                 'label_filter': {
-                    'act':1,
-                    'pred':0
+                    "sparta":1,
+                    "pred":0
                 }
             }
             
             orb_bad_misclass_dict = {
                 'X_filter': {
-                    "p_Scaled_radii": ('>',0.3),
-                    "p_Scaled_radii": ('<',0.5),
-                    "p_Radial_vel": ('<',0.6),
-                    "p_Radial_vel": ('>',-0.6)
+                    "p_Scaled_radii": [('>',0.3),('<',0.5)],
+                    "p_Radial_vel": [('<',0.6),('>',-0.6)]
                 },
                 'label_filter': {
-                    'act':1,
-                    'pred':0
+                    "sparta":1,
+                    "pred":0
                 }
             }        
             
             orb_bad_corr_dict = {
                 'X_filter': {
-                    "p_Scaled_radii": ('>',0.3),
-                    "p_Scaled_radii": ('<',0.5),
-                    "p_Radial_vel": ('<',0.6),
-                    "p_Radial_vel": ('>',-0.6)
+                    "p_Scaled_radii": [('>',0.3),('<',0.5)],
+                    "p_Radial_vel": [('<',0.6),('>',-0.6)]
                 },
                 'label_filter': {
-                    'act':1,
-                    'pred':1
+                    "sparta":1,
+                    "pred":1
                 }
             }       
             
             in_btwn_dict = {
                 'X_filter': {
-                    "p_Scaled_radii": ('>',0.3),
-                    "p_Scaled_radii": ('<',0.5),
-                    "p_Radial_vel": ('<',0.6),
-                    "p_Radial_vel": ('>',-0.6)
+                    "p_Scaled_radii": [('>',0.3),('<',0.5)],
+                    "p_Radial_vel": [('<',0.6),('>',-0.6)]
                 },
             }
             
             test_dict = {
                 'label_filter':{
-                    'pred':1,
-                    'act':1,
+                    "pred":1,
+                    "sparta":1,
                     }
             }
             
@@ -168,7 +158,7 @@ if __name__ == '__main__':
             # bad_orb_corr_shap_values = all_shap_values[bad_orb_corr_fltr]
             # all_shap,all_shap_values, all_X = shap_with_filter(explainer,X=X_df,y=y_df,preds=preds,col_names=new_columns)
             # in_btwn_shap,in_btwn_shap_values = shap_with_filter(explainer,in_btwn_dict,X_df,y_df,preds,new_columns,sample=0.0001)
-
+    
             all_ptl_explnr, all_ptl_shap, all_ptl_X = shap_with_filter(explainer,X_df,y_df,preds,col_names=new_columns,max_size=5000)
             no_sec_explnr, no_sec_shap, no_sec_X = shap_with_filter(explainer,X_df,y_df,preds,fltr_dic=no_second_dict,col_names=new_columns,max_size=5000)
             

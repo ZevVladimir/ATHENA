@@ -129,7 +129,7 @@ if __name__ == "__main__":
 
         ke_fastparam_dict = load_pickle(fast_model_fldr_loc + "ke_fastparams_dict.pickle")
     
-        
+        #TODO rename simp to fast
         simp_mask_orb, preds_simp_ke = fast_ke_predictor(ke_fastparam_dict,r_test,vr_test,lnv2_test,r_cut_calib)
         
         preds_fit_ke = opt_ke_predictor(opt_param_dict, bins, r_test, vr_test, lnv2_test, r_cut_calib)

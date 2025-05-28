@@ -738,40 +738,44 @@ def filter_ddf(X, y = None, preds = None, fltr_dic = None, col_names = None, max
         full_filter = None
         if fltr_dic is not None:
             if "X_filter" in fltr_dic:
-                for feature, (operator, value) in fltr_dic["X_filter"].items():
-                    if operator == '>':
-                        condition = X[feature] > value
-                    elif operator == '<':
-                        condition = X[feature] < value
-                    elif operator == '>=':
-                        condition = X[feature] >= value
-                    elif operator == '<=':
-                        condition = X[feature] <= value
-                    elif operator == '==':
-                        if value == "nan":
-                            condition = X[feature].isna()
-                        else:
-                            condition = X[feature] == value
-                    elif operator == '!=':
-                        condition = X[feature] != value
-                        
-                    if feature == next(iter(fltr_dic[next(iter(fltr_dic))])):
-                        full_filter = condition
-                    else:
-                        full_filter &= condition
+                for feature, conditions in fltr_dic["X_filter"].items():
+                    if not isinstance(conditions, list):
+                        conditions = [conditions]
+                    for operator, value in conditions:
+                        if operator == '>':
+                            condition = X[feature] > value               
+                        elif operator == '<':
+                            condition = X[feature] < value    
+                        elif operator == '>=':
+                            condition = X[feature] >= value
+                        elif operator == '<=':
+                            condition = X[feature] <= value
+                        elif operator == '==':
+                            if value == "nan":
+                                condition = X[feature].isna()
+                            else:
+                                condition = X[feature] == value
+                        elif operator == '!=':
+                            condition = X[feature] != value
+                            
+                        full_filter = condition if full_filter is None else full_filter & condition
                 
             if "label_filter" in fltr_dic:
                 for feature, value in fltr_dic["label_filter"].items():
-                    if feature == "act":
-                        condition = y["Orbit_infall"] == value
+                    if feature == "sparta":
+                        if isinstance(y, (dd.DataFrame, pd.DataFrame)):
+                            y = y["Orbit_infall"]      
+                        condition = y == value
                     elif feature == "pred":
+                        if isinstance(y, (dd.DataFrame, pd.DataFrame)):
+                            preds = preds["preds"]
                         condition = preds == value
-                    if feature == next(iter(fltr_dic[next(iter(fltr_dic))])):
-                        full_filter = condition
-                    else:
-                        full_filter &= condition
-
-            
+                        if isinstance(condition, dd.DataFrame):
+                            condition = condition["preds"]
+                            condition = condition.reset_index(drop=True)
+                            
+                    full_filter = condition if full_filter is None else full_filter & condition
+                    
             X = X[full_filter]
         nrows = X.shape[0].compute()
             
