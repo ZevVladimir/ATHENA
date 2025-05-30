@@ -258,7 +258,7 @@ if __name__ == "__main__":
     act_mass_prf_all, act_mass_prf_orb, all_masses, bins = load_sparta_mass_prf(sim_splits,all_idxs,curr_test_sims)
     act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb 
     
-    plt_SPARTA_KE_dist(ke_param_dict, fltr_combs, bins, r_test, lnv2_test, perc = perc, width = width, r_cut = r_cut_calib, plot_loc = plot_loc, title = "bin_fit_", cust_line_dict = opt_param_dict)
+    plt_SPARTA_KE_dist(ke_param_dict, fltr_combs, bins, r_test, lnv2_test, perc = perc, width = width, r_cut = r_cut_calib, plot_loc = plot_loc, title = "bin_fit_", plot_lin_too=True, cust_line_dict = opt_param_dict)
 
 #######################################################################################################################################    
     all_z = []

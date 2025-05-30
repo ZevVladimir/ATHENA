@@ -9,9 +9,10 @@ import dask.dataframe as dd
 from dask import delayed
 import pandas as pd
 
-from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, load_data, extract_snaps, get_feature_labels, set_cosmology, filter_ddf, split_sparta_hdf5_name
+from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, load_data, extract_snaps, get_feature_labels, set_cosmology, filter_ddf, filter_df, split_sparta_hdf5_name
 from utils.data_and_loading_functions import create_directory, load_pickle, load_config, load_pickle, timed, load_SPARTA_data
 from src.utils.ke_cut_support import fast_ke_predictor, opt_ke_predictor
+from src.utils.vis_fxns import plt_SPARTA_KE_dist
 
 config_params = load_config(os.getcwd() + "/config.ini")
 
@@ -55,7 +56,7 @@ if __name__ == "__main__":
       
     fast_model_fldr_loc = path_to_models + comb_fast_model_sims + "/" + model_type + "/"
     opt_model_fldr_loc = path_to_models + comb_opt_model_sims + "/" + model_type + "/" 
-    
+    #TODO make this a loop through test sims
     curr_test_sims = ke_test_sims[0]
     test_comb_name = get_combined_name(curr_test_sims) 
     dset_name = eval_datasets[0]
@@ -97,6 +98,7 @@ if __name__ == "__main__":
         vr_test = X_df["p_Radial_vel"]
         vphys = X_df["p_phys_vel"]
         lnv2_test = np.log(vphys**2)
+        X_df["p_lnv2"] = lnv2_test
         
         mask_vr_neg = (vr_test < 0)
         mask_vr_pos = ~mask_vr_neg
@@ -117,18 +119,18 @@ if __name__ == "__main__":
         orb_agree_dict = {
             'X_filter': {
                 "p_Scaled_radii": [('>',1.7),('<',1.9)],
-                "p_Radial_vel": [('>',-4),('<',-3)]
+                "p_lnv2": [('>',-4),('<',-3)]
             },
             'label_filter': {
                 "sparta":1,
-                "pred":1,
+                "pred":1
             }
         }
         
         inf_agree_dict = {
             'X_filter': {
                 "p_Scaled_radii": [('>',1.7),('<',1.9)],
-                "p_Radial_vel": [('>',-4),('<',-3)]
+                "p_lnv2": [('>',-4),('<',-3)]
             },
             'label_filter': {
                 "sparta":0,
@@ -139,7 +141,7 @@ if __name__ == "__main__":
         orb_disagree_dict = {
             'X_filter': {
                 "p_Scaled_radii": [('>',1.7),('<',1.9)],
-                "p_Radial_vel": [('>',-4),('<',-3)]
+                "p_lnv2": [('>',-4),('<',-3)]
             },
             'label_filter': {
                 "sparta":1,
@@ -150,7 +152,7 @@ if __name__ == "__main__":
         inf_disagree_dict = {
             'X_filter': {
                 "p_Scaled_radii": [('>',1.7),('<',1.9)],
-                "p_Radial_vel": [('>',-4),('<',-3)]
+                "p_lnv2": [('>',-4),('<',-3)]
             },
             'label_filter': {
                 "sparta":0,
@@ -158,24 +160,16 @@ if __name__ == "__main__":
             }
         }
         
-        nparts = 1
-        part_size = preds_fast_ke.shape[0] // nparts
-
-        # Step 1: Create delayed pandas DataFrames
-        delayed_parts = []
-        for i in range(nparts):
-            start = i * part_size
-            end = (i + 1) * part_size if i < nparts - 1 else preds_fast_ke.shape[0]
-            
-            part = delayed(pd.DataFrame)(preds_fast_ke[start:end], columns=["preds"])
-            delayed_parts.append(part)
-        preds_fast_ke = dd.from_delayed(delayed_parts, meta=pd.DataFrame(columns=["preds"], dtype=np.int8))
-        preds_fast_ke = preds_fast_ke.to_backend('pandas')
-
-        orb_agree, orb_agree_fltr = filter_ddf(X_df, y_df, preds_fast_ke, orb_agree_dict, max_size=2500)
-        orb_disagree, orb_disagree_fltr = filter_ddf(X_df, y_df, preds_fast_ke, orb_disagree_dict, max_size=2500)
-        inf_agree, inf_agree_fltr = filter_ddf(X_df, y_df, preds_fast_ke, inf_agree_dict, max_size=2500)
-        inf_disagree, inf_disgree_fltr = filter_ddf(X_df, y_df, preds_fast_ke, inf_disagree_dict, max_size=2500) 
+        y_df = y_df.values.compute().squeeze()
+        X_df = X_df.compute()
+        orb_agree, orb_agree_fltr = filter_df(X_df,y_df,preds_fast_ke,orb_agree_dict)
+        orb_disagree, orb_disagree_fltr = filter_df(X_df, y_df, preds_fast_ke, orb_disagree_dict)
+        inf_agree, inf_agree_fltr = filter_df(X_df, y_df, preds_fast_ke, inf_agree_dict)
+        inf_disagree, inf_disgree_fltr = filter_df(X_df, y_df, preds_fast_ke, inf_disagree_dict) 
+        
+        param_path = fast_model_fldr_loc + "ke_fastparams_dict.pickle"
+        ke_param_dict = load_pickle(param_path)      
+        
         
         nbins = 25
         
@@ -221,5 +215,5 @@ if __name__ == "__main__":
         ax[1,3].set_ylabel("Number of Counts")
         ax[1,3].set_title("SPARTA: Infalling Fast: Orbiting")
         
-        fig.savefig(debug_plt_path + "radius_hists.png")
+        fig.savefig(debug_plt_path + test_comb_name + "_radius_hists.png")
         

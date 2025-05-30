@@ -763,11 +763,12 @@ def filter_ddf(X, y = None, preds = None, fltr_dic = None, col_names = None, max
             if "label_filter" in fltr_dic:
                 for feature, value in fltr_dic["label_filter"].items():
                     if feature == "sparta":
+                        print(y)
                         if isinstance(y, (dd.DataFrame, pd.DataFrame)):
                             y = y["Orbit_infall"]      
                         condition = y == value
                     elif feature == "pred":
-                        if isinstance(y, (dd.DataFrame, pd.DataFrame)):
+                        if isinstance(preds, (dd.DataFrame, pd.DataFrame)):
                             preds = preds["preds"]
                         condition = preds == value
                         if isinstance(condition, dd.DataFrame):
@@ -775,8 +776,8 @@ def filter_ddf(X, y = None, preds = None, fltr_dic = None, col_names = None, max
                             condition = condition.reset_index(drop=True)
                             
                     full_filter = condition if full_filter is None else full_filter & condition
-                    
-            X = X[full_filter]
+
+            X = X.loc[full_filter]
         nrows = X.shape[0].compute()
             
         if nrows > max_size and max_size > 0:
@@ -791,7 +792,62 @@ def filter_ddf(X, y = None, preds = None, fltr_dic = None, col_names = None, max
             X.columns = col_names
             
         # Return the filtered array and the indices of the original array that remain
-        return X.compute(), X.index.values.compute()
+        return X.compute(),full_filter.compute()
+  
+def filter_df(X, y=None, preds=None, fltr_dic=None, col_names=None, max_size=500, rand_seed=42):
+    full_filter = pd.Series(True, index=X.index)
+
+    if fltr_dic is not None:
+        if "X_filter" in fltr_dic:
+            for feature, conditions in fltr_dic["X_filter"].items():
+                if not isinstance(conditions, list):
+                    conditions = [conditions]
+                for operator, value in conditions:
+                    if operator == '>':
+                        condition = X[feature] > value
+                    elif operator == '<':
+                        condition = X[feature] < value
+                    elif operator == '>=':
+                        condition = X[feature] >= value
+                    elif operator == '<=':
+                        condition = X[feature] <= value
+                    elif operator == '==':
+                        if value == "nan":
+                            condition = X[feature].isna()
+                        else:
+                            condition = X[feature] == value
+                    elif operator == '!=':
+                        condition = X[feature] != value
+                    else:
+                        raise ValueError(f"Unknown operator: {operator}")
+                    full_filter &= condition
+
+        if "label_filter" in fltr_dic:
+            for feature, value in fltr_dic["label_filter"].items():
+                if feature == "sparta":
+                    if isinstance(y, pd.DataFrame):
+                        y = y["Orbit_infall"]
+                    condition = y == value
+                elif feature == "pred":
+                    if isinstance(preds, pd.DataFrame):
+                        preds = preds["preds"]
+                    condition = preds == value
+                else:
+                    raise ValueError(f"Unknown label_filter feature: {feature}")
+                full_filter &= condition
+
+    X_filtered = X[full_filter]
+
+    # Sample if needed
+    nrows = len(X_filtered)
+    if nrows > max_size and max_size > 0:
+        sample_frac = max_size / nrows
+        X_filtered = X_filtered.sample(frac=sample_frac, random_state=rand_seed)
+
+    if col_names is not None:
+        X_filtered.columns = col_names
+
+    return X_filtered, full_filter  
     
 # Can set max_size to 0 to include all the particles
 def shap_with_filter(explainer, X, y, preds, fltr_dic = None, col_names = None, max_size=500):

@@ -1458,7 +1458,7 @@ def plt_cust_ke_line(b,bins,linewidth):
         else:
             plt.plot([x1,x2],[y1,y2],lw=linewidth, color="cyan")
             
-def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut, plot_loc, title, cust_line_dict = None):
+def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut, plot_loc, title, plot_lin_too = False, cust_line_dict = None):
     m_pos = feat_dict["m_pos"]
     b_pos = feat_dict["b_pos"]
     m_neg = feat_dict["m_neg"]
@@ -1498,87 +1498,104 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         magma_cmap.set_under(color='black')
         magma_cmap.set_bad(color='black') 
         
-        widths = [4,4,4,4,.5]
-        heights = [4]
-        fig = plt.figure(constrained_layout=True, figsize=(36,9))
-        gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
-
-        ax1 = fig.add_subplot(gs[0])
-        ax2 = fig.add_subplot(gs[1])
-        ax3 = fig.add_subplot(gs[2])
-        ax4 = fig.add_subplot(gs[3])
-        
-        axes = [ax1,ax2,ax3,ax4]
-        
-        ax1.set_ylabel(r'$\ln(v^2/v_{200m}^2)$',fontsize=axis_fntsize)
-        ax1.set_xlabel(r'$r/R_{200m}$',fontsize=axis_fntsize)
-        ax2.set_xlabel(r'$r/R_{200m}$',fontsize=axis_fntsize)
-        ax3.set_xlabel(r'$r/R_{200m}$',fontsize=axis_fntsize)
-        ax4.set_xlabel(r'$r/R_{200m}$',fontsize=axis_fntsize)
-        
-        ax2.tick_params('y', labelleft=False,colors="white",direction="in")
-        ax3.tick_params('y', labelleft=False,colors="white",direction="in")
-        ax4.tick_params('y', labelleft=False,colors="white",direction="in")
-
         line_width = 6.0
         
-        plt.sca(axes[0])
-        plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
-                    cmap=magma_cmap, range=(x_range, y_range))
-        plt.plot(x, y12, lw=line_width, color="k",
-                label="Simple Cut")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Calibration Limit",lw=line_width)
-        if cust_line_dict is not None:
-            plt_cust_ke_line(b = cust_line_dict["orb_vr_pos"]["b"], bins = bins,linewidth=line_width)
-        plt.text(0.05,3.6,r"Orbiting Particles $v_r>0$"+"\nAccording to SPARTA",fontsize=txt_fntsize,weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-        plt.xlim(0, 2)
-        
-        plt.sca(axes[1])
-        plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
-                    cmap=magma_cmap, range=(x_range, y_range))
-        plt.plot(x, y12, lw=line_width, color="k",
-                label="Simple Cut")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Calibration Limit",lw=line_width)
-        if cust_line_dict is not None:
-            plt_cust_ke_line(b = cust_line_dict["inf_vr_pos"]["b"], bins = bins,linewidth=line_width)
-        plt.text(0.05,3.6,r"Infalling Particles $v_r>0$"+"\nAccording to SPARTA",fontsize=txt_fntsize,weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-        plt.xlim(0, 2)
+        widths = [4,4,4,4,.5]
+        nrows = 2 if plot_lin_too else 1
+        heights = [4] * nrows
+        fig = plt.figure(constrained_layout=True, figsize=(36, 9 * nrows))
+        gs = fig.add_gridspec(nrows, len(widths), width_ratios=widths, height_ratios=heights, hspace=0.05, wspace=0)
 
-        plt.sca(axes[2])
-        plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
-                    cmap=magma_cmap, range=(x_range, y_range))
-        plt.plot(x, y22, lw=line_width, color="k",
-                label="Simple Cut")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Calibration Limit",lw=line_width)
-        if cust_line_dict is not None:
-            plt_cust_ke_line(b = cust_line_dict["orb_vr_neg"]["b"], bins = bins,linewidth=line_width)
-        plt.text(0.05,3.6,r"Orbiting Particles $v_r<0$"+"\nAccording to SPARTA",fontsize=txt_fntsize,weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-        plt.xlim(0, 2)
-        
-        plt.sca(axes[3])
-        plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, norm="log", vmin=log_vmin, vmax=vmax,
-                    cmap=magma_cmap, range=(x_range, y_range))
-        plt.plot(x, y22, lw=line_width, color="k",
-                label="Simple Cut")
-        plt.vlines(x=r_cut,ymin=y_range[0],ymax=y_range[1],label="Calibration Limit",lw=line_width)
-        if cust_line_dict is not None:
-            plt_cust_ke_line(b = cust_line_dict["inf_vr_neg"]["b"], bins = bins,linewidth=line_width)
-        plt.legend(loc="lower left",fontsize=legend_fntsize)
-        plt.text(0.05,3.6,r"Infalling Particles $v_r<0$"+"\nAccording to SPARTA",fontsize=txt_fntsize,weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-        cbar_log= plt.colorbar()
-        cbar_log.ax.tick_params(labelsize=cbar_tick_fntsize)
-        cbar_log.set_label(r'$N$ (Counts)', fontsize=cbar_label_fntsize)
-        plt.xlim(0, 2)
-        
-        for i,ax in enumerate(axes):
-            if i == 3:
-                ax.text(0.1, -3.7, "Orbiting According\nto Kinetic Energy Cut", fontsize=txt_fntsize, color="r",
-                    weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-                ax.text(0.9, 2.2, "Infalling According\nto Kinetic Energy Cut", fontsize=txt_fntsize, color="b",
-                    weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-            ax.tick_params(axis='both',which='both',labelcolor="black",colors="white",direction="in",labelsize=tick_label_fntsize,length=8,width=2)
 
-        plt.savefig(plot_loc + title + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=400)    
+        axes = []
+        for row in range(nrows):
+            for col in range(4):  # Only first 4 columns used for hist2d
+                ax = fig.add_subplot(gs[row, col])
+                axes.append(ax)
+        row_norms = [None,"log"] if plot_lin_too else ["log"]
+
+        for row_idx, norm in enumerate(row_norms):
+            offset = row_idx * 4
+            ax1, ax2, ax3, ax4 = axes[offset:offset+4]
+
+            for ax in [ax2, ax3, ax4]:
+                ax.tick_params('y', labelleft=False, colors="white", direction="in")
+
+            hist_args = dict(bins=nbins, vmin=(log_vmin if norm == "log" else lin_vmin), vmax=vmax,
+                            cmap=magma_cmap, range=(x_range, y_range), norm=(norm if norm == "log" else None))
+
+            # Orb vr > 0
+            plt.sca(ax1)
+            plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], **hist_args)
+            plt.plot(x, y12, lw=line_width, color="g", label="Simple Cut")
+            plt.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
+            if cust_line_dict is not None:
+                plt_cust_ke_line(b=cust_line_dict["orb_vr_pos"]["b"], bins=bins, linewidth=line_width)
+            plt.text(0.05, 3.6, r"Orbiting Particles $v_r>0$" + "\nAccording to SPARTA",
+                    fontsize=txt_fntsize, weight="bold", bbox=dict(facecolor='w', alpha=0.75))
+            ax1.set_ylabel(r'$\ln(v^2/v_{200m}^2)$', fontsize=axis_fntsize)
+            ax1.set_xlabel(r'$r/R_{200m}$', fontsize=axis_fntsize)
+            plt.xlim(0, 2)
+
+            # Inf vr > 0
+            plt.sca(ax2)
+            plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], **hist_args)
+            plt.plot(x, y12, lw=line_width, color="g", label="Simple Cut")
+            plt.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
+            if cust_line_dict is not None:
+                plt_cust_ke_line(b=cust_line_dict["inf_vr_pos"]["b"], bins=bins, linewidth=line_width)
+            plt.text(0.05, 3.6, r"Infalling Particles $v_r>0$" + "\nAccording to SPARTA",
+                    fontsize=txt_fntsize, weight="bold", bbox=dict(facecolor='w', alpha=0.75))
+            ax2.set_xlabel(r'$r/R_{200m}$', fontsize=axis_fntsize)
+            plt.xlim(0, 2)
+
+            # Orb vr < 0
+            plt.sca(ax3)
+            plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], **hist_args)
+            plt.plot(x, y22, lw=line_width, color="g", label="Simple Cut")
+            plt.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
+            if cust_line_dict is not None:
+                plt_cust_ke_line(b=cust_line_dict["orb_vr_neg"]["b"], bins=bins, linewidth=line_width)
+            plt.text(0.05, 3.6, r"Orbiting Particles $v_r<0$" + "\nAccording to SPARTA",
+                    fontsize=txt_fntsize, weight="bold", bbox=dict(facecolor='w', alpha=0.75))
+            ax3.set_xlabel(r'$r/R_{200m}$', fontsize=axis_fntsize)
+            plt.xlim(0, 2)
+
+            # Inf vr < 0
+            plt.sca(ax4)
+            plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], **hist_args)
+            plt.plot(x, y22, lw=line_width, color="g", label="Simple Cut")
+            plt.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
+            if cust_line_dict is not None:
+                plt_cust_ke_line(b=cust_line_dict["inf_vr_neg"]["b"], bins=bins, linewidth=line_width)
+            if row_idx == 0:
+                plt.legend(loc="lower left", fontsize=legend_fntsize)
+            plt.text(0.05, 3.6, r"Infalling Particles $v_r<0$" + "\nAccording to SPARTA",
+                    fontsize=txt_fntsize, weight="bold", bbox=dict(facecolor='w', alpha=0.75))
+            plt.xlim(0, 2)
+            if row_idx == 0:
+                cbar_log = plt.colorbar()
+                cbar_log.ax.tick_params(labelsize=cbar_tick_fntsize)
+                cbar_log.set_label(r'$N$ (Counts)', fontsize=cbar_label_fntsize)
+            elif row_idx == 1:
+                cbar_lin = plt.colorbar()
+                cbar_lin.ax.tick_params(labelsize=cbar_tick_fntsize)
+                cbar_lin.set_label(r'$N$ (Counts)', fontsize=cbar_label_fntsize)
+
+            for i in range(4):
+                ax = axes[offset + i]
+                if i == 3 and row_idx == 0:
+                    ax.text(0.1, -3.7, "Orbiting According\nto Kinetic Energy Cut", fontsize=txt_fntsize, color="r",
+                            weight="bold", bbox=dict(facecolor='w', alpha=0.75))
+                    ax.text(0.7, 2.1, "Infalling According\nto Kinetic Energy Cut", fontsize=txt_fntsize, color="b",
+                            weight="bold", bbox=dict(facecolor='w', alpha=0.75))
+                ax.tick_params(axis='both', which='both', labelcolor="black", colors="white",
+                            direction="in", labelsize=tick_label_fntsize, length=8, width=2)
+
+        if plot_lin_too:
+            plt.savefig(plot_loc + "lin_log_" + title + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=400)    
+        else:
+            plt.savefig(plot_loc + "log_" + title + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=400) 
         
 
 def compare_split_prfs_ke(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_orb_prfs, simp_inf_prfs, bins, lin_rticks, save_location, title="comb_ke_fits_", prf_func=np.nanmedian, split_name="\\nu", prf_name_0 = "Optimized Cut", prf_name_1 = "SPARTA", prf_name_2 = "Fast Cut", prf_name_3 = "SPARTA"): 
