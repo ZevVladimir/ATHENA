@@ -105,6 +105,9 @@ if __name__ == "__main__":
         columns_to_keep = [col for col in data.columns if col != target_column[0]]
         X_df = data[columns_to_keep]
         y_df = data[target_column]
+        
+        feature_columns = get_feature_labels(features,all_tdyn_steps)
+        preds_ML = make_preds(client, bst, data[feature_columns])
             
         X_df = X_df.to_backend('pandas')
         y_df = y_df.to_backend('pandas')
@@ -133,11 +136,7 @@ if __name__ == "__main__":
         bins = sparta_params[sparta_param_names[0]]
         
         
-        preds_fit_ke = opt_ke_predictor(opt_param_dict, bins, r_test.compute().to_numpy(), vr_test.compute().to_numpy(), lnv2_test.compute().to_numpy(), r_cut_calib)
-        
-        preds_ML = make_preds(client, bst, X_df)
-        print(preds_ML)
-        
+        preds_opt_ke = opt_ke_predictor(opt_param_dict, bins, r_test.compute().to_numpy(), vr_test.compute().to_numpy(), lnv2_test.compute().to_numpy(), r_cut_calib)       
         
         y_df = y_df.values.compute().squeeze()
         X_df = X_df.compute()
@@ -153,8 +152,10 @@ if __name__ == "__main__":
         sparta_infalling_counts = np.zeros(num_bins)
         ml_orbiting_counts = np.zeros(num_bins)
         ml_infalling_counts = np.zeros(num_bins)
-        ke_orbiting_counts = np.zeros(num_bins)
-        ke_infalling_counts = np.zeros(num_bins)
+        fast_ke_orbiting_counts = np.zeros(num_bins)
+        fast_ke_infalling_counts = np.zeros(num_bins)
+        opt_ke_orbiting_counts = np.zeros(num_bins)
+        opt_ke_infalling_counts = np.zeros(num_bins)
     
         for i in range(num_bins):
             in_bin = bin_indices == i
@@ -162,35 +163,26 @@ if __name__ == "__main__":
             sparta_infalling_counts[i] = np.sum(y_df[in_bin] == 0)
             ml_orbiting_counts[i] = np.sum(preds_ML[in_bin] == 1)
             ml_infalling_counts[i] = np.sum(preds_ML[in_bin] == 0)
-            ke_orbiting_counts[i] = np.sum(preds_fast_ke[in_bin] == 1)
-            ke_infalling_counts[i] = np.sum(preds_fast_ke[in_bin] == 0)
+            fast_ke_orbiting_counts[i] = np.sum(preds_fast_ke[in_bin] == 1)
+            fast_ke_infalling_counts[i] = np.sum(preds_fast_ke[in_bin] == 0)
+            opt_ke_orbiting_counts[i] = np.sum(preds_opt_ke[in_bin] == 1)
+            opt_ke_infalling_counts[i] = np.sum(preds_opt_ke[in_bin] == 0)
 
         with np.errstate(divide='ignore', invalid='ignore'):
             sparta_ratio = np.where(sparta_infalling_counts > 0, sparta_orbiting_counts / (sparta_infalling_counts + sparta_orbiting_counts), np.nan)
             ml_ratio = np.where(ml_infalling_counts > 0, ml_orbiting_counts / (ml_infalling_counts + ml_orbiting_counts), np.nan)
-            ke_ratio = np.where(ke_infalling_counts > 0, ke_orbiting_counts / (ke_infalling_counts + ke_orbiting_counts), np.nan)
-        bin_centers = np.sqrt(bins[:-1] * bins[1:])
-        bin_widths = bins[1:] - bins[:-1]
-        bar_widths = bin_widths * 0.4
-        offset = bar_widths / 2
+            fast_ke_ratio = np.where(fast_ke_infalling_counts > 0, fast_ke_orbiting_counts / (fast_ke_infalling_counts + fast_ke_orbiting_counts), np.nan)
+            opt_ke_ratio = np.where(opt_ke_infalling_counts > 0, opt_ke_orbiting_counts / (opt_ke_infalling_counts + opt_ke_orbiting_counts), np.nan)
 
         fig, ax = plt.subplots(1, figsize=(10,5))
-        ax.bar(bin_centers - offset, ml_ratio, width=bar_widths, label='ML Classification', alpha=0.7)
-        ax.bar(bin_centers + offset, ke_ratio, width=bar_widths, label='Fast KE Cut Classification', alpha=0.7)     
-        ax.set_xscale("log")  
+        ax.plot(bins, sparta_ratio, label='SPARTA Classification')
+        ax.plot(bins, fast_ke_ratio, label='Fast KE Cut Classification')
+        ax.plot(bins, opt_ke_ratio, label='Optimized KE Cut Classification')
+        ax.plot(bins, ml_ratio, label='ML Classification')     
+      
         ax.legend()
         ax.set_xlabel(r"Radius $r/R_{\rm 200m}$")
         ax.set_ylabel(r"$N_{\rm orb}/N_{\rm tot}$")
         
-        fig.savefig(debug_plt_path + test_comb_name + "_ML_fast_orb_rat_by_rad.png")
-        
-        fig, ax = plt.subplots(1, figsize=(10,5))
-        ax.bar(bin_centers - offset, sparta_ratio, width=bar_widths, label='SPARTA Classification', alpha=0.7)
-        ax.bar(bin_centers + offset, ke_ratio, width=bar_widths, label='Fast KE Cut Classification', alpha=0.7)     
-        ax.set_xscale("log")  
-        ax.legend()
-        ax.set_xlabel(r"Radius $r/R_{\rm 200m}$")
-        ax.set_ylabel(r"$N_{\rm orb}/N_{\rm tot}$")
-        
-        fig.savefig(debug_plt_path + test_comb_name + "_sparta_fast_orb_rat_by_rad.png")
+        fig.savefig(debug_plt_path + test_comb_name + "_all_orb_rat_by_rad.png")
         
