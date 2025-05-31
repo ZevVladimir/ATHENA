@@ -29,6 +29,7 @@ use_gpu = config_params["DASK_CLIENT"]["use_gpu"]
 model_sims = config_params["TRAIN_MODEL"]["model_sims"]
 features = config_params["TRAIN_MODEL"]["features"]
 target_column = config_params["TRAIN_MODEL"]["target_column"]
+model_type = config_params["TRAIN_MODEL"]["model_type"]
 
 eval_datasets = config_params["EVAL_MODEL"]["eval_datasets"]
 plt_nu_splits = parse_ranges(config_params["EVAL_MODEL"]["plt_nu_splits"])
@@ -52,6 +53,21 @@ ke_test_sims = config_params["KE_CUT"]["ke_test_sims"]
     
 if __name__ == "__main__":
     client = setup_client()
+    
+    comb_model_sims = get_combined_name(model_sims) 
+        
+    model_name = get_model_name(model_type, model_sims)    
+    model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"
+    model_save_loc = model_fldr_loc + model_name + ".json"
+    
+    try:
+        bst = xgb.Booster()
+        bst.load_model(model_save_loc)
+        if use_gpu:
+            bst.set_param({"device": "cuda:0"})
+        print("Loaded Model Trained on:",model_sims)
+    except:
+        print("Couldn't load Booster Located at: " + model_save_loc)
 
     model_type = "kinetic_energy_cut"
     
@@ -67,11 +83,7 @@ if __name__ == "__main__":
     plot_loc = opt_model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
     create_directory(plot_loc)
     
-    comb_model_sims = get_combined_name(model_sims) 
-        
-    model_name = get_model_name(model_type, model_sims)    
-    model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"
-    model_save_loc = model_fldr_loc + model_name + ".json"
+    
     
     dset_params = load_pickle(ML_dset_path + curr_test_sims[0] + "/dset_params.pickle")
     sim_cosmol = dset_params["cosmology"]
@@ -81,14 +93,7 @@ if __name__ == "__main__":
     snap_list = extract_snaps(curr_test_sims[0])
     cosmol = set_cosmology(sim_cosmol)
     
-    try:
-        bst = xgb.Booster()
-        bst.load_model(model_save_loc)
-        if use_gpu:
-            bst.set_param({"device": "cuda:0"})
-        print("Loaded Model Trained on:",model_sims)
-    except:
-        print("Couldn't load Booster Located at: " + model_save_loc)
+    
     
     if os.path.isfile(opt_model_fldr_loc + "ke_optparams_dict.pickle"):
         print("Loading parameters from saved file")
