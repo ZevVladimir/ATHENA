@@ -86,10 +86,11 @@ def find_start_pnt(directory):
     return max_number
 
 def calc_halo_mem(n_ptl):
-    # rad, rad_vel, tang_vel each 4bytes
+    # rad, rad_vel, tang_vel, physical vel each 4bytes
     # HIPIDS is 8 bytes 
     # orbit/infall is one byte
-    n_bytes = (3 * 4 + 1 + 8) * n_ptl
+    # Add some headroom for pandas/hdf5 = 32 bytes per particle
+    n_bytes = 32 * n_ptl
     
     return n_bytes
 
@@ -287,79 +288,33 @@ def halo_loop(ptl_idx, curr_iter, num_iter, indices, halo_splits, snap_dict, use
             if debug_indiv_dens_prf:
                 create_dens_prfs[:1] = 1
                 
-            # with mp.Pool(processes=num_processes) as p:
-            #     results = tuple(zip(*p.starmap(search_halos, 
-            #                    zip(repeat(ret_labels), repeat(snap_dict), use_indices,
-            #                        (ptls_pid[curr_ptl_indices[i].astype(int)] for i in range(curr_num_halos)), 
-            #                        (ptls_pos[curr_ptl_indices[j].astype(int)] for j in range(curr_num_halos)),
-            #                        (ptls_vel[curr_ptl_indices[k].astype(int)] for k in range(curr_num_halos)),
-            #                        (use_halos_pos[l,:] for l in range(curr_num_halos)),
-            #                        (use_halos_v[l,:] for l in range(curr_num_halos)),
-            #                        (use_halos_r200m[l] for l in range(curr_num_halos)),
-            #                        (last_peri_snap[halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
-            #                        (n_peri[halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
-            #                        (tracer_id[halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
-            #                        (n_lower_lim[halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
-            #                        (mass_prf_all[l,:] for l in range(curr_num_halos)),
-            #                        (mass_prf_orb[l,:] for l in range(curr_num_halos)),
-            #                        repeat(bins),
-            #                        (create_dens_prfs[l] for l in range(curr_num_halos)),
-            #                        ),
-            #                    chunksize=mp_chunk_size)))
+            with mp.Pool(processes=num_processes) as p:
+                results = tuple(zip(*p.starmap(search_halos, 
+                               zip(repeat(ret_labels), repeat(snap_dict), use_indices,
+                                   (ptls_pid[curr_ptl_indices[i].astype(int)] for i in range(curr_num_halos)), 
+                                   (ptls_pos[curr_ptl_indices[j].astype(int)] for j in range(curr_num_halos)),
+                                   (ptls_vel[curr_ptl_indices[k].astype(int)] for k in range(curr_num_halos)),
+                                   (use_halos_pos[l,:] for l in range(curr_num_halos)),
+                                   (use_halos_v[l,:] for l in range(curr_num_halos)),
+                                   (use_halos_r200m[l] for l in range(curr_num_halos)),
+                                   (last_peri_snap[halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
+                                   (n_peri[halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
+                                   (tracer_id[halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
+                                   (n_lower_lim[halo_first[m]:halo_first[m]+halo_n[m]] for m in range(curr_num_halos)),
+                                   (mass_prf_all[l,:] for l in range(curr_num_halos)),
+                                   (mass_prf_orb[l,:] for l in range(curr_num_halos)),
+                                   repeat(bins),
+                                   (create_dens_prfs[l] for l in range(curr_num_halos)),
+                                   ),
+                               chunksize=mp_chunk_size)))
 
-            #     if ret_labels:
-            #         (all_HIPIDs, all_orb_assn, all_rad_vel, all_tang_vel, all_scal_rad, all_phys_vel) = results
-            #     else:
-            #         (all_HIPIDs, all_rad_vel, all_tang_vel, all_scal_rad, all_phys_vel) = results
+                if ret_labels:
+                    (all_HIPIDs, all_orb_assn, all_rad_vel, all_tang_vel, all_scal_rad, all_phys_vel) = results
+                else:
+                    (all_HIPIDs, all_rad_vel, all_tang_vel, all_scal_rad, all_phys_vel) = results
 
-            # p.close()
-            # p.join()
-            
-            results_list = []
-            for i in range(curr_num_halos):
-                result = search_halos(
-                    ret_labels,
-                    snap_dict,
-                    use_indices[i],
-                    ptls_pid[curr_ptl_indices[i].astype(int)],
-                    ptls_pos[curr_ptl_indices[i].astype(int)],
-                    ptls_vel[curr_ptl_indices[i].astype(int)],
-                    use_halos_pos[i, :],
-                    use_halos_v[i, :],
-                    use_halos_r200m[i],
-                    last_peri_snap[halo_first[i]:halo_first[i]+halo_n[i]],
-                    n_peri[halo_first[i]:halo_first[i]+halo_n[i]],
-                    tracer_id[halo_first[i]:halo_first[i]+halo_n[i]],
-                    n_lower_lim[halo_first[i]:halo_first[i]+halo_n[i]],
-                    mass_prf_all[i, :],
-                    mass_prf_orb[i, :],
-                    bins,
-                    create_dens_prfs[i],
-                )
-                results_list.append(result)
-
-            # Unzip results
-            results = tuple(zip(*results_list))
-
-            if ret_labels:
-                all_HIPIDs, all_orb_assn, all_rad_vel, all_tang_vel, all_scal_rad, all_phys_vel = results
-            else:
-                all_HIPIDs, all_rad_vel, all_tang_vel, all_scal_rad, all_phys_vel = results
-            
-            # if not ret_labels:
-            #     box_size = snap_dict["box_size"]
-            #     for i in range(5):
-            #         fig,ax = plt.subplots(1)
-            #         ax.scatter(ptls_pos[curr_ptl_indices[i].astype(int),0],ptls_pos[curr_ptl_indices[i].astype(int),1],c="blue")
-            #         ax.scatter(use_halos_pos[i,0],use_halos_pos[i,1],c="red",s=10)
-            #         circle = plt.Circle((use_halos_pos[i,0],use_halos_pos[i,1]), use_halos_r200m[i], color='green', fill=False, linewidth=4)
-            #         ax.add_patch(circle)
-            #         fig.savefig(debug_plt_path + str(i) + "_" + name + ".png")
-            #         ptl_rad, coord_dist = calc_radius(use_halos_pos[i,0], use_halos_pos[i,1], use_halos_pos[i,2], ptls_pos[curr_ptl_indices[i].astype(int),0], ptls_pos[curr_ptl_indices[i].astype(int),1], ptls_pos[curr_ptl_indices[i].astype(int),2], box_size)
-            #         print(ptl_rad[:10])
-            #         print(use_halos_r200m[i])
-            #         print(np.where(ptl_rad/use_halos_r200m[i] > 4)[0].shape)
-            #         # print(all_scal_rad[start_num_ptls[i]: start_num_ptls[i] + use_num_ptls[i]])
+            p.close()
+            p.join()
             
             all_HIPIDs = np.concatenate(all_HIPIDs, axis = 0)
             all_rad_vel = np.concatenate(all_rad_vel, axis = 0)

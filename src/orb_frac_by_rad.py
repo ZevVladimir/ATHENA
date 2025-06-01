@@ -139,7 +139,7 @@ if __name__ == "__main__":
         param_paths = [["config","anl_prf","r_bins_lin"]]
         sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, pickle_data=pickle_data)
         bins = sparta_params[sparta_param_names[0]]
-        
+        bins = np.insert(bins, 0, 0)
         
         preds_opt_ke = opt_ke_predictor(opt_param_dict, bins, r_test.compute().to_numpy(), vr_test.compute().to_numpy(), lnv2_test.compute().to_numpy(), r_cut_calib)       
         
@@ -180,14 +180,18 @@ if __name__ == "__main__":
             opt_ke_ratio = np.where(opt_ke_infalling_counts > 0, opt_ke_orbiting_counts / (opt_ke_infalling_counts + opt_ke_orbiting_counts), np.nan)
 
         fig, ax = plt.subplots(1, figsize=(10,5))
-        ax.plot(bins, sparta_ratio, label='SPARTA Classification')
-        ax.plot(bins, fast_ke_ratio, label='Fast KE Cut Classification')
-        ax.plot(bins, opt_ke_ratio, label='Optimized KE Cut Classification')
-        ax.plot(bins, ml_ratio, label='ML Classification')     
+        ax.plot(bins[1:], sparta_ratio, label='SPARTA Classification')
+        ax.plot(bins[1:], fast_ke_ratio, label='Fast KE Cut Classification')
+        ax.plot(bins[1:], opt_ke_ratio, label='Optimized KE Cut Classification')
+        ax.plot(bins[1:], ml_ratio, label='ML Classification')     
       
-        ax.legend()
-        ax.set_xlabel(r"Radius $r/R_{\rm 200m}$")
-        ax.set_ylabel(r"$N_{\rm orb}/N_{\rm tot}$")
+        legend_fntsize = 14
+        axis_fntsize = 18
+        tick_fntsize = 14
+        ax.legend(fontsize=legend_fntsize, loc="upper right")
+        ax.set_xlabel(r"Radius $r/R_{\rm 200m}$",fontsize=axis_fntsize)
+        ax.set_ylabel(r"$N_{\rm orb}/N_{\rm tot}$",fontsize=axis_fntsize)
+        ax.tick_params(axis='both', labelsize=tick_fntsize, length=6,width=2, direction="in")
         
-        fig.savefig(debug_plt_path + test_comb_name + "_all_orb_rat_by_rad.png")
+        fig.savefig(debug_plt_path + test_comb_name + "_all_orb_rat_by_rad.png",dpi=400)
         
