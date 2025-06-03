@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import argparse
 
-from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, load_data, eval_model, get_model_name, extract_snaps, make_preds, get_feature_labels
+from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, load_data, paper_dens_prf, paper_ptl_dist, paper_misclass, get_model_name, extract_snaps, make_preds, get_feature_labels
 from utils.data_and_loading_functions import create_directory, timed, load_pickle, save_pickle, load_config
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -34,8 +34,7 @@ test_sims = config_params["EVAL_MODEL"]["test_sims"]
 eval_datasets = config_params["EVAL_MODEL"]["eval_datasets"]
 dens_prf_plt = config_params["EVAL_MODEL"]["dens_prf_plt"]
 misclass_plt = config_params["EVAL_MODEL"]["misclass_plt"]
-fulldist_plt = config_params["EVAL_MODEL"]["fulldist_plt"]
-io_frac_plt = config_params["EVAL_MODEL"]["io_frac_plt"]
+full_dist_plt = config_params["EVAL_MODEL"]["fulldist_plt"]
 dens_prf_nu_split = config_params["EVAL_MODEL"]["dens_prf_nu_split"]
 dens_prf_macc_split = config_params["EVAL_MODEL"]["dens_prf_macc_split"]
 
@@ -109,9 +108,12 @@ if __name__ == "__main__":
                 
                 with timed(f"Predictions for {y.size.compute():.3e} particles"):
                     preds = make_preds(client, bst, X)
-    
-                eval_model(model_info, preds, use_sims=curr_test_sims, dst_type=dset_name, X=X, y=y, halo_ddf=halo_df, sim_cosmol=sim_cosmol, all_tdyn_steps=all_tdyn_steps, plot_save_loc=plot_loc,dens_prf=dens_prf_plt,missclass=misclass_plt,\
-                    full_dist=fulldist_plt,io_frac=io_frac_plt,split_nu=dens_prf_nu_split,split_macc=dens_prf_macc_split)
+                if dens_prf_plt:
+                    paper_dens_prf(X,y,preds,halo_df,curr_test_sims,sim_cosmol,plot_loc,split_by_nu=dens_prf_nu_split,split_by_macc=dens_prf_macc_split)
+                if full_dist_plt:
+                    paper_ptl_dist(X,y,all_tdyn_steps,plot_loc)
+                if misclass_plt:
+                    paper_misclass(X,y,preds,curr_test_sims,dset_name,all_tdyn_steps,plot_loc)
                 del data 
                 del X
                 del y

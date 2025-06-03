@@ -134,7 +134,7 @@ def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xtick_l
 # Uses np.histogram2d to create a histogram and the edges of the histogram in one dictionary
 # Can also do a linear binning then a logarithmic binning (similar to symlog) but allows for 
 # special case of only positive log and not negative log
-def histogram(x,y,use_bins,hist_range,min_ptl,set_ptl,split_xscale_dict=None,split_yscale_dict=None):
+def histogram(x,y,use_bins,hist_range,min_ptl,set_ptl,split_xscale_dict=None,split_yscale_dict=None):   
     if split_yscale_dict is not None:
         linthrsh = split_yscale_dict["linthrsh"]
         lin_nbin = split_yscale_dict["lin_nbin"]
@@ -177,7 +177,7 @@ def histogram(x,y,use_bins,hist_range,min_ptl,set_ptl,split_xscale_dict=None,spl
         use_bins[0] = x_bins
         if split_yscale_dict == None:
             use_bins[1] = x_bins.size 
-
+        
     hist = np.histogram2d(x, y, bins=use_bins, range=hist_range)
     
     fin_hist = {
@@ -242,11 +242,13 @@ def adjust_frac_hist(hist_data, inf_data, orb_data, max_value, min_value):
     hist_data["hist"] = hist
     return hist_data
 
-def plot_prim_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, split_scale_dict, num_bins, save_loc, save_title=""):
+def plot_prim_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, split_scale_dict, save_loc, save_title=""):
     with timed("Full Ptl Dist Plot"):
         
         linthrsh = split_scale_dict["linthrsh"]
-        log_nbin = split_scale_dict["log_nbin"]
+        # The default number of bins is assuming there is no log split and that all bins are linear
+        lin_nbin = split_scale_dict["lin_nbin"]
+        def_bins = [lin_nbin,lin_nbin]
         
         p_r_range = [np.min(p_r),np.max(p_r)]
         p_rv_range = [np.min(p_rv),np.max(p_rv)]
@@ -261,9 +263,9 @@ def plot_prim_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, split_scale_dict, num_bin
         inf_p_tv, orb_p_tv = split_orb_inf(p_tv,p_corr_labels)
         
         # Use the binning from all particles for the orbiting and infalling plots and the secondary snap to keep it consistent
-        all_p_r_p_rv = histogram(p_r,p_rv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
-        all_p_r_p_tv = histogram(p_r,p_tv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
-        all_p_rv_p_tv = histogram(p_rv,p_tv,use_bins=[num_bins,num_bins],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
+        all_p_r_p_rv = histogram(p_r,p_rv,use_bins=def_bins,hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+        all_p_r_p_tv = histogram(p_r,p_tv,use_bins=def_bins,hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+        all_p_rv_p_tv = histogram(p_rv,p_tv,use_bins=def_bins,hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
 
         inf_p_r_p_rv = histogram(inf_p_r,inf_p_rv,use_bins=[all_p_r_p_rv["x_edge"],all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
         inf_p_r_p_tv = histogram(inf_p_r,inf_p_tv,use_bins=[all_p_r_p_tv["x_edge"],all_p_r_p_tv["y_edge"]],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
@@ -382,11 +384,14 @@ def plot_prim_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, split_scale_dict, num_bin
         fig.savefig(save_loc + "ptl_distr" + save_title + ".png")
         plt.close()
 
-def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_dict, num_bins, save_loc, save_title=""):
+#TODO create general function for any number of snaps. or input what you want to plot across snaps?
+def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_dict, save_loc, save_title=""):
     with timed("Full Ptl Dist Plot"):
         
         linthrsh = split_scale_dict["linthrsh"]
-        log_nbin = split_scale_dict["log_nbin"]
+        # The default number of bins is assuming there is no log split and that all bins are linear
+        lin_nbin = split_scale_dict["lin_nbin"]
+        def_bins = [lin_nbin,lin_nbin]
         
         p_r_range = [np.min(p_r),np.max(p_r)]
         p_rv_range = [np.min(p_rv),np.max(p_rv)]
@@ -403,9 +408,9 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         inf_c_rv, orb_c_rv = split_orb_inf(c_rv,p_corr_labels)
         
         # Use the binning from all particles for the orbiting and infalling plots and the secondary snap to keep it consistent
-        all_p_r_p_rv = histogram(p_r,p_rv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
-        all_p_r_p_tv = histogram(p_r,p_tv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
-        all_p_rv_p_tv = histogram(p_rv,p_tv,use_bins=[num_bins,num_bins],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
+        all_p_r_p_rv = histogram(p_r,p_rv,use_bins=def_bins,hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+        all_p_r_p_tv = histogram(p_r,p_tv,use_bins=def_bins,hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
+        all_p_rv_p_tv = histogram(p_rv,p_tv,use_bins=def_bins,hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
         all_c_r_c_rv = histogram(c_r,c_rv,use_bins=[all_p_r_p_rv["x_edge"],all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
         
         inf_p_r_p_rv = histogram(inf_p_r,inf_p_rv,use_bins=[all_p_r_p_rv["x_edge"],all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
@@ -437,7 +442,6 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         # min_frac_ptl = np.min(np.array([np.min(hist_frac_p_r_p_rv["hist"]),np.min(hist_frac_p_r_p_tv["hist"]),np.min(hist_frac_p_rv_p_tv["hist"]),np.min(hist_frac_c_r_c_rv["hist"])]))
         max_frac_ptl = 3.5
         min_frac_ptl = -3.5
-        
         
         hist_frac_p_r_p_rv = adjust_frac_hist(hist_frac_p_r_p_rv, inf_p_r_p_rv, orb_p_r_p_rv, max_frac_ptl, min_frac_ptl)
         hist_frac_p_r_p_tv = adjust_frac_hist(hist_frac_p_r_p_tv, inf_p_r_p_tv, orb_p_r_p_tv, max_frac_ptl, min_frac_ptl)
@@ -538,11 +542,13 @@ def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_di
         fig.savefig(save_loc + "ptl_distr" + save_title + ".png")
         plt.close()
 
-def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_dict, num_bins, save_loc, model_info,dataset_name):
+def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_dict, save_loc, model_info,dataset_name):
     with timed("Miss Class Dist Plot"):
 
         linthrsh = split_scale_dict["linthrsh"]
-        log_nbin = split_scale_dict["log_nbin"]
+        # The default number of bins is assuming there is no log split and that all bins are linear
+        lin_nbin = split_scale_dict["lin_nbin"]
+        def_bins = [lin_nbin,lin_nbin]
 
         p_r_range = [np.min(p_r),np.max(p_r)]
         p_rv_range = [np.min(p_rv),np.max(p_rv)]
@@ -594,9 +600,9 @@ def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv,
         
         # Create histograms for all particles and then for the incorrect particles
         # Use the binning from all particles for the orbiting and infalling plots and the secondary snap to keep it consistent
-        act_all_p_r_p_rv = histogram(p_r,p_rv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
-        act_all_p_r_p_tv = histogram(p_r,p_tv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
-        act_all_p_rv_p_tv = histogram(p_rv,p_tv,use_bins=[num_bins,num_bins],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
+        act_all_p_r_p_rv = histogram(p_r,p_rv,use_bins=def_bins,hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
+        act_all_p_r_p_tv = histogram(p_r,p_tv,use_bins=def_bins,hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
+        act_all_p_rv_p_tv = histogram(p_rv,p_tv,use_bins=def_bins,hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
         act_all_c_r_c_rv = histogram(c_r,c_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
         
         act_inf_p_r_p_rv = histogram(act_inf_p_r,act_inf_p_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
@@ -711,11 +717,15 @@ def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv,
 def plot_perr_err():
     return
 
-def plot_log_vel(log_phys_vel,radii,labels,save_loc,add_line=[None,None],show_v200m=False,v200m=1.5):
+def plot_log_vel(log_phys_vel,radii,labels,save_loc,split_scale_dict,add_line=[None,None],show_v200m=False,v200m=1.5):
     if v200m == -1:
         title = "no_cut"
     else:
         title = str(v200m) + "v200m"
+    
+    # The default number of bins is assuming there is no log split and that all bins are linear
+    lin_nbin = split_scale_dict["lin_nbin"]
+    def_bins = [lin_nbin,lin_nbin]
     
     orb_loc = np.where(labels == 1)[0]
     inf_loc = np.where(labels == 0)[0]
@@ -728,9 +738,9 @@ def plot_log_vel(log_phys_vel,radii,labels,save_loc,add_line=[None,None],show_v2
     set_ptl = 0
     scale_min_ptl = 1e-4
     
-    all = histogram(radii,log_phys_vel,use_bins=[num_bins,num_bins],hist_range=[r_range,pv_range],min_ptl=min_ptl,set_ptl=set_ptl)
-    inf = histogram(radii[inf_loc],log_phys_vel[inf_loc],use_bins=[num_bins,num_bins],hist_range=[r_range,pv_range],min_ptl=min_ptl,set_ptl=set_ptl)
-    orb = histogram(radii[orb_loc],log_phys_vel[orb_loc],use_bins=[num_bins,num_bins],hist_range=[r_range,pv_range],min_ptl=min_ptl,set_ptl=set_ptl)
+    all = histogram(radii,log_phys_vel,use_bins=def_bins,hist_range=[r_range,pv_range],min_ptl=min_ptl,set_ptl=set_ptl)
+    inf = histogram(radii[inf_loc],log_phys_vel[inf_loc],use_bins=def_bins,hist_range=[r_range,pv_range],min_ptl=min_ptl,set_ptl=set_ptl)
+    orb = histogram(radii[orb_loc],log_phys_vel[orb_loc],use_bins=def_bins,hist_range=[r_range,pv_range],min_ptl=min_ptl,set_ptl=set_ptl)
     
     tot_nptl = radii.shape[0]
     
@@ -905,58 +915,6 @@ def plot_halo_slice_class(ptl_pos,preds,labels,halo_pos,halo_r200m,save_loc,sear
     
     all_ax.legend(fontsize=legendfontsize)
     fig.savefig(save_loc+title+"classif_halo_dist.png",dpi=300)        
-
-def plot_halo_3d_class(ptl_pos, preds, labels, halo_pos, halo_r200m, save_loc, search_rad=0, title=""):
-    # Center particles around the halo position
-    ptl_pos[:, 0] -= halo_pos[0]
-    ptl_pos[:, 1] -= halo_pos[1]
-    ptl_pos[:, 2] -= halo_pos[2]
-
-    # Classify particles
-    inc_inf = np.where((preds == 1) & (labels == 0))[0]
-    inc_orb = np.where((preds == 0) & (labels == 1))[0]
-    corr_inf = np.where((preds == 0) & (labels == 0))[0]
-    corr_orb = np.where((preds == 1) & (labels == 1))[0]
-    
-    # Create 3D plot
-    fig = plt.figure(figsize=(10, 8))
-    ax = fig.add_subplot(111, projection='3d')
-
-    # Scatter plot for particle classifications
-    ax.scatter(ptl_pos[corr_inf, 0], ptl_pos[corr_inf, 1], ptl_pos[corr_inf, 2], 
-               color='green', label="Correctly Labeled Infalling", s=1)
-    ax.scatter(ptl_pos[corr_orb, 0], ptl_pos[corr_orb, 1], ptl_pos[corr_orb, 2], 
-               color='blue', label="Correctly Labeled Orbiting", s=1)
-    ax.scatter(ptl_pos[inc_inf, 0], ptl_pos[inc_inf, 1], ptl_pos[inc_inf, 2], 
-               color='red', label="Incorrectly Labeled Infalling", s=1)
-    ax.scatter(ptl_pos[inc_orb, 0], ptl_pos[inc_orb, 1], ptl_pos[inc_orb, 2], 
-               color='orange', label="Incorrectly Labeled Orbiting", s=1)
-
-    # Add R200m sphere
-    # u = np.linspace(0, 2 * np.pi, 100)
-    # v = np.linspace(0, np.pi, 100)
-    # x = halo_r200m * np.outer(np.cos(u), np.sin(v))
-    # y = halo_r200m * np.outer(np.sin(u), np.sin(v))
-    # z = halo_r200m * np.outer(np.ones_like(u), np.cos(v))
-    # ax.plot_wireframe(x, y, z, color='black', linewidth=0.5, linestyle='--', label="R200m")
-
-    # Add search radius sphere (if applicable)
-    if search_rad > 0:
-        x_search = search_rad * halo_r200m * np.outer(np.cos(u), np.sin(v))
-        y_search = search_rad * halo_r200m * np.outer(np.sin(u), np.sin(v))
-        z_search = search_rad * halo_r200m * np.outer(np.ones_like(u), np.cos(v))
-        ax.plot_wireframe(x_search, y_search, z_search, color='yellow', linewidth=0.5, linestyle='--', label=f"Search Radius: {search_rad}R200m")
-
-    # Axis labels and title
-    ax.set_xlabel(r"$x [h^{-1}kpc]$")
-    ax.set_ylabel(r"$y [h^{-1}kpc]$")
-    ax.set_zlabel(r"$z [h^{-1}kpc]$")
-    ax.set_title(title)
-    ax.legend()
-
-    # Save the figure
-    save_path = save_loc + title + "_3d_classif_halo_dist.png"
-    fig.savefig(save_path,dpi=300)
 
 def plot_halo_slice(ptl_pos, labels, halo_pos, halo_r200m, save_loc, search_rad=0, title=""):
     cividis_cmap = plt.get_cmap("cividis")
@@ -1388,81 +1346,6 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
         inf_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize, labelleft=False)
         
         fig.savefig(save_location + title + "prfl_rat.png",bbox_inches='tight',dpi=300)
-        
-def inf_orb_frac(p_corr_labels,p_r,p_rv,p_tv,c_r,c_rv,split_scale_dict,num_bins,save_loc):
-    linthrsh = split_scale_dict["linthrsh"]
-    
-    p_r_range = [np.min(p_r),np.max(p_r)]
-    p_rv_range = [np.min(p_rv),np.max(p_rv)]
-    p_tv_range = [np.min(p_tv),np.max(p_tv)]
-    
-    act_min_ptl = 10
-    set_ptl = 0
-    scale_min_ptl = 1e-4
-    
-    inf_p_r, orb_p_r = split_orb_inf(p_r,p_corr_labels)
-    inf_p_rv, orb_p_rv = split_orb_inf(p_rv,p_corr_labels)
-    inf_p_tv, orb_p_tv = split_orb_inf(p_tv,p_corr_labels)
-    inf_c_r, orb_c_r = split_orb_inf(c_r,p_corr_labels)
-    inf_c_rv, orb_c_rv = split_orb_inf(c_rv,p_corr_labels)
-    
-    
-    # Use the binning from all particles for the orbiting and infalling plots and the secondary snap to keep it consistent
-    hist_inf_p_r_p_rv = histogram(inf_p_r,inf_p_rv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
-    hist_inf_p_r_p_tv = histogram(inf_p_r,inf_p_tv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
-    hist_inf_p_rv_p_tv = histogram(inf_p_rv,inf_p_tv,use_bins=[num_bins,num_bins],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
-    hist_inf_c_r_c_rv = histogram(inf_c_r,inf_c_rv,use_bins=[hist_inf_p_r_p_rv["x_edge"],hist_inf_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
-    hist_orb_p_r_p_rv = histogram(orb_p_r,orb_p_rv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
-    hist_orb_p_r_p_tv = histogram(orb_p_r,orb_p_tv,use_bins=[num_bins,num_bins],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
-    hist_orb_p_rv_p_tv = histogram(orb_p_rv,orb_p_tv,use_bins=[num_bins,num_bins],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
-    hist_orb_c_r_c_rv = histogram(orb_c_r,orb_c_rv,use_bins=[hist_orb_p_r_p_rv["x_edge"],hist_orb_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=set_ptl,split_yscale_dict=split_scale_dict)
-
-    hist_frac_p_r_p_rv = scale_hists(hist_inf_p_r_p_rv, hist_orb_p_r_p_rv)
-    hist_frac_p_r_p_tv = scale_hists(hist_inf_p_r_p_tv, hist_orb_p_r_p_tv)
-    hist_frac_p_rv_p_tv = scale_hists(hist_inf_p_rv_p_tv, hist_orb_p_rv_p_tv)
-    hist_frac_c_r_c_rv = scale_hists(hist_inf_c_r_c_rv, hist_orb_c_r_c_rv)
-    
-    max_ptl = np.max(np.array([np.max(hist_frac_p_r_p_rv["hist"]),np.max(hist_frac_p_r_p_tv["hist"]),np.max(hist_frac_p_rv_p_tv["hist"]),np.max(hist_frac_c_r_c_rv["hist"])]))
-        
-    cividis_cmap = plt.get_cmap("cividis")
-    cividis_cmap.set_under(color='black')
-    cividis_cmap.set_bad(color='black') 
-    
-    plot_kwargs = {
-            "vmin":scale_min_ptl,
-            "vmax":max_ptl,
-            "norm":"log",
-            "origin":"lower",
-            "aspect":"auto",
-            "cmap":cividis_cmap,
-    }
-    
-    r_ticks = split_scale_dict["lin_rticks"] + split_scale_dict["log_rticks"]
-    
-    rv_ticks = split_scale_dict["lin_rvticks"] + split_scale_dict["log_rvticks"]
-    rv_ticks = rv_ticks + [-x for x in rv_ticks if x != 0]
-    rv_ticks.sort()
-
-    tv_ticks = split_scale_dict["lin_tvticks"] + split_scale_dict["log_tvticks"]       
-    
-    widths = [4,4,4,4,.2]
-    heights = [4]
-    
-    fig = plt.figure(constrained_layout=True, figsize=(45,10))
-    gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
-    
-    imshow_plot(fig.add_subplot(gs[0,0]),hist_frac_p_r_p_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
-    imshow_plot(fig.add_subplot(gs[0,1]),hist_frac_p_r_p_tv,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
-    imshow_plot(fig.add_subplot(gs[0,2]),hist_frac_p_rv_p_tv,x_label="$v_r/V_{200m}$",hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,kwargs=plot_kwargs)
-    imshow_plot(fig.add_subplot(gs[0,3]),hist_frac_c_r_c_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,kwargs=plot_kwargs)
- 
-    color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=scale_min_ptl, vmax=max_ptl),cmap=cividis_cmap), cax=plt.subplot(gs[:,-1]))
-    color_bar.set_label(r"$N_{inf}/N_{orb}$",fontsize=26)
-    color_bar.ax.tick_params(which="major",direction="in",labelsize=22,length=10,width=3)
-    color_bar.ax.tick_params(which="minor",direction="in",labelsize=22,length=5,width=1.5)
-    
-    fig.savefig(save_loc + "inf_orb_frac.png")
-    plt.close()
     
 def plot_tree(bst,tree_num,save_loc):
     fig, ax = plt.subplots(figsize=(400, 10))
@@ -1861,4 +1744,248 @@ def compare_split_prfs_ke(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_
         
         fig.savefig(save_location + title + "prfl_rat.png",bbox_inches='tight',dpi=400)    
     
+# Creates the density profiles seen throughout the paper.
+# 3 panels for all, orbiting, and infalling profiles with options to be split by nu or by mass accretion rate
+def paper_dens_prf(X,y,preds,halo_df,use_sims,sim_cosmol,plot_save_loc,split_by_nu=False,split_by_macc=False):
+    halo_first = halo_df["Halo_first"].values
+    halo_n = halo_df["Halo_n"].values
+    all_idxs = halo_df["Halo_indices"].values
+
+    cosmol = set_cosmology(sim_cosmol)
+
+    all_z = []
+    all_rhom = []
+    # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
+    sim_splits = np.where(halo_first == 0)[0]
+
+    # if there are multiple simulations, to correctly index the dataset we need to update the starting values for the 
+    # stacked simulations such that they correspond to the larger dataset and not one specific simulation
+    if len(use_sims) > 1:
+        for i,sim in enumerate(use_sims):
+            # The first sim remains the same
+            if i == 0:
+                continue
+            # Else if it isn't the final sim 
+            elif i < len(use_sims) - 1:
+                halo_first[sim_splits[i]:sim_splits[i+1]] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
+            # Else if the final sim
+            else:
+                halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
+    
+    # Get the redshifts for each simulation's primary snapshot
+    for i,sim in enumerate(use_sims):
+        with open(ML_dset_path + sim + "/dset_params.pickle", "rb") as file:
+            dset_params = pickle.load(file)
+            curr_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"][()]
+            curr_rho_m = dset_params["all_snap_info"]["prime_snap_info"]["rho_m"][()]
+            all_z.append(curr_z)
+            all_rhom.append(curr_rho_m)
+            h = dset_params["all_snap_info"]["prime_snap_info"]["h"][()]
+    
+    tot_num_halos = halo_n.shape[0]
+    min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
+    
+    # Get SPARTA's mass profiles
+    act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sparta_mass_prf(sim_splits,all_idxs,use_sims)
+    act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
+    
+    # Create mass profiles from the model's predictions
+    prime_radii = X["p_Scaled_radii"].values.compute()
+    calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=prime_radii, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, use_mp=True, all_z=all_z)
+    my_mass_prf_all, my_mass_prf_orb, my_mass_prf_inf, my_nus, my_r200m = create_stack_mass_prf(sim_splits,radii=prime_radii, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=y.compute().values.flatten(), prf_bins=bins, use_mp=True, all_z=all_z)
+    # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
+    small_halo_fltr = np.isnan(calc_r200m)
+    act_mass_prf_all[small_halo_fltr,:] = np.nan
+    act_mass_prf_orb[small_halo_fltr,:] = np.nan
+    act_mass_prf_inf[small_halo_fltr,:] = np.nan
+    
+    all_prfs = [calc_mass_prf_all, act_mass_prf_all]
+    orb_prfs = [calc_mass_prf_orb, act_mass_prf_orb]
+    inf_prfs = [calc_mass_prf_inf, act_mass_prf_inf]
+
+    # Calculate the density by divide the mass of each bin by the volume of that bin's radius
+    calc_dens_prf_all = calculate_density(calc_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+    calc_dens_prf_orb = calculate_density(calc_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+    calc_dens_prf_inf = calculate_density(calc_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+    
+    act_dens_prf_all = calculate_density(act_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+    act_dens_prf_orb = calculate_density(act_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+    act_dens_prf_inf = calculate_density(act_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+    
+    if debug_indiv_dens_prf > 0:
+        my_dens_prf_orb = calculate_density(my_mass_prf_orb*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
+        my_dens_prf_all = calculate_density(my_mass_prf_all*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
+        my_dens_prf_inf = calculate_density(my_mass_prf_inf*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
+    
+        ratio = np.where(act_dens_prf_all != 0, calc_dens_prf_all / act_dens_prf_all, np.nan)
+
+        # Compute the difference for each halo (using range: max - min)
+        diff = np.nanmax(ratio, axis=1) - np.nanmin(ratio, axis=1)
+
+        # If you want the top k halos with the largest differences, use:
+        k = 5  # Example value
+        big_halo_loc = np.argsort(diff)[-k:]
+    
+        for i in range(k):
+            all_prfs = [my_mass_prf_all[big_halo_loc[i]], act_mass_prf_all[big_halo_loc[i]]]
+            orb_prfs = [my_mass_prf_orb[big_halo_loc[i]], act_mass_prf_orb[big_halo_loc[i]]]
+            inf_prfs = [my_mass_prf_inf[big_halo_loc[i]], act_mass_prf_inf[big_halo_loc[i]]]
+            compare_prfs(all_prfs,orb_prfs,inf_prfs,bins[1:],lin_rticks,debug_plt_path,sim + "_" + str(i)+"_mass",prf_func=None)
+
+        for i in range(k):
+            all_prfs = [my_dens_prf_all[big_halo_loc[i]], act_dens_prf_all[big_halo_loc[i]]]
+            orb_prfs = [my_dens_prf_orb[big_halo_loc[i]], act_dens_prf_orb[big_halo_loc[i]]]
+            inf_prfs = [my_dens_prf_inf[big_halo_loc[i]], act_dens_prf_inf[big_halo_loc[i]]]
+            compare_prfs(all_prfs,orb_prfs,inf_prfs,bins[1:],lin_rticks,debug_plt_path,sim + "_" + str(i)+"_dens",prf_func=None)
+            
+    curr_halos_r200m_list = []
+    past_halos_r200m_list = []
+    
+    for i,sim in enumerate(use_sims):
+        if i < len(use_sims) - 1:
+            curr_idxs = all_idxs[sim_splits[i]:sim_splits[i+1]]
+        else:
+            curr_idxs = all_idxs[sim_splits[i]:]
+        dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
+        curr_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"][()]
+        p_sparta_snap = dset_params["all_snap_info"]["prime_snap_info"]["sparta_snap"][()]
+        snap_dir_format = dset_params["snap_dir_format"]
+        snap_format = dset_params["snap_format"]
+        
+        sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
+        curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
+                
+        # Load the halo's positions and radii
+        param_paths = [["halos","R200m"]]
+        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, pickle_data=pickle_data)
+        p_halos_r200m = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
+
+        p_halos_r200m = p_halos_r200m[curr_idxs]
+
+        # If we want the density profiles to only consist of halos of a specific peak height (nu) bin 
+        if split_by_nu:
+            nu_all_prf_lst = []
+            nu_orb_prf_lst = []
+            nu_inf_prf_lst = []
+        
+            cpy_plt_nu_splits = plt_nu_splits.copy()
+            for i,nu_split in enumerate(cpy_plt_nu_splits):
+                # Take the second element of the where to filter by the halos (?)
+                fltr = np.where((calc_nus > nu_split[0]) & (calc_nus < nu_split[1]))[0]
+
+                if fltr.shape[0] > min_halo_nu_bin:
+                    nu_all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
+                    nu_orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
+                    nu_inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
+                else:
+                    plt_nu_splits.remove(nu_split)
+            compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),nu_all_prf_lst,nu_orb_prf_lst,nu_inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="nu_dens_med_",prf_func=np.nanmedian, prf_name_0="ML Model", prf_name_1="SPARTA")
+        if split_by_macc and dset_params["t_dyn_steps"]:
+            all_tdyn_steps = dset_params["t_dyn_steps"]
+            if all_tdyn_steps[0] == 1:
+                # we can just use the secondary snap here because if it was already calculated for 1 dynamical time forago
+                past_z = dset_params["all_snap_info"]["comp_"+str(all_tdyn_steps[0]) + "_tdstp_snap_info"]["red_shift"][()] 
+                c_sparta_snap = dset_params["all_snap_info"]["comp_"+str(all_tdyn_steps[0]) + "_tdstp_snap_info"]["sparta_snap"][()]
+            else:
+                # If the prior secondary snap is not 1 dynamical time ago get that information
+                
+                with h5py.File(curr_sparta_HDF5_path,"r") as f:
+                    dic_sim = {}
+                    grp_sim = f['simulation']
+                    for f in grp_sim.attrs:
+                        dic_sim[f] = grp_sim.attrs[f]
+                    
+                all_sparta_z = dic_sim['snap_z']
+                
+                t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], curr_z)
+                c_snap_dict = get_comp_snap_info(t_dyn=t_dyn, t_dyn_step=1, cosmol = cosmol, p_red_shift=curr_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
+                c_sparta_snap = c_snap_dict["sparta_snap"]
+            c_halos_r200m = sparta_params[sparta_param_names[0]][:,c_sparta_snap]
+            c_halos_r200m = c_halos_r200m[curr_idxs]
+            
+            curr_halos_r200m_list.append(p_halos_r200m)
+            past_halos_r200m_list.append(c_halos_r200m)
+            
+            curr_halos_r200m = np.concatenate(curr_halos_r200m_list)
+            past_halos_r200m = np.concatenate(past_halos_r200m_list)
+            macc_all_prf_lst = []
+            macc_orb_prf_lst = []
+            macc_inf_prf_lst = []
+            
+            calc_maccs = calc_mass_acc_rate(curr_halos_r200m,past_halos_r200m,curr_z,past_z)
+            cpy_plt_macc_splits = plt_macc_splits.copy()
+            for i,macc_split in enumerate(cpy_plt_macc_splits):
+                # Take the second element of the where to filter by the halos (?)
+                fltr = np.where((calc_maccs > macc_split[0]) & (calc_maccs < macc_split[1]))[0]
+                if fltr.shape[0] > 25:
+                    macc_all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
+                    macc_orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
+                    macc_inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
+                else:
+                    plt_macc_splits.remove(macc_split)
+
+            
+            compare_split_prfs(plt_macc_splits,len(cpy_plt_macc_splits),macc_all_prf_lst,macc_orb_prf_lst,macc_inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title= "macc_dens_", split_name="\Gamma", prf_name_0="ML Model", prf_name_1="SPARTA")
+        if not split_by_nu and not split_by_macc:
+            all_prf_lst = filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos)
+            orb_prf_lst = filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos)
+            inf_prf_lst = filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos)
+            
+            # Ignore warnigns about taking mean/median of empty slices and division by 0 that are expected with how the profiles are handled
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_med_",prf_func=np.nanmedian)
+                compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_avg_",prf_func=np.nanmean)
+
+# Creates the ptl distribution plot as seen in the paper with vr vs r, vt vs r, and vr vs vt for the primary snapshot and vr vs r for the secondary snapshots
+def paper_ptl_dist(X,y,all_tdyn_steps,plot_save_loc):
+    p_corr_labels=y.compute().values.flatten()
+    p_r=X["p_Scaled_radii"].values.compute()
+    p_rv=X["p_Radial_vel"].values.compute()
+    p_tv=X["p_Tangential_vel"].values.compute()
+    c_r=X[str(all_tdyn_steps[0]) + "_Scaled_radii"].values.compute()
+    c_rv=X[str(all_tdyn_steps[0]) +"_Radial_vel"].values.compute()
+    
+    split_scale_dict = {
+        "linthrsh":linthrsh, 
+        "lin_nbin":lin_nbin,
+        "log_nbin":log_nbin,
+        "lin_rvticks":lin_rvticks,
+        "log_rvticks":log_rvticks,
+        "lin_tvticks":lin_tvticks,
+        "log_tvticks":log_tvticks,
+        "lin_rticks":lin_rticks,
+        "log_rticks":log_rticks,
+    }
+    plot_full_ptl_dist(p_corr_labels=p_corr_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,split_scale_dict=split_scale_dict,save_loc=plot_save_loc)
+    
+#  Creates the misclassification plot as seen in the paper with vr vs r, vt vs r, and vr vs vt for the primary snapshot and vr vs r for the secondary snapshots
+def paper_misclass(X,y,preds,use_sims,dst_type,all_tdyn_steps,plot_save_loc):
+    p_corr_labels=y.compute().values.flatten()
+    p_ml_labels=preds.values
+    p_r=X["p_Scaled_radii"].values.compute()
+    p_rv=X["p_Radial_vel"].values.compute()
+    p_tv=X["p_Tangential_vel"].values.compute()
+    c_r=X[str(all_tdyn_steps[0]) + "_Scaled_radii"].values.compute()
+    c_rv=X[str(all_tdyn_steps[0]) +"_Radial_vel"].values.compute()
+    
+    split_scale_dict = {
+        "linthrsh":linthrsh, 
+        "lin_nbin":lin_nbin,
+        "log_nbin":log_nbin,
+        "lin_rvticks":lin_rvticks,
+        "log_rvticks":log_rvticks,
+        "lin_tvticks":lin_tvticks,
+        "log_tvticks":log_tvticks,
+        "lin_rticks":lin_rticks,
+        "log_rticks":log_rticks,
+    }
+    
+     # Dataset name is used to save to model info the misclassification rates
+    curr_sim_name = ""
+    for sim in use_sims:
+        curr_sim_name += sim
+        curr_sim_name += "_"
+    curr_sim_name += dst_type
+    plot_miss_class_dist(p_corr_labels=p_corr_labels,p_ml_labels=p_ml_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,split_scale_dict=split_scale_dict,save_loc=plot_save_loc,model_info=model_info,dataset_name=curr_sim_name)
     
