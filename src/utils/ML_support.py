@@ -17,45 +17,36 @@ import multiprocessing as mp
 
 from .data_and_loading_functions import load_SPARTA_data, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, load_pickle, load_config, get_comp_snap_info, create_directory, set_cosmology
 from .vis_fxns import plot_full_ptl_dist, plot_miss_class_dist, compare_prfs, compare_split_prfs, inf_orb_frac
-from .calculation_functions import create_mass_prf, create_stack_mass_prf, filter_prf, calculate_density, calc_mass_acc_rate, calc_t_dyn
-from sparta_tools import sparta 
+from .calculation_functions import create_mass_prf, create_stack_mass_prf, filter_prf, calculate_density, calc_mass_acc_rate, calc_t_dyn 
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
-config_dict = load_config(os.getcwd() + "/config.ini")
-rand_seed = config_dict["MISC"]["random_seed"]
-curr_sparta_file = config_dict["SPARTA_DATA"]["curr_sparta_file"]
-debug_indiv_dens_prf = config_dict["MISC"]["debug_indiv_dens_prf"]
-pickle_data = config_dict["MISC"]["pickle_data"]
+config_params = load_config(os.getcwd() + "/config.ini")
+rand_seed = config_params["MISC"]["random_seed"]
+curr_sparta_file = config_params["SPARTA_DATA"]["curr_sparta_file"]
+debug_indiv_dens_prf = config_params["MISC"]["debug_indiv_dens_prf"]
+pickle_data = config_params["MISC"]["pickle_data"]
 
-snap_path = config_dict["SNAP_DATA"]["snap_path"]
+snap_path = config_params["SNAP_DATA"]["snap_path"]
 
-SPARTA_output_path = config_dict["SPARTA_DATA"]["sparta_output_path"]
-pickled_path = config_dict["PATHS"]["pickled_path"]
-ML_dset_path = config_dict["PATHS"]["ml_dset_path"]
-debug_plt_path = config_dict["PATHS"]["debug_plt_path"]
+SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
+pickled_path = config_params["PATHS"]["pickled_path"]
+ML_dset_path = config_params["PATHS"]["ml_dset_path"]
+debug_plt_path = config_params["PATHS"]["debug_plt_path"]
 
-on_zaratan = config_dict["DASK_CLIENT"]["on_zaratan"]
-use_gpu = config_dict["DASK_CLIENT"]["use_gpu"]
-dask_task_ncpus = config_dict["DASK_CLIENT"]["dask_task_ncpus"]
+on_zaratan = config_params["DASK_CLIENT"]["on_zaratan"]
+use_gpu = config_params["DASK_CLIENT"]["use_gpu"]
+dask_task_ncpus = config_params["DASK_CLIENT"]["dask_task_ncpus"]
 
-file_lim = config_dict["TRAIN_MODEL"]["file_lim"]
+file_lim = config_params["TRAIN_MODEL"]["file_lim"]
 
-plt_nu_splits = config_dict["EVAL_MODEL"]["plt_nu_splits"]
+plt_nu_splits = config_params["EVAL_MODEL"]["plt_nu_splits"]
 plt_nu_splits = parse_ranges(plt_nu_splits)
 
-plt_macc_splits = config_dict["EVAL_MODEL"]["plt_macc_splits"]
+plt_macc_splits = config_params["EVAL_MODEL"]["plt_macc_splits"]
 plt_macc_splits = parse_ranges(plt_macc_splits)
-min_halo_nu_bin = config_dict["EVAL_MODEL"]["min_halo_nu_bin"]
-linthrsh = config_dict["EVAL_MODEL"]["linthrsh"]
-lin_nbin = config_dict["EVAL_MODEL"]["lin_nbin"]
-log_nbin = config_dict["EVAL_MODEL"]["log_nbin"]
-lin_rvticks = config_dict["EVAL_MODEL"]["lin_rvticks"]
-log_rvticks = config_dict["EVAL_MODEL"]["log_rvticks"]
-lin_tvticks = config_dict["EVAL_MODEL"]["lin_tvticks"]
-log_tvticks = config_dict["EVAL_MODEL"]["log_tvticks"]
-lin_rticks = config_dict["EVAL_MODEL"]["lin_rticks"]
-log_rticks = config_dict["EVAL_MODEL"]["log_rticks"]
+min_halo_nu_bin = config_params["EVAL_MODEL"]["min_halo_nu_bin"]
+
 
 # From the input simulation name extract the simulation name (ex: cbol_l0063_n0256) and the SPARTA hdf5 output name (ex: cbol_l0063_n0256_4r200m_1-5v200m)
 def split_sparta_hdf5_name(sim):
@@ -415,57 +406,6 @@ def load_data(client, sims, dset_name, sim_cosmol, prime_snap, limit_files = Fal
     all_dask_dfs = dd.concat(dask_dfs)
     
     return all_dask_dfs,act_scale_pos_weight
-
-# Reconstruct SPARTA's mass profiles and stack them together for a list of sims
-def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):                
-    mass_prf_all_list = []
-    mass_prf_1halo_list = []
-    all_r200m_list = []
-    all_masses = []
-    
-    for i,sim in enumerate(use_sims):
-        # Get the halo indices corresponding to this simulation
-        if i < len(use_sims) - 1:
-            use_idxs = all_idxs[sim_splits[i]:sim_splits[i+1]]
-        else:
-            use_idxs = all_idxs[sim_splits[i]:]
-        
-        sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
-        # find the snapshots for this simulation
-        curr_snap_list = extract_snaps(sim)
-        
-        with open(ML_dset_path + sim + "/dset_params.pickle", "rb") as file:
-            dset_params = pickle.load(file)
-            
-        p_sparta_snap = dset_params["all_snap_info"]["prime_snap_info"]["sparta_snap"]
-        
-        curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"      
-        
-        param_paths = [["halos","id"],["simulation","particle_mass"],["anl_prf","M_all"],["anl_prf","M_1halo"],["halos","R200m"],["config","anl_prf","r_bins_lin"]]
-        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, pickle_data=pickle_data)
-        halos_ids = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
-        ptl_mass = sparta_params[sparta_param_names[1]]
- 
-        use_halo_ids = halos_ids[use_idxs]
-
-        mass_prf_all_list.append(sparta_params[sparta_param_names[2]][:,p_sparta_snap,:])
-        mass_prf_1halo_list.append(sparta_params[sparta_param_names[3]][:,p_sparta_snap,:])
-
-        all_r200m_list.append(sparta_params[sparta_param_names[4]][:,p_sparta_snap])
-
-        all_masses.append(ptl_mass)
-
-    mass_prf_all = np.vstack(mass_prf_all_list)
-    mass_prf_1halo = np.vstack(mass_prf_1halo_list)
-    all_r200m = np.concatenate(all_r200m_list)
-    
-    bins = sparta_params[sparta_param_names[5]]
-    bins = np.insert(bins, 0, 0)
-
-    if ret_r200m:
-        return mass_prf_all,mass_prf_1halo,all_masses,bins,all_r200m
-    else:
-        return mass_prf_all,mass_prf_1halo,all_masses,bins
 
 
 def get_combined_name(model_sims):

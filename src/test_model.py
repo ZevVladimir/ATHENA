@@ -38,6 +38,16 @@ full_dist_plt = config_params["EVAL_MODEL"]["fulldist_plt"]
 dens_prf_nu_split = config_params["EVAL_MODEL"]["dens_prf_nu_split"]
 dens_prf_macc_split = config_params["EVAL_MODEL"]["dens_prf_macc_split"]
 
+linthrsh = config_params["EVAL_MODEL"]["linthrsh"]
+lin_nbin = config_params["EVAL_MODEL"]["lin_nbin"]
+log_nbin = config_params["EVAL_MODEL"]["log_nbin"]
+lin_rvticks = config_params["EVAL_MODEL"]["lin_rvticks"]
+log_rvticks = config_params["EVAL_MODEL"]["log_rvticks"]
+lin_tvticks = config_params["EVAL_MODEL"]["lin_tvticks"]
+log_tvticks = config_params["EVAL_MODEL"]["log_tvticks"]
+lin_rticks = config_params["EVAL_MODEL"]["lin_rticks"]
+log_rticks = config_params["EVAL_MODEL"]["log_rticks"]
+
 ###############################################################################################################
 
 if __name__ == "__main__":    
@@ -105,6 +115,18 @@ if __name__ == "__main__":
 
                 X = data[feature_columns]
                 y = data[target_column]
+                
+                split_scale_dict = {
+                    "linthrsh":linthrsh, 
+                    "lin_nbin":lin_nbin,
+                    "log_nbin":log_nbin,
+                    "lin_rvticks":lin_rvticks,
+                    "log_rvticks":log_rvticks,
+                    "lin_tvticks":lin_tvticks,
+                    "log_tvticks":log_tvticks,
+                    "lin_rticks":lin_rticks,
+                    "log_rticks":log_rticks,
+                }
                 
                 with timed(f"Predictions for {y.size.compute():.3e} particles"):
                     preds = make_preds(client, bst, X)
