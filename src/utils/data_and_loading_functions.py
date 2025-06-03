@@ -1,4 +1,5 @@
 import pickle
+import joblib
 import h5py 
 import os
 import numpy as np
@@ -109,6 +110,16 @@ def load_pickle(path):
             return pickle.load(pickle_file)
     else:
         raise FileNotFoundError
+    
+# joblib is better for large np arrays
+def save_joblib(data, path):
+    joblib.dump(data,path)
+    
+def load_joblib(path):
+    if os.path.isfile(path):
+        return joblib.load(path)
+    else:
+        raise FileNotFoundError
 
 def load_ptl_param(sparta_name, param_name, snap, snap_path):
     # save to folder containing pickled data to be accessed easily later
@@ -120,6 +131,7 @@ def load_ptl_param(sparta_name, param_name, snap, snap_path):
         ptl_param = load_pickle(file_path)
     except FileNotFoundError:
         ptl_param = readsnap(snap_path, param_name, 'dm')
+        #TODO check if ptl_param is np array and if so use joblib instead to save
         save_pickle(ptl_param,file_path)
 
     return ptl_param
@@ -136,7 +148,7 @@ def load_SPARTA_data(sparta_HDF5_path, param_path_list, sparta_name, pickle_data
         save_name = "_".join(map(str, param_path))
         all_save_names.append(save_name)
         try:
-            param = load_pickle(pickled_path + str(sparta_name) + "/" + save_name + ".pickle")
+            param = load_joblib(pickled_path + str(sparta_name) + "/" + save_name + ".pickle")
         except FileNotFoundError:
             if not reload_sparta:
                 sparta_output = sparta.load(filename=sparta_HDF5_path, log_level= 0)
@@ -144,7 +156,7 @@ def load_SPARTA_data(sparta_HDF5_path, param_path_list, sparta_name, pickle_data
         
             param = reduce(lambda dct, key: dct[key], param_path, sparta_output)
             if pickle_data:
-                save_pickle(param,pickled_path + str(sparta_name) +  "/" + save_name + ".pickle")
+                save_joblib(param,pickled_path + str(sparta_name) +  "/" + save_name + ".pickle")
 
         param_dict[save_name] = param
 

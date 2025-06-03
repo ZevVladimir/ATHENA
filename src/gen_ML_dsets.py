@@ -651,7 +651,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         "Halo_indices":use_indices,
                         "Halo_R200m":use_halos_r200m,
                     })
-                    halo_df.to_hdf(save_location + "Train/halo_info/halo_" + str(i+train_start_pnt) + ".h5", key='data', mode='w',format='table')  
+                    halo_df.to_hdf(save_location + "Train/halo_info/halo_" + str(j+train_start_pnt) + ".h5", key='data', mode='w',format='table')  
 
                     ptl_df = pd.DataFrame({
                         "HIPIDS":train_p_HIPIDs,
@@ -715,7 +715,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         "Halo_indices":use_indices,
                         "Halo_R200m":use_halos_r200m,
                     })
-                    halo_df.to_hdf(save_location + "Test/halo_info/halo_" + str(i+test_start_pnt) + ".h5", key='data', mode='w',format='table')  
+                    halo_df.to_hdf(save_location + "Test/halo_info/halo_" + str(j+test_start_pnt) + ".h5", key='data', mode='w',format='table')  
 
                     ptl_df = pd.DataFrame({
                         "HIPIDS":test_p_HIPIDs,

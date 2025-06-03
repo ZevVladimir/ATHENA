@@ -189,8 +189,10 @@ if __name__ == "__main__":
         axis_fntsize = 18
         tick_fntsize = 14
         ax.legend(fontsize=legend_fntsize, loc="upper right")
-        ax.set_xlabel(r"Radius $r/R_{\rm 200m}$",fontsize=axis_fntsize)
+        ax.set_xlabel(r"$r/R_{\rm 200m}$",fontsize=axis_fntsize)
         ax.set_ylabel(r"$N_{\rm orb}/N_{\rm tot}$",fontsize=axis_fntsize)
+        ax.set_xlim(0,3)
+        ax.set_ylim(0,1)
         ax.tick_params(axis='both', labelsize=tick_fntsize, length=6,width=2, direction="in")
         
         fig.savefig(debug_plt_path + test_comb_name + "_all_orb_rat_by_rad.png",dpi=400)

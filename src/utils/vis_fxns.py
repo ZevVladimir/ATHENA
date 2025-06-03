@@ -1142,10 +1142,6 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
         ax_1.plot(bins, ratio_orb_prf, 'b')
         ax_1.plot(bins, ratio_inf_prf, 'g')
         
-        # ax_1.fill_between(bins, np.nanpercentile(ratio_all_prf, q=15.9, axis=0),np.nanpercentile(ratio_all_prf, q=84.1, axis=0), color='r', alpha=fill_alpha)
-        # ax_1.fill_between(bins, np.nanpercentile(ratio_orb_prf, q=15.9, axis=0),np.nanpercentile(ratio_orb_prf, q=84.1, axis=0), color='b', alpha=fill_alpha)
-        # ax_1.fill_between(bins, np.nanpercentile(ratio_inf_prf, q=15.9, axis=0),np.nanpercentile(ratio_inf_prf, q=84.1, axis=0), color='g', alpha=fill_alpha) 
-            
         ax_0.set_ylabel(r"$\rho / \rho_m$", fontsize=axisfntsize)
         ax_0.set_xscale("log")
         ax_0.set_yscale("log")
@@ -1174,7 +1170,34 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
         ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
         fig.suptitle(title)
         fig.savefig(save_location + title + "prfl_rat.png",bbox_inches='tight')
-        
+
+def gen_plot(ax,x,y,**kwargs):
+    ax.plot(x,y)
+    
+    if "xlabel" in kwargs:
+        ax.set_xlabel(kwargs["xlabel"])
+    if "ylabel" in kwargs:
+        ax.set_ylabel(kwargs["ylabel"])
+    if "xlim" in kwargs:
+        ax.set_xlim(kwargs["xlim"])
+    if "ylim" in kwargs:
+        ax.set_ylim(kwargs["yliml"])
+    if "xscale" in kwargs:
+        ax.set_xscale(kwargs["xscale"])
+    if "yscale" in kwargs:
+        ax.set_yscale(kwargs["yscale"]) 
+    if "title" in kwargs:
+        ax.set_title(kwargs["title"])
+    if 'legend_handles' in kwargs and 'legend_labels' in kwargs:
+        legend_handles = kwargs.get("legend_handles")
+        legend_labels = kwargs.get("legend_labels")
+        legend_kwargs = kwargs.get("legend_kwargs",{})
+        ax.legend(legend_handles,legend_labels,**legend_kwargs)
+    else:
+        legend_kwargs = kwargs.get("legend_kwargs",{})
+        ax.legend(**legend_kwargs)
+    
+
 # Profiles should be a list of lists where each list consists of [calc_prf,act_prf] for each split
 # You can either use the median plots with use_med=True or the average with use_med=False
 # The prf_name_0 and prf_name_1 correspond to what you want each profile to be named in the plot corresponding to where they are located in the _prfs variable
@@ -1446,7 +1469,6 @@ def plot_tree(bst,tree_num,save_loc):
     xgb.plot_tree(bst, num_trees=tree_num, ax=ax,rankdir='LR')
     fig.savefig(save_loc + "/tree_plot.png")
 
-
 def plt_cust_ke_line(b,bins,linewidth):
     for i in range(bins.shape[0]-1):
         x1 = bins[i]
@@ -1597,7 +1619,6 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         else:
             plt.savefig(plot_loc + "log_" + title + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=400) 
         
-
 def compare_split_prfs_ke(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_orb_prfs, simp_inf_prfs, bins, lin_rticks, save_location, title="comb_ke_fits_", prf_func=np.nanmedian, split_name="\\nu", prf_name_0 = "Optimized Cut", prf_name_1 = "SPARTA", prf_name_2 = "Fast Cut", prf_name_3 = "SPARTA"): 
     with timed("Compare Split Profiles"):
         # Parameters to tune sizes of plots and fonts
@@ -1839,4 +1860,5 @@ def compare_split_prfs_ke(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_
         simp_inf_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize, labelleft=False)
         
         fig.savefig(save_location + title + "prfl_rat.png",bbox_inches='tight',dpi=400)    
+    
     

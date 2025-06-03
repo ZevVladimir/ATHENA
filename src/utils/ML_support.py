@@ -441,20 +441,17 @@ def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         
         curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"      
         
-        param_paths = [["halos","id"],["simulation","particle_mass"]]
+        param_paths = [["halos","id"],["simulation","particle_mass"],["anl_prf","M_all"],["anl_prf","M_1halo"],["halos","R200m"],["config","anl_prf","r_bins_lin"]]
         sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, pickle_data=pickle_data)
         halos_ids = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
         ptl_mass = sparta_params[sparta_param_names[1]]
  
         use_halo_ids = halos_ids[use_idxs]
-        #TODO don't use sparta.load anymore
-        sparta_output = sparta.load(filename=curr_sparta_HDF5_path, halo_ids=use_halo_ids, log_level=0)
-        new_idxs = conv_halo_id_spid(use_halo_ids, sparta_output, p_sparta_snap) # If the order changed by sparta re-sort the indices
-        
-        mass_prf_all_list.append(sparta_output['anl_prf']['M_all'][new_idxs,p_sparta_snap,:])
-        mass_prf_1halo_list.append(sparta_output['anl_prf']['M_1halo'][new_idxs,p_sparta_snap,:])
 
-        all_r200m_list.append(sparta_output['halos']['R200m'][:,p_sparta_snap])
+        mass_prf_all_list.append(sparta_params[sparta_param_names[2]][:,p_sparta_snap,:])
+        mass_prf_1halo_list.append(sparta_params[sparta_param_names[3]][:,p_sparta_snap,:])
+
+        all_r200m_list.append(sparta_params[sparta_param_names[4]][:,p_sparta_snap])
 
         all_masses.append(ptl_mass)
 
@@ -462,13 +459,207 @@ def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
     mass_prf_1halo = np.vstack(mass_prf_1halo_list)
     all_r200m = np.concatenate(all_r200m_list)
     
-    bins = sparta_output["config"]['anl_prf']["r_bins_lin"]
+    bins = sparta_params[sparta_param_names[5]]
     bins = np.insert(bins, 0, 0)
 
     if ret_r200m:
         return mass_prf_all,mass_prf_1halo,all_masses,bins,all_r200m
     else:
         return mass_prf_all,mass_prf_1halo,all_masses,bins
+
+# Creates the density profiles seen throughout the paper.
+# 3 panels for all, orbiting, and infalling profiles with options to be split by nu or by mass accretion rate
+def paper_dens_prf(X,y,preds,halo_df,use_sims):
+    halo_first = halo_df["Halo_first"].values
+    halo_n = halo_df["Halo_n"].values
+    all_idxs = halo_df["Halo_indices"].values
+
+    all_z = []
+    all_rhom = []
+    # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
+    sim_splits = np.where(halo_first == 0)[0]
+
+    # if there are multiple simulations, to correctly index the dataset we need to update the starting values for the 
+    # stacked simulations such that they correspond to the larger dataset and not one specific simulation
+    if len(use_sims) > 1:
+        for i,sim in enumerate(use_sims):
+            # The first sim remains the same
+            if i == 0:
+                continue
+            # Else if it isn't the final sim 
+            elif i < len(use_sims) - 1:
+                halo_first[sim_splits[i]:sim_splits[i+1]] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
+            # Else if the final sim
+            else:
+                halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
+    
+    # Get the redshifts for each simulation's primary snapshot
+    for i,sim in enumerate(use_sims):
+        with open(ML_dset_path + sim + "/dset_params.pickle", "rb") as file:
+            dset_params = pickle.load(file)
+            curr_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"][()]
+            curr_rho_m = dset_params["all_snap_info"]["prime_snap_info"]["rho_m"][()]
+            all_z.append(curr_z)
+            all_rhom.append(curr_rho_m)
+            h = dset_params["all_snap_info"]["prime_snap_info"]["h"][()]
+    
+    tot_num_halos = halo_n.shape[0]
+    min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
+    
+    # Get SPARTA's mass profiles
+    act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sparta_mass_prf(sim_splits,all_idxs,use_sims)
+    act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
+    
+    snap_list = extract_snaps(use_sims[0])
+    
+    # Create mass profiles from the model's predictions
+    prime_radii = X["p_Scaled_radii"].values.compute()
+    calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=prime_radii, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, use_mp=True, all_z=all_z)
+    my_mass_prf_all, my_mass_prf_orb, my_mass_prf_inf, my_nus, my_r200m = create_stack_mass_prf(sim_splits,radii=prime_radii, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=y.compute().values.flatten(), prf_bins=bins, use_mp=True, all_z=all_z)
+    # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
+    small_halo_fltr = np.isnan(calc_r200m)
+    act_mass_prf_all[small_halo_fltr,:] = np.nan
+    act_mass_prf_orb[small_halo_fltr,:] = np.nan
+    act_mass_prf_inf[small_halo_fltr,:] = np.nan
+    
+    all_prfs = [calc_mass_prf_all, act_mass_prf_all]
+    orb_prfs = [calc_mass_prf_orb, act_mass_prf_orb]
+    inf_prfs = [calc_mass_prf_inf, act_mass_prf_inf]
+
+    # Calculate the density by divide the mass of each bin by the volume of that bin's radius
+    calc_dens_prf_all = calculate_density(calc_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+    calc_dens_prf_orb = calculate_density(calc_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+    calc_dens_prf_inf = calculate_density(calc_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+    
+    act_dens_prf_all = calculate_density(act_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+    act_dens_prf_orb = calculate_density(act_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+    act_dens_prf_inf = calculate_density(act_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+    
+    if debug_indiv_dens_prf > 0:
+        my_dens_prf_orb = calculate_density(my_mass_prf_orb*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
+        my_dens_prf_all = calculate_density(my_mass_prf_all*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
+        my_dens_prf_inf = calculate_density(my_mass_prf_inf*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
+    
+        ratio = np.where(act_dens_prf_all != 0, calc_dens_prf_all / act_dens_prf_all, np.nan)
+
+        # Compute the difference for each halo (using range: max - min)
+        diff = np.nanmax(ratio, axis=1) - np.nanmin(ratio, axis=1)
+
+        # If you want the top k halos with the largest differences, use:
+        k = 5  # Example value
+        big_halo_loc = np.argsort(diff)[-k:]
+    
+        for i in range(k):
+            all_prfs = [my_mass_prf_all[big_halo_loc[i]], act_mass_prf_all[big_halo_loc[i]]]
+            orb_prfs = [my_mass_prf_orb[big_halo_loc[i]], act_mass_prf_orb[big_halo_loc[i]]]
+            inf_prfs = [my_mass_prf_inf[big_halo_loc[i]], act_mass_prf_inf[big_halo_loc[i]]]
+            compare_prfs(all_prfs,orb_prfs,inf_prfs,bins[1:],lin_rticks,debug_plt_path,sim + "_" + str(i)+"_mass",prf_func=None)
+
+        for i in range(k):
+            all_prfs = [my_dens_prf_all[big_halo_loc[i]], act_dens_prf_all[big_halo_loc[i]]]
+            orb_prfs = [my_dens_prf_orb[big_halo_loc[i]], act_dens_prf_orb[big_halo_loc[i]]]
+            inf_prfs = [my_dens_prf_inf[big_halo_loc[i]], act_dens_prf_inf[big_halo_loc[i]]]
+            compare_prfs(all_prfs,orb_prfs,inf_prfs,bins[1:],lin_rticks,debug_plt_path,sim + "_" + str(i)+"_dens",prf_func=None)
+            
+    curr_halos_r200m_list = []
+    past_halos_r200m_list = []
+    
+    for i,sim in enumerate(use_sims):
+        if i < len(use_sims) - 1:
+            curr_idxs = all_idxs[sim_splits[i]:sim_splits[i+1]]
+        else:
+            curr_idxs = all_idxs[sim_splits[i]:]
+        dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
+        curr_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"][()]
+        p_sparta_snap = dset_params["all_snap_info"]["prime_snap_info"]["sparta_snap"][()]
+        snap_dir_format = dset_params["snap_dir_format"]
+        snap_format = dset_params["snap_format"]
+        
+        sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
+        curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
+                
+        # Load the halo's positions and radii
+        param_paths = [["halos","R200m"]]
+        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, pickle_data=pickle_data)
+        p_halos_r200m = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
+
+        p_halos_r200m = p_halos_r200m[curr_idxs]
+
+        # If we want the density profiles to only consist of halos of a specific peak height (nu) bin 
+        if split_nu:
+            nu_all_prf_lst = []
+            nu_orb_prf_lst = []
+            nu_inf_prf_lst = []
+        
+            cpy_plt_nu_splits = plt_nu_splits.copy()
+            for i,nu_split in enumerate(cpy_plt_nu_splits):
+                # Take the second element of the where to filter by the halos (?)
+                fltr = np.where((calc_nus > nu_split[0]) & (calc_nus < nu_split[1]))[0]
+
+                if fltr.shape[0] > min_halo_nu_bin:
+                    nu_all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
+                    nu_orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
+                    nu_inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
+                else:
+                    plt_nu_splits.remove(nu_split)
+            compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),nu_all_prf_lst,nu_orb_prf_lst,nu_inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="nu_dens_med_",prf_func=np.nanmedian, prf_name_0="ML Model", prf_name_1="SPARTA")
+        if split_macc and len(all_tdyn_steps) >= 1:
+            if dset_params["t_dyn_steps"] :
+                if dset_params["t_dyn_steps"][0] == 1:
+                    # we can just use the secondary snap here because if it was already calculated for 1 dynamical time forago
+                    past_z = dset_params["all_snap_info"]["comp_"+str(all_tdyn_steps[0]) + "_tdstp_snap_info"]["red_shift"][()] 
+                    c_sparta_snap = dset_params["all_snap_info"]["comp_"+str(all_tdyn_steps[0]) + "_tdstp_snap_info"]["sparta_snap"][()]
+                else:
+                    # If the prior secondary snap is not 1 dynamical time ago get that information
+                    
+                    with h5py.File(curr_sparta_HDF5_path,"r") as f:
+                        dic_sim = {}
+                        grp_sim = f['simulation']
+                        for f in grp_sim.attrs:
+                            dic_sim[f] = grp_sim.attrs[f]
+                        
+                    all_sparta_z = dic_sim['snap_z']
+                    
+                    t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], curr_z)
+                    c_snap_dict = get_comp_snap_info(t_dyn=t_dyn, t_dyn_step=1, cosmol = cosmol, p_red_shift=curr_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
+                    c_sparta_snap = c_snap_dict["sparta_snap"]
+                c_halos_r200m = sparta_params[sparta_param_names[0]][:,c_sparta_snap]
+                c_halos_r200m = c_halos_r200m[curr_idxs]
+                
+                curr_halos_r200m_list.append(p_halos_r200m)
+                past_halos_r200m_list.append(c_halos_r200m)
+                
+            curr_halos_r200m = np.concatenate(curr_halos_r200m_list)
+            past_halos_r200m = np.concatenate(past_halos_r200m_list)
+            macc_all_prf_lst = []
+            macc_orb_prf_lst = []
+            macc_inf_prf_lst = []
+            
+            calc_maccs = calc_mass_acc_rate(curr_halos_r200m,past_halos_r200m,curr_z,past_z)
+            cpy_plt_macc_splits = plt_macc_splits.copy()
+            for i,macc_split in enumerate(cpy_plt_macc_splits):
+                # Take the second element of the where to filter by the halos (?)
+                fltr = np.where((calc_maccs > macc_split[0]) & (calc_maccs < macc_split[1]))[0]
+                if fltr.shape[0] > 25:
+                    macc_all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
+                    macc_orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
+                    macc_inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
+                else:
+                    plt_macc_splits.remove(macc_split)
+
+            
+            compare_split_prfs(plt_macc_splits,len(cpy_plt_macc_splits),macc_all_prf_lst,macc_orb_prf_lst,macc_inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title= "macc_dens_", split_name="\Gamma", prf_name_0="ML Model", prf_name_1="SPARTA")
+        if not split_nu and not split_macc:
+            all_prf_lst = filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos)
+            orb_prf_lst = filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos)
+            inf_prf_lst = filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos)
+            
+            # Ignore warnigns about taking mean/median of empty slices and division by 0 that are expected with how the profiles are handled
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_med_",prf_func=np.nanmedian)
+                compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_avg_",prf_func=np.nanmean)
+
 
 # Evaluate an input model by generating plots of comparisons between the model's predictions and SPARTA
 def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, sim_cosmol, plot_save_loc, all_tdyn_steps, dens_prf = False,missclass=False,full_dist=False,io_frac=False,split_nu=False,split_macc=False): 
@@ -480,198 +671,7 @@ def eval_model(model_info, preds, use_sims, dst_type, X, y, halo_ddf, sim_cosmol
     
     num_bins = 50
 
-    # Generate a comparative density profile
-    if dens_prf:
-        halo_first = halo_ddf["Halo_first"].values
-        halo_n = halo_ddf["Halo_n"].values
-        all_idxs = halo_ddf["Halo_indices"].values
-
-        all_z = []
-        all_rhom = []
-        # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
-        sim_splits = np.where(halo_first == 0)[0]
-
-        # if there are multiple simulations, to correctly index the dataset we need to update the starting values for the 
-        # stacked simulations such that they correspond to the larger dataset and not one specific simulation
-        if len(use_sims) > 1:
-            for i,sim in enumerate(use_sims):
-                # The first sim remains the same
-                if i == 0:
-                    continue
-                # Else if it isn't the final sim 
-                elif i < len(use_sims) - 1:
-                    halo_first[sim_splits[i]:sim_splits[i+1]] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
-                # Else if the final sim
-                else:
-                    halo_first[sim_splits[i]:] += (halo_first[sim_splits[i]-1] + halo_n[sim_splits[i]-1])
-        
-        # Get the redshifts for each simulation's primary snapshot
-        for i,sim in enumerate(use_sims):
-            with open(ML_dset_path + sim + "/dset_params.pickle", "rb") as file:
-                dset_params = pickle.load(file)
-                curr_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"][()]
-                curr_rho_m = dset_params["all_snap_info"]["prime_snap_info"]["rho_m"][()]
-                all_z.append(curr_z)
-                all_rhom.append(curr_rho_m)
-                h = dset_params["all_snap_info"]["prime_snap_info"]["h"][()]
-        
-        tot_num_halos = halo_n.shape[0]
-        min_disp_halos = int(np.ceil(0.3 * tot_num_halos))
-        
-        # Get SPARTA's mass profiles
-        act_mass_prf_all, act_mass_prf_orb,all_masses,bins = load_sparta_mass_prf(sim_splits,all_idxs,use_sims)
-        act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
-        
-        snap_list = extract_snaps(use_sims[0])
-        
-        # Create mass profiles from the model's predictions
-        prime_radii = X["p_Scaled_radii"].values.compute()
-        calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=prime_radii, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, use_mp=True, all_z=all_z)
-        my_mass_prf_all, my_mass_prf_orb, my_mass_prf_inf, my_nus, my_r200m = create_stack_mass_prf(sim_splits,radii=prime_radii, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=y.compute().values.flatten(), prf_bins=bins, use_mp=True, all_z=all_z)
-        # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
-        small_halo_fltr = np.isnan(calc_r200m)
-        act_mass_prf_all[small_halo_fltr,:] = np.nan
-        act_mass_prf_orb[small_halo_fltr,:] = np.nan
-        act_mass_prf_inf[small_halo_fltr,:] = np.nan
-        
-        all_prfs = [calc_mass_prf_all, act_mass_prf_all]
-        orb_prfs = [calc_mass_prf_orb, act_mass_prf_orb]
-        inf_prfs = [calc_mass_prf_inf, act_mass_prf_inf]
-
-        # Calculate the density by divide the mass of each bin by the volume of that bin's radius
-        calc_dens_prf_all = calculate_density(calc_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
-        calc_dens_prf_orb = calculate_density(calc_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
-        calc_dens_prf_inf = calculate_density(calc_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
-        
-        act_dens_prf_all = calculate_density(act_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
-        act_dens_prf_orb = calculate_density(act_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
-        act_dens_prf_inf = calculate_density(act_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
-        
-        if debug_indiv_dens_prf > 0:
-            my_dens_prf_orb = calculate_density(my_mass_prf_orb*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
-            my_dens_prf_all = calculate_density(my_mass_prf_all*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
-            my_dens_prf_inf = calculate_density(my_mass_prf_inf*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
-        
-            ratio = np.where(act_dens_prf_all != 0, calc_dens_prf_all / act_dens_prf_all, np.nan)
-
-            # Compute the difference for each halo (using range: max - min)
-            diff = np.nanmax(ratio, axis=1) - np.nanmin(ratio, axis=1)
-
-            # If you want the top k halos with the largest differences, use:
-            k = 5  # Example value
-            big_halo_loc = np.argsort(diff)[-k:]
-        
-            for i in range(k):
-                all_prfs = [my_mass_prf_all[big_halo_loc[i]], act_mass_prf_all[big_halo_loc[i]]]
-                orb_prfs = [my_mass_prf_orb[big_halo_loc[i]], act_mass_prf_orb[big_halo_loc[i]]]
-                inf_prfs = [my_mass_prf_inf[big_halo_loc[i]], act_mass_prf_inf[big_halo_loc[i]]]
-                compare_prfs(all_prfs,orb_prfs,inf_prfs,bins[1:],lin_rticks,debug_plt_path,sim + "_" + str(i)+"_mass",prf_func=None)
-
-            for i in range(k):
-                all_prfs = [my_dens_prf_all[big_halo_loc[i]], act_dens_prf_all[big_halo_loc[i]]]
-                orb_prfs = [my_dens_prf_orb[big_halo_loc[i]], act_dens_prf_orb[big_halo_loc[i]]]
-                inf_prfs = [my_dens_prf_inf[big_halo_loc[i]], act_dens_prf_inf[big_halo_loc[i]]]
-                compare_prfs(all_prfs,orb_prfs,inf_prfs,bins[1:],lin_rticks,debug_plt_path,sim + "_" + str(i)+"_dens",prf_func=None)
-                
-        curr_halos_r200m_list = []
-        past_halos_r200m_list = []
-        
-        for i,sim in enumerate(use_sims):
-            if i < len(use_sims) - 1:
-                curr_idxs = all_idxs[sim_splits[i]:sim_splits[i+1]]
-            else:
-                curr_idxs = all_idxs[sim_splits[i]:]
-            dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
-            curr_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"][()]
-            p_sparta_snap = dset_params["all_snap_info"]["prime_snap_info"]["sparta_snap"][()]
-            snap_dir_format = dset_params["snap_dir_format"]
-            snap_format = dset_params["snap_format"]
-            
-            sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
-            curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
-                    
-            # Load the halo's positions and radii
-            param_paths = [["halos","R200m"]]
-            sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, pickle_data=pickle_data)
-            p_halos_r200m = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
-
-            p_halos_r200m = p_halos_r200m[curr_idxs]
-
-            # If we want the density profiles to only consist of halos of a specific peak height (nu) bin 
-            if split_nu:
-                nu_all_prf_lst = []
-                nu_orb_prf_lst = []
-                nu_inf_prf_lst = []
-            
-                cpy_plt_nu_splits = plt_nu_splits.copy()
-                for i,nu_split in enumerate(cpy_plt_nu_splits):
-                    # Take the second element of the where to filter by the halos (?)
-                    fltr = np.where((calc_nus > nu_split[0]) & (calc_nus < nu_split[1]))[0]
-
-                    if fltr.shape[0] > min_halo_nu_bin:
-                        nu_all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
-                        nu_orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
-                        nu_inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
-                    else:
-                        plt_nu_splits.remove(nu_split)
-                compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),nu_all_prf_lst,nu_orb_prf_lst,nu_inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="nu_dens_med_",prf_func=np.nanmedian, prf_name_0="ML Model", prf_name_1="SPARTA")
-            if split_macc and len(all_tdyn_steps) >= 1:
-                if dset_params["t_dyn_steps"] :
-                    if dset_params["t_dyn_steps"][0] == 1:
-                        # we can just use the secondary snap here because if it was already calculated for 1 dynamical time forago
-                        past_z = dset_params["all_snap_info"]["comp_"+str(all_tdyn_steps[0]) + "_tdstp_snap_info"]["red_shift"][()] 
-                        c_sparta_snap = dset_params["all_snap_info"]["comp_"+str(all_tdyn_steps[0]) + "_tdstp_snap_info"]["sparta_snap"][()]
-                    else:
-                        # If the prior secondary snap is not 1 dynamical time ago get that information
-                        
-                        with h5py.File(curr_sparta_HDF5_path,"r") as f:
-                            dic_sim = {}
-                            grp_sim = f['simulation']
-                            for f in grp_sim.attrs:
-                                dic_sim[f] = grp_sim.attrs[f]
-                            
-                        all_sparta_z = dic_sim['snap_z']
-                        
-                        t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], curr_z)
-                        c_snap_dict = get_comp_snap_info(t_dyn=t_dyn, t_dyn_step=1, cosmol = cosmol, p_red_shift=curr_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
-                        c_sparta_snap = c_snap_dict["sparta_snap"]
-                    c_halos_r200m = sparta_params[sparta_param_names[0]][:,c_sparta_snap]
-                    c_halos_r200m = c_halos_r200m[curr_idxs]
-                    
-                    curr_halos_r200m_list.append(p_halos_r200m)
-                    past_halos_r200m_list.append(c_halos_r200m)
-                    
-                curr_halos_r200m = np.concatenate(curr_halos_r200m_list)
-                past_halos_r200m = np.concatenate(past_halos_r200m_list)
-                macc_all_prf_lst = []
-                macc_orb_prf_lst = []
-                macc_inf_prf_lst = []
-                
-                calc_maccs = calc_mass_acc_rate(curr_halos_r200m,past_halos_r200m,curr_z,past_z)
-                cpy_plt_macc_splits = plt_macc_splits.copy()
-                for i,macc_split in enumerate(cpy_plt_macc_splits):
-                    # Take the second element of the where to filter by the halos (?)
-                    fltr = np.where((calc_maccs > macc_split[0]) & (calc_maccs < macc_split[1]))[0]
-                    if fltr.shape[0] > 25:
-                        macc_all_prf_lst.append(filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos,fltr))
-                        macc_orb_prf_lst.append(filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fltr))
-                        macc_inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
-                    else:
-                        plt_macc_splits.remove(macc_split)
-
-                
-                compare_split_prfs(plt_macc_splits,len(cpy_plt_macc_splits),macc_all_prf_lst,macc_orb_prf_lst,macc_inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title= "macc_dens_", split_name="\Gamma", prf_name_0="ML Model", prf_name_1="SPARTA")
-            if not split_nu and not split_macc:
-                all_prf_lst = filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos)
-                orb_prf_lst = filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos)
-                inf_prf_lst = filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos)
-                
-                # Ignore warnigns about taking mean/median of empty slices and division by 0 that are expected with how the profiles are handled
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore", category=RuntimeWarning)
-                    compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_med_",prf_func=np.nanmedian)
-                    compare_prfs(all_prf_lst,orb_prf_lst,inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="dens_avg_",prf_func=np.nanmean)
-    #TODO generalize this to any number of snapshots?
+        #TODO generalize this to any number of snapshots?
     # Both the missclassification and distribution and infalling orbiting ratio plots are 2D histograms and the model parameters and allow for linear-log split scaling
     if missclass or full_dist or io_frac:       
         p_corr_labels=y.compute().values.flatten()
@@ -777,7 +777,7 @@ def filter_ddf(X, y = None, preds = None, fltr_dic = None, col_names = None, max
                             
                     full_filter = condition if full_filter is None else full_filter & condition
 
-            X = X.loc[full_filter]
+            X = X[full_filter]
         nrows = X.shape[0].compute()
             
         if nrows > max_size and max_size > 0:
@@ -836,18 +836,18 @@ def filter_df(X, y=None, preds=None, fltr_dic=None, col_names=None, max_size=500
                     raise ValueError(f"Unknown label_filter feature: {feature}")
                 full_filter &= condition
 
-    X_filtered = X[full_filter]
+        X = X[full_filter]
 
     # Sample if needed
-    nrows = len(X_filtered)
+    nrows = len(X)
     if nrows > max_size and max_size > 0:
         sample_frac = max_size / nrows
-        X_filtered = X_filtered.sample(frac=sample_frac, random_state=rand_seed)
+        X = X.sample(frac=sample_frac, random_state=rand_seed)
 
     if col_names is not None:
-        X_filtered.columns = col_names
+        X.columns = col_names
 
-    return X_filtered, full_filter  
+    return X, full_filter  
     
 # Can set max_size to 0 to include all the particles
 def shap_with_filter(explainer, X, y, preds, fltr_dic = None, col_names = None, max_size=500):
