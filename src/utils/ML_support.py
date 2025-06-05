@@ -353,7 +353,7 @@ def combine_results(results, client):
 def reform_datasets_nested(client, ptl_mass, use_z, max_mem, sim_cosmol, folder_path, prime_snap, filter_nu=None, limit_files=False, nu_splits=None):
     snap_n_files = len(os.listdir(folder_path + "/ptl_info/" + str(prime_snap)+"/"))
     n_files = snap_n_files
-    if limit_files:
+    if limit_files and file_lim > 0:
         n_files = np.min([snap_n_files,file_lim]) 
     
     delayed_results = []

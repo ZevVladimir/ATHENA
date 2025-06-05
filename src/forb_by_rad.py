@@ -100,7 +100,7 @@ if __name__ == "__main__":
         opt_param_dict = load_pickle(opt_model_fldr_loc + "ke_optparams_dict.pickle")
     else:
         raise FileNotFoundError(f"Expected to find optimized parameters at {os.path.join(opt_model_fldr_loc, 'ke_optparams_dict.pickle')}")
-    with timed("Histogram Creation"):
+    with timed("Fraction of Orb by Rad Plot Creation"):
         # Get the redshifts for each simulation's primary snapshot
 
         test_comb_name = get_combined_name(curr_test_sims) 
@@ -195,5 +195,5 @@ if __name__ == "__main__":
         ax.set_ylim(0,1)
         ax.tick_params(axis='both', labelsize=tick_fntsize, length=6,width=2, direction="in")
         
-        fig.savefig(debug_plt_path + test_comb_name + "_all_orb_rat_by_rad.png",dpi=400)
+        fig.savefig(debug_plt_path + test_comb_name + "_forb_by_rad.png",dpi=400)
         

@@ -152,7 +152,7 @@ def clean_prf(prf_1, prf_2, frac=0.5):
             prf_2[:, i] = np.nan
     return prf_1, prf_2
 
-def compute_prfs_ratio(calc_prf, act_prf, prf_func=None):
+def compute_prfs_info(calc_prf, act_prf, prf_func=None):
     if prf_func is not None:
         clean_prf(calc_prf, act_prf)
         func_calc = prf_func(calc_prf, axis=0)
@@ -188,9 +188,9 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
         invis_calc, = ax_0.plot([0], [0], color='black', linestyle='-')
         invis_act, = ax_0.plot([0], [0], color='black', linestyle='--')
 
-        calc_all_prfs, act_all_prfs, mid_ratio_all_prf, all_ratio_all_prf = compute_prfs_ratio(all_prfs[0],all_prfs[1],prf_func)
-        calc_orb_prfs, act_orb_prfs, mid_ratio_orb_prf, all_ratio_orb_prf = compute_prfs_ratio(orb_prfs[0],orb_prfs[1],prf_func)
-        calc_inf_prfs, act_inf_prfs, mid_ratio_inf_prf, all_ratio_inf_prf = compute_prfs_ratio(inf_prfs[0],inf_prfs[1],prf_func)
+        calc_all_prfs, act_all_prfs, mid_ratio_all_prf, all_ratio_all_prf = compute_prfs_info(all_prfs[0],all_prfs[1],prf_func)
+        calc_orb_prfs, act_orb_prfs, mid_ratio_orb_prf, all_ratio_orb_prf = compute_prfs_info(orb_prfs[0],orb_prfs[1],prf_func)
+        calc_inf_prfs, act_inf_prfs, mid_ratio_inf_prf, all_ratio_inf_prf = compute_prfs_info(inf_prfs[0],inf_prfs[1],prf_func)
                     
         # Plot the calculated profiles
         all_lb, = ax_0.plot(bins, calc_all_prfs, 'r-', label = "All")
@@ -314,14 +314,14 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
         inf_plt_lbls = [prf_name_0,prf_name_1]
         #TODO generalize this to a function
         for i,nu_split in enumerate(plt_splits):
-            calc_all_prfs, act_all_prfs, mid_ratio_all_prf = compute_prfs_ratio(all_prfs[i][0],all_prfs[i][1],prf_func)
-            calc_orb_prfs, act_orb_prfs, mid_ratio_orb_prf = compute_prfs_ratio(orb_prfs[i][0],orb_prfs[i][1],prf_func)
-            calc_inf_prfs, act_inf_prfs, mid_ratio_inf_prf = compute_prfs_ratio(inf_prfs[i][0],inf_prfs[i][1],prf_func)
+            calc_all_prfs, act_all_prfs, mid_ratio_all_prf, all_ratio_all_prf = compute_prfs_info(all_prfs[i][0],all_prfs[i][1],prf_func)
+            calc_orb_prfs, act_orb_prfs, mid_ratio_orb_prf, all_ratio_orb_prf = compute_prfs_info(orb_prfs[i][0],orb_prfs[i][1],prf_func)
+            calc_inf_prfs, act_inf_prfs, mid_ratio_inf_prf, all_ratio_inf_prf = compute_prfs_info(inf_prfs[i][0],inf_prfs[i][1],prf_func)
             
             # Plot the calculated profiles
-            all_lb, = all_ax_0.plot(bins, func_calc_all_prfs, linestyle='-', color = all_colors[i], label = rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
-            orb_lb, = orb_ax_0.plot(bins, func_calc_orb_prfs, linestyle='-', color = orb_colors[i], label = rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
-            inf_lb, = inf_ax_0.plot(bins, func_calc_inf_prfs, linestyle='-', color = inf_colors[i], label = rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
+            all_lb, = all_ax_0.plot(bins, calc_all_prfs, linestyle='-', color = all_colors[i], label = rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
+            orb_lb, = orb_ax_0.plot(bins, calc_orb_prfs, linestyle='-', color = orb_colors[i], label = rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
+            inf_lb, = inf_ax_0.plot(bins, calc_inf_prfs, linestyle='-', color = inf_colors[i], label = rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
              
             all_plt_lines.append(all_lb)
             all_plt_lbls.append(rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
@@ -331,9 +331,9 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
             inf_plt_lbls.append(rf"{nu_split[0]}$< {split_name} <$ {nu_split[1]}")
             
             # Plot the SPARTA (actual) profiles 
-            all_ax_0.plot(bins, func_act_all_prfs, linestyle='--', color = all_colors[i])
-            orb_ax_0.plot(bins, func_act_orb_prfs, linestyle='--', color = orb_colors[i])
-            inf_ax_0.plot(bins, func_act_inf_prfs, linestyle='--', color = inf_colors[i])
+            all_ax_0.plot(bins, act_all_prfs, linestyle='--', color = all_colors[i])
+            orb_ax_0.plot(bins, act_orb_prfs, linestyle='--', color = orb_colors[i])
+            inf_ax_0.plot(bins, act_inf_prfs, linestyle='--', color = inf_colors[i])
 
             all_ax_1.plot(bins, mid_ratio_all_prf, color = all_colors[i])
             orb_ax_1.plot(bins, mid_ratio_orb_prf, color = orb_colors[i])
@@ -588,10 +588,6 @@ def compare_split_prfs_ke(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_
         
         #TODO generalize this to a function
         for i,nu_split in enumerate(plt_splits):
-            # Take the ratio of the calculated profiles and the actual profiles and center around 0
-            # ratio_all_prf = (all_prfs[i][0] / all_prfs[i][1]) - 1
-            # ratio_orb_prf = (orb_prfs[i][0] / orb_prfs[i][1]) - 1
-            # ratio_inf_prf = (inf_prfs[i][0] / inf_prfs[i][1]) - 1
             if prf_func != None:
                 clean_prf(fit_orb_prfs[i][0],fit_orb_prfs[i][1])
                 clean_prf(fit_inf_prfs[i][0],fit_inf_prfs[i][1])

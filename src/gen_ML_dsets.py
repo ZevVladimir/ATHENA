@@ -14,7 +14,7 @@ import pandas as pd
 import psutil
 import argparse
 
-from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, conv_halo_id_spid, get_comp_snap_info, create_directory, find_closest_z_snap, timed, clean_dir, load_pickle, save_pickle, get_num_snaps, load_config
+from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, get_comp_snap_info, create_directory, find_closest_z_snap, timed, clean_dir, load_pickle, save_pickle, get_num_snaps, load_config
 from utils.calculation_functions import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn, create_mass_prf, calculate_density
 from src.utils.vis_fxns import compare_prfs
 from utils.ML_support import split_sparta_hdf5_name
@@ -596,8 +596,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
             for k in range(len(prnt_halo_splits)):
                 if k < len(prnt_halo_splits) - 1:
                     print(((np.sum(train_halo_mem[prnt_halo_splits[k]:prnt_halo_splits[k+1]])) + 128 )*1e-9,"GB")
-            
-            
+        
             curr_snap_path = snap_path + "/snapdir_" + snap_dir_format.format(curr_ptl_snap) + "/snapshot_" + snap_format.format(curr_ptl_snap)
             
             if i == 0:

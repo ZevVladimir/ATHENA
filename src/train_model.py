@@ -38,6 +38,7 @@ target_column = config_params["TRAIN_MODEL"]["target_column"]
 model_sims = config_params["TRAIN_MODEL"]["model_sims"]
 model_type = config_params["TRAIN_MODEL"]["model_type"]
 tree_err = config_params["TRAIN_MODEL"]["tree_err"]
+file_lim = config_params["TRAIN_MODEL"]["file_lim"]
 
 retrain = config_params["MISC"]["retrain_model"]
 
@@ -113,7 +114,11 @@ if __name__ == "__main__":
     else:
         with timed("Loading Datasets"):
             # Do desired adjustments to data if selected, otherwise just load the data normally
-            train_data,scale_pos_weight = load_data(client,model_sims,"Train",sim_cosmol,prime_snap=all_snaps[0],filter_nu=False,limit_files=True)
+            if file_lim > 0:
+                lim_train_files = True
+            else:
+                lim_train_files = False
+            train_data,scale_pos_weight = load_data(client,model_sims,"Train",sim_cosmol,prime_snap=all_snaps[0],filter_nu=False,limit_files=lim_train_files)
             test_data,scale_pos_weight = load_data(client,model_sims,"Test",sim_cosmol,prime_snap=all_snaps[0],filter_nu=False,limit_files=False)
                 
             X_test = test_data[feature_columns]
