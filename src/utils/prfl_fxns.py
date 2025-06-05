@@ -36,20 +36,6 @@ plt_macc_splits = config_dict["EVAL_MODEL"]["plt_macc_splits"]
 plt_macc_splits = parse_ranges(plt_macc_splits)
 min_halo_nu_bin = config_dict["EVAL_MODEL"]["min_halo_nu_bin"]
 
-# Get the difference in the number of particles present in a mass profile and a dataset
-# This can be useful to create a simple plot of which bins in a generated density profile do not match
-def diff_n_prf(diff_n_ptl, radii, idx, start_bin, end_bin, mass, act_prf):
-    radii_within_range = np.where((radii >= start_bin) & (radii < end_bin))[0]
-    
-    # If it isn't the first bin simple find the difference between this and the last bin in the profile and then sutbraction
-    if radii_within_range.size != 0 and idx != 0:
-        diff_n_ptl[idx] = np.round((act_prf[idx] - act_prf[idx-1])/mass) - radii_within_range.size
-    # If this is the first bin simply subtract the number in the profile and the number in this radial bin
-    elif idx == 0:
-        diff_n_ptl[idx] = np.round(act_prf[idx]/mass) - radii_within_range.size
-        
-    return diff_n_ptl
-
 # Get the mass of the next bin of a profile
 def update_mass_prf(calc_prf, radii, idx, start_bin, end_bin, mass):
     radii_within_range = np.where((radii >= start_bin) & (radii < end_bin))[0]
@@ -161,7 +147,6 @@ def compute_prfs_info(calc_prf, act_prf, prf_func=None):
     all_ratios = (calc_prf / act_prf) - 1
     return func_calc, func_act, mid_ratio, all_ratios
 
-
 # Profiles should be a list [calc_prf,act_prf]
 # You can either use the median plots with use_med=True or the average with use_med=False
 def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title, prf_func=np.nanmedian):       
@@ -265,7 +250,6 @@ def plot_split_prf_and_rat(ax0,ax1,bins,calc_prf,act_prf,prf_func,plt_lines,plt_
     
     plot_split_prf_rat(ax1, bins, mid_ratio_prf, all_ratio_prf, curr_color, fill_alpha)
 
-    
 # Profiles should be a list of lists where each list consists of [calc_prf,act_prf] for each split
 # You can either use the median plots with use_med=True or the average with use_med=False
 # The prf_name_0 and prf_name_1 correspond to what you want each profile to be named in the plot corresponding to where they are located in the _prfs variable
@@ -581,7 +565,7 @@ def compare_split_prfs_ke(plt_splits, n_lines, opt_orb_prfs, opt_inf_prfs, fast_
 
 # Creates the density profiles seen throughout the paper.
 # 3 panels for all, orbiting, and infalling profiles with options to be split by nu or by mass accretion rate
-def paper_dens_prf(X,y,preds,halo_df,use_sims,sim_cosmol,split_scale_dict,plot_save_loc,split_by_nu=False,split_by_macc=False):
+def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol,split_scale_dict,plot_save_loc,split_by_nu=False,split_by_macc=False):
     halo_first = halo_df["Halo_first"].values
     halo_n = halo_df["Halo_n"].values
     all_idxs = halo_df["Halo_indices"].values

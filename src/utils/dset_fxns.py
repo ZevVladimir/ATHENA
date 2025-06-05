@@ -31,59 +31,6 @@ def split_orb_inf(data, labels):
     orbit = data[np.where(labels == 1)[0]]
     return infall, orbit
 
-def split_dset_by_mass(halo_first, halo_n, path_to_dataset, curr_dataset):
-    with h5py.File((path_to_dataset), 'r') as all_ptl_properties:
-        first_prop = True
-        for key in all_ptl_properties.keys():
-            # only want the data important for the training now in the training dataset
-            # dataset now has form HIPIDS, Orbit_Infall, Scaled Radii x num snaps, Rad Vel x num snaps, Tang Vel x num snaps
-            if key != "Halo_first" and key != "Halo_n":
-                if all_ptl_properties[key].ndim > 1:
-                    for row in range(all_ptl_properties[key].ndim):
-                        if first_prop:
-                            curr_dataset = np.array(all_ptl_properties[key][halo_first:halo_first+halo_n,row])
-                            first_prop = False
-                        else:
-                            curr_dataset = np.column_stack((curr_dataset,all_ptl_properties[key][halo_first:halo_first+halo_n,row])) 
-                else:
-                    if first_prop:
-                        curr_dataset = np.array(all_ptl_properties[key][halo_first:halo_first+halo_n])
-                        first_prop = False
-                    else:
-                        curr_dataset = np.column_stack((curr_dataset,all_ptl_properties[key][halo_first:halo_first+halo_n]))
-    return curr_dataset
-
-def split_data_by_halo(client,frac, halo_props, ptl_data, return_halo=False):
-    #TODO implement functionality for multiple sims
-    halo_first = halo_props["Halo_first"]
-    halo_n = halo_props["Halo_n"]
-
-    num_halos = len(halo_first)
-    
-    split_halo = int(np.ceil(frac * num_halos))
-    
-    halo_1 = halo_props.loc[:split_halo]
-    halo_2 = halo_props.loc[split_halo:]
-    
-    halo_2.loc[:,"Halo_first"] = halo_2["Halo_first"] - halo_2["Halo_first"].iloc[0]
-    
-    num_ptls = halo_n.loc[:split_halo].sum()
-    
-    ptl_1 = ptl_data.compute().iloc[:num_ptls,:]
-    ptl_2 = ptl_data.compute().iloc[num_ptls:,:]
-
-    
-    scatter_ptl_1 = client.scatter(ptl_1)
-    ptl_1 = dd.from_delayed(scatter_ptl_1)
-    
-    scatter_ptl_2 = client.scatter(ptl_2)
-    ptl_2 = dd.from_delayed(scatter_ptl_2)
-    
-    if return_halo:
-        return ptl_1, ptl_2, halo_1, halo_2
-    else:
-        return ptl_1, ptl_2
-
 # Goes through a folder where a dataset's hdf5 files are stored and reforms them into one pandas dataframe (in order)
 def reform_dset_dfs(folder_path):
     hdf5_files = []

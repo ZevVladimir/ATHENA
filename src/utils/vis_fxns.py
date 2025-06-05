@@ -29,39 +29,6 @@ def get_bin_loc(bin_edges,search_num):
     
     return search_loc
 
-def gen_ticks(bin_edges,spacing=6):
-    ticks = []
-    tick_loc = []
-
-    # Add every spacing bin edge
-    ticks.extend(bin_edges[::spacing])
-
-    # Ensure the first and last bin edges are included
-    ticks.extend([bin_edges[0], bin_edges[-1]])
-
-    tick_loc = np.arange(bin_edges.size)[::spacing].tolist()
-    tick_loc.extend([0,bin_edges.size-1])
-
-    zero_loc = get_bin_loc(bin_edges,0)
-
-    # only add the tick if it is noticeably far away from 0
-    if zero_loc > 0.05:
-        tick_loc.append(zero_loc)
-        ticks.append(0)
-
-    # Remove ticks that will get rounded down to 0
-    ticks = np.round(ticks,2).tolist()
-    rmv_ticks = np.where(ticks == 0)[0]
-    if rmv_ticks.size > 0:
-        ticks = ticks.pop(rmv_ticks)
-        tick_loc = tick_loc.pop(rmv_ticks)
-
-    # Remove duplicates and sort the list
-    ticks = sorted(set(ticks))
-    tick_loc = sorted(set(tick_loc))
-    
-    return tick_loc, ticks
-
 def imshow_plot(ax, img, x_label="", y_label="", text="", title="", hide_xtick_labels=False, hide_ytick_labels=False,\
     xticks = None,yticks = None,xtick_color="white",ytick_color="white",xlinthrsh = None, ylinthrsh = None, xlim=None,ylim=None,\
         axisfontsize=28, number = None, return_img=False, kwargs=None):
@@ -242,6 +209,7 @@ def adjust_frac_hist(hist_data, inf_data, orb_data, max_value, min_value):
     hist_data["hist"] = hist
     return hist_data
 
+#TODO create general function for any number of snaps. or input what you want to plot across snaps?
 def plot_prim_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, split_scale_dict, save_loc, save_title=""):
     with timed("Full Ptl Dist Plot"):
         
@@ -384,7 +352,7 @@ def plot_prim_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, split_scale_dict, save_lo
         fig.savefig(save_loc + "ptl_distr" + save_title + ".png")
         plt.close()
 
-#TODO create general function for any number of snaps. or input what you want to plot across snaps?
+
 def plot_full_ptl_dist(p_corr_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_dict, save_loc, save_title=""):
     with timed("Full Ptl Dist Plot"):
         
@@ -714,9 +682,6 @@ def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv,
         fig.savefig(save_loc + "scaled_miss_class.png")
         plt.close()
 
-def plot_perr_err():
-    return
-
 def plot_log_vel(log_phys_vel,radii,labels,save_loc,split_scale_dict,add_line=[None,None],show_v200m=False,v200m=1.5):
     if v200m == -1:
         title = "no_cut"
@@ -1017,12 +982,6 @@ def plot_halo_slice(ptl_pos, labels, halo_pos, halo_r200m, save_loc, search_rad=
     plt.savefig(f"{save_loc}{title}_halo_dist.png", dpi=500)
     plt.close(fig)
 
-    
-def plot_tree(bst,tree_num,save_loc):
-    fig, ax = plt.subplots(figsize=(400, 10))
-    xgb.plot_tree(bst, num_trees=tree_num, ax=ax,rankdir='LR')
-    fig.savefig(save_loc + "/tree_plot.png")
-
 def plt_cust_ke_line(b,bins,linewidth):
     for i in range(bins.shape[0]-1):
         x1 = bins[i]
@@ -1173,7 +1132,6 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         else:
             plt.savefig(plot_loc + "log_" + title + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=400) 
         
-
 # Creates the ptl distribution plot as seen in the paper with vr vs r, vt vs r, and vr vs vt for the primary snapshot and vr vs r for the secondary snapshots
 def paper_ptl_dist(X,y,all_tdyn_steps,split_scale_dict,plot_save_loc):
     p_corr_labels=y.compute().values.flatten()

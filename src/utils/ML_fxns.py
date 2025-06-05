@@ -152,26 +152,6 @@ def get_model_name(model_type, trained_on_sims):
     model_name = f"{model_type}_{get_combined_name(trained_on_sims)}"        
     return model_name
 
-# Convert a simulation's name to where the primary snapshot location is in the pickled data (ex: cbol_l0063_n0256_4r200m_1-5v200m_190to166 -> 190_cbol_l0063_n0256_4r200m_1-5v200m)
-def get_pickle_path_for_sim(input_str):
-    # Define the regex pattern to match the string parts
-    pattern = r"_([\d]+)to([\d]+)"
-    
-    # Search for the pattern in the input string
-    match = re.search(pattern, input_str)
-    
-    if not match:
-        raise ValueError("Input string:",input_str, "does not match the expected format.")
-
-    # Extract the parts of the string
-    prefix = input_str[:match.start()]
-    first_number = match.group(1)
-    
-    # Construct the new string
-    new_string = f"{first_number}_{prefix}"
-    
-    return new_string
-
 def get_combined_name(model_sims):
     combined_name = ""
     for i,sim in enumerate(model_sims):

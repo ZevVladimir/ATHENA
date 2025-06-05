@@ -106,3 +106,8 @@ class MLModel:
             raise FileNotFoundError(f"No model found at {filepath}")
         
         print(f"Model loaded from {filepath}")
+
+    def plot_tree(bst,tree_num,save_loc):
+        fig, ax = plt.subplots(figsize=(400, 10))
+        xgb.plot_tree(bst, num_trees=tree_num, ax=ax,rankdir='LR')
+        fig.savefig(save_loc + "/tree_plot.png")

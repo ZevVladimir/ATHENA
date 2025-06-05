@@ -133,28 +133,7 @@ def load_RSTAR_data(rockstar_loc, param_list, curr_z):
     for param in param_list:
         param_data[param] = np.array(param_data[param])
 
-    return param_data
-
-def save_dict_to_hdf5(hdf5_group, dictionary):
-    for key, value in dictionary.items():
-        if isinstance(value, dict):  # Check if the value is a dictionary
-            subgroup = hdf5_group.create_group(key)  # Create a subgroup
-            save_dict_to_hdf5(subgroup, value)  # Recursively save the subdictionary
-        else:
-            hdf5_group.create_dataset(key, data=value)  
-
-def save_to_hdf5(hdf5_file, data_name, dataset, chunk, max_shape):
-    if isinstance(dataset, dict):
-        hdf5_group = hdf5_file.create_group(data_name)
-        # recursively deal with dictionaries
-        save_dict_to_hdf5(hdf5_group, dataset)   
-    else: 
-        if data_name not in list(hdf5_file.keys()):
-            hdf5_file.create_dataset(data_name, data = dataset, chunks = chunk, maxshape = max_shape, dtype=dataset.dtype)
-        # with a new file adding on additional data to the datasets
-        elif data_name in list(hdf5_file.keys()):
-            hdf5_file[data_name].resize((hdf5_file[data_name].shape[0] + dataset.shape[0]), axis = 0)
-            hdf5_file[data_name][-dataset.shape[0]:] = dataset   
+    return param_data 
 
 def get_comp_snap_info(t_dyn, t_dyn_step, cosmol, p_red_shift, all_sparta_z, snap_dir_format, snap_format, snap_path):
     c_snap_dict = {}
