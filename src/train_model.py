@@ -127,7 +127,7 @@ if __name__ == "__main__":
             
             X_train = train_data[feature_columns]
             y_train = train_data[target_column]
-            
+
             create_directory(model_fldr_loc)
             create_directory(gen_plot_save_loc)
             

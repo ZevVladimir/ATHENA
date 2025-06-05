@@ -15,8 +15,8 @@ import psutil
 import argparse
 
 from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, get_comp_snap_info, create_directory, find_closest_z_snap, timed, clean_dir, load_pickle, save_pickle, get_num_snaps, load_config
-from utils.calculation_functions import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn, create_mass_prf, calculate_density
-from src.utils.vis_fxns import compare_prfs
+from utils.calculation_functions import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn, calculate_density
+from utils.profile_creation import create_mass_prf, compare_prfs
 from utils.ML_support import split_sparta_hdf5_name
 ##################################################################################################################
 parser = argparse.ArgumentParser()
@@ -179,17 +179,6 @@ def search_halos(ret_labels, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_p
     scaled_tang_vel = fnd_tang_vel / curr_v200m
     scaled_radii = ptl_rad / halo_r200m
     scaled_phys_vel = phys_vel / curr_v200m
-    if not ret_labels:
-        if np.where(scaled_radii > 4)[0].shape[0] > 0:
-            print(ptl_rad[:10])
-            print(halo_r200m)
-            print(np.where(scaled_radii > 4)[0].shape)
-            fig,ax = plt.subplots(1)
-            ax.scatter(curr_ptl_pos[:,0],curr_ptl_pos[:,1],c="blue")
-            ax.scatter(halo_pos[0],halo_pos[1],c="red",s=10)
-            circle = plt.Circle((halo_pos[0],halo_pos[1]), halo_r200m, color='green', fill=False, linewidth=4)
-            ax.add_patch(circle)
-            fig.savefig(debug_plt_path + str(curr_halo_idx) + ".png")
     
     scaled_radii_inds = scaled_radii.argsort()
     scaled_radii = scaled_radii[scaled_radii_inds]
@@ -240,7 +229,7 @@ def halo_loop(ptl_idx, curr_iter, num_iter, indices, halo_splits, snap_dict, use
                 use_indices = indices[halo_splits[curr_iter]:halo_splits[curr_iter+1]]
             else:
                 use_indices = indices[halo_splits[curr_iter]:]
-
+           
             # Load the halo information for the ids within this range
             param_paths = [["halos","R200m"],["halos","position"],["halos","ptl_oct_first"],["halos","ptl_oct_n"],["halos","velocity"],["tcr_ptl","res_oct","last_pericenter_snap"],\
                 ["tcr_ptl","res_oct","n_pericenter"],["tcr_ptl","res_oct","tracer_id"],["tcr_ptl","res_oct","n_is_lower_limit"],["anl_prf","M_all"],["anl_prf","M_1halo"],["config","anl_prf","r_bins_lin"]]
@@ -547,7 +536,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
 
         train_halo_splits = det_halo_splits(train_halo_mem, sub_dset_mem_size)
         test_halo_splits = det_halo_splits(test_halo_mem, sub_dset_mem_size)
-            
+        
         print(f"Total num halos: {total_num_halos:.3e}")
         print(f"Total num ptls: {tot_num_ptls:.3e}")
 
@@ -595,7 +584,9 @@ with timed("Generating Datasets for " + curr_sparta_file):
             
             for k in range(len(prnt_halo_splits)):
                 if k < len(prnt_halo_splits) - 1:
-                    print(((np.sum(train_halo_mem[prnt_halo_splits[k]:prnt_halo_splits[k+1]])) + 128 )*1e-9,"GB")
+                    value_gb = ((np.sum(train_halo_mem[prnt_halo_splits[k]:prnt_halo_splits[k+1]])) + 128) * 1e-9
+                    print(f"{value_gb:.2f} GB")
+
         
             curr_snap_path = snap_path + "/snapdir_" + snap_dir_format.format(curr_ptl_snap) + "/snapshot_" + snap_format.format(curr_ptl_snap)
             
@@ -605,6 +596,12 @@ with timed("Generating Datasets for " + curr_sparta_file):
                 curr_ptls_vel = p_ptls_vel
                 curr_ptls_pos = p_ptls_pos
                 curr_ptl_tree = p_ptl_tree
+                # We have to collect all the HIPIDs in a list so that if there are more than one splits for memory
+                # they can then be accurately compared to their corresponding batch from the past snapshot
+                all_train_p_HIPIDs = []
+                all_test_p_HIPIDs = []
+                all_p_train_nptls = []
+                all_p_test_nptls = []
             else:
                 curr_snap_dict = dset_params["all_snap_info"]["comp_" + str(all_tdyn_steps[i-1]) + "_tdstp_snap_info"]
             curr_sparta_snap = curr_snap_dict["sparta_snap"]
@@ -635,14 +632,17 @@ with timed("Generating Datasets for " + curr_sparta_file):
             train_prnt_halo_splits.append(train_idxs.size)
             print("Train Splits")
             print("Num halos in each split:", ", ".join(map(str, np.diff(train_prnt_halo_splits))) + ".", train_num_iter, "splits")
-        
+
             for j in range(train_num_iter):
                 if i == 0:
                     ret_labels = True
                     train_p_HIPIDs, p_orb_assn, p_rad_vel, p_tang_vel, p_scale_rad, p_phys_vel, p_start_num_ptls, p_use_num_ptls, use_indices, use_halos_r200m = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=train_num_iter, \
                         indices=train_idxs, halo_splits=train_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=True, ptls_pid=curr_ptls_pid, \
                         ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels)
-                    p_train_num_use_ptls = train_p_HIPIDs.shape[0]
+                    p_train_nptls = train_p_HIPIDs.shape[0]
+                    
+                    all_p_train_nptls.append(p_train_nptls)
+                    all_train_p_HIPIDs.append(train_p_HIPIDs.copy())
                     
                     halo_df = pd.DataFrame({
                         "Halo_first":p_start_num_ptls,
@@ -661,16 +661,19 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         "p_phys_vel":p_phys_vel
                     })
                 else:
+                    # Access the correct number of particles for this batch 
+                    p_train_nptls = all_p_train_nptls[j]
+                    
                     ret_labels = False
                     c_HIPIDs, c_rad_vel, c_tang_vel, c_scale_rad, c_phys_vel = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=train_num_iter, indices=train_idxs, \
                         halo_splits=train_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=False, ptls_pid=curr_ptls_pid, ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels)
 
-                    match_hipid_idx = np.intersect1d(train_p_HIPIDs, c_HIPIDs, return_indices=True)
+                    match_hipid_idx = np.intersect1d(all_train_p_HIPIDs[j], c_HIPIDs, return_indices=True)
 
-                    save_scale_rad = np.zeros((p_train_num_use_ptls,), dtype = np.float32)
-                    save_rad_vel = np.zeros((p_train_num_use_ptls,), dtype = np.float32)
-                    save_tang_vel = np.zeros((p_train_num_use_ptls,), dtype = np.float32)
-                    save_phys_vel = np.zeros((p_train_num_use_ptls,), dtype = np.float32)
+                    save_scale_rad = np.zeros((p_train_nptls,), dtype = np.float32)
+                    save_rad_vel = np.zeros((p_train_nptls,), dtype = np.float32)
+                    save_tang_vel = np.zeros((p_train_nptls,), dtype = np.float32)
+                    save_phys_vel = np.zeros((p_train_nptls,), dtype = np.float32)
                     save_scale_rad[match_hipid_idx[1]] = c_scale_rad[match_hipid_idx[2]]
                     save_rad_vel[match_hipid_idx[1]] = c_rad_vel[match_hipid_idx[2]]
                     save_tang_vel[match_hipid_idx[1]] = c_tang_vel[match_hipid_idx[2]]
@@ -687,12 +690,11 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         str(all_tdyn_steps[i-1]) + "_Tangential_vel":save_tang_vel,
                         str(all_tdyn_steps[i-1]) + "_phys_vel":save_phys_vel
                     })
-                
                 ptl_df.to_hdf(save_location + "Train/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+train_start_pnt) + ".h5", key='data', mode='w',format='table')  
-                ptl_idx += p_train_num_use_ptls
+                ptl_idx += p_train_nptls
                 if debug_mem == 1:
                     print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
-        
+                
             test_num_iter = len(test_halo_splits)
             test_prnt_halo_splits = test_halo_splits.copy()
             test_prnt_halo_splits.append(test_idxs.size)
@@ -706,7 +708,10 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     test_p_HIPIDs, p_orb_assn, p_rad_vel, p_tang_vel, p_scale_rad, p_phys_vel, p_start_num_ptls, p_use_num_ptls, use_indices, use_halos_r200m = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=test_num_iter, \
                         indices=test_idxs, halo_splits=test_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=True, ptls_pid=curr_ptls_pid, \
                         ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels)
-                    p_test_num_use_ptls = test_p_HIPIDs.shape[0]
+                    p_test_nptls = test_p_HIPIDs.shape[0]
+                    
+                    all_p_test_nptls.append(p_test_nptls)
+                    all_test_p_HIPIDs.append(test_p_HIPIDs.copy())
                     
                     halo_df = pd.DataFrame({
                         "Halo_first":p_start_num_ptls,
@@ -725,16 +730,18 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         "p_phys_vel":p_phys_vel
                     })
                 else:
+                    # Access the correct number of particles for this batch 
+                    p_test_nptls = all_p_test_nptls[j]
                     ret_labels = False
                     c_HIPIDs, c_rad_vel, c_tang_vel, c_scale_rad, c_phys_vel = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=test_num_iter, indices=test_idxs, \
                         halo_splits=test_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=False, ptls_pid=curr_ptls_pid, ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels,name="Test")
 
-                    match_hipid_idx = np.intersect1d(test_p_HIPIDs, c_HIPIDs, return_indices=True)
+                    match_hipid_idx = np.intersect1d(all_test_p_HIPIDs[j], c_HIPIDs, return_indices=True)
                     
-                    save_scale_rad = np.zeros((p_test_num_use_ptls,), dtype = np.float32)
-                    save_rad_vel = np.zeros((p_test_num_use_ptls,), dtype = np.float32)
-                    save_tang_vel = np.zeros((p_test_num_use_ptls,), dtype = np.float32)
-                    save_phys_vel = np.zeros((p_test_num_use_ptls,), dtype = np.float32)
+                    save_scale_rad = np.zeros((p_test_nptls,), dtype = np.float32)
+                    save_rad_vel = np.zeros((p_test_nptls,), dtype = np.float32)
+                    save_tang_vel = np.zeros((p_test_nptls,), dtype = np.float32)
+                    save_phys_vel = np.zeros((p_test_nptls,), dtype = np.float32)
                     save_scale_rad[match_hipid_idx[1]] = c_scale_rad[match_hipid_idx[2]]
                     save_rad_vel[match_hipid_idx[1]] = c_rad_vel[match_hipid_idx[2]]
                     save_tang_vel[match_hipid_idx[1]] = c_tang_vel[match_hipid_idx[2]]
@@ -744,8 +751,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     save_rad_vel[save_rad_vel == 0] = np.nan
                     save_tang_vel[save_tang_vel == 0] = np.nan
                     save_phys_vel[save_phys_vel == 0] = np.nan
-                    print(save_scale_rad)
-                    print(np.where(save_scale_rad > 4)[0].shape)
+                    
                     ptl_df = pd.DataFrame({
                         str(all_tdyn_steps[i-1]) + "_Scaled_radii":save_scale_rad,
                         str(all_tdyn_steps[i-1]) + "_Radial_vel":save_rad_vel,
@@ -754,7 +760,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     })
                 
                 ptl_df.to_hdf(save_location + "Test/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+test_start_pnt) + ".h5", key='data', mode='w',format='table')  
-                ptl_idx += p_test_num_use_ptls
+                ptl_idx += p_test_nptls
                 if debug_mem == 1:
                     print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
                 

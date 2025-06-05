@@ -15,9 +15,7 @@ import warnings
 from dask.distributed import Client
 import multiprocessing as mp
 
-from .data_and_loading_functions import load_SPARTA_data, conv_halo_id_spid, timed, split_data_by_halo, parse_ranges, load_pickle, load_config, get_comp_snap_info, create_directory, set_cosmology
-from .vis_fxns import plot_full_ptl_dist, plot_miss_class_dist, compare_prfs, compare_split_prfs, inf_orb_frac
-from .calculation_functions import create_mass_prf, create_stack_mass_prf, filter_prf, calculate_density, calc_mass_acc_rate, calc_t_dyn 
+from .data_and_loading_functions import load_SPARTA_data, timed, parse_ranges, load_config, set_cosmology
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -353,9 +351,10 @@ def combine_results(results, client):
 def reform_datasets_nested(client, ptl_mass, use_z, max_mem, sim_cosmol, folder_path, prime_snap, filter_nu=None, limit_files=False, nu_splits=None):
     snap_n_files = len(os.listdir(folder_path + "/ptl_info/" + str(prime_snap)+"/"))
     n_files = snap_n_files
+
     if limit_files and file_lim > 0:
         n_files = np.min([snap_n_files,file_lim]) 
-    
+
     delayed_results = []
     for file_index in range(n_files):
         # Create delayed tasks for each file
@@ -376,6 +375,7 @@ def calc_scal_pos_weight(df):
     scale_pos_weight = count_negatives / count_positives
     return scale_pos_weight
 
+#TODO rename and move to data_and_loading 
 # Loads all the data for the inputted list of simulations into one dataframe. Finds the scale position weight for the dataset and any adjusted weighting for it if desired
 def load_data(client, sims, dset_name, sim_cosmol, prime_snap, limit_files = False, filter_nu=False, nu_splits=None):
     dask_dfs = []
