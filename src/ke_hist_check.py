@@ -1,18 +1,13 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-plt.rcParams.update({"text.usetex":True, "font.family": "serif", "figure.dpi": 150})
+plt.rcParams.update({"text.usetex":True, "font.family": "serif", "figure.dpi": 300})
 import os
-import matplotlib as mpl
-mpl.rcParams.update(mpl.rcParamsDefault)
-import dask.dataframe as dd
-from dask import delayed
-import pandas as pd
 
-from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, load_data, extract_snaps, get_feature_labels, set_cosmology, filter_ddf, filter_df, split_sparta_hdf5_name
-from utils.data_and_loading_functions import create_directory, load_pickle, load_config, load_pickle, timed, load_SPARTA_data
-from src.utils.ke_cut_support import fast_ke_predictor, opt_ke_predictor
-from src.utils.vis_fxns import plt_SPARTA_KE_dist
+from src.utils.ML_fxns import setup_client, get_combined_name, parse_ranges, extract_snaps, get_feature_labels, filter_df, split_sparta_hdf5_name
+from src.utils.save_load_fxns import create_directory, load_pickle, load_config, load_pickle, timed, load_SPARTA_data, load_ML_dsets
+from src.utils.ke_cut_fxns import fast_ke_predictor, opt_ke_predictor
+from src.utils.misc_fxns import set_cosmology
 
 config_params = load_config(os.getcwd() + "/config.ini")
 
@@ -81,7 +76,7 @@ if __name__ == "__main__":
 
         test_comb_name = get_combined_name(curr_test_sims) 
         
-        data,scale_pos_weight = load_data(client,curr_test_sims,dset_name,sim_cosmol,snap_list[0],limit_files=False)
+        data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,sim_cosmol,snap_list[0],limit_files=False)
         
         columns_to_keep = [col for col in data.columns if col != target_column[0]]
         X_df = data[columns_to_keep]

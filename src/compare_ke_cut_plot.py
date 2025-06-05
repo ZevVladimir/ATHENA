@@ -1,17 +1,16 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-plt.rcParams.update({"text.usetex":True, "font.family": "serif", "figure.dpi": 150})
+plt.rcParams.update({"text.usetex":True, "font.family": "serif", "figure.dpi": 300})
 import os
-import matplotlib as mpl
-mpl.rcParams.update(mpl.rcParamsDefault)
 import pickle
 
-from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, extract_snaps, get_feature_labels, set_cosmology
-from utils.data_and_loading_functions import create_directory, load_pickle, load_config, load_pickle, timed
-from src.utils.ke_cut_support import load_ke_data, fast_ke_predictor, opt_ke_predictor
-from src.utils.vis_fxns import compare_split_prfs_ke
-from utils.calculation_functions import calculate_density, filter_prf
+from src.utils.ML_fxns import setup_client, get_combined_name, parse_ranges, extract_snaps, get_feature_labels
+from src.utils.save_load_fxns import create_directory, load_pickle, load_config, load_pickle, timed, load_sparta_mass_prf
+from src.utils.ke_cut_fxns import load_ke_data, fast_ke_predictor, opt_ke_predictor
+from src.utils.calc_fxns import calc_rho
+from src.utils.misc_fxns import set_cosmology
+from src.utils.prfl_fxns import create_stack_mass_prf, filter_prf, compare_split_prfs_ke
 
 config_params = load_config(os.getcwd() + "/config.ini")
 
@@ -143,17 +142,17 @@ if __name__ == "__main__":
         act_mass_prf_inf[fit_small_halo_fltr,:] = np.nan
 
         # Calculate the density by divide the mass of each bin by the volume of that bin's radius
-        fit_calc_dens_prf_all = calculate_density(fit_calc_mass_prf_all*h,bins[1:],fit_calc_r200m*h,sim_splits,all_rhom)
-        fit_calc_dens_prf_orb = calculate_density(fit_calc_mass_prf_orb*h,bins[1:],fit_calc_r200m*h,sim_splits,all_rhom)
-        fit_calc_dens_prf_inf = calculate_density(fit_calc_mass_prf_inf*h,bins[1:],fit_calc_r200m*h,sim_splits,all_rhom)
+        fit_calc_dens_prf_all = calc_rho(fit_calc_mass_prf_all*h,bins[1:],fit_calc_r200m*h,sim_splits,all_rhom)
+        fit_calc_dens_prf_orb = calc_rho(fit_calc_mass_prf_orb*h,bins[1:],fit_calc_r200m*h,sim_splits,all_rhom)
+        fit_calc_dens_prf_inf = calc_rho(fit_calc_mass_prf_inf*h,bins[1:],fit_calc_r200m*h,sim_splits,all_rhom)
         
-        simp_calc_dens_prf_all = calculate_density(simp_calc_mass_prf_all*h,bins[1:],simp_calc_r200m*h,sim_splits,all_rhom)
-        simp_calc_dens_prf_orb = calculate_density(simp_calc_mass_prf_orb*h,bins[1:],simp_calc_r200m*h,sim_splits,all_rhom)
-        simp_calc_dens_prf_inf = calculate_density(simp_calc_mass_prf_inf*h,bins[1:],simp_calc_r200m*h,sim_splits,all_rhom)
+        simp_calc_dens_prf_all = calc_rho(simp_calc_mass_prf_all*h,bins[1:],simp_calc_r200m*h,sim_splits,all_rhom)
+        simp_calc_dens_prf_orb = calc_rho(simp_calc_mass_prf_orb*h,bins[1:],simp_calc_r200m*h,sim_splits,all_rhom)
+        simp_calc_dens_prf_inf = calc_rho(simp_calc_mass_prf_inf*h,bins[1:],simp_calc_r200m*h,sim_splits,all_rhom)
 
-        act_dens_prf_all = calculate_density(act_mass_prf_all*h,bins[1:],fit_calc_r200m*h,sim_splits,all_rhom)
-        act_dens_prf_orb = calculate_density(act_mass_prf_orb*h,bins[1:],fit_calc_r200m*h,sim_splits,all_rhom)
-        act_dens_prf_inf = calculate_density(act_mass_prf_inf*h,bins[1:],fit_calc_r200m*h,sim_splits,all_rhom)
+        act_dens_prf_all = calc_rho(act_mass_prf_all*h,bins[1:],fit_calc_r200m*h,sim_splits,all_rhom)
+        act_dens_prf_orb = calc_rho(act_mass_prf_orb*h,bins[1:],fit_calc_r200m*h,sim_splits,all_rhom)
+        act_dens_prf_inf = calc_rho(act_mass_prf_inf*h,bins[1:],fit_calc_r200m*h,sim_splits,all_rhom)
 
         # If we want the density profiles to only consist of halos of a specific peak height (nu) bin 
 

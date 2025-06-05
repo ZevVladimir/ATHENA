@@ -4,8 +4,8 @@ import xgboost as xgb
 
 import shap
 
-from utils.data_and_loading_functions import create_directory, timed, load_config, load_pickle
-from utils.ML_support import setup_client, get_combined_name, load_data, make_preds, shap_with_filter, get_model_name, extract_snaps, get_feature_labels
+from src.utils.save_load_fxns import create_directory, timed, load_config, load_pickle, load_ML_dsets
+from src.utils.ML_fxns import setup_client, get_combined_name, make_preds, shap_with_filter, get_model_name, extract_snaps, get_feature_labels
 
 config_params = load_config(os.getcwd() + "/config.ini")
 
@@ -52,7 +52,7 @@ if __name__ == '__main__':
                 plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
                 create_directory(plot_loc)
                 all_snaps = extract_snaps(model_sims[0])
-                data,scale_pos_weight = load_data(client,curr_test_sims,dset_name,sim_cosmol,all_snaps[0],limit_files=False)
+                data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,sim_cosmol,all_snaps[0],limit_files=False)
                 
                 X_df = data[feature_columns]
                 y_df = data[target_column]

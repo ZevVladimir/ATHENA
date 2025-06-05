@@ -1,21 +1,15 @@
-from dask import array as da
-from dask.distributed import Client
-from contextlib import contextmanager
-
 import xgboost as xgb
 import pickle
 import os
 import numpy as np
-import json
 import re
 import pandas as pd
-import multiprocessing as mp
-import h5py
 from sparta_tools import sparta
 
-from utils.ML_support import setup_client,get_combined_name,reform_dataset_dfs,split_sparta_hdf5_name,load_data,make_preds, get_model_name
-from utils.data_and_loading_functions import create_directory,load_SPARTA_data,load_ptl_param, load_config
-from src.utils.vis_fxns import plot_halo_slice_class, plot_halo_3d_class
+from src.utils.ML_fxns import setup_client,get_combined_name,split_sparta_hdf5_name,make_preds, get_model_name
+from src.utils.save_load_fxns import create_directory,load_SPARTA_data,load_ptl_param, load_config, load_ML_dsets
+from src.utils.vis_fxns import plot_halo_slice_class
+from src.utils.dset_fxns import reform_dset_dfs
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 config_params = load_config(os.getcwd() + "/config.ini")
@@ -91,7 +85,7 @@ if __name__ == "__main__":
     plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
     create_directory(plot_loc)
 
-    halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
+    halo_ddf = reform_dset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
     all_idxs = halo_ddf["Halo_indices"].values
 
     with open(ML_dset_path + sim + "/p_ptl_tree.pickle", "rb") as pickle_file:
@@ -125,14 +119,14 @@ if __name__ == "__main__":
     halo_files = []
     halo_dfs = []
     if dset_name == "Full":    
-        halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + "Train" + "/halo_info/"))
-        halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/"))
+        halo_dfs.append(reform_dset_dfs(ML_dset_path + sim + "/" + "Train" + "/halo_info/"))
+        halo_dfs.append(reform_dset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/"))
     else:
-        halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
+        halo_dfs.append(reform_dset_dfs(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
 
     halo_df = pd.concat(halo_dfs)
     
-    data,scale_pos_weight = load_data(client,test_sims[0],dset_name,limit_files=False)
+    data,scale_pos_weight = load_ML_dsets(client,test_sims[0],dset_name,limit_files=False)
 
     X = data[feature_columns]
     y = data[target_column]
@@ -185,4 +179,4 @@ if __name__ == "__main__":
     preds = preds.iloc[halo_first[large_loc]:halo_first[large_loc] + halo_n[large_loc]]
 
     plot_halo_slice_class(curr_ptl_pos,preds,curr_orb_assn,use_halo_pos,use_halo_r200m,plot_loc)
-    plot_halo_3d_class(curr_ptl_pos,preds,curr_orb_assn,use_halo_pos,use_halo_r200m,plot_loc)
+    

@@ -1,20 +1,17 @@
 import numpy as np
 from colossus.halo import mass_so
 from colossus.utils import constants
-import multiprocessing as mp
-from itertools import repeat
 import numexpr as ne
-from colossus.lss.peaks import peakHeight
-from colossus.halo.mass_so import M_to_R
 
 G = constants.G # kpc km^2 / M_⊙ / s^2
 
 # How much memory a halo takes up. Needs to be adjusted if outputted parameters are changed
 def calc_halo_mem(n_ptl):
-    # rad, rad_vel, tang_vel each 4bytes and two snaps
+    # rad, rad_vel, tang_vel, physical vel each 4bytes
     # HIPIDS is 8 bytes 
     # orbit/infall is one byte
-    n_bytes = (6 * 4 + 1 + 8) * n_ptl
+    # Add some headroom for pandas/hdf5 = 32 bytes per particle
+    n_bytes = 32 * n_ptl
     
     return n_bytes
 
@@ -62,7 +59,7 @@ def calc_radius(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, box_
 
 # Calculates density within sphere of given radius with given mass and calculating volume at each particle's radius
 # Also can scale by rho_m if supplied
-def calculate_density(masses, bins, r200m, sim_splits, rho_m = None,print_test=False):
+def calc_rho(masses, bins, r200m, sim_splits, rho_m = None,print_test=False):
     rho = np.zeros_like(masses)
     
     if r200m.size == 1:
@@ -242,7 +239,6 @@ def calc_halo_params(comp_snap, snap_dict, curr_halo_idx, curr_ptl_pids, curr_pt
     else:
         return fnd_HIPIDs, scaled_rad_vel, scaled_tang_vel, scaled_radii
 
-
 # Print the number of infalling particles within a multiple of R200m and the number of orbiting outside and the fraction of the total pop.
 # r_scale is the radius scaled by R200m, nr200m is the multiple of r200m to consider
 def nptl_inc_placement_r200m(r_scale, mult_r200m, orb_assn):
@@ -255,4 +251,12 @@ def nptl_inc_placement_r200m(r_scale, mult_r200m, orb_assn):
 
     print("Number of infalling particles within R200m:",n_inf_inside,"Fraction of total infalling population:",n_inf_inside / n_inf)
     print("Number of orbiting particles outside of R200m:",n_orb_inside, "Fraction of total orbiting population:",n_orb_inside / n_orb)
+        
+# Calculates the scaled position weight for a dataset. Which is used to weight the model towards the population with less particles (should be the orbiting population)
+def calc_scal_pos_weight(df):
+    count_negatives = (df['Orbit_infall'] == 0).sum()
+    count_positives = (df['Orbit_infall'] == 1).sum()
+
+    scale_pos_weight = count_negatives / count_positives
+    return scale_pos_weight
         

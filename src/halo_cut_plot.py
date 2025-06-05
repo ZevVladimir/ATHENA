@@ -1,16 +1,15 @@
 import os
-import json
 import random
 import pickle
-import re
-from scipy.spatial import cKDTree
+from scipy.spatial import KDTree
 import numpy as np
 from sparta_tools import sparta
 
-from utils.ML_support import get_combined_name,reform_dataset_dfs,split_sparta_hdf5_name,get_model_name
+from src.utils.ML_fxns import get_combined_name,split_sparta_hdf5_name,get_model_name
 from src.utils.vis_fxns import plot_halo_slice
-from utils.data_and_loading_functions import create_directory,load_SPARTA_data,timed,load_ptl_param,load_config
-from utils.calculation_functions import calc_radius, nptl_inc_placement_r200m
+from src.utils.save_load_fxns import create_directory,load_SPARTA_data,timed,load_ptl_param,load_config
+from src.utils.calc_fxns import calc_radius, nptl_inc_placement_r200m
+from src.utils.dset_fxns import reform_dset_dfs
 
 config_params = load_config(os.getcwd() + "/config.ini")
 
@@ -52,7 +51,7 @@ test_comb_name = get_combined_name(test_sims[0])
 plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/halo_slices/"
 create_directory(plot_loc)
 
-halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
+halo_ddf = reform_dset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
 all_idxs = halo_ddf["Halo_indices"].values
 
 sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
@@ -89,7 +88,7 @@ if os.path.isfile(ML_dset_path + sim + "/p_ptl_tree.pickle"):
     with open(ML_dset_path + sim + "/p_ptl_tree.pickle", "rb") as pickle_file:
         tree = pickle.load(pickle_file)
 else:
-    tree = cKDTree(data = ptls_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size)
+    tree = KDTree(data = ptls_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size)
 
 random.seed(365)
 used_numbers = set()

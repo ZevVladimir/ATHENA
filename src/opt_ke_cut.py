@@ -2,18 +2,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import minimize
 
-plt.rcParams.update({"text.usetex":True, "font.family": "serif", "figure.dpi": 150})
+plt.rcParams.update({"text.usetex":True, "font.family": "serif", "figure.dpi": 300})
 import os
-import matplotlib as mpl
-mpl.rcParams.update(mpl.rcParamsDefault)
 import pickle
 from sparta_tools import sparta
 
-from utils.ML_support import setup_client, get_combined_name, parse_ranges, load_sparta_mass_prf, create_stack_mass_prf, split_sparta_hdf5_name, load_SPARTA_data, reform_dataset_dfs, get_feature_labels, extract_snaps
-from utils.data_and_loading_functions import create_directory, load_pickle, conv_halo_id_spid, load_config, save_pickle, load_pickle, timed, set_cosmology
-from src.utils.ke_cut_support import load_ke_data, opt_ke_predictor
-from src.utils.vis_fxns import plt_SPARTA_KE_dist, compare_split_prfs
-from utils.calculation_functions import calculate_density, filter_prf, calc_mass_acc_rate
+from src.utils.ML_fxns import setup_client, get_combined_name, parse_ranges, split_sparta_hdf5_name, get_feature_labels, extract_snaps
+from src.utils.save_load_fxns import create_directory, load_pickle, load_config, save_pickle, load_pickle, timed, load_sparta_mass_prf, load_SPARTA_data
+from src.utils.ke_cut_fxns import load_ke_data, opt_ke_predictor
+from src.utils.vis_fxns import plt_SPARTA_KE_dist
+from src.utils.calc_fxns import calc_rho, calc_mass_acc_rate
+from src.utils.prfl_fxns import create_stack_mass_prf, filter_prf, compare_split_prfs
+from src.utils.dset_fxns import reform_dset_dfs
+from src.utils.misc_fxns import set_cosmology, conv_halo_id_spid
 
 config_params = load_config(os.getcwd() + "/config.ini")
 
@@ -301,13 +302,13 @@ if __name__ == "__main__":
         act_mass_prf_inf[small_halo_fltr,:] = np.nan
 
         # Calculate the density by divide the mass of each bin by the volume of that bin's radius
-        calc_dens_prf_all = calculate_density(calc_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
-        calc_dens_prf_orb = calculate_density(calc_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
-        calc_dens_prf_inf = calculate_density(calc_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+        calc_dens_prf_all = calc_rho(calc_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+        calc_dens_prf_orb = calc_rho(calc_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+        calc_dens_prf_inf = calc_rho(calc_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
 
-        act_dens_prf_all = calculate_density(act_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
-        act_dens_prf_orb = calculate_density(act_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
-        act_dens_prf_inf = calculate_density(act_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+        act_dens_prf_all = calc_rho(act_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+        act_dens_prf_orb = calc_rho(act_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+        act_dens_prf_inf = calc_rho(act_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
 
         # If we want the density profiles to only consist of halos of a specific peak height (nu) bin 
 
@@ -349,7 +350,7 @@ if __name__ == "__main__":
             curr_halos_r200m = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
             curr_halos_ids = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
             
-            halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
+            halo_ddf = reform_dset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
             curr_idxs = halo_ddf["Halo_indices"].values
             
             use_halo_r200m = curr_halos_r200m[curr_idxs]

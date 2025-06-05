@@ -1,11 +1,6 @@
 import numpy as np
 import os
-import pickle
-import json
 import h5py
-import re
-import pandas as pd
-from colossus.lss import peaks
 import warnings
 import multiprocessing as mp
 from itertools import repeat
@@ -14,9 +9,10 @@ from colossus.lss.peaks import peakHeight
 from colossus.halo.mass_so import M_to_R
 from matplotlib.legend_handler import HandlerTuple
 
-from .data_and_loading_functions import load_SPARTA_data, parse_ranges, load_pickle, load_config, get_comp_snap_info, create_directory, set_cosmology, timed
-from .calculation_functions import calculate_density, calc_mass_acc_rate, calc_t_dyn
-from .ML_support import split_sparta_hdf5_name
+from .save_load_fxns import load_SPARTA_data, load_pickle, load_config, get_comp_snap_info, timed, load_sparta_mass_prf
+from .calc_fxns import calc_rho, calc_mass_acc_rate, calc_t_dyn
+from .ML_fxns import split_sparta_hdf5_name
+from .misc_fxns import parse_ranges, set_cosmology
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -480,55 +476,6 @@ def create_stack_mass_prf(splits, radii, halo_first, halo_n, mass, orbit_assn, p
     
     return calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m.flatten()
 
-# Reconstruct SPARTA's mass profiles and stack them together for a list of sims
-def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):                
-    mass_prf_all_list = []
-    mass_prf_1halo_list = []
-    all_r200m_list = []
-    all_masses = []
-    
-    for i,sim in enumerate(use_sims):
-        # Get the halo indices corresponding to this simulation
-        if i < len(use_sims) - 1:
-            use_idxs = all_idxs[sim_splits[i]:sim_splits[i+1]]
-        else:
-            use_idxs = all_idxs[sim_splits[i]:]
-        
-        sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
-        
-        with open(ML_dset_path + sim + "/dset_params.pickle", "rb") as file:
-            dset_params = pickle.load(file)
-            
-        p_sparta_snap = dset_params["all_snap_info"]["prime_snap_info"]["sparta_snap"]
-        
-        curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"      
-        
-        param_paths = [["halos","id"],["simulation","particle_mass"],["anl_prf","M_all"],["anl_prf","M_1halo"],["halos","R200m"],["config","anl_prf","r_bins_lin"]]
-        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, pickle_data=pickle_data)
-        halos_ids = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
-        ptl_mass = sparta_params[sparta_param_names[1]]
- 
-        use_halo_ids = halos_ids[use_idxs]
-
-        mass_prf_all_list.append(sparta_params[sparta_param_names[2]][:,p_sparta_snap,:])
-        mass_prf_1halo_list.append(sparta_params[sparta_param_names[3]][:,p_sparta_snap,:])
-
-        all_r200m_list.append(sparta_params[sparta_param_names[4]][:,p_sparta_snap])
-
-        all_masses.append(ptl_mass)
-
-    mass_prf_all = np.vstack(mass_prf_all_list)
-    mass_prf_1halo = np.vstack(mass_prf_1halo_list)
-    all_r200m = np.concatenate(all_r200m_list)
-    
-    bins = sparta_params[sparta_param_names[5]]
-    bins = np.insert(bins, 0, 0)
-
-    if ret_r200m:
-        return mass_prf_all,mass_prf_1halo,all_masses,bins,all_r200m
-    else:
-        return mass_prf_all,mass_prf_1halo,all_masses,bins
-
 def compare_split_prfs_ke(plt_splits, n_lines, fit_orb_prfs, fit_inf_prfs, simp_orb_prfs, simp_inf_prfs, bins, lin_rticks, save_location, title="comb_ke_fits_", prf_func=np.nanmedian, split_name="\\nu", prf_name_0 = "Optimized Cut", prf_name_1 = "SPARTA", prf_name_2 = "Fast Cut", prf_name_3 = "SPARTA"): 
     with timed("Compare Split Profiles"):
         # Parameters to tune sizes of plots and fonts
@@ -829,18 +776,18 @@ def paper_dens_prf(X,y,preds,halo_df,use_sims,sim_cosmol,split_scale_dict,plot_s
     inf_prfs = [calc_mass_prf_inf, act_mass_prf_inf]
 
     # Calculate the density by divide the mass of each bin by the volume of that bin's radius
-    calc_dens_prf_all = calculate_density(calc_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
-    calc_dens_prf_orb = calculate_density(calc_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
-    calc_dens_prf_inf = calculate_density(calc_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+    calc_dens_prf_all = calc_rho(calc_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+    calc_dens_prf_orb = calc_rho(calc_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+    calc_dens_prf_inf = calc_rho(calc_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
     
-    act_dens_prf_all = calculate_density(act_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
-    act_dens_prf_orb = calculate_density(act_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
-    act_dens_prf_inf = calculate_density(act_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+    act_dens_prf_all = calc_rho(act_mass_prf_all*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+    act_dens_prf_orb = calc_rho(act_mass_prf_orb*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
+    act_dens_prf_inf = calc_rho(act_mass_prf_inf*h,bins[1:],calc_r200m*h,sim_splits,all_rhom)
     
     if debug_indiv_dens_prf > 0:
-        my_dens_prf_orb = calculate_density(my_mass_prf_orb*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
-        my_dens_prf_all = calculate_density(my_mass_prf_all*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
-        my_dens_prf_inf = calculate_density(my_mass_prf_inf*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
+        my_dens_prf_orb = calc_rho(my_mass_prf_orb*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
+        my_dens_prf_all = calc_rho(my_mass_prf_all*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
+        my_dens_prf_inf = calc_rho(my_mass_prf_inf*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
     
         ratio = np.where(act_dens_prf_all != 0, calc_dens_prf_all / act_dens_prf_all, np.nan)
 

@@ -1,12 +1,14 @@
 import xgboost as xgb
 import pickle
 import os
-import numpy as np
 import pandas as pd
 import argparse
 
-from utils.ML_support import setup_client, get_combined_name, reform_dataset_dfs, load_data, paper_dens_prf, paper_ptl_dist, paper_misclass, get_model_name, extract_snaps, make_preds, get_feature_labels
-from utils.data_and_loading_functions import create_directory, timed, load_pickle, save_pickle, load_config
+from src.utils.ML_fxns import setup_client, get_combined_name, get_model_name, extract_snaps, make_preds, get_feature_labels
+from src.utils.save_load_fxns import create_directory, timed, load_pickle, save_pickle, load_config, load_ML_dsets
+from src.utils.dset_fxns import reform_dset_dfs
+from src.utils.prfl_fxns import paper_dens_prf
+from src.utils.vis_fxns import paper_misclass, paper_ptl_dist
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 parser = argparse.ArgumentParser()
@@ -101,17 +103,17 @@ if __name__ == "__main__":
                 halo_dfs = []
                 if dset_name == "Full":    
                     for sim in curr_test_sims:
-                        halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + "Train" + "/halo_info/"))
-                        halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/"))
+                        halo_dfs.append(reform_dset_dfs(ML_dset_path + sim + "/" + "Train" + "/halo_info/"))
+                        halo_dfs.append(reform_dset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/"))
                 else:
                     for sim in curr_test_sims:
-                        halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
+                        halo_dfs.append(reform_dset_dfs(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
 
                 halo_df = pd.concat(halo_dfs)
                 
                 # Load the particle information
                 all_snaps = extract_snaps(model_sims[0])
-                data,scale_pos_weight = load_data(client,curr_test_sims,dset_name,sim_cosmol,all_snaps[0],limit_files=False)
+                data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,sim_cosmol,all_snaps[0])
 
                 X = data[feature_columns]
                 y = data[target_column]

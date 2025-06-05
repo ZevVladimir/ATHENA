@@ -1,17 +1,14 @@
 import matplotlib.pyplot as plt
-import numpy as np
-from scipy.optimize import curve_fit, minimize
-
-plt.rcParams.update({"text.usetex":True, "font.family": "serif", "figure.dpi": 150})
+plt.rcParams.update({"text.usetex":True, "font.family": "serif", "figure.dpi": 300})
 import os
-import json
 import pandas as pd
-import matplotlib as mpl
-mpl.rcParams.update(mpl.rcParamsDefault)
-from scipy.spatial import cKDTree
+import numpy as np
+from scipy.spatial import KDTree
 
-from utils.ML_support import load_data, get_combined_name, reform_dataset_dfs, parse_ranges, split_sparta_hdf5_name
-from utils.data_and_loading_functions import timed, load_pickle, load_SPARTA_data, load_config, load_RSTAR_data, depair_np
+from .ML_fxns import split_sparta_hdf5_name
+from .save_load_fxns import load_pickle, load_SPARTA_data, load_config, load_ML_dsets
+from .dset_fxns import reform_dset_dfs
+from .misc_fxns import parse_ranges, depair_np, timed
 
 config_dict = load_config(os.getcwd() + "/config.ini")
 
@@ -84,7 +81,7 @@ def halo_select(sims, ptl_data):
         halos_r200m = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
         
         
-        halo_ddf = reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
+        halo_ddf = reform_dset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
         curr_idxs = halo_ddf["Halo_indices"].values
         halo_first = halo_ddf["Halo_first"].values
         halo_n = halo_ddf["Halo_n"].values
@@ -106,7 +103,7 @@ def halo_select(sims, ptl_data):
         use_halo_pos = halos_pos[curr_idxs]
         use_halo_r200m = halos_r200m[curr_idxs]
         # Construct a search tree of halo positions
-        curr_halo_tree = cKDTree(data = use_halo_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size)
+        curr_halo_tree = KDTree(data = use_halo_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size)
         
         # For each massive halo search the area around the halo to determine if there are any halos that are more than 20% the size of this halo
         for i in range(max_nhalo):
@@ -142,16 +139,16 @@ def load_ke_data(client, curr_test_sims, sim_cosmol, snap_list):
         halo_dfs = []
         if dset_name == "Full":    
             for sim in curr_test_sims:
-                halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + "Train" + "/halo_info/"))
-                halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/"))
+                halo_dfs.append(reform_dset_dfs(ML_dset_path + sim + "/" + "Train" + "/halo_info/"))
+                halo_dfs.append(reform_dset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/"))
         else:
             for sim in curr_test_sims:
-                halo_dfs.append(reform_dataset_dfs(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
+                halo_dfs.append(reform_dset_dfs(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
 
         halo_df = pd.concat(halo_dfs)
         
         # Load the particle information
-        data,scale_pos_weight = load_data(client,curr_test_sims,dset_name,sim_cosmol,prime_snap=snap_list[0],limit_files=False)
+        data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,sim_cosmol,prime_snap=snap_list[0],limit_files=False)
         samp_data = halo_select(curr_test_sims,data)
     r = samp_data["p_Scaled_radii"]
     vr = samp_data["p_Radial_vel"]

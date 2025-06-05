@@ -2,10 +2,9 @@
 #TODO For the snaps allow it to be either an array of specific redshifts or dynamical time separation
 import numexpr as ne
 import numpy as np
-from scipy.spatial import cKDTree
+from scipy.spatial import KDTree
 from colossus.cosmology import cosmology
 import h5py
-import matplotlib.pyplot as plt
 import os
 import multiprocessing as mp
 from itertools import repeat
@@ -14,10 +13,11 @@ import pandas as pd
 import psutil
 import argparse
 
-from utils.data_and_loading_functions import load_SPARTA_data, load_ptl_param, get_comp_snap_info, create_directory, find_closest_z_snap, timed, clean_dir, load_pickle, save_pickle, get_num_snaps, load_config
-from utils.calculation_functions import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn, calculate_density
-from utils.profile_creation import create_mass_prf, compare_prfs
-from utils.ML_support import split_sparta_hdf5_name
+from src.utils.save_load_fxns import load_SPARTA_data, load_ptl_param, get_comp_snap_info, create_directory, load_pickle, save_pickle, load_config
+from src.utils.calc_fxns import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn, calc_rho, calc_halo_mem
+from src.utils.prfl_fxns import create_mass_prf, compare_prfs
+from src.utils.ML_fxns import split_sparta_hdf5_name
+from utils.misc_fxns import timed, clean_dir, find_closest_z_snap, get_num_snaps
 ##################################################################################################################
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -84,15 +84,6 @@ def find_start_pnt(directory):
                 max_number = number
                 
     return max_number
-
-def calc_halo_mem(n_ptl):
-    # rad, rad_vel, tang_vel, physical vel each 4bytes
-    # HIPIDS is 8 bytes 
-    # orbit/infall is one byte
-    # Add some headroom for pandas/hdf5 = 32 bytes per particle
-    n_bytes = 32 * n_ptl
-    
-    return n_bytes
 
 def det_halo_splits(mem_arr, mem_lim):
     split_idxs = []
@@ -193,15 +184,15 @@ def search_halos(ret_labels, snap_dict, curr_halo_idx, curr_ptl_pids, curr_ptl_p
     if create_dens_prf and ret_labels:      
         calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, m200m = create_mass_prf(scaled_radii, curr_orb_assn, bins, ptl_mass)
 
-        calc_dens_prf_all = calculate_density(calc_mass_prf_all, bins[1:], halo_r200m, np.array([0]), p_rho_m)
-        calc_dens_prf_orb = calculate_density(calc_mass_prf_orb, bins[1:], halo_r200m, np.array([0]), p_rho_m)
-        calc_dens_prf_inf = calculate_density(calc_mass_prf_inf, bins[1:], halo_r200m, np.array([0]), p_rho_m)
+        calc_dens_prf_all = calc_rho(calc_mass_prf_all, bins[1:], halo_r200m, np.array([0]), p_rho_m)
+        calc_dens_prf_orb = calc_rho(calc_mass_prf_orb, bins[1:], halo_r200m, np.array([0]), p_rho_m)
+        calc_dens_prf_inf = calc_rho(calc_mass_prf_inf, bins[1:], halo_r200m, np.array([0]), p_rho_m)
         
         act_mass_prf_inf = act_mass_prf_all - act_mass_prf_orb
         
-        act_dens_prf_all = calculate_density(act_mass_prf_all, bins[1:], halo_r200m, np.array([0]), p_rho_m)
-        act_dens_prf_orb = calculate_density(act_mass_prf_orb, bins[1:], halo_r200m, np.array([0]), p_rho_m)
-        act_dens_prf_inf = calculate_density(act_mass_prf_inf, bins[1:], halo_r200m, np.array([0]), p_rho_m,print_test=True)
+        act_dens_prf_all = calc_rho(act_mass_prf_all, bins[1:], halo_r200m, np.array([0]), p_rho_m)
+        act_dens_prf_orb = calc_rho(act_mass_prf_orb, bins[1:], halo_r200m, np.array([0]), p_rho_m)
+        act_dens_prf_inf = calc_rho(act_mass_prf_inf, bins[1:], halo_r200m, np.array([0]), p_rho_m,print_test=True)
 
         all_prfs = [calc_dens_prf_all, act_dens_prf_all]
         orb_prfs = [calc_dens_prf_orb, act_dens_prf_orb]
@@ -465,7 +456,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
         if os.path.isfile(save_location + "p_ptl_tree.pickle") and reset_lvl < 2:
                 p_ptl_tree = load_pickle(save_location + "p_ptl_tree.pickle")
         else:
-            p_ptl_tree = cKDTree(data = p_ptls_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size) # construct search trees for primary snap
+            p_ptl_tree = KDTree(data = p_ptls_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size) # construct search trees for primary snap
             if pickle_data:
                 save_pickle(p_ptl_tree,save_location + "p_ptl_tree.pickle")
 
@@ -623,7 +614,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                 if os.path.isfile(save_location + str(curr_ptl_snap) + "_ptl_tree.pickle") and reset_lvl < 2:
                     curr_ptl_tree = load_pickle(save_location + str(curr_ptl_snap) + "_ptl_tree.pickle")
                 else:
-                    curr_ptl_tree = cKDTree(data = curr_ptls_pos, leafsize = 3, balanced_tree = False, boxsize = curr_box_size)
+                    curr_ptl_tree = KDTree(data = curr_ptls_pos, leafsize = 3, balanced_tree = False, boxsize = curr_box_size)
                     if pickle_data:
                         save_pickle(curr_ptl_tree, save_location +  str(curr_ptl_snap) + "_ptl_tree.pickle")        
     

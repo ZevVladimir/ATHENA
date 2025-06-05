@@ -5,7 +5,8 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Circle
 import xgboost as xgb
 
-from .data_and_loading_functions import split_orb_inf, timed
+from .save_load_fxns import timed
+from .dset_fxns import split_orb_inf
 
 plt.rcParams['mathtext.fontset'] = 'dejavuserif'
 plt.rcParams['font.family'] = 'serif'

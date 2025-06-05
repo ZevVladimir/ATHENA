@@ -1,5 +1,3 @@
-import dask.dataframe as dd
-
 import xgboost as xgb
 from xgboost import dask as dxgb
     
@@ -9,11 +7,10 @@ import matplotlib.pyplot as plt
 import pickle
 import os
 import numpy as np
-import pandas as pd
 import argparse
 
-from utils.data_and_loading_functions import create_directory, timed, load_pickle, save_pickle, load_config
-from utils.ML_support import setup_client, get_combined_name, load_data, extract_snaps, get_model_name, get_feature_labels
+from src.utils.save_load_fxns import create_directory, timed, load_pickle, save_pickle, load_config, load_ML_dsets
+from src.utils.ML_fxns import setup_client, get_combined_name, extract_snaps, get_model_name, get_feature_labels
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -113,13 +110,9 @@ if __name__ == "__main__":
         print("Loaded Booster")
     else:
         with timed("Loading Datasets"):
-            # Do desired adjustments to data if selected, otherwise just load the data normally
-            if file_lim > 0:
-                lim_train_files = True
-            else:
-                lim_train_files = False
-            train_data,scale_pos_weight = load_data(client,model_sims,"Train",sim_cosmol,prime_snap=all_snaps[0],filter_nu=False,limit_files=lim_train_files)
-            test_data,scale_pos_weight = load_data(client,model_sims,"Test",sim_cosmol,prime_snap=all_snaps[0],filter_nu=False,limit_files=False)
+            train_data,scale_pos_weight = load_ML_dsets(client,model_sims,"Train",sim_cosmol,prime_snap=all_snaps[0],file_lim=file_lim,filter_nu=False)
+            # We want to use the full testing dataset regardless
+            test_data,scale_pos_weight = load_ML_dsets(client,model_sims,"Test",sim_cosmol,prime_snap=all_snaps[0],file_lim=0,filter_nu=False)
                 
             X_test = test_data[feature_columns]
             y_test = test_data[target_column]
