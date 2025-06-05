@@ -231,17 +231,13 @@ def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         
         curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"      
         
-        param_paths = [["halos","id"],["simulation","particle_mass"],["anl_prf","M_all"],["anl_prf","M_1halo"],["halos","R200m"],["config","anl_prf","r_bins_lin"]]
+        param_paths = [["simulation","particle_mass"],["anl_prf","M_all"],["anl_prf","M_1halo"],["halos","R200m"],["config","anl_prf","r_bins_lin"]]
         sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, pickle_data=pickle_data)
-        halos_ids = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
-        ptl_mass = sparta_params[sparta_param_names[1]]
- 
-        use_halo_ids = halos_ids[use_idxs]
+        ptl_mass = sparta_params[sparta_param_names[0]]
 
-        mass_prf_all_list.append(sparta_params[sparta_param_names[2]][:,p_sparta_snap,:])
-        mass_prf_1halo_list.append(sparta_params[sparta_param_names[3]][:,p_sparta_snap,:])
-
-        all_r200m_list.append(sparta_params[sparta_param_names[4]][:,p_sparta_snap])
+        mass_prf_all_list.append(sparta_params[sparta_param_names[1]][use_idxs,p_sparta_snap,:])
+        mass_prf_1halo_list.append(sparta_params[sparta_param_names[2]][use_idxs,p_sparta_snap,:])
+        all_r200m_list.append(sparta_params[sparta_param_names[3]][use_idxs,p_sparta_snap])
 
         all_masses.append(ptl_mass)
 
@@ -249,7 +245,8 @@ def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
     mass_prf_1halo = np.vstack(mass_prf_1halo_list)
     all_r200m = np.concatenate(all_r200m_list)
     
-    bins = sparta_params[sparta_param_names[5]]
+    # We assume bins are the same from each sparta simulation
+    bins = sparta_params[sparta_param_names[4]]
     bins = np.insert(bins, 0, 0)
 
     if ret_r200m:

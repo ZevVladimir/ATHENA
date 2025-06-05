@@ -1,5 +1,3 @@
-import matplotlib.pyplot as plt
-plt.rcParams.update({"text.usetex":True, "font.family": "serif", "figure.dpi": 300})
 import os
 import pandas as pd
 import numpy as np
@@ -148,7 +146,7 @@ def load_ke_data(client, curr_test_sims, sim_cosmol, snap_list):
         halo_df = pd.concat(halo_dfs)
         
         # Load the particle information
-        data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,sim_cosmol,prime_snap=snap_list[0],limit_files=False)
+        data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,sim_cosmol,prime_snap=snap_list[0])
         samp_data = halo_select(curr_test_sims,data)
     r = samp_data["p_Scaled_radii"]
     vr = samp_data["p_Radial_vel"]

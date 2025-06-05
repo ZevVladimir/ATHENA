@@ -1,7 +1,4 @@
-import matplotlib.pyplot as plt
 import numpy as np
-
-plt.rcParams.update({"text.usetex":True, "font.family": "serif", "figure.dpi": 300})
 import os
 import pickle
 
@@ -174,5 +171,6 @@ if __name__ == "__main__":
                 simp_orb_prf_lst.append(filter_prf(simp_calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,simp_fltr))
                 simp_inf_prf_lst.append(filter_prf(simp_calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,simp_fltr))
             if fit_fltr.shape[0] < 25 and simp_fltr.shape[0] < 25:
-                plt_nu_splits.remove(nu_split)        
+                plt_nu_splits.remove(nu_split)     
+
         compare_split_prfs_ke(plt_nu_splits,len(cpy_plt_nu_splits),fit_orb_prf_lst,fit_inf_prf_lst,simp_orb_prf_lst,simp_inf_prf_lst,bins[1:],lin_rticks,plot_loc)

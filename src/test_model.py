@@ -133,11 +133,11 @@ if __name__ == "__main__":
                 with timed(f"Predictions for {y.size.compute():.3e} particles"):
                     preds = make_preds(client, bst, X)
                 if dens_prf_plt:
-                    paper_dens_prf(X,y,preds,halo_df,curr_test_sims,sim_cosmol,plot_loc,split_by_nu=dens_prf_nu_split,split_by_macc=dens_prf_macc_split)
+                    paper_dens_prf(X, y, preds, halo_df, curr_test_sims, sim_cosmol, split_scale_dict, plot_loc, split_by_nu=dens_prf_nu_split, split_by_macc=dens_prf_macc_split)
                 if full_dist_plt:
-                    paper_ptl_dist(X,y,all_tdyn_steps,plot_loc)
+                    paper_ptl_dist(X, y, all_tdyn_steps, split_scale_dict, plot_loc)
                 if misclass_plt:
-                    paper_misclass(X,y,preds,curr_test_sims,dset_name,all_tdyn_steps,plot_loc)
+                    paper_misclass(X, y, preds, curr_test_sims, dset_name, all_tdyn_steps, split_scale_dict, plot_loc)
                 del data 
                 del X
                 del y

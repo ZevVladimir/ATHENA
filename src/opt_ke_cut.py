@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import minimize
 
-plt.rcParams.update({"text.usetex":True, "font.family": "serif", "figure.dpi": 300})
 import os
 import pickle
 from sparta_tools import sparta

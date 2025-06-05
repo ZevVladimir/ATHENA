@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import curve_fit, minimize
 
-plt.rcParams.update({"text.usetex":True, "font.family": "serif", "figure.dpi": 300})
 import os
 import pickle
 import scipy.ndimage as ndimage
@@ -349,6 +348,7 @@ if __name__ == "__main__":
     cbar_label_fntsize = 18
     cbar_tick_fntsize = 14
 
+    #TODO move these plots to vis_fxns.py
     with timed("SPARTA KE Dist plot"):
         magma_cmap = plt.get_cmap("magma")
         magma_cmap.set_under(color='black')
