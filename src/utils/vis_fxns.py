@@ -3,6 +3,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Circle
+import scipy.ndimage as ndimage
 
 from .util_fxns import timed, split_orb_inf
 
@@ -855,7 +856,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
             # Orb vr > 0
             plt.sca(ax1)
             plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], **hist_args)
-            plt.plot(x, y12, lw=line_width, color="g", label="Simple Cut")
+            plt.plot(x, y12, lw=line_width, color="g", label="Fast Cut")
             plt.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
             if cust_line_dict is not None:
                 plt_cust_ke_line(b=cust_line_dict["orb_vr_pos"]["b"], bins=bins, linewidth=line_width)
@@ -868,7 +869,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
             # Inf vr > 0
             plt.sca(ax2)
             plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], **hist_args)
-            plt.plot(x, y12, lw=line_width, color="g", label="Simple Cut")
+            plt.plot(x, y12, lw=line_width, color="g", label="Fast Cut")
             plt.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
             if cust_line_dict is not None:
                 plt_cust_ke_line(b=cust_line_dict["inf_vr_pos"]["b"], bins=bins, linewidth=line_width)
@@ -880,7 +881,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
             # Orb vr < 0
             plt.sca(ax3)
             plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], **hist_args)
-            plt.plot(x, y22, lw=line_width, color="g", label="Simple Cut")
+            plt.plot(x, y22, lw=line_width, color="g", label="Fast Cut")
             plt.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
             if cust_line_dict is not None:
                 plt_cust_ke_line(b=cust_line_dict["orb_vr_neg"]["b"], bins=bins, linewidth=line_width)
@@ -892,7 +893,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
             # Inf vr < 0
             plt.sca(ax4)
             plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], **hist_args)
-            plt.plot(x, y22, lw=line_width, color="g", label="Simple Cut")
+            plt.plot(x, y22, lw=line_width, color="g", label="Fast Cut")
             plt.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
             if cust_line_dict is not None:
                 plt_cust_ke_line(b=cust_line_dict["inf_vr_neg"]["b"], bins=bins, linewidth=line_width)
@@ -925,3 +926,136 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         else:
             plt.savefig(plot_loc + "log_" + title + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=400) 
         
+def plt_KE_dist_grad(feat_dict, fltr_combs, r_r200m, vr, lnv2, nbins, x_range, y_range, r_cut_calib, plot_loc, sim_title="Simulation: Bolshoi 1000Mpc"):
+    with timed("KE Dist plot"):
+        title_fntsize = 22
+        legend_fntsize = 18
+        
+        m_pos = feat_dict["m_pos"]
+        b_pos = feat_dict["b_pos"]
+        m_neg = feat_dict["m_neg"]
+        b_neg = feat_dict["b_neg"]
+        
+        x = np.linspace(0, 3, 1000)
+        y12 = m_pos * x + b_pos
+        y22 = m_neg * x + b_neg
+        
+        fig, axes = plt.subplots(3, 2, figsize=(12, 14))
+        axes = axes.flatten()
+        fig.suptitle(
+            r"Kinetic energy distribution of particles around halos at $z=0$"+"\n" + sim_title,fontsize=16)
+
+        for ax in axes:
+            ax.set_xlabel(r'$r/R_{200m}$',fontsize=16)
+            ax.set_ylabel(r'$\ln(v^2/v_{200m}^2)$',fontsize=16)
+            ax.set_xlim(0, 2)
+            ax.set_ylim(-2, 2.5)
+            ax.text(0.25, -1.4, "Orbiting", fontsize=16, color="r",
+                    weight="bold", bbox=dict(facecolor='w', alpha=0.75))
+            ax.text(1.5, 0.7, "Infalling", fontsize=16, color="b",
+                    weight="bold", bbox=dict(facecolor='w', alpha=0.75))
+            ax.tick_params(axis='both',which='both',direction="in",labelsize=12,length=8,width=2)
+
+        plt.sca(axes[0])
+        plt.title(r'$v_r > 0$',fontsize=title_fntsize)
+        plt.hist2d(r_r200m[fltr_combs["mask_vr_pos"]], lnv2[fltr_combs["mask_vr_pos"]], bins=nbins,
+                    cmap="terrain", range=(x_range, y_range))
+        plt.plot(x, y12, lw=2.0, color="k",
+                label="Fast Cut")
+        plt.vlines(x=r_cut_calib,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(label=r'$N$ (Counts)')
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.xlim(0, 2)
+        
+
+        plt.sca(axes[1])
+        plt.title(r'$v_r < 0$',fontsize=title_fntsize)
+        plt.hist2d(r_r200m[fltr_combs["mask_vr_neg"]], lnv2[fltr_combs["mask_vr_neg"]], bins=nbins,
+                    cmap="terrain", range=(x_range, y_range))
+        plt.plot(x, y22, lw=2.0, color="k",
+                label="Fast Cut")
+        plt.vlines(x=r_cut_calib,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(label=r'$N$ (Counts)')
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.xlim(0, 2)
+        
+        plt.sca(axes[2])
+        plt.title(r'$v_r > 0$',fontsize=title_fntsize)
+        h3 = plt.hist2d(r_r200m[fltr_combs["mask_vr_pos"]], lnv2[fltr_combs["mask_vr_pos"]], bins=nbins, norm="log",
+                    cmap="terrain", range=(x_range, y_range))
+        plt.plot(x, y12, lw=2.0, color="k",
+                label="Fast Cut")
+        plt.vlines(x=r_cut_calib,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(h3[3], label=r'$N$ (Counts)')
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.xlim(0, 2)
+
+        plt.sca(axes[3])
+        plt.title(r'$v_r < 0$',fontsize=title_fntsize)
+        h4 = plt.hist2d(r_r200m[fltr_combs["mask_vr_neg"]], lnv2[fltr_combs["mask_vr_neg"]], bins=nbins, norm="log",
+                    cmap="terrain", range=(x_range, y_range))
+        plt.plot(x, y22, lw=2.0, color="k",
+                label="Fast Cut")
+        plt.vlines(x=r_cut_calib,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(h4[3], label=r'$N$ (Counts)')
+        plt.legend(loc="upper right",fontsize=legend_fntsize)
+        plt.xlim(0, 2)
+        
+        mask_vrn = (vr < 0)
+        mask_vrp = ~mask_vrn
+
+        # Compute density and gradient.
+        # For vr > 0
+        hist_zp, hist_xp, hist_yp = np.histogram2d(r_r200m[mask_vrp], lnv2[mask_vrp], 
+                                                    bins=nbins, 
+                                                    range=((0, 3.), (-2, 2.5)),
+                                                    density=True)
+        # Bin centres
+        hist_xp = 0.5 * (hist_xp[:-1] + hist_xp[1:])
+        hist_yp = 0.5 * (hist_yp[:-1] + hist_yp[1:])
+        # Bin spacing
+        dx = np.mean(np.diff(hist_xp))
+        dy = np.mean(np.diff(hist_yp))
+        # Generate a 2D grid corresponding to the histogram
+        hist_xp, hist_yp = np.meshgrid(hist_xp, hist_yp)
+        # Evaluate the gradient at each radial bin
+        hist_z_grad = np.zeros_like(hist_zp)
+        for i in range(hist_xp.shape[0]):
+            hist_z_grad[i, :] = np.gradient(hist_zp[i, :], dy)
+        # Apply a gaussian filter to smooth the gradient.
+        hist_zp = ndimage.gaussian_filter(hist_z_grad, 2.0)
+
+        # Same for vr < 0
+        hist_zn, hist_xn, hist_yn = np.histogram2d(r_r200m[mask_vrn], lnv2[mask_vrn],
+                                                    bins=nbins,
+                                                    range=((0, 3.), (-2, 2.5)),
+                                                    density=True)
+        hist_xn = 0.5 * (hist_xn[:-1] + hist_xn[1:])
+        hist_yn = 0.5 * (hist_yn[:-1] + hist_yn[1:])
+        dy = np.mean(np.diff(hist_yn))
+        hist_xn, hist_yn = np.meshgrid(hist_xn, hist_yn)
+        hist_z_grad = np.zeros_like(hist_zn)
+        for i in range(hist_xn.shape[0]):
+            hist_z_grad[i, :] = np.gradient(hist_zn[i, :], dy)
+        hist_zn = ndimage.gaussian_filter(hist_z_grad, 2.0)
+
+        #Plot the smoothed gradient
+        plt.sca(axes[4])
+        plt.title(r'$v_r > 0$',fontsize=title_fntsize)
+        plt.contourf(hist_xp, hist_yp, hist_zp.T, levels=80, cmap='terrain')
+        plt.vlines(x=r_cut_calib,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(label="Smoothed Gradient Magnitude")
+        plt.xlim(0, 2)
+        
+        # Plot the smoothed gradient
+        plt.sca(axes[5])
+        plt.title(r'$v_r < 0$',fontsize=title_fntsize)
+        plt.contourf(hist_xn, hist_yn, hist_zn.T, levels=80, cmap='terrain')
+        plt.vlines(x=r_cut_calib,ymin=y_range[0],ymax=y_range[1],label="Radius cut")
+        plt.colorbar(label="Smoothed Gradient Magnitude")
+        plt.xlim(0, 2)
+        
+        
+
+        plt.tight_layout();
+        plt.savefig(plot_loc + "fast_KE_dist_grad.png")

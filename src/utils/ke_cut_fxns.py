@@ -5,8 +5,7 @@ from scipy.spatial import KDTree
 
 from .ML_fxns import split_sparta_hdf5_name
 from .util_fxns import load_pickle, load_SPARTA_data, load_config, load_ML_dsets
-from .dset_fxns import reform_dset_dfs
-from .misc_fxns import parse_ranges, depair_np, timed
+from .util_fxns import reform_dset_dfs, parse_ranges, depair_np, timed
 
 config_dict = load_config(os.getcwd() + "/config.ini")
 
