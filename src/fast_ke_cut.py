@@ -214,42 +214,44 @@ if __name__ == "__main__":
     model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"  
     create_directory(model_fldr_loc)
     
+    
+        
+    dset_params = load_pickle(ML_dset_path + fast_ke_calib_sims[0] + "/dset_params.pickle")
+    sim_cosmol = dset_params["cosmology"]
+    all_tdyn_steps = dset_params["t_dyn_steps"]
+    
+    feature_columns = get_feature_labels(features,all_tdyn_steps)
+    snap_list = extract_snaps(fast_ke_calib_sims[0])
+    cosmol = set_cosmology(sim_cosmol)
+    
+    ####################################################################################################################################################################################################################################
+    
+    if os.path.exists(model_fldr_loc + "ke_fastparams_dict.pickle"):
+        ke_param_dict = load_pickle(model_fldr_loc + "ke_fastparams_dict.pickle")
+        m_pos = ke_param_dict["m_pos"]
+        b_pos = ke_param_dict["b_pos"]
+        m_neg = ke_param_dict["m_neg"]
+        b_neg = ke_param_dict["b_neg"]
+    else:
+        (m_pos, b_pos), (m_neg, b_neg) = calibrate_finder()
+        
+        ke_param_dict = {
+            "m_pos":m_pos,
+            "b_pos":b_pos,
+            "m_neg":m_neg,
+            "b_neg":b_neg
+        }
+        save_pickle(ke_param_dict, model_fldr_loc + "ke_fastparams_dict.pickle")
+    
+    print("\nCalibration Params")
+    print(m_pos,b_pos,m_neg,b_neg)
+    print("\n")
+    
     for curr_test_sims in ke_test_sims:
         test_comb_name = get_combined_name(curr_test_sims) 
         dset_name = eval_datasets[0]
         plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
         create_directory(plot_loc)
-        
-        dset_params = load_pickle(ML_dset_path + curr_test_sims[0] + "/dset_params.pickle")
-        sim_cosmol = dset_params["cosmology"]
-        all_tdyn_steps = dset_params["t_dyn_steps"]
-        
-        feature_columns = get_feature_labels(features,all_tdyn_steps)
-        snap_list = extract_snaps(fast_ke_calib_sims[0])
-        cosmol = set_cosmology(sim_cosmol)
-        
-        ####################################################################################################################################################################################################################################
-        
-        if os.path.exists(model_fldr_loc + "ke_fastparams_dict.pickle"):
-            ke_param_dict = load_pickle(model_fldr_loc + "ke_fastparams_dict.pickle")
-            m_pos = ke_param_dict["m_pos"]
-            b_pos = ke_param_dict["b_pos"]
-            m_neg = ke_param_dict["m_neg"]
-            b_neg = ke_param_dict["b_neg"]
-        else:
-            (m_pos, b_pos), (m_neg, b_neg) = calibrate_finder()
-            
-            ke_param_dict = {
-                "m_pos":m_pos,
-                "b_pos":b_pos,
-                "m_neg":m_neg,
-                "b_neg":b_neg
-            }
-            save_pickle(ke_param_dict, model_fldr_loc + "ke_fastparams_dict.pickle")
-        
-        print("\nCalibration Params")
-        print(m_pos,b_pos,m_neg,b_neg)
-        print("\n")
         
         r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client, curr_test_sims,sim_cosmol,snap_list)
         

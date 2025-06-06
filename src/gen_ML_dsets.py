@@ -1,5 +1,3 @@
-#TODO Add functionality for any number of snaps to be used
-#TODO For the snaps allow it to be either an array of specific redshifts or dynamical time separation
 import numexpr as ne
 import numpy as np
 from scipy.spatial import KDTree
@@ -211,8 +209,7 @@ def halo_loop(ptl_idx, curr_iter, num_iter, indices, halo_splits, snap_dict, use
         curr_snap = snap_dict["ptl_snap"]
         curr_sparta_snap = snap_dict["sparta_snap"]
         curr_a = snap_dict["scale_factor"]
-        
-        #TODO move use_indices finding outside the function?
+
         with timed("Split "+str(curr_iter+1)+"/"+str(num_iter)):
             # Get the indices corresponding to where we are in the number of iterations (0:num_halo_persplit) -> (num_halo_persplit:2*num_halo_persplit) etc
             if curr_iter < (num_iter - 1):
@@ -316,11 +313,13 @@ def halo_loop(ptl_idx, curr_iter, num_iter, indices, halo_splits, snap_dict, use
 
 with timed("Generating Datasets for " + curr_sparta_file):
     with timed("Startup"):
-        #TODO check if dset_params exists with right number of snaps
-        #TODO add reason for error being thrown if no know snaps
-        if reset_lvl <= 1 and len(known_snaps) > 0:
-            save_location = ML_dset_path + curr_sparta_file + "_" + "_".join(str(x) for x in known_snaps) + "/"
-            dset_params = load_pickle(save_location+"dset_params.pickle")
+        if reset_lvl <= 1:
+            if len(known_snaps) > 0:
+                save_location = os.path.join(ML_dset_path, curr_sparta_file + "_" + "_".join(str(x) for x in known_snaps)) + "/"
+                dset_params = load_pickle(os.path.join(save_location, "dset_params.pickle"))
+            else:
+                raise ValueError("To load the correct parameter file, provide the known snapshots. If the snapshots are unknown, set reset_lvl > 1.")
+
 
         if reset_lvl <= 1:
             sim_cosmol = dset_params["cosmology"]
