@@ -7,7 +7,7 @@ import argparse
 from src.utils.ML_fxns import setup_client, get_combined_name, get_model_name, extract_snaps, make_preds, get_feature_labels
 from src.utils.util_fxns import create_directory, timed, load_pickle, save_pickle, load_config, load_ML_dsets,reform_dset_dfs
 from src.utils.prfl_fxns import paper_dens_prf_plt
-from src.utils.vis_fxns import paper_misclass, paper_ptl_dist
+from src.utils.vis_fxns import paper_misclass, gen_ptl_dist_plt
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 parser = argparse.ArgumentParser()
@@ -129,12 +129,39 @@ if __name__ == "__main__":
                     "log_rticks":log_rticks,
                 }
                 
+                r_ticks = split_scale_dict["lin_rticks"] + split_scale_dict["log_rticks"]
+        
+                rv_ticks = split_scale_dict["lin_rvticks"] + split_scale_dict["log_rvticks"]
+                rv_ticks = rv_ticks + [-x for x in rv_ticks if x != 0]
+                rv_ticks.sort()
+
+                tv_ticks = split_scale_dict["lin_tvticks"] + split_scale_dict["log_tvticks"]  
+                
                 with timed(f"Predictions for {y.size.compute():.3e} particles"):
                     preds = make_preds(client, bst, X)
                 if dens_prf_plt:
                     paper_dens_prf_plt(X, y, preds, halo_df, curr_test_sims, sim_cosmol, split_scale_dict, plot_loc, split_by_nu=dens_prf_nu_split, split_by_macc=dens_prf_macc_split)
                 if full_dist_plt:
-                    paper_ptl_dist(X, y, all_tdyn_steps, split_scale_dict, plot_loc)
+                    p_act_labels=y.compute().values.flatten()
+                    p_r=X["p_Scaled_radii"].values.compute()
+                    p_rv=X["p_Radial_vel"].values.compute()
+                    p_tv=X["p_Tangential_vel"].values.compute()
+                    c_r=X[str(all_tdyn_steps[0]) + "_Scaled_radii"].values.compute()
+                    c_rv=X[str(all_tdyn_steps[0]) +"_Radial_vel"].values.compute()
+                    ptl_dist_data_dict = {
+                        "p_r":p_r,
+                        "p_rv":p_rv,
+                        "p_tv":p_tv,
+                        "c_r":c_r,
+                        "c_rv":c_rv,
+                    }
+                    ptl_dist_plot_list = [
+                        {"x": "p_r", "y": "p_rv", "split_x": False, "split_y": True, "x_label":"$r/R_{200m}$", "y_label":"$v_r/v_{200m}$","title":"Current Snapshot", "x_ticks":r_ticks, "y_ticks":rv_ticks},
+                        {"x": "p_r", "y": "p_tv", "split_x": False, "split_y": True, "x_label":"$r/R_{200m}$", "y_label":"$v_t/v_{200m}$","title":"", "x_ticks":r_ticks, "y_ticks":tv_ticks},
+                        {"x": "p_rv", "y": "p_tv", "split_x": True, "split_y": True, "x_label":"$v_r/v_{200m}$", "y_label":"","title":"", "x_ticks":rv_ticks, "y_ticks":tv_ticks},
+                        {"x": "c_r", "y": "c_rv", "split_x": False, "split_y": True, "x_label":"$r/R_{200m}$", "y_label":"$v_r/v_{200m}$","title":"Past Snapshot", "x_ticks":r_ticks, "y_ticks":rv_ticks},
+                    ]
+                    gen_ptl_dist_plt(p_act_labels,split_scale_dict,plot_loc,ptl_dist_data_dict,ptl_dist_plot_list,save_title="gen_plt_")
                 if misclass_plt:
                     paper_misclass(X, y, preds, curr_test_sims, dset_name, all_tdyn_steps, split_scale_dict, plot_loc, model_info)
                 del data 
