@@ -1,7 +1,5 @@
 import matplotlib.pyplot as plt
 import numpy as np
-
-plt.rcParams.update({"text.usetex":True, "font.family": "serif", "figure.dpi": 300})
 import os
 import xgboost as xgb
 
@@ -71,124 +69,114 @@ if __name__ == "__main__":
       
     fast_model_fldr_loc = path_to_models + comb_fast_model_sims + "/" + model_type + "/"
     opt_model_fldr_loc = path_to_models + comb_opt_model_sims + "/" + model_type + "/" 
-    #TODO make this a loop through test sims
-    curr_test_sims = ke_test_sims[0]
-    test_comb_name = get_combined_name(curr_test_sims) 
-    dset_name = eval_datasets[0]
-    plot_loc = opt_model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
-    create_directory(plot_loc)
     
-    
-    
-    dset_params = load_pickle(ML_dset_path + curr_test_sims[0] + "/dset_params.pickle")
-    sim_cosmol = dset_params["cosmology"]
-    all_tdyn_steps = dset_params["t_dyn_steps"]
-    
-    feature_columns = get_feature_labels(features,all_tdyn_steps)
-    snap_list = extract_snaps(curr_test_sims[0])
-    cosmol = set_cosmology(sim_cosmol)
-    
-    
-    
-    if os.path.isfile(opt_model_fldr_loc + "ke_optparams_dict.pickle"):
-        print("Loading parameters from saved file")
-        opt_param_dict = load_pickle(opt_model_fldr_loc + "ke_optparams_dict.pickle")
-    else:
-        raise FileNotFoundError(f"Expected to find optimized parameters at {os.path.join(opt_model_fldr_loc, 'ke_optparams_dict.pickle')}")
-    with timed("Fraction of Orb by Rad Plot Creation"):
-        # Get the redshifts for each simulation's primary snapshot
-
+    for curr_test_sims in ke_test_sims:
         test_comb_name = get_combined_name(curr_test_sims) 
+        dset_name = eval_datasets[0]
+        plot_loc = opt_model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
+        create_directory(plot_loc)
         
-        data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,sim_cosmol,snap_list[0])
-        
-        columns_to_keep = [col for col in data.columns if col != target_column[0]]
-        X_df = data[columns_to_keep]
-        y_df = data[target_column]
+        dset_params = load_pickle(ML_dset_path + curr_test_sims[0] + "/dset_params.pickle")
+        sim_cosmol = dset_params["cosmology"]
+        all_tdyn_steps = dset_params["t_dyn_steps"]
         
         feature_columns = get_feature_labels(features,all_tdyn_steps)
-        preds_ML = make_preds(client, bst, data[feature_columns])
+        snap_list = extract_snaps(curr_test_sims[0])
+        cosmol = set_cosmology(sim_cosmol)
+        
+        if os.path.isfile(opt_model_fldr_loc + "ke_optparams_dict.pickle"):
+            print("Loading parameters from saved file")
+            opt_param_dict = load_pickle(opt_model_fldr_loc + "ke_optparams_dict.pickle")
+        else:
+            raise FileNotFoundError(f"Expected to find optimized parameters at {os.path.join(opt_model_fldr_loc, 'ke_optparams_dict.pickle')}")
+        with timed("Fraction of Orb by Rad Plot Creation"):
+            test_comb_name = get_combined_name(curr_test_sims) 
             
-        X_df = X_df.to_backend('pandas')
-        y_df = y_df.to_backend('pandas')
+            data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,sim_cosmol,snap_list[0])
+            
+            columns_to_keep = [col for col in data.columns if col != target_column[0]]
+            X_df = data[columns_to_keep]
+            y_df = data[target_column]
+            
+            feature_columns = get_feature_labels(features,all_tdyn_steps)
+            preds_ML = make_preds(client, bst, data[feature_columns])
+                
+            X_df = X_df.to_backend('pandas')
+            y_df = y_df.to_backend('pandas')
+            
+            r_test = X_df["p_Scaled_radii"]
+            vr_test = X_df["p_Radial_vel"]
+            vphys = X_df["p_phys_vel"]
+            lnv2_test = np.log(vphys**2)
+            X_df["p_lnv2"] = lnv2_test
+            
+            mask_vr_neg = (vr_test < 0)
+            mask_vr_pos = ~mask_vr_neg
 
-        # new_columns = ["Current $r/R_{\mathrm{200m}}$","Current $v_{\mathrm{r}}/V_{\mathrm{200m}}$","Current $v_{\mathrm{t}}/V_{\mathrm{200m}}$","Past $r/R_{\mathrm{200m}}$","Past $v_{\mathrm{r}}/V_{\mathrm{200m}}$","Past $v_{\mathrm{t}}/V_{\mathrm{200m}}$"]
-        # col2num = {col: i for i, col in enumerate(new_columns)}
-        # order = list(map(col2num.get, new_columns))
-        
-        r_test = X_df["p_Scaled_radii"]
-        vr_test = X_df["p_Radial_vel"]
-        vphys = X_df["p_phys_vel"]
-        lnv2_test = np.log(vphys**2)
-        X_df["p_lnv2"] = lnv2_test
-        
-        mask_vr_neg = (vr_test < 0)
-        mask_vr_pos = ~mask_vr_neg
+            ke_fastparam_dict = load_pickle(fast_model_fldr_loc + "ke_fastparams_dict.pickle")        
+            fast_mask_orb, preds_fast_ke = fast_ke_predictor(ke_fastparam_dict,r_test.compute().to_numpy(),vr_test.compute().to_numpy(),lnv2_test.compute().to_numpy(),r_cut_calib)
+            
+            sparta_name, sparta_search_name = split_sparta_hdf5_name(curr_test_sims[0])
+            curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5" 
+            
+            param_paths = [["config","anl_prf","r_bins_lin"]]
+            sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, pickle_data=pickle_data)
+            bins = sparta_params[sparta_param_names[0]]
+            bins = np.insert(bins, 0, 0)
+            
+            preds_opt_ke = opt_ke_predictor(opt_param_dict, bins, r_test.compute().to_numpy(), vr_test.compute().to_numpy(), lnv2_test.compute().to_numpy(), r_cut_calib)       
+            
+            y_df = y_df.values.compute().squeeze()
+            X_df = X_df.compute()
+            
+            param_path = fast_model_fldr_loc + "ke_fastparams_dict.pickle"
+            ke_param_dict = load_pickle(param_path)      
+            
+            bin_indices = np.digitize(X_df["p_Scaled_radii"], bins) - 1  # subtract 1 to make bins zero-indexed
 
-        ke_fastparam_dict = load_pickle(fast_model_fldr_loc + "ke_fastparams_dict.pickle")        
-        fast_mask_orb, preds_fast_ke = fast_ke_predictor(ke_fastparam_dict,r_test.compute().to_numpy(),vr_test.compute().to_numpy(),lnv2_test.compute().to_numpy(),r_cut_calib)
+            # Step 2: Initialize counters
+            num_bins = len(bins) - 1
+            sparta_orbiting_counts = np.zeros(num_bins)
+            sparta_infalling_counts = np.zeros(num_bins)
+            ml_orbiting_counts = np.zeros(num_bins)
+            ml_infalling_counts = np.zeros(num_bins)
+            fast_ke_orbiting_counts = np.zeros(num_bins)
+            fast_ke_infalling_counts = np.zeros(num_bins)
+            opt_ke_orbiting_counts = np.zeros(num_bins)
+            opt_ke_infalling_counts = np.zeros(num_bins)
         
-        sparta_name, sparta_search_name = split_sparta_hdf5_name(curr_test_sims[0])
-        curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5" 
-        
-        param_paths = [["config","anl_prf","r_bins_lin"]]
-        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, pickle_data=pickle_data)
-        bins = sparta_params[sparta_param_names[0]]
-        bins = np.insert(bins, 0, 0)
-        
-        preds_opt_ke = opt_ke_predictor(opt_param_dict, bins, r_test.compute().to_numpy(), vr_test.compute().to_numpy(), lnv2_test.compute().to_numpy(), r_cut_calib)       
-        
-        y_df = y_df.values.compute().squeeze()
-        X_df = X_df.compute()
-        
-        param_path = fast_model_fldr_loc + "ke_fastparams_dict.pickle"
-        ke_param_dict = load_pickle(param_path)      
-        
-        bin_indices = np.digitize(X_df["p_Scaled_radii"], bins) - 1  # subtract 1 to make bins zero-indexed
+            for i in range(num_bins):
+                in_bin = bin_indices == i
+                sparta_orbiting_counts[i] = np.sum(y_df[in_bin] == 1)
+                sparta_infalling_counts[i] = np.sum(y_df[in_bin] == 0)
+                ml_orbiting_counts[i] = np.sum(preds_ML[in_bin] == 1)
+                ml_infalling_counts[i] = np.sum(preds_ML[in_bin] == 0)
+                fast_ke_orbiting_counts[i] = np.sum(preds_fast_ke[in_bin] == 1)
+                fast_ke_infalling_counts[i] = np.sum(preds_fast_ke[in_bin] == 0)
+                opt_ke_orbiting_counts[i] = np.sum(preds_opt_ke[in_bin] == 1)
+                opt_ke_infalling_counts[i] = np.sum(preds_opt_ke[in_bin] == 0)
 
-        # Step 2: Initialize counters
-        num_bins = len(bins) - 1
-        sparta_orbiting_counts = np.zeros(num_bins)
-        sparta_infalling_counts = np.zeros(num_bins)
-        ml_orbiting_counts = np.zeros(num_bins)
-        ml_infalling_counts = np.zeros(num_bins)
-        fast_ke_orbiting_counts = np.zeros(num_bins)
-        fast_ke_infalling_counts = np.zeros(num_bins)
-        opt_ke_orbiting_counts = np.zeros(num_bins)
-        opt_ke_infalling_counts = np.zeros(num_bins)
-    
-        for i in range(num_bins):
-            in_bin = bin_indices == i
-            sparta_orbiting_counts[i] = np.sum(y_df[in_bin] == 1)
-            sparta_infalling_counts[i] = np.sum(y_df[in_bin] == 0)
-            ml_orbiting_counts[i] = np.sum(preds_ML[in_bin] == 1)
-            ml_infalling_counts[i] = np.sum(preds_ML[in_bin] == 0)
-            fast_ke_orbiting_counts[i] = np.sum(preds_fast_ke[in_bin] == 1)
-            fast_ke_infalling_counts[i] = np.sum(preds_fast_ke[in_bin] == 0)
-            opt_ke_orbiting_counts[i] = np.sum(preds_opt_ke[in_bin] == 1)
-            opt_ke_infalling_counts[i] = np.sum(preds_opt_ke[in_bin] == 0)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                sparta_ratio = np.where(sparta_infalling_counts > 0, sparta_orbiting_counts / (sparta_infalling_counts + sparta_orbiting_counts), np.nan)
+                ml_ratio = np.where(ml_infalling_counts > 0, ml_orbiting_counts / (ml_infalling_counts + ml_orbiting_counts), np.nan)
+                fast_ke_ratio = np.where(fast_ke_infalling_counts > 0, fast_ke_orbiting_counts / (fast_ke_infalling_counts + fast_ke_orbiting_counts), np.nan)
+                opt_ke_ratio = np.where(opt_ke_infalling_counts > 0, opt_ke_orbiting_counts / (opt_ke_infalling_counts + opt_ke_orbiting_counts), np.nan)
 
-        with np.errstate(divide='ignore', invalid='ignore'):
-            sparta_ratio = np.where(sparta_infalling_counts > 0, sparta_orbiting_counts / (sparta_infalling_counts + sparta_orbiting_counts), np.nan)
-            ml_ratio = np.where(ml_infalling_counts > 0, ml_orbiting_counts / (ml_infalling_counts + ml_orbiting_counts), np.nan)
-            fast_ke_ratio = np.where(fast_ke_infalling_counts > 0, fast_ke_orbiting_counts / (fast_ke_infalling_counts + fast_ke_orbiting_counts), np.nan)
-            opt_ke_ratio = np.where(opt_ke_infalling_counts > 0, opt_ke_orbiting_counts / (opt_ke_infalling_counts + opt_ke_orbiting_counts), np.nan)
-
-        fig, ax = plt.subplots(1, figsize=(10,5))
-        ax.plot(bins[1:], sparta_ratio, label='SPARTA Classification')
-        ax.plot(bins[1:], fast_ke_ratio, label='Fast KE Cut Classification')
-        ax.plot(bins[1:], opt_ke_ratio, label='Optimized KE Cut Classification')
-        ax.plot(bins[1:], ml_ratio, label='ML Classification')     
-      
-        legend_fntsize = 14
-        axis_fntsize = 18
-        tick_fntsize = 14
-        ax.legend(fontsize=legend_fntsize, loc="upper right")
-        ax.set_xlabel(r"$r/R_{\rm 200m}$",fontsize=axis_fntsize)
-        ax.set_ylabel(r"$N_{\rm orb}/N_{\rm tot}$",fontsize=axis_fntsize)
-        ax.set_xlim(0,3)
-        ax.set_ylim(0,1)
-        ax.tick_params(axis='both', labelsize=tick_fntsize, length=6,width=2, direction="in")
+            fig, ax = plt.subplots(1, figsize=(10,5))
+            ax.plot(bins[1:], sparta_ratio, label='SPARTA Classification')
+            ax.plot(bins[1:], fast_ke_ratio, label='Fast KE Cut Classification')
+            ax.plot(bins[1:], opt_ke_ratio, label='Optimized KE Cut Classification')
+            ax.plot(bins[1:], ml_ratio, label='ML Classification')     
         
-        fig.savefig(debug_plt_path + test_comb_name + "_forb_by_rad.png",dpi=400)
-        
+            legend_fntsize = 14
+            axis_fntsize = 18
+            tick_fntsize = 14
+            ax.legend(fontsize=legend_fntsize, loc="upper right")
+            ax.set_xlabel(r"$r/R_{\rm 200m}$",fontsize=axis_fntsize)
+            ax.set_ylabel(r"$N_{\rm orb}/N_{\rm tot}$",fontsize=axis_fntsize)
+            ax.set_xlim(0,3)
+            ax.set_ylim(0,1)
+            ax.tick_params(axis='both', labelsize=tick_fntsize, length=6,width=2, direction="in")
+            
+            fig.savefig(debug_plt_path + test_comb_name + "_forb_by_rad.png",dpi=400)
+            
