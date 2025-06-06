@@ -208,8 +208,7 @@ def adjust_frac_hist(hist_data, inf_data, orb_data, max_value, min_value):
     return hist_data
 
 def gen_ptl_dist_col(x_param, y_param, act_labels, split_scale_dict, ptl_lim_dict, split_x=False, split_y=False):
-    linthrsh = split_scale_dict["linthrsh"]
-    # The default number of bins is assuming there is no log split and that all bins are linear
+    # The default number of bins is assuming there is no log split and that all bins are linear (histogram will adjust the bins if log are required)
     lin_nbin = split_scale_dict["lin_nbin"]
     def_bins = [lin_nbin,lin_nbin]
     
@@ -262,7 +261,7 @@ def gen_ptl_dist_col(x_param, y_param, act_labels, split_scale_dict, ptl_lim_dic
 # Example entry in the list, pass empty strings if you don't wish for labels or titles to be shown. By default x labels are only shown on the bottom row and y labels for every one: 
 # {"x": "p_r", "y": "p_rv", "split_x": False, "split_y": True, "x_label":"$r/R_{200m}$", "y_label":"$v_r/v_{200m}$","title":"Current Snapshot", "x_ticks"=[0,0.5,1,2,3,4], "y_ticks"=[-12,-6,-3,-2,-1,0,1,2,3,6,12]}
 # For the ticks include both lin and log and positive and negative if that is what you wish to display
-def gen_ptl_dist_plt(p_act_labels, split_scale_dict, save_loc, data_dict = {}, plot_combo_list = [], \
+def gen_ptl_dist_plt(act_labels, split_scale_dict, save_loc, data_dict = {}, plot_combo_list = [], \
     ptl_lim_dict = {"act_min_ptl":10,"set_ptl":0,"scale_min_ptl":1e-4,"max_frac_ptl":3.5,"min_frac_ptl":-3.5}, save_title=""):
     with timed("Full Ptl Dist Plot"):
         linthrsh = split_scale_dict["linthrsh"]
@@ -305,7 +304,7 @@ def gen_ptl_dist_plt(p_act_labels, split_scale_dict, save_loc, data_dict = {}, p
             x_param = data_dict[plot_combo["x"]]
             y_param = data_dict[plot_combo["y"]]
             
-            all_fhist, inf_fhist, orb_fhist, hist_frac = gen_ptl_dist_col(x_param, y_param, p_act_labels, split_scale_dict, ptl_lim_dict, plot_combo["split_x"], plot_combo["split_y"])
+            all_fhist, inf_fhist, orb_fhist, hist_frac = gen_ptl_dist_col(x_param, y_param, act_labels, split_scale_dict, ptl_lim_dict, plot_combo["split_x"], plot_combo["split_y"])
             all_max_ptls.append(np.nanmax(all_fhist["hist"]))
 
             if i == 0:
@@ -345,135 +344,99 @@ def gen_ptl_dist_plt(p_act_labels, split_scale_dict, save_loc, data_dict = {}, p
         fig.savefig(save_loc + "ptl_distr" + save_title + ".png")
         plt.close()
 
-#TODO create general function for any number of snaps. or input what you want to plot across snaps?]
-def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_dict, save_loc, model_info,dataset_name):
-    with timed("Miss Class Dist Plot"):
+def gen_missclass_col(x_param, y_param, inc_inf_fltr, inc_orb_fltr, act_labels, split_scale_dict, ptl_lim_dict, split_x=False, split_y=False):
+    # The default number of bins is assuming there is no log split and that all bins are linear (histogram will adjust the bins if log are required)
+    lin_nbin = split_scale_dict["lin_nbin"]
+    def_bins = [lin_nbin,lin_nbin]
+    
+    inc_inf_x_param = x_param[inc_inf_fltr]
+    inc_orb_x_param = x_param[inc_orb_fltr]
+    inc_inf_y_param = y_param[inc_inf_fltr]
+    inc_orb_y_param = y_param[inc_orb_fltr]
+    
 
-        linthrsh = split_scale_dict["linthrsh"]
-        # The default number of bins is assuming there is no log split and that all bins are linear
-        lin_nbin = split_scale_dict["lin_nbin"]
-        def_bins = [lin_nbin,lin_nbin]
+    act_inf_x_param, act_orb_x_param = split_orb_inf(x_param, act_labels)
+    act_inf_y_param, act_orb_y_param = split_orb_inf(y_param, act_labels)
+    
+    x_param_range = [np.nanmin(x_param),np.nanmax(x_param)]
+    y_param_range = [np.nanmin(y_param),np.nanmax(y_param)]
+    
+    if split_x:
+        split_xscale_dict = split_scale_dict
+    else:
+        split_xscale_dict = None
+    if split_y:
+        split_yscale_dict = split_scale_dict
+    else:
+        split_yscale_dict = None
+    
+    # Create histograms for all particles and then for the incorrect particles
+    # Use the binning from all particles for the orbiting and infalling plots and the secondary snap to keep it consistent
+    act_all_fhist = histogram(x_param,y_param,use_bins=def_bins,hist_range=[x_param_range,y_param_range],min_ptl=ptl_lim_dict["act_min_ptl"],set_ptl=ptl_lim_dict["act_set_ptl"],split_xscale_dict=split_xscale_dict,split_yscale_dict=split_yscale_dict)
+    act_inf_fhist = histogram(act_inf_x_param,act_inf_y_param,use_bins=[act_all_fhist["x_edge"],act_all_fhist["y_edge"]],hist_range=[x_param_range,y_param_range],min_ptl=ptl_lim_dict["act_min_ptl"],set_ptl=ptl_lim_dict["act_set_ptl"],split_xscale_dict=split_xscale_dict,split_yscale_dict=split_yscale_dict)
+    act_orb_fhist = histogram(act_orb_x_param,act_orb_y_param,use_bins=[act_all_fhist["x_edge"],act_all_fhist["y_edge"]],hist_range=[x_param_range,y_param_range],min_ptl=ptl_lim_dict["act_min_ptl"],set_ptl=ptl_lim_dict["act_set_ptl"],split_xscale_dict=split_xscale_dict,split_yscale_dict=split_yscale_dict)
+    inc_inf_fhist = histogram(inc_inf_x_param,inc_inf_y_param,use_bins=[act_all_fhist["x_edge"],act_all_fhist["y_edge"]],hist_range=[x_param_range,y_param_range],min_ptl=ptl_lim_dict["act_min_ptl"],set_ptl=ptl_lim_dict["act_set_ptl"],split_xscale_dict=split_xscale_dict,split_yscale_dict=split_yscale_dict)
+    inc_orb_fhist = histogram(inc_orb_x_param,inc_orb_y_param,use_bins=[act_all_fhist["x_edge"],act_all_fhist["y_edge"]],hist_range=[x_param_range,y_param_range],min_ptl=ptl_lim_dict["act_min_ptl"],set_ptl=ptl_lim_dict["act_set_ptl"],split_xscale_dict=split_xscale_dict,split_yscale_dict=split_yscale_dict)
 
-        p_r_range = [np.min(p_r),np.max(p_r)]
-        p_rv_range = [np.min(p_rv),np.max(p_rv)]
-        p_tv_range = [np.min(p_tv),np.max(p_tv)]
+    inc_all_fhist = {
+        "hist":inc_inf_fhist["hist"] + inc_orb_fhist["hist"],
+        "x_edge":act_all_fhist["x_edge"],
+        "y_edge":act_all_fhist["y_edge"]
+    }
+
+    scale_inc_all_fhist = scale_hists(inc_all_fhist,act_all_fhist,act_min=ptl_lim_dict["act_min_ptl"],inc_min=ptl_lim_dict["inc_min_ptl"])
+    scale_inc_inf_fhist = scale_hists(inc_inf_fhist,act_inf_fhist,act_min=ptl_lim_dict["act_min_ptl"],inc_min=ptl_lim_dict["inc_min_ptl"])    
+    scale_inc_orb_fhist = scale_hists(inc_orb_fhist,act_orb_fhist,act_min=ptl_lim_dict["act_min_ptl"],inc_min=ptl_lim_dict["inc_min_ptl"])
+
+    return scale_inc_all_fhist, scale_inc_inf_fhist, scale_inc_orb_fhist
         
-        inc_min_ptl = 1e-4
-        act_min_ptl = 10
-        act_set_ptl = 0
-
+# Same as ptl_dist_plt except plotting the misclassificaiton information but info passed in same way
+# Pass all the data in a dictionary to allow for reuse and general number of plots.
+# Then pass in plot_combos a list of dictionaries of the keys to the data_dict of what you want plotted (left to right order for plotting)
+# and whether there should be splits in the scales (boolean value for "split_x" and "split_y") and any labels/titles
+# Example entry in the list, pass empty strings if you don't wish for labels or titles to be shown. By default x labels are only shown on the bottom row and y labels for every one: 
+# {"x": "p_r", "y": "p_rv", "split_x": False, "split_y": True, "x_label":"$r/R_{200m}$", "y_label":"$v_r/v_{200m}$","title":"Current Snapshot", "x_ticks"=[0,0.5,1,2,3,4], "y_ticks"=[-12,-6,-3,-2,-1,0,1,2,3,6,12]}
+# For the ticks include both lin and log and positive and negative if that is what you wish to display
+def gen_missclass_dist_plt(act_labels, pred_labels, split_scale_dict, save_loc, model_info, dset_name, data_dict = {}, plot_combo_list = [], \
+    ptl_lim_dict = {"inc_min_ptl": 1e-4,"act_min_ptl": 10,"act_set_ptl": 0,}, save_title=""):
+    with timed("Missclass Dist Plot"):
         # inc_inf: particles that are actually infalling but labeled as orbiting
         # inc_orb: particles that are actually orbiting but labeled as infalling
-        inc_inf = np.where((p_ml_labels == 1) & (p_corr_labels == 0))[0]
-        inc_orb = np.where((p_ml_labels == 0) & (p_corr_labels == 1))[0]
-        num_inf = np.where(p_corr_labels == 0)[0].shape[0]
-        num_orb = np.where(p_corr_labels == 1)[0].shape[0]
-        tot_num_inc = inc_orb.shape[0] + inc_inf.shape[0]
+        inc_inf_fltr = np.where((pred_labels == 1) & (act_labels == 0))[0]
+        inc_orb_fltr = np.where((pred_labels == 0) & (act_labels == 1))[0]
+        num_inf = np.where(act_labels == 0)[0].shape[0]
+        num_orb = np.where(act_labels == 1)[0].shape[0]
+        tot_num_inc = inc_orb_fltr.shape[0] + inc_inf_fltr.shape[0]
         tot_num_ptl = num_orb + num_inf
 
         missclass_dict = {
             "Total Num of Particles": tot_num_ptl,
-            "Num Incorrect Infalling Particles": str(inc_inf.shape[0])+", "+str(np.round(((inc_inf.shape[0]/num_inf)*100),2))+"% of infalling ptls",
-            "Num Incorrect Orbiting Particles": str(inc_orb.shape[0])+", "+str(np.round(((inc_orb.shape[0]/num_orb)*100),2))+"% of orbiting ptls",
+            "Num Incorrect Infalling Particles": str(inc_inf_fltr.shape[0])+", "+str(np.round(((inc_inf_fltr.shape[0]/num_inf)*100),2))+"% of infalling ptls",
+            "Num Incorrect Orbiting Particles": str(inc_orb_fltr.shape[0])+", "+str(np.round(((inc_orb_fltr.shape[0]/num_orb)*100),2))+"% of orbiting ptls",
             "Num Incorrect All Particles": str(tot_num_inc)+", "+str(np.round(((tot_num_inc/tot_num_ptl)*100),2))+"% of all ptls",
         }
         
         if "Results" not in model_info:
             model_info["Results"] = {}
         
-        if dataset_name not in model_info["Results"]:
-            model_info["Results"][dataset_name]={}
-        model_info["Results"][dataset_name]["Primary Snap"] = missclass_dict
+        if dset_name not in model_info["Results"]:
+            model_info["Results"][dset_name]={}
+        model_info["Results"][dset_name]["Primary Snap"] = missclass_dict
         
-        inc_inf_p_r = p_r[inc_inf]
-        inc_orb_p_r = p_r[inc_orb]
-        inc_inf_p_rv = p_rv[inc_inf]
-        inc_orb_p_rv = p_rv[inc_orb]
-        inc_inf_p_tv = p_tv[inc_inf]
-        inc_orb_p_tv = p_tv[inc_orb]
-        inc_inf_c_r = c_r[inc_inf]
-        inc_orb_c_r = c_r[inc_orb]
-        inc_inf_c_rv = c_rv[inc_inf]
-        inc_orb_c_rv = c_rv[inc_orb]
+        linthrsh = split_scale_dict["linthrsh"]
 
-        act_inf_p_r, act_orb_p_r = split_orb_inf(p_r, p_corr_labels)
-        act_inf_p_rv, act_orb_p_rv = split_orb_inf(p_rv, p_corr_labels)
-        act_inf_p_tv, act_orb_p_tv = split_orb_inf(p_tv, p_corr_labels)
-        act_inf_c_r, act_orb_c_r = split_orb_inf(c_r, p_corr_labels)
-        act_inf_c_rv, act_orb_c_rv = split_orb_inf(c_rv, p_corr_labels)
+        n_col = len(plot_combo_list)
         
-        # Create histograms for all particles and then for the incorrect particles
-        # Use the binning from all particles for the orbiting and infalling plots and the secondary snap to keep it consistent
-        act_all_p_r_p_rv = histogram(p_r,p_rv,use_bins=def_bins,hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
-        act_all_p_r_p_tv = histogram(p_r,p_tv,use_bins=def_bins,hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
-        act_all_p_rv_p_tv = histogram(p_rv,p_tv,use_bins=def_bins,hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
-        act_all_c_r_c_rv = histogram(c_r,c_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
-        
-        act_inf_p_r_p_rv = histogram(act_inf_p_r,act_inf_p_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
-        act_inf_p_r_p_tv = histogram(act_inf_p_r,act_inf_p_tv,use_bins=[act_all_p_r_p_tv["x_edge"],act_all_p_r_p_tv["y_edge"]],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
-        act_inf_p_rv_p_tv = histogram(act_inf_p_rv,act_inf_p_tv,use_bins=[act_all_p_rv_p_tv["x_edge"],act_all_p_rv_p_tv["y_edge"]],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
-        act_inf_c_r_c_rv = histogram(act_inf_c_r,act_inf_c_rv,use_bins=[act_all_c_r_c_rv["x_edge"],act_all_c_r_c_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
-        
-        act_orb_p_r_p_rv = histogram(act_orb_p_r,act_orb_p_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
-        act_orb_p_r_p_tv = histogram(act_orb_p_r,act_orb_p_tv,use_bins=[act_all_p_r_p_tv["x_edge"],act_all_p_r_p_tv["y_edge"]],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
-        act_orb_p_rv_p_tv = histogram(act_orb_p_rv,act_orb_p_tv,use_bins=[act_all_p_rv_p_tv["x_edge"],act_all_p_rv_p_tv["y_edge"]],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
-        act_orb_c_r_c_rv = histogram(act_orb_c_r,act_orb_c_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
-            
-        inc_inf_p_r_p_rv = histogram(inc_inf_p_r,inc_inf_p_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
-        inc_inf_p_r_p_tv = histogram(inc_inf_p_r,inc_inf_p_tv,use_bins=[act_all_p_r_p_tv["x_edge"],act_all_p_r_p_tv["y_edge"]],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
-        inc_inf_p_rv_p_tv = histogram(inc_inf_p_rv,inc_inf_p_tv,use_bins=[act_all_p_rv_p_tv["x_edge"],act_all_p_rv_p_tv["y_edge"]],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
-        inc_inf_c_r_c_rv = histogram(inc_inf_c_r,inc_inf_c_rv,use_bins=[act_all_c_r_c_rv["x_edge"],act_all_c_r_c_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
-        
-        inc_orb_p_r_p_rv = histogram(inc_orb_p_r,inc_orb_p_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
-        inc_orb_p_r_p_tv = histogram(inc_orb_p_r,inc_orb_p_tv,use_bins=[act_all_p_r_p_tv["x_edge"],act_all_p_r_p_tv["y_edge"]],hist_range=[p_r_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
-        inc_orb_p_rv_p_tv = histogram(inc_orb_p_rv,inc_orb_p_tv,use_bins=[act_all_p_rv_p_tv["x_edge"],act_all_p_rv_p_tv["y_edge"]],hist_range=[p_rv_range,p_tv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_xscale_dict=split_scale_dict,split_yscale_dict=split_scale_dict)
-        inc_orb_c_r_c_rv = histogram(inc_orb_c_r,inc_orb_c_rv,use_bins=[act_all_p_r_p_rv["x_edge"],act_all_p_r_p_rv["y_edge"]],hist_range=[p_r_range,p_rv_range],min_ptl=act_min_ptl,set_ptl=act_set_ptl,split_yscale_dict=split_scale_dict)
-
-        
-        inc_all_p_r_p_rv = {
-            "hist":inc_inf_p_r_p_rv["hist"] + inc_orb_p_r_p_rv["hist"],
-            "x_edge":act_all_p_r_p_rv["x_edge"],
-            "y_edge":act_all_p_r_p_rv["y_edge"]
-        }
-        inc_all_p_r_p_tv = {
-            "hist":inc_inf_p_r_p_tv["hist"] + inc_orb_p_r_p_tv["hist"],
-            "x_edge":act_all_p_r_p_tv["x_edge"],
-            "y_edge":act_all_p_r_p_tv["y_edge"]
-        }
-        inc_all_p_rv_p_tv = {
-            "hist":inc_inf_p_rv_p_tv["hist"] + inc_orb_p_rv_p_tv["hist"],
-            "x_edge":act_all_p_rv_p_tv["x_edge"],
-            "y_edge":act_all_p_rv_p_tv["y_edge"]
-        }
-        inc_all_c_r_c_rv = {
-            "hist":inc_inf_c_r_c_rv["hist"] + inc_orb_c_r_c_rv["hist"],
-            "x_edge":act_all_c_r_c_rv["x_edge"],
-            "y_edge":act_all_c_r_c_rv["y_edge"]
-        }
-
-        scale_inc_all_p_r_p_rv = scale_hists(inc_all_p_r_p_rv,act_all_p_r_p_rv,act_min=act_min_ptl,inc_min=inc_min_ptl)
-        scale_inc_all_p_r_p_tv = scale_hists(inc_all_p_r_p_tv,act_all_p_r_p_tv,act_min=act_min_ptl,inc_min=inc_min_ptl)
-        scale_inc_all_p_rv_p_tv = scale_hists(inc_all_p_rv_p_tv,act_all_p_rv_p_tv,act_min=act_min_ptl,inc_min=inc_min_ptl)
-        scale_inc_all_c_r_c_rv = scale_hists(inc_all_c_r_c_rv,act_all_c_r_c_rv,act_min=act_min_ptl,inc_min=inc_min_ptl)
-        
-        scale_inc_inf_p_r_p_rv = scale_hists(inc_inf_p_r_p_rv,act_inf_p_r_p_rv,act_min=act_min_ptl,inc_min=inc_min_ptl)
-        scale_inc_inf_p_r_p_tv = scale_hists(inc_inf_p_r_p_tv,act_inf_p_r_p_tv,act_min=act_min_ptl,inc_min=inc_min_ptl)
-        scale_inc_inf_p_rv_p_tv = scale_hists(inc_inf_p_rv_p_tv,act_inf_p_rv_p_tv,act_min=act_min_ptl,inc_min=inc_min_ptl)
-        scale_inc_inf_c_r_c_rv = scale_hists(inc_inf_c_r_c_rv,act_inf_c_r_c_rv,act_min=act_min_ptl,inc_min=inc_min_ptl)
-        
-        scale_inc_orb_p_r_p_rv = scale_hists(inc_orb_p_r_p_rv,act_orb_p_r_p_rv,act_min=act_min_ptl,inc_min=inc_min_ptl)
-        scale_inc_orb_p_r_p_tv = scale_hists(inc_orb_p_r_p_tv,act_orb_p_r_p_tv,act_min=act_min_ptl,inc_min=inc_min_ptl)
-        scale_inc_orb_p_rv_p_tv = scale_hists(inc_orb_p_rv_p_tv,act_orb_p_rv_p_tv,act_min=act_min_ptl,inc_min=inc_min_ptl)
-        scale_inc_orb_c_r_c_rv = scale_hists(inc_orb_c_r_c_rv,act_orb_c_r_c_rv,act_min=act_min_ptl,inc_min=inc_min_ptl)
+        widths = [4] * n_col + [0.5]
+        heights = [0.15,4,4,4] # have extra row up top so there is space for the title
         
         magma_cmap = plt.get_cmap("magma")
         magma_cmap = LinearSegmentedColormap.from_list('magma_truncated', magma_cmap(np.linspace(0.15, 1, 256)))
         magma_cmap.set_under(color='black')
         magma_cmap.set_bad(color='black')
         
-        
         scale_miss_class_args = {
-                "vmin":inc_min_ptl,
+                "vmin":ptl_lim_dict["inc_min_ptl"],
                 "vmax":1,
                 "norm":"log",
                 "origin":"lower",
@@ -481,41 +444,35 @@ def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv,
                 "cmap":magma_cmap,
         }
         
-        r_ticks = split_scale_dict["lin_rticks"] + split_scale_dict["log_rticks"]
-        
-        rv_ticks = split_scale_dict["lin_rvticks"] + split_scale_dict["log_rvticks"]
-        rv_ticks = rv_ticks + [-x for x in rv_ticks if x != 0]
-        rv_ticks.sort()
-
-        tv_ticks = split_scale_dict["lin_tvticks"] + split_scale_dict["log_tvticks"]     
-        
-        widths = [4,4,4,4,.5]
-        heights = [0.12,4,4,4]
-        
-        fig = plt.figure(constrained_layout=True,figsize=(24,16))
+        fig = plt.figure(constrained_layout=True,figsize=(6*n_col,16))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
+            
+        for i,plot_combo in enumerate(plot_combo_list):
+            x_param = data_dict[plot_combo["x"]]
+            y_param = data_dict[plot_combo["y"]]
+            
+            scale_inc_all_fhist, scale_inc_inf_fhist, scale_inc_orb_fhist = gen_missclass_col(x_param, y_param, inc_inf_fltr, inc_orb_fltr, act_labels, split_scale_dict, ptl_lim_dict, plot_combo["split_x"], plot_combo["split_y"])
 
-        imshow_plot(fig.add_subplot(gs[1,0]),scale_inc_all_p_r_p_rv,y_label="$v_r/v_{200m}$",hide_xtick_labels=True,text="All Misclassified",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="S1",kwargs=scale_miss_class_args, title="Current Snapshot")
-        imshow_plot(fig.add_subplot(gs[1,1]),scale_inc_all_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="S2",kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[1,2]),scale_inc_all_p_rv_p_tv,hide_xtick_labels=True,hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="S3",kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[1,3]),scale_inc_all_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="S4",kwargs=scale_miss_class_args, title="Past Snapshot")
-
-        imshow_plot(fig.add_subplot(gs[2,0]),scale_inc_inf_p_r_p_rv,hide_xtick_labels=True,y_label="$v_r/v_{200m}$",text="Label: Orbit\nReal: Infall",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="S5",kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[2,1]),scale_inc_inf_p_r_p_tv,y_label="$v_t/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="S6",kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[2,2]),scale_inc_inf_p_rv_p_tv,hide_xtick_labels=True,hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="S7",kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[2,3]),scale_inc_inf_c_r_c_rv,y_label="$v_r/v_{200m}$",hide_xtick_labels=True,xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="S8",kwargs=scale_miss_class_args)
+            if i == 0:
+                text_all = "All Particles"
+                text_inf = "Infalling Particles"
+                text_orb = "Orbiting Particles"
+                text_frac = r"$N_{infalling} / N_{orbiting}$"
+            else:
+                text_all = ""
+                text_inf = ""
+                text_orb = ""
+                text_frac = ""
+            imshow_plot(fig.add_subplot(gs[1,i]),scale_inc_all_fhist,y_label=plot_combo["y_label"],hide_xtick_labels=True,text="All Misclassified",xticks=plot_combo["x_ticks"],yticks=plot_combo["y_ticks"],ylinthrsh=linthrsh,number="S"+str(i+1),kwargs=scale_miss_class_args, title=plot_combo["title"])
+            imshow_plot(fig.add_subplot(gs[2,i]),scale_inc_inf_fhist,hide_xtick_labels=True,y_label=plot_combo["y_label"],text="Label: Orbit\nReal: Infall",xticks=plot_combo["x_ticks"],yticks=plot_combo["y_ticks"],ylinthrsh=linthrsh,number="S"+str(i+5),kwargs=scale_miss_class_args)
+            imshow_plot(fig.add_subplot(gs[3,i]),scale_inc_orb_fhist,x_label=plot_combo["x_label"],y_label=plot_combo["y_label"],text="Label: Infall\nReal: Orbit",xticks=plot_combo["x_ticks"],yticks=plot_combo["y_ticks"],ylinthrsh=linthrsh,number="S"+str(i+9),kwargs=scale_miss_class_args)
         
-        imshow_plot(fig.add_subplot(gs[3,0]),scale_inc_orb_p_r_p_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",text="Label: Infall\nReal: Orbit",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="S9",kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[3,1]),scale_inc_orb_p_r_p_tv,x_label="$r/R_{200m}$",y_label="$v_t/v_{200m}$",xticks=r_ticks,yticks=tv_ticks,ylinthrsh=linthrsh,number="S10",kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[3,2]),scale_inc_orb_p_rv_p_tv,x_label="$v_r/v_{200m}$",hide_ytick_labels=True,xticks=rv_ticks,yticks=tv_ticks,xlinthrsh=linthrsh,ylinthrsh=linthrsh,number="S11",kwargs=scale_miss_class_args)
-        imshow_plot(fig.add_subplot(gs[3,3]),scale_inc_orb_c_r_c_rv,x_label="$r/R_{200m}$",y_label="$v_r/v_{200m}$",xticks=r_ticks,yticks=rv_ticks,ylinthrsh=linthrsh,number="S12",kwargs=scale_miss_class_args)
-        
-        color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=inc_min_ptl, vmax=1),cmap=magma_cmap), cax=plt.subplot(gs[1:,-1]))
+        color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=ptl_lim_dict["inc_min_ptl"], vmax=1),cmap=magma_cmap), cax=plt.subplot(gs[1:,-1]))
         color_bar.set_label(r"$N_{\mathrm{bin, inc}} / N_{\mathrm{bin, tot}}$",fontsize=22)
         color_bar.ax.tick_params(which="major",direction="in",labelsize=18,length=10,width=3)
         color_bar.ax.tick_params(which="minor",direction="in",labelsize=18,length=5,width=1.5)
         
-        fig.savefig(save_loc + "scaled_miss_class.png")
+        fig.savefig(save_loc + save_title + "scaled_miss_class.png")
         plt.close()
 
 def plot_log_vel(log_phys_vel,radii,labels,save_loc,split_scale_dict,add_line=[None,None],show_v200m=False,v200m=1.5):
@@ -968,21 +925,3 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
         else:
             plt.savefig(plot_loc + "log_" + title + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=400) 
         
-#  Creates the misclassification plot as seen in the paper with vr vs r, vt vs r, and vr vs vt for the primary snapshot and vr vs r for the secondary snapshots
-def paper_misclass(X,y,preds,use_sims,dst_type,all_tdyn_steps,split_scale_dict,plot_save_loc,model_info):
-    p_corr_labels=y.compute().values.flatten()
-    p_ml_labels=preds.values
-    p_r=X["p_Scaled_radii"].values.compute()
-    p_rv=X["p_Radial_vel"].values.compute()
-    p_tv=X["p_Tangential_vel"].values.compute()
-    c_r=X[str(all_tdyn_steps[0]) + "_Scaled_radii"].values.compute()
-    c_rv=X[str(all_tdyn_steps[0]) +"_Radial_vel"].values.compute()
-    
-     # Dataset name is used to save to model info the misclassification rates
-    curr_sim_name = ""
-    for sim in use_sims:
-        curr_sim_name += sim
-        curr_sim_name += "_"
-    curr_sim_name += dst_type
-    plot_miss_class_dist(p_corr_labels=p_corr_labels,p_ml_labels=p_ml_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,split_scale_dict=split_scale_dict,save_loc=plot_save_loc,model_info=model_info,dataset_name=curr_sim_name)
-    
