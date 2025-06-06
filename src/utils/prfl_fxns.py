@@ -12,7 +12,7 @@ from matplotlib.legend_handler import HandlerTuple
 from .util_fxns import load_SPARTA_data, load_pickle, load_config, get_comp_snap_info, timed, load_sparta_mass_prf
 from .calc_fxns import calc_rho, calc_mass_acc_rate, calc_t_dyn
 from .ML_fxns import split_sparta_hdf5_name
-from .misc_fxns import parse_ranges, set_cosmology
+from .util_fxns import parse_ranges, set_cosmology
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -614,10 +614,8 @@ def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol,split_scale_dict,pl
     prime_radii = X["p_Scaled_radii"].values.compute()
     calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=prime_radii, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, use_mp=True, all_z=all_z)
     my_mass_prf_all, my_mass_prf_orb, my_mass_prf_inf, my_nus, my_r200m = create_stack_mass_prf(sim_splits,radii=prime_radii, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=y.compute().values.flatten(), prf_bins=bins, use_mp=True, all_z=all_z)
+    
     # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
-    print(calc_mass_prf_all.shape)
-    print(act_mass_prf_all.shape)
-    print(all_idxs.shape)
     small_halo_fltr = np.isnan(calc_r200m)
     act_mass_prf_all[small_halo_fltr,:] = np.nan
     act_mass_prf_orb[small_halo_fltr,:] = np.nan
@@ -664,12 +662,13 @@ def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol,split_scale_dict,pl
             
     curr_halos_r200m_list = []
     past_halos_r200m_list = []
-    #TODO already load dset_params earlier in the file can I just do this earlier?
+    
     for i,sim in enumerate(use_sims):
         if i < len(use_sims) - 1:
             curr_idxs = all_idxs[sim_splits[i]:sim_splits[i+1]]
         else:
             curr_idxs = all_idxs[sim_splits[i]:]
+        # We reload dset_params as we need this information on a sim by sim basis and it doesn't take very long to load
         dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
         curr_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"][()]
         p_sparta_snap = dset_params["all_snap_info"]["prime_snap_info"]["sparta_snap"][()]
