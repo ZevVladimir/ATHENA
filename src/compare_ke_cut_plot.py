@@ -124,53 +124,52 @@ if __name__ == "__main__":
         mask_vr_pos = ~mask_vr_neg
 
         ke_fastparam_dict = load_pickle(fast_model_fldr_loc + "ke_fastparams_dict.pickle")
-    
-        #TODO rename simp to fast
-        simp_mask_orb, preds_simp_ke = fast_ke_predictor(ke_fastparam_dict,r_test,vr_test,lnv2_test,r_cut_calib)
+
+        fast_mask_orb, preds_fast_ke = fast_ke_predictor(ke_fastparam_dict,r_test,vr_test,lnv2_test,r_cut_calib)
         
-        preds_fit_ke = opt_ke_predictor(opt_param_dict, bins, r_test, vr_test, lnv2_test, r_cut_calib)
+        preds_opt_ke = opt_ke_predictor(opt_param_dict, bins, r_test, vr_test, lnv2_test, r_cut_calib)
         
-        fit_calc_mass_prf_all, fit_calc_mass_prf_orb, fit_calc_mass_prf_inf, fit_calc_nus, fit_calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds_fit_ke, prf_bins=bins, use_mp=True, all_z=all_z)
-        simp_calc_mass_prf_all, simp_calc_mass_prf_orb, simp_calc_mass_prf_inf, simp_calc_nus, simp_calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds_simp_ke, prf_bins=bins, use_mp=True, all_z=all_z)
+        opt_calc_mass_prf_all, opt_calc_mass_prf_orb, opt_calc_mass_prf_inf, opt_calc_nus, opt_calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds_opt_ke, prf_bins=bins, use_mp=True, all_z=all_z)
+        fast_calc_mass_prf_all, fast_calc_mass_prf_orb, fast_calc_mass_prf_inf, fast_calc_nus, fast_calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds_fast_ke, prf_bins=bins, use_mp=True, all_z=all_z)
 
         # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
-        fit_small_halo_fltr = np.isnan(fit_calc_r200m)
-        act_mass_prf_orb[fit_small_halo_fltr,:] = np.nan
-        act_mass_prf_inf[fit_small_halo_fltr,:] = np.nan
+        opt_small_halo_fltr = np.isnan(opt_calc_r200m)
+        act_mass_prf_orb[opt_small_halo_fltr,:] = np.nan
+        act_mass_prf_inf[opt_small_halo_fltr,:] = np.nan
 
         # Calculate the density by divide the mass of each bin by the volume of that bin's radius
-        fit_calc_dens_prf_all = calc_rho(fit_calc_mass_prf_all*h,bins[1:],fit_calc_r200m*h,sim_splits,all_rhom)
-        fit_calc_dens_prf_orb = calc_rho(fit_calc_mass_prf_orb*h,bins[1:],fit_calc_r200m*h,sim_splits,all_rhom)
-        fit_calc_dens_prf_inf = calc_rho(fit_calc_mass_prf_inf*h,bins[1:],fit_calc_r200m*h,sim_splits,all_rhom)
+        opt_calc_dens_prf_all = calc_rho(opt_calc_mass_prf_all*h,bins[1:],opt_calc_r200m*h,sim_splits,all_rhom)
+        opt_calc_dens_prf_orb = calc_rho(opt_calc_mass_prf_orb*h,bins[1:],opt_calc_r200m*h,sim_splits,all_rhom)
+        opt_calc_dens_prf_inf = calc_rho(opt_calc_mass_prf_inf*h,bins[1:],opt_calc_r200m*h,sim_splits,all_rhom)
         
-        simp_calc_dens_prf_all = calc_rho(simp_calc_mass_prf_all*h,bins[1:],simp_calc_r200m*h,sim_splits,all_rhom)
-        simp_calc_dens_prf_orb = calc_rho(simp_calc_mass_prf_orb*h,bins[1:],simp_calc_r200m*h,sim_splits,all_rhom)
-        simp_calc_dens_prf_inf = calc_rho(simp_calc_mass_prf_inf*h,bins[1:],simp_calc_r200m*h,sim_splits,all_rhom)
+        fast_calc_dens_prf_all = calc_rho(fast_calc_mass_prf_all*h,bins[1:],fast_calc_r200m*h,sim_splits,all_rhom)
+        fast_calc_dens_prf_orb = calc_rho(fast_calc_mass_prf_orb*h,bins[1:],fast_calc_r200m*h,sim_splits,all_rhom)
+        fast_calc_dens_prf_inf = calc_rho(fast_calc_mass_prf_inf*h,bins[1:],fast_calc_r200m*h,sim_splits,all_rhom)
 
-        act_dens_prf_all = calc_rho(act_mass_prf_all*h,bins[1:],fit_calc_r200m*h,sim_splits,all_rhom)
-        act_dens_prf_orb = calc_rho(act_mass_prf_orb*h,bins[1:],fit_calc_r200m*h,sim_splits,all_rhom)
-        act_dens_prf_inf = calc_rho(act_mass_prf_inf*h,bins[1:],fit_calc_r200m*h,sim_splits,all_rhom)
+        act_dens_prf_all = calc_rho(act_mass_prf_all*h,bins[1:],opt_calc_r200m*h,sim_splits,all_rhom)
+        act_dens_prf_orb = calc_rho(act_mass_prf_orb*h,bins[1:],opt_calc_r200m*h,sim_splits,all_rhom)
+        act_dens_prf_inf = calc_rho(act_mass_prf_inf*h,bins[1:],opt_calc_r200m*h,sim_splits,all_rhom)
 
         # If we want the density profiles to only consist of halos of a specific peak height (nu) bin 
 
-        fit_orb_prf_lst = []
-        fit_inf_prf_lst = []
+        opt_orb_prf_lst = []
+        opt_inf_prf_lst = []
         
-        simp_orb_prf_lst = []
-        simp_inf_prf_lst = []
+        fast_orb_prf_lst = []
+        fast_inf_prf_lst = []
         cpy_plt_nu_splits = plt_nu_splits.copy()
         
         for i,nu_split in enumerate(cpy_plt_nu_splits):
             # Take the second element of the where to filter by the halos (?)
-            fit_fltr = np.where((fit_calc_nus > nu_split[0]) & (fit_calc_nus < nu_split[1]))[0]
-            simp_fltr = np.where((simp_calc_nus > nu_split[0]) & (simp_calc_nus < nu_split[1]))[0]
-            if fit_fltr.shape[0] > 25:
-                fit_orb_prf_lst.append(filter_prf(fit_calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fit_fltr))
-                fit_inf_prf_lst.append(filter_prf(fit_calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fit_fltr))
-            if simp_fltr.shape[0] > 25:
-                simp_orb_prf_lst.append(filter_prf(simp_calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,simp_fltr))
-                simp_inf_prf_lst.append(filter_prf(simp_calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,simp_fltr))
-            if fit_fltr.shape[0] < 25 and simp_fltr.shape[0] < 25:
+            opt_fltr = np.where((opt_calc_nus > nu_split[0]) & (opt_calc_nus < nu_split[1]))[0]
+            fast_fltr = np.where((fast_calc_nus > nu_split[0]) & (fast_calc_nus < nu_split[1]))[0]
+            if opt_fltr.shape[0] > 25:
+                opt_orb_prf_lst.append(filter_prf(opt_calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,opt_fltr))
+                opt_inf_prf_lst.append(filter_prf(opt_calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,opt_fltr))
+            if fast_fltr.shape[0] > 25:
+                fast_orb_prf_lst.append(filter_prf(fast_calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos,fast_fltr))
+                fast_inf_prf_lst.append(filter_prf(fast_calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fast_fltr))
+            if opt_fltr.shape[0] < 25 and fast_fltr.shape[0] < 25:
                 plt_nu_splits.remove(nu_split)     
 
-        compare_split_prfs_ke(plt_nu_splits,len(cpy_plt_nu_splits),fit_orb_prf_lst,fit_inf_prf_lst,simp_orb_prf_lst,simp_inf_prf_lst,bins[1:],lin_rticks,plot_loc)
+        compare_split_prfs_ke(plt_nu_splits,len(cpy_plt_nu_splits),opt_orb_prf_lst,opt_inf_prf_lst,fast_orb_prf_lst,fast_inf_prf_lst,bins[1:],lin_rticks,plot_loc)

@@ -256,7 +256,6 @@ def gen_ptl_dist_col(x_param, y_param, act_labels, split_scale_dict, ptl_lim_dic
     
     return all_fhist, inf_fhist, orb_fhist, hist_frac
 
-#TODO create general function for any number of snaps. or input what you want to plot across snaps?]
 # Pass all the data in a dictionary to allow for reuse and general number of plots.
 # Then pass in plot_combos a list of dictionaries of the keys to the data_dict of what you want plotted (left to right order for plotting)
 # and whether there should be splits in the scales (boolean value for "split_x" and "split_y") and any labels/titles
@@ -346,7 +345,7 @@ def gen_ptl_dist_plt(p_act_labels, split_scale_dict, save_loc, data_dict = {}, p
         fig.savefig(save_loc + "ptl_distr" + save_title + ".png")
         plt.close()
 
-
+#TODO create general function for any number of snaps. or input what you want to plot across snaps?]
 def plot_miss_class_dist(p_corr_labels, p_ml_labels, p_r, p_rv, p_tv, c_r, c_rv, split_scale_dict, save_loc, model_info,dataset_name):
     with timed("Miss Class Dist Plot"):
 
