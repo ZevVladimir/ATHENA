@@ -5,9 +5,8 @@ import pandas as pd
 import argparse
 
 from src.utils.ML_fxns import setup_client, get_combined_name, get_model_name, extract_snaps, make_preds, get_feature_labels
-from src.utils.save_load_fxns import create_directory, timed, load_pickle, save_pickle, load_config, load_ML_dsets
-from src.utils.dset_fxns import reform_dset_dfs
-from src.utils.prfl_fxns import paper_dens_prf
+from src.utils.util_fxns import create_directory, timed, load_pickle, save_pickle, load_config, load_ML_dsets,reform_dset_dfs
+from src.utils.prfl_fxns import paper_dens_prf_plt
 from src.utils.vis_fxns import paper_misclass, paper_ptl_dist
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -133,11 +132,11 @@ if __name__ == "__main__":
                 with timed(f"Predictions for {y.size.compute():.3e} particles"):
                     preds = make_preds(client, bst, X)
                 if dens_prf_plt:
-                    paper_dens_prf(X, y, preds, halo_df, curr_test_sims, sim_cosmol, split_scale_dict, plot_loc, split_by_nu=dens_prf_nu_split, split_by_macc=dens_prf_macc_split)
+                    paper_dens_prf_plt(X, y, preds, halo_df, curr_test_sims, sim_cosmol, split_scale_dict, plot_loc, split_by_nu=dens_prf_nu_split, split_by_macc=dens_prf_macc_split)
                 if full_dist_plt:
                     paper_ptl_dist(X, y, all_tdyn_steps, split_scale_dict, plot_loc)
                 if misclass_plt:
-                    paper_misclass(X, y, preds, curr_test_sims, dset_name, all_tdyn_steps, split_scale_dict, plot_loc)
+                    paper_misclass(X, y, preds, curr_test_sims, dset_name, all_tdyn_steps, split_scale_dict, plot_loc, model_info)
                 del data 
                 del X
                 del y

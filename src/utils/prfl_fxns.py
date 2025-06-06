@@ -9,7 +9,7 @@ from colossus.lss.peaks import peakHeight
 from colossus.halo.mass_so import M_to_R
 from matplotlib.legend_handler import HandlerTuple
 
-from .save_load_fxns import load_SPARTA_data, load_pickle, load_config, get_comp_snap_info, timed, load_sparta_mass_prf
+from .util_fxns import load_SPARTA_data, load_pickle, load_config, get_comp_snap_info, timed, load_sparta_mass_prf
 from .calc_fxns import calc_rho, calc_mass_acc_rate, calc_t_dyn
 from .ML_fxns import split_sparta_hdf5_name
 from .misc_fxns import parse_ranges, set_cosmology

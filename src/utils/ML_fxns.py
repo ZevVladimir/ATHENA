@@ -9,8 +9,8 @@ import re
 import pandas as pd
 import multiprocessing as mp
 
-from .save_load_fxns import load_config
-from .misc_fxns import split_sparta_hdf5_name, timed, parse_ranges
+from .util_fxns import load_config
+from .util_fxns import split_sparta_hdf5_name, timed, parse_ranges
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -220,6 +220,7 @@ def filter_ddf(X, y = None, preds = None, fltr_dic = None, col_names = None, max
                     full_filter = condition if full_filter is None else full_filter & condition
 
             X = X[full_filter]
+
         nrows = X.shape[0].compute()
             
         if nrows > max_size and max_size > 0:
@@ -233,8 +234,10 @@ def filter_ddf(X, y = None, preds = None, fltr_dic = None, col_names = None, max
         if col_names != None:
             X.columns = col_names
             
+        if full_filter is not None:
+            full_filter = full_filter.compute()
         # Return the filtered array and the indices of the original array that remain
-        return X.compute(),full_filter.compute()
+        return X.compute(),full_filter
   
 def filter_df(X, y=None, preds=None, fltr_dic=None, col_names=None, max_size=500, rand_seed=42):
     full_filter = pd.Series(True, index=X.index)

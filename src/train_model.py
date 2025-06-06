@@ -9,7 +9,7 @@ import os
 import numpy as np
 import argparse
 
-from src.utils.save_load_fxns import create_directory, timed, load_pickle, save_pickle, load_config, load_ML_dsets
+from src.utils.util_fxns import create_directory, timed, load_pickle, save_pickle, load_config, load_ML_dsets
 from src.utils.ML_fxns import setup_client, get_combined_name, extract_snaps, get_model_name, get_feature_labels
 
 ##################################################################################################################

@@ -6,10 +6,10 @@ import re
 import pandas as pd
 from sparta_tools import sparta
 
-from src.utils.ML_fxns import setup_client,get_combined_name,split_sparta_hdf5_name,make_preds, get_model_name
-from src.utils.save_load_fxns import create_directory,load_SPARTA_data,load_ptl_param, load_config, load_ML_dsets
+from src.utils.ML_fxns import setup_client,get_combined_name,make_preds, get_model_name
+from src.utils.util_fxns import create_directory,load_SPARTA_data,load_ptl_param, load_config, load_ML_dsets
 from src.utils.vis_fxns import plot_halo_slice_class
-from src.utils.dset_fxns import reform_dset_dfs
+from src.utils.util_fxns import reform_dset_dfs,split_sparta_hdf5_name
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
 config_params = load_config(os.getcwd() + "/config.ini")
@@ -126,7 +126,7 @@ if __name__ == "__main__":
 
     halo_df = pd.concat(halo_dfs)
     
-    data,scale_pos_weight = load_ML_dsets(client,test_sims[0],dset_name,limit_files=False)
+    data,scale_pos_weight = load_ML_dsets(client,test_sims[0],dset_name)
 
     X = data[feature_columns]
     y = data[target_column]

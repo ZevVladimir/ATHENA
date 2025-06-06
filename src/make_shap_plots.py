@@ -4,7 +4,7 @@ import xgboost as xgb
 
 import shap
 
-from src.utils.save_load_fxns import create_directory, timed, load_config, load_pickle, load_ML_dsets
+from src.utils.util_fxns import create_directory, timed, load_config, load_pickle, load_ML_dsets
 from src.utils.ML_fxns import setup_client, get_combined_name, make_preds, shap_with_filter, get_model_name, extract_snaps, get_feature_labels
 
 config_params = load_config(os.getcwd() + "/config.ini")
@@ -52,7 +52,7 @@ if __name__ == '__main__':
                 plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
                 create_directory(plot_loc)
                 all_snaps = extract_snaps(model_sims[0])
-                data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,sim_cosmol,all_snaps[0],limit_files=False)
+                data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,sim_cosmol,all_snaps[0])
                 
                 X_df = data[feature_columns]
                 y_df = data[target_column]
@@ -83,83 +83,6 @@ if __name__ == '__main__':
                 }
             }
             
-            orb_in_dict = {
-                'X_filter': {
-                    "p_Scaled_radii": ('<',0.2),
-                    "p_Radial_vel": [('<',0.6),('>',-0.6)]
-                },
-                'label_filter': {
-                    "sparta":1,
-                    "pred":0
-                }
-            }
-            
-            orb_out_dict = {
-                'X_filter': {
-                    "p_Scaled_radii": [('>',0.5),('<',1)],
-                    "p_Radial_vel": [('<',0.6),('>',0)]
-                },
-                'label_filter': {
-                    "sparta":1,
-                    "pred":0
-                }
-            }
-            
-            orb_bad_misclass_dict = {
-                'X_filter': {
-                    "p_Scaled_radii": [('>',0.3),('<',0.5)],
-                    "p_Radial_vel": [('<',0.6),('>',-0.6)]
-                },
-                'label_filter': {
-                    "sparta":1,
-                    "pred":0
-                }
-            }        
-            
-            orb_bad_corr_dict = {
-                'X_filter': {
-                    "p_Scaled_radii": [('>',0.3),('<',0.5)],
-                    "p_Radial_vel": [('<',0.6),('>',-0.6)]
-                },
-                'label_filter': {
-                    "sparta":1,
-                    "pred":1
-                }
-            }       
-            
-            in_btwn_dict = {
-                'X_filter': {
-                    "p_Scaled_radii": [('>',0.3),('<',0.5)],
-                    "p_Radial_vel": [('<',0.6),('>',-0.6)]
-                },
-            }
-            
-            test_dict = {
-                'label_filter':{
-                    "pred":1,
-                    "sparta":1,
-                    }
-            }
-            
-            # all_explainer = explainer(X_df.compute())
-            # all_shap_values = explainer.shap_values(X_df.compute())
-            
-            # no_second_X, no_second_fltr = filter_ddf(X_df,y_df,preds,fltr_dic=no_second_dict,col_names=new_columns,max_size=10000)
-            # no_second_shap = all_explainer[no_second_fltr]
-            # no_second_shap_values = all_shap_values[no_second_fltr]
-            # good_orb_in_shap,good_orb_in_shap_values = shap_with_filter(explainer,orb_in_dict,X_df,y_df,preds,new_columns)
-            # good_orb_out_shap,good_orb_out_shap_values = shap_with_filter(explainer,orb_out_dict,X_df,y_df,preds,new_columns)
-            # test_shap, test_vals, test_X = shap_with_filter(explainer,test_dict,X_df,y_df,preds,new_columns)
-            
-            # bad_orb_missclass_X,bad_orb_missclass_fltr = filter_ddf(X_df,y_df,preds,fltr_dic = orb_bad_misclass_dict,col_names=new_columns)
-            # bad_orb_missclass_shap = all_explainer[bad_orb_missclass_fltr]
-            # bad_orb_missclass_shap_values = all_shap_values[bad_orb_missclass_fltr]
-            
-            # bad_orb_corr_X,bad_orb_corr_fltr = filter_ddf(X_df,y_df,preds,fltr_dic=orb_bad_corr_dict,col_names=new_columns)
-            # bad_orb_corr_shap = all_explainer[bad_orb_corr_fltr]
-            # bad_orb_corr_shap_values = all_shap_values[bad_orb_corr_fltr]
-            # all_shap,all_shap_values, all_X = shap_with_filter(explainer,X=X_df,y=y_df,preds=preds,col_names=new_columns)
-            # in_btwn_shap,in_btwn_shap_values = shap_with_filter(explainer,in_btwn_dict,X_df,y_df,preds,new_columns,sample=0.0001)
     
             all_ptl_explnr, all_ptl_shap, all_ptl_X = shap_with_filter(explainer,X_df,y_df,preds,col_names=new_columns,max_size=5000)
             no_sec_explnr, no_sec_shap, no_sec_X = shap_with_filter(explainer,X_df,y_df,preds,fltr_dic=no_second_dict,col_names=new_columns,max_size=5000)
@@ -191,40 +114,5 @@ if __name__ == '__main__':
             ax2.set_xlim(combined_xlim)
             
             fig.savefig(plot_loc + "comb_shap.png")
-            print("finished combined shap plot")
-         
-
-        # widths = [4,4]
-        # heights = [4,4]
-        # fig_width = 75
-        # fig_height = 50
-        # fig = plt.figure(constrained_layout=True,figsize=(fig_width,fig_height))
-        # gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
-
-        # ax1 = fig.add_subplot(gs[0,0])
-        # ax2 = fig.add_subplot(gs[0,1])
-        # ax3 = fig.add_subplot(gs[1,0])
-        # ax4 = fig.add_subplot(gs[1,1])
-
-        # plt.sca(ax1)
-        # r=shap.decision_plot(expected_value, bad_orb_corr_shap_values,features=bad_orb_corr_X,feature_names=new_columns,plot_color="viridis",color_bar=False,auto_size_plot=False,show=False,feature_order=None,return_objects=True, hide_bot_label=True)
-        # plt.sca(ax2)
-        # shap.plots.beeswarm(bad_orb_corr_shap,plot_size=(fig_width/2,fig_height/2),show=False,order=order,hide_features=True, hide_xaxis=True)
-        # plt.sca(ax3)
-        # shap.decision_plot(expected_value, bad_orb_missclass_shap_values,features=bad_orb_missclass_X,feature_names=new_columns,plot_color="magma",color_bar=False,auto_size_plot=False,show=False,feature_order=None,xlim=r.xlim)
-        # plt.sca(ax4)
-        # shap.plots.beeswarm(bad_orb_missclass_shap,plot_size=(fig_width/2,fig_height/2),show=False,order=order,hide_features=True)
-        
-        # ax1.text(-15,0.25,"Orbiting Particles\nCorrectly Labeled",bbox={"facecolor":'white',"alpha":0.9,},fontsize=20)
-        # ax3.text(-15,0.25,"Orbiting Particles\nIncorrectly Labeled",bbox={"facecolor":'white',"alpha":0.9,},fontsize=20)
-        
-        # # Set it so the xlims for both beeswarms are the same
-        # xlim2 = ax2.get_xlim()
-        # xlim4 = ax4.get_xlim()
-        # new_xlim = (min(xlim2[0], xlim4[0]), max(xlim2[1], xlim4[1]))
-        # ax2.set_xlim(new_xlim)
-        # ax4.set_xlim(new_xlim)
-        
-        # fig.savefig(plot_loc + "vr_r_orb_middle_decision.png")
 
     

@@ -5,11 +5,11 @@ from scipy.spatial import KDTree
 import numpy as np
 from sparta_tools import sparta
 
-from src.utils.ML_fxns import get_combined_name,split_sparta_hdf5_name,get_model_name
+from src.utils.ML_fxns import get_combined_name,get_model_name
 from src.utils.vis_fxns import plot_halo_slice
-from src.utils.save_load_fxns import create_directory,load_SPARTA_data,timed,load_ptl_param,load_config
+from src.utils.util_fxns import create_directory,load_SPARTA_data,timed,load_ptl_param,load_config
 from src.utils.calc_fxns import calc_radius, nptl_inc_placement_r200m
-from src.utils.dset_fxns import reform_dset_dfs
+from src.utils.util_fxns import reform_dset_dfs,split_sparta_hdf5_name
 
 config_params = load_config(os.getcwd() + "/config.ini")
 

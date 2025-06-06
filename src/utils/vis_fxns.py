@@ -5,7 +5,7 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Circle
 import xgboost as xgb
 
-from .save_load_fxns import timed
+from .util_fxns import timed
 from .dset_fxns import split_orb_inf
 
 plt.rcParams['mathtext.fontset'] = 'dejavuserif'
@@ -1144,7 +1144,7 @@ def paper_ptl_dist(X,y,all_tdyn_steps,split_scale_dict,plot_save_loc):
     plot_full_ptl_dist(p_corr_labels=p_corr_labels,p_r=p_r,p_rv=p_rv,p_tv=p_tv,c_r=c_r,c_rv=c_rv,split_scale_dict=split_scale_dict,save_loc=plot_save_loc)
     
 #  Creates the misclassification plot as seen in the paper with vr vs r, vt vs r, and vr vs vt for the primary snapshot and vr vs r for the secondary snapshots
-def paper_misclass(X,y,preds,use_sims,dst_type,all_tdyn_steps,split_scale_dict,plot_save_loc):
+def paper_misclass(X,y,preds,use_sims,dst_type,all_tdyn_steps,split_scale_dict,plot_save_loc,model_info):
     p_corr_labels=y.compute().values.flatten()
     p_ml_labels=preds.values
     p_r=X["p_Scaled_radii"].values.compute()

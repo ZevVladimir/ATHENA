@@ -8,12 +8,11 @@ import scipy.ndimage as ndimage
 from sparta_tools import sparta
 
 from src.utils.calc_fxns import calc_rho, calc_mass_acc_rate
-from src.utils.ML_fxns import setup_client, get_combined_name, parse_ranges, split_sparta_hdf5_name, get_feature_labels, get_model_name, extract_snaps
-from src.utils.save_load_fxns import create_directory, timed, save_pickle, load_pickle, load_SPARTA_data, load_config, load_sparta_mass_prf
+from src.utils.ML_fxns import setup_client, get_combined_name, get_feature_labels, get_model_name, extract_snaps
+from src.utils.util_fxns import create_directory, timed, save_pickle, load_pickle, load_SPARTA_data, load_config, load_sparta_mass_prf
 from src.utils.ke_cut_fxns import load_ke_data, fast_ke_predictor
 from src.utils.prfl_fxns import create_stack_mass_prf, filter_prf, compare_split_prfs
-from src.utils.dset_fxns import reform_dset_dfs
-from src.utils.misc_fxns import set_cosmology, depair_np, conv_halo_id_spid
+from src.utils.util_fxns import set_cosmology, depair_np, conv_halo_id_spid, reform_dset_dfs, parse_ranges, split_sparta_hdf5_name
 
 config_params = load_config(os.getcwd() + "/config.ini")
 

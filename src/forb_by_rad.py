@@ -5,10 +5,10 @@ plt.rcParams.update({"text.usetex":True, "font.family": "serif", "figure.dpi": 3
 import os
 import xgboost as xgb
 
-from src.utils.ML_fxns import setup_client, get_combined_name, make_preds, parse_ranges, get_model_name, extract_snaps, get_feature_labels, split_sparta_hdf5_name
-from src.utils.save_load_fxns import create_directory, load_pickle, load_config, load_pickle, timed, load_SPARTA_data, load_ML_dsets
+from src.utils.ML_fxns import setup_client, get_combined_name, make_preds, get_model_name, extract_snaps, get_feature_labels
+from src.utils.util_fxns import create_directory, load_pickle, load_config, load_pickle, timed, load_SPARTA_data, load_ML_dsets
 from src.utils.ke_cut_fxns import fast_ke_predictor, opt_ke_predictor
-from src.utils.misc_fxns import set_cosmology
+from src.utils.util_fxns import set_cosmology, parse_ranges, split_sparta_hdf5_name
 
 config_params = load_config(os.getcwd() + "/config.ini")
 
@@ -100,7 +100,7 @@ if __name__ == "__main__":
 
         test_comb_name = get_combined_name(curr_test_sims) 
         
-        data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,sim_cosmol,snap_list[0],limit_files=False)
+        data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,sim_cosmol,snap_list[0])
         
         columns_to_keep = [col for col in data.columns if col != target_column[0]]
         X_df = data[columns_to_keep]

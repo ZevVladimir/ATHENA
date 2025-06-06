@@ -6,14 +6,13 @@ import os
 import pickle
 from sparta_tools import sparta
 
-from src.utils.ML_fxns import setup_client, get_combined_name, parse_ranges, split_sparta_hdf5_name, get_feature_labels, extract_snaps
-from src.utils.save_load_fxns import create_directory, load_pickle, load_config, save_pickle, load_pickle, timed, load_sparta_mass_prf, load_SPARTA_data
+from src.utils.ML_fxns import setup_client, get_combined_name, get_feature_labels, extract_snaps
+from src.utils.util_fxns import create_directory, load_pickle, load_config, save_pickle, load_pickle, timed, load_sparta_mass_prf, load_SPARTA_data
 from src.utils.ke_cut_fxns import load_ke_data, opt_ke_predictor
 from src.utils.vis_fxns import plt_SPARTA_KE_dist
 from src.utils.calc_fxns import calc_rho, calc_mass_acc_rate
 from src.utils.prfl_fxns import create_stack_mass_prf, filter_prf, compare_split_prfs
-from src.utils.dset_fxns import reform_dset_dfs
-from src.utils.misc_fxns import set_cosmology, conv_halo_id_spid
+from src.utils.util_fxns import set_cosmology, conv_halo_id_spid,reform_dset_dfs, parse_ranges, split_sparta_hdf5_name
 
 config_params = load_config(os.getcwd() + "/config.ini")
 

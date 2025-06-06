@@ -2,11 +2,11 @@ import numpy as np
 import os
 import pickle
 
-from src.utils.ML_fxns import setup_client, get_combined_name, parse_ranges, extract_snaps, get_feature_labels
-from src.utils.save_load_fxns import create_directory, load_pickle, load_config, load_pickle, timed, load_sparta_mass_prf
+from src.utils.ML_fxns import setup_client, get_combined_name, extract_snaps, get_feature_labels
+from src.utils.util_fxns import create_directory, load_pickle, load_config, load_pickle, timed, load_sparta_mass_prf
 from src.utils.ke_cut_fxns import load_ke_data, fast_ke_predictor, opt_ke_predictor
 from src.utils.calc_fxns import calc_rho
-from src.utils.misc_fxns import set_cosmology
+from src.utils.util_fxns import set_cosmology, parse_ranges
 from src.utils.prfl_fxns import create_stack_mass_prf, filter_prf, compare_split_prfs_ke
 
 config_params = load_config(os.getcwd() + "/config.ini")

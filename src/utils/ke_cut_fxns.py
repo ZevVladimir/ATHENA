@@ -4,7 +4,7 @@ import numpy as np
 from scipy.spatial import KDTree
 
 from .ML_fxns import split_sparta_hdf5_name
-from .save_load_fxns import load_pickle, load_SPARTA_data, load_config, load_ML_dsets
+from .util_fxns import load_pickle, load_SPARTA_data, load_config, load_ML_dsets
 from .dset_fxns import reform_dset_dfs
 from .misc_fxns import parse_ranges, depair_np, timed
 

@@ -13,11 +13,10 @@ import pandas as pd
 import psutil
 import argparse
 
-from src.utils.save_load_fxns import load_SPARTA_data, load_ptl_param, get_comp_snap_info, create_directory, load_pickle, save_pickle, load_config
+from src.utils.util_fxns import load_SPARTA_data, load_ptl_param, get_comp_snap_info, create_directory, load_pickle, save_pickle, load_config
 from src.utils.calc_fxns import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn, calc_rho, calc_halo_mem
 from src.utils.prfl_fxns import create_mass_prf, compare_prfs
-from src.utils.ML_fxns import split_sparta_hdf5_name
-from utils.misc_fxns import timed, clean_dir, find_closest_z_snap, get_num_snaps
+from utils.util_fxns import timed, clean_dir, find_closest_z_snap, get_num_snaps, split_sparta_hdf5_name
 ##################################################################################################################
 parser = argparse.ArgumentParser()
 parser.add_argument(
