@@ -12,7 +12,7 @@ import psutil
 import argparse
 
 from src.utils.util_fxns import load_SPARTA_data, load_ptl_param, get_comp_snap_info, create_directory, load_pickle, save_pickle, load_config
-from src.utils.calc_fxns import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn, calc_rho, calc_halo_mem
+from src.utils.calc_fxns import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn, calc_rho, calc_halo_mem, calc_t_dyn_col
 from src.utils.prfl_fxns import create_mass_prf, compare_prfs
 from utils.util_fxns import timed, clean_dir, find_closest_z_snap, get_num_snaps, split_sparta_hdf5_name
 ##################################################################################################################
@@ -375,7 +375,6 @@ with timed("Generating Datasets for " + curr_sparta_file):
                 p_box_size = dset_params["all_snap_info"]["prime_snap_info"]["box_size"]
                 little_h = dset_params["all_snap_info"]["prime_snap_info"]["h"]
 
-            # Set constants
             all_ptl_snap_list.append(p_snap)
             p_snap_path = snap_path + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
             all_snap_info["prime_snap_info"] = prime_snap_dict
@@ -402,10 +401,11 @@ with timed("Generating Datasets for " + curr_sparta_file):
             ptl_mass = sparta_params[sparta_param_names[5]]
             
         with timed("Load Complementary Snapshots"):
-            #TODO adjust this check to instead look the dictionary?
             if reset_lvl > 1 or len(known_snaps) == 0:
                 for t_dyn_step in all_tdyn_steps:
-                    t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0]], input_z)
+                    t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], input_z, little_h)
+                    print("My Tdyn",t_dyn)
+                    calc_t_dyn_col(cosmol,input_z)
                     c_snap_dict = get_comp_snap_info(t_dyn=t_dyn, t_dyn_step=t_dyn_step, cosmol = cosmol, p_red_shift=input_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
                     c_snap = c_snap_dict["ptl_snap"]
                     c_sparta_snap = c_snap_dict["sparta_snap"]
@@ -505,6 +505,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
         total_num_halos = match_halo_idxs.shape[0]
         
         #TODO split the halos more intelligently so that halo sizes are evenly distributed
+        #TODO create option to also create a validation set
         # split all indices into train and test groups
         split_pnt = int((1-test_dset_frac) * total_num_halos)
         train_idxs = match_halo_idxs[:split_pnt]
@@ -532,7 +533,6 @@ with timed("Generating Datasets for " + curr_sparta_file):
 
         tot_num_snaps = get_num_snaps(snap_path)
         
-        #TODO move t_dyn_steps to within their respective snap?
         dset_params = {
             "sparta_file": curr_sparta_file,
             "snap_dir_format":snap_dir_format,

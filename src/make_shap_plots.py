@@ -113,6 +113,6 @@ if __name__ == '__main__':
             ax1.set_xlim(combined_xlim)
             ax2.set_xlim(combined_xlim)
             
-            fig.savefig(plot_loc + "comb_shap.png")
+            fig.savefig(plot_loc + "comb_shap.pdf")
 
     

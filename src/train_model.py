@@ -165,7 +165,6 @@ if __name__ == "__main__":
             
         if tree_err:
             with timed("Evaluate Tree Error"):
-                #TODO make this optional and document evaluation of model
                 #TODO see if it is possible to save the history
                 # Get accuracy at each boosting round
                 # Extract training and validation error (1 - accuracy) at each round
@@ -182,7 +181,7 @@ if __name__ == "__main__":
                 plt.xlabel('Number of Trees')
                 plt.ylabel('Accuracy')
                 plt.legend()
-                plt.savefig(gen_plot_save_loc + "train_test_acc.png")
+                plt.savefig(gen_plot_save_loc + "train_test_acc.pdf")
 
                 # You can also inspect the final accuracy after training
                 final_train_accuracy = train_accuracies[-1]
@@ -215,7 +214,7 @@ if __name__ == "__main__":
                 plt.legend()
 
                 plt.tight_layout()
-                plt.savefig(gen_plot_save_loc + "tree_time_acc.png")
+                plt.savefig(gen_plot_save_loc + "tree_time_acc.pdf")
 
     
     client.close()

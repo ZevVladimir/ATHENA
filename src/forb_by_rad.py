@@ -179,5 +179,5 @@ if __name__ == "__main__":
             ax.set_ylim(0,1)
             ax.tick_params(axis='both', labelsize=tick_fntsize, length=6,width=2, direction="in")
             
-            fig.savefig(debug_plt_path + test_comb_name + "_forb_by_rad.png",dpi=400)
+            fig.savefig(debug_plt_path + test_comb_name + "_forb_by_rad.pdf",dpi=400)
             

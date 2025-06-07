@@ -342,7 +342,7 @@ def gen_ptl_dist_plt(act_labels, split_scale_dict, save_loc, data_dict = {}, plo
         color_bar.ax.tick_params(which="major",direction="in",labelsize=18,length=5,width=3)
         color_bar.ax.tick_params(which="minor",direction="in",labelsize=18,length=2.5,width=1.5)
             
-        fig.savefig(save_loc + "ptl_distr" + save_title + ".png")
+        fig.savefig(save_loc + "ptl_distr" + save_title + ".pdf")
         plt.close()
 
 def gen_missclass_col(x_param, y_param, inc_inf_fltr, inc_orb_fltr, act_labels, split_scale_dict, ptl_lim_dict, split_x=False, split_y=False):
@@ -473,7 +473,7 @@ def gen_missclass_dist_plt(act_labels, pred_labels, split_scale_dict, save_loc, 
         color_bar.ax.tick_params(which="major",direction="in",labelsize=18,length=10,width=3)
         color_bar.ax.tick_params(which="minor",direction="in",labelsize=18,length=5,width=1.5)
         
-        fig.savefig(save_loc + save_title + "scaled_miss_class.png")
+        fig.savefig(save_loc + save_title + "scaled_miss_class.pdf")
         plt.close()
 
 def plot_log_vel(log_phys_vel,radii,labels,save_loc,split_scale_dict,add_line=[None,None],show_v200m=False,v200m=1.5):
@@ -569,7 +569,7 @@ def plot_log_vel(log_phys_vel,radii,labels,save_loc,split_scale_dict,add_line=[N
     lin_color_bar.ax.tick_params(which="major",direction="in",labelsize=18,length=10,width=3)
     lin_color_bar.ax.tick_params(which="minor",direction="in",labelsize=18,length=5,width=1.5)
     
-    fig.savefig(save_loc + "log_phys_vel_" + title + ".png")
+    fig.savefig(save_loc + "log_phys_vel_" + title + ".pdf")
     
 
     line_y = add_line[0] * radii + add_line[1]
@@ -673,7 +673,7 @@ def plot_halo_slice_class(ptl_pos,preds,labels,halo_pos,halo_r200m,save_loc,sear
         ax.set_ylim(combined_ylim)
     
     all_ax.legend(fontsize=legendfontsize)
-    fig.savefig(save_loc+title+"classif_halo_dist.png",dpi=300)        
+    fig.savefig(save_loc+title+"classif_halo_dist.pdf",dpi=300)        
 
 def plot_halo_slice(ptl_pos, labels, halo_pos, halo_r200m, save_loc, search_rad=0, title=""):
     cividis_cmap = plt.get_cmap("cividis")
@@ -773,7 +773,7 @@ def plot_halo_slice(ptl_pos, labels, halo_pos, halo_r200m, save_loc, search_rad=
     cbar.ax.tick_params(which="major", direction="in", labelsize=8, length=5, width=1.5)
 
     # Save the figure
-    plt.savefig(f"{save_loc}{title}_halo_dist.png", dpi=500)
+    plt.savefig(f"{save_loc}{title}_halo_dist.pdf", dpi=500)
     plt.close(fig)
 
 def plt_cust_ke_line(b,bins,linewidth):
@@ -922,9 +922,9 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
                             direction="in", labelsize=tick_label_fntsize, length=8, width=2)
 
         if plot_lin_too:
-            plt.savefig(plot_loc + "lin_log_" + title + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=400)    
+            plt.savefig(plot_loc + "lin_log_" + title + "sparta_KE_dist_cut.pdf",bbox_inches='tight',dpi=400)    
         else:
-            plt.savefig(plot_loc + "log_" + title + "sparta_KE_dist_cut.png",bbox_inches='tight',dpi=400) 
+            plt.savefig(plot_loc + "log_" + title + "sparta_KE_dist_cut.pdf",bbox_inches='tight',dpi=400) 
         
 def plt_KE_dist_grad(feat_dict, fltr_combs, r_r200m, vr, lnv2, nbins, x_range, y_range, r_cut_calib, plot_loc, sim_title="Simulation: Bolshoi 1000Mpc"):
     with timed("KE Dist plot"):
@@ -1058,4 +1058,4 @@ def plt_KE_dist_grad(feat_dict, fltr_combs, r_r200m, vr, lnv2, nbins, x_range, y
         
 
         plt.tight_layout();
-        plt.savefig(plot_loc + "fast_KE_dist_grad.png")
+        plt.savefig(plot_loc + "fast_KE_dist_grad.pdf")

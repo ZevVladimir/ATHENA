@@ -110,4 +110,4 @@ class MLModel:
     def plot_tree(bst,tree_num,save_loc):
         fig, ax = plt.subplots(figsize=(400, 10))
         xgb.plot_tree(bst, num_trees=tree_num, ax=ax,rankdir='LR')
-        fig.savefig(save_loc + "/tree_plot.png")
+        fig.savefig(save_loc + "/tree_plot.pdf")

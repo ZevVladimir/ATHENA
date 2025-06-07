@@ -1,3 +1,4 @@
+import colossus.cosmology
 import numpy as np
 from colossus.halo import mass_so
 from colossus.utils import constants
@@ -155,12 +156,21 @@ def calc_tang_vel(rv, phys_v_comp, rhat):
     return tv
 
 # Calculate the dynamical time based on 200m 
-def calc_t_dyn(halo_r200m, red_shift):
+def calc_t_dyn(halo_r200m, red_shift,little_h):
     halo_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200m")
     curr_v200m = calc_v200m(halo_m200m, halo_r200m)
     t_dyn = (2*halo_r200m)/curr_v200m
  
-    return np.average(t_dyn)
+    return t_dyn * little_h
+
+def calc_t_dyn_col(cosmol,curr_z):
+    t_hubb = (1/cosmol.Hz(curr_z)) 
+    rho_c = cosmol.rho_c(curr_z)
+    rho_m = cosmol.rho_m(curr_z)
+    rho_200m = 200 * rho_m
+
+    t_dyn_def = np.power(2,(3/2)) * t_hubb * np.power((rho_200m / rho_c),(-1/2))
+    print("Colossus Tdyn",t_dyn_def*1e3)
 
 def calc_mass_acc_rate(curr_r200m, past_r200m, curr_z, past_z):
     curr_m200m = mass_so.R_to_M(curr_r200m, curr_z, "200m")
