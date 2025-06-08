@@ -10,7 +10,7 @@ from colossus.halo.mass_so import M_to_R
 from matplotlib.legend_handler import HandlerTuple
 
 from .util_fxns import load_SPARTA_data, load_pickle, load_config, get_comp_snap_info, timed, load_sparta_mass_prf
-from .calc_fxns import calc_rho, calc_mass_acc_rate, calc_t_dyn
+from .calc_fxns import calc_rho, calc_mass_acc_rate, calc_tdyn
 from .ML_fxns import split_sparta_hdf5_name
 from .util_fxns import parse_ranges, set_cosmology
 
@@ -214,7 +214,7 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
         ax_1.set_xticks(tick_locs,strng_ticks)  
         ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
         fig.suptitle(title)
-        fig.savefig(save_location + title + "prfl_rat.png",bbox_inches='tight')
+        fig.savefig(save_location + title + "prfl_rat.pdf",bbox_inches='tight')
 
 def plot_split_prf(ax,bins,calc_prf,act_prf,curr_color,plt_lines,plt_lbls,var_split,split_name):
     lb, = ax.plot(bins, calc_prf, linestyle='-', color = curr_color, label = rf"{var_split[0]}$< {split_name} <$ {var_split[1]}")    
@@ -362,7 +362,7 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
         inf_ax_1.set_xticks(tick_locs,strng_ticks)  
         inf_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize, labelleft=False)
         
-        fig.savefig(save_location + title + "prfl_rat.png",bbox_inches='tight',dpi=300)
+        fig.savefig(save_location + title + "prfl_rat.pdf",bbox_inches='tight',dpi=300)
 
 # Creates a stacked mass profile for an entire dataset by generating mass profiles for each halo and combining them
 def create_stack_mass_prf(splits, radii, halo_first, halo_n, mass, orbit_assn, prf_bins, use_mp = True, all_z = []):
@@ -463,31 +463,13 @@ def compare_split_prfs_ke(plt_splits, n_lines, opt_orb_prfs, opt_inf_prfs, fast_
             plot_split_prf_and_rat(fast_orb_ax_0, fast_orb_ax_1, bins, fast_orb_prfs[i][0],fast_orb_prfs[i][1], prf_func, fast_orb_plt_lines, fast_orb_plt_lbls, var_split, split_name, fast_orb_colors[i], fill_alpha)
             plot_split_prf_and_rat(fast_inf_ax_0, fast_inf_ax_1, bins, fast_inf_prfs[i][0],fast_inf_prfs[i][1], prf_func, fast_inf_plt_lines, fast_inf_plt_lbls, var_split, split_name, fast_inf_colors[i], fill_alpha)
                 
-        opt_orb_ax_0.set_xscale("log")
-        opt_orb_ax_0.set_yscale("log")
-        opt_orb_ax_0.set_xlim(0.05,np.max(lin_rticks))
-        opt_orb_ax_0.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
-        opt_orb_ax_0.tick_params(axis='x', which='both', labelbottom=False) # we don't want the labels just the tick marks
-        opt_orb_ax_0.tick_params(axis='y', which='both')
-        opt_orb_ax_0.legend(opt_orb_plt_lines,opt_orb_plt_lbls,fontsize=legendfntsize, loc = "lower left")
-        opt_orb_ax_0.text(0.95,0.95, "Orbiting Particles", ha="right", va="top", transform=opt_orb_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
-        
-        opt_inf_ax_0.set_xscale("log")
-        opt_inf_ax_0.set_yscale("log")
-        opt_inf_ax_0.set_xlim(0.05,np.max(lin_rticks))
-        opt_inf_ax_0.set_ylim(opt_orb_ax_0.get_ylim())
-        opt_inf_ax_0.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
-        opt_inf_ax_0.tick_params(axis='x', which='both', labelbottom=False) # we don't want the labels just the tick marks
-        opt_inf_ax_0.tick_params(axis='y', which='both', labelleft=False) 
-        opt_inf_ax_0.legend(opt_inf_plt_lines,opt_inf_plt_lbls,fontsize=legendfntsize, loc = "lower left")
-        opt_inf_ax_0.text(0.95,0.95, "Infalling Particles", ha="right", va="top", transform=opt_inf_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
 
         fast_orb_ax_0.set_xscale("log")
         fast_orb_ax_0.set_yscale("log")
         fast_orb_ax_0.set_xlim(0.05,np.max(lin_rticks))
         fast_orb_ax_0.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
         fast_orb_ax_0.tick_params(axis='x', which='both', labelbottom=False) # we don't want the labels just the tick marks
-        fast_orb_ax_0.tick_params(axis='y', which='both', labelleft=False)
+        fast_orb_ax_0.tick_params(axis='y', which='both')
         fast_orb_ax_0.legend(fast_orb_plt_lines,fast_orb_plt_lbls,fontsize=legendfntsize, loc = "lower left")
         fast_orb_ax_0.text(0.95,0.95, "Orbiting Particles", ha="right", va="top", transform=fast_orb_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
         
@@ -501,6 +483,24 @@ def compare_split_prfs_ke(plt_splits, n_lines, opt_orb_prfs, opt_inf_prfs, fast_
         fast_inf_ax_0.legend(fast_inf_plt_lines,fast_inf_plt_lbls,fontsize=legendfntsize, loc = "lower left")
         fast_inf_ax_0.text(0.95,0.95, "Infalling Particles", ha="right", va="top", transform=fast_inf_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
 
+        opt_orb_ax_0.set_xscale("log")
+        opt_orb_ax_0.set_yscale("log")
+        opt_orb_ax_0.set_xlim(0.05,np.max(lin_rticks))
+        opt_orb_ax_0.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
+        opt_orb_ax_0.tick_params(axis='x', which='both', labelbottom=False) # we don't want the labels just the tick marks
+        opt_orb_ax_0.tick_params(axis='y', which='both', labelleft=False)
+        opt_orb_ax_0.legend(opt_orb_plt_lines,opt_orb_plt_lbls,fontsize=legendfntsize, loc = "lower left")
+        opt_orb_ax_0.text(0.95,0.95, "Orbiting Particles", ha="right", va="top", transform=opt_orb_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
+        
+        opt_inf_ax_0.set_xscale("log")
+        opt_inf_ax_0.set_yscale("log")
+        opt_inf_ax_0.set_xlim(0.05,np.max(lin_rticks))
+        opt_inf_ax_0.set_ylim(opt_orb_ax_0.get_ylim())
+        opt_inf_ax_0.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
+        opt_inf_ax_0.tick_params(axis='x', which='both', labelbottom=False) # we don't want the labels just the tick marks
+        opt_inf_ax_0.tick_params(axis='y', which='both', labelleft=False) 
+        opt_inf_ax_0.legend(opt_inf_plt_lines,opt_inf_plt_lbls,fontsize=legendfntsize, loc = "lower left")
+        opt_inf_ax_0.text(0.95,0.95, "Infalling Particles", ha="right", va="top", transform=opt_inf_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
 
         opt_orb_y_min, opt_orb_y_max = opt_orb_ax_0.get_ylim()
         opt_inf_y_min, opt_inf_y_max = opt_inf_ax_0.get_ylim()
@@ -561,7 +561,7 @@ def compare_split_prfs_ke(plt_splits, n_lines, opt_orb_prfs, opt_inf_prfs, fast_
         fast_inf_ax_1.set_xticks(tick_locs,strng_ticks)  
         fast_inf_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize, labelleft=False)
         
-        fig.savefig(save_location + title + "prfl_rat.png",bbox_inches='tight',dpi=400)    
+        fig.savefig(save_location + title + "prfl_rat.pdf",bbox_inches='tight',dpi=400)    
 
 # Creates the density profiles seen throughout the paper.
 # 3 panels for all, orbiting, and infalling profiles with options to be split by nu or by mass accretion rate
@@ -719,8 +719,9 @@ def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol,split_scale_dict,pl
                         dic_sim[f] = grp_sim.attrs[f]
                     
                 all_sparta_z = dic_sim['snap_z']
+                little_h = dic_sim["h"]
                 
-                t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], curr_z)
+                t_dyn = calc_tdyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], curr_z, little_h)
                 c_snap_dict = get_comp_snap_info(t_dyn=t_dyn, t_dyn_step=1, cosmol = cosmol, p_red_shift=curr_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
                 c_sparta_snap = c_snap_dict["sparta_snap"]
             c_halos_r200m = sparta_params[sparta_param_names[0]][:,c_sparta_snap]

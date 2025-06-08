@@ -87,32 +87,32 @@ if __name__ == '__main__':
             all_ptl_explnr, all_ptl_shap, all_ptl_X = shap_with_filter(explainer,X_df,y_df,preds,col_names=new_columns,max_size=5000)
             no_sec_explnr, no_sec_shap, no_sec_X = shap_with_filter(explainer,X_df,y_df,preds,fltr_dic=no_second_dict,col_names=new_columns,max_size=5000)
             
-        with timed("Make SHAP plots"):
-            widths = [4,4]
-            heights = [4]
-            
-            fig = plt.figure(constrained_layout=True)
-            gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
+            with timed("Make SHAP plots"):
+                widths = [4,4]
+                heights = [4]
+                
+                fig = plt.figure(constrained_layout=True)
+                gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
 
-            ax1 = fig.add_subplot(gs[0])
-            ax2 = fig.add_subplot(gs[1])
-            plt.sca(ax1)
-            ax_all_ptl = shap.plots.beeswarm(all_ptl_explnr,plot_size=(20,10),show=False,order=order,color_bar=False)
-            ax1.set_title("All Particles",fontsize=26)
+                ax1 = fig.add_subplot(gs[0])
+                ax2 = fig.add_subplot(gs[1])
+                plt.sca(ax1)
+                ax_all_ptl = shap.plots.beeswarm(all_ptl_explnr,plot_size=(20,10),show=False,order=order,color_bar=False)
+                ax1.set_title("All Particles",fontsize=26)
 
-            plt.sca(ax2)
-            ax_no_sec = shap.plots.beeswarm(no_sec_explnr,plot_size=(20,10),show=False,order=order,hide_features=True)
-            ax2.set_title("Particles with no Past Snapshot",fontsize=26)
-            
-            # Set the xlim to be the max/min of both axes
-            xlims_ax1 = ax1.get_xlim()
-            xlims_ax2 = ax2.get_xlim()
+                plt.sca(ax2)
+                ax_no_sec = shap.plots.beeswarm(no_sec_explnr,plot_size=(20,10),show=False,order=order,hide_features=True)
+                ax2.set_title("Particles with no Past Snapshot",fontsize=26)
+                
+                # Set the xlim to be the max/min of both axes
+                xlims_ax1 = ax1.get_xlim()
+                xlims_ax2 = ax2.get_xlim()
 
-            combined_xlim = (min(xlims_ax1[0], xlims_ax2[0]), max(xlims_ax1[1], xlims_ax2[1]))
-            
-            ax1.set_xlim(combined_xlim)
-            ax2.set_xlim(combined_xlim)
-            
-            fig.savefig(plot_loc + "comb_shap.pdf")
+                combined_xlim = (min(xlims_ax1[0], xlims_ax2[0]), max(xlims_ax1[1], xlims_ax2[1]))
+                
+                ax1.set_xlim(combined_xlim)
+                ax2.set_xlim(combined_xlim)
+                
+                fig.savefig(plot_loc + "comb_shap.pdf")
 
     

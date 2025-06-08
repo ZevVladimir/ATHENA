@@ -12,7 +12,7 @@ import psutil
 import argparse
 
 from src.utils.util_fxns import load_SPARTA_data, load_ptl_param, get_comp_snap_info, create_directory, load_pickle, save_pickle, load_config
-from src.utils.calc_fxns import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_t_dyn, calc_rho, calc_halo_mem, calc_t_dyn_col
+from src.utils.calc_fxns import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_tdyn, calc_rho, calc_halo_mem, calc_tdyn_col
 from src.utils.prfl_fxns import create_mass_prf, compare_prfs
 from utils.util_fxns import timed, clean_dir, find_closest_z_snap, get_num_snaps, split_sparta_hdf5_name
 ##################################################################################################################
@@ -35,6 +35,7 @@ pickled_path = config_params["PATHS"]["pickled_path"]
 ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 debug_plt_path = config_params["PATHS"]["debug_plt_path"]
 
+random_seed = config_params["MISC"]["random_seed"]
 debug_mem = config_params["MISC"]["debug_mem"]
 debug_indiv_dens_prf = config_params["MISC"]["debug_indiv_dens_prf"]
 sim_cosmol = config_params["MISC"]["sim_cosmol"]
@@ -51,6 +52,7 @@ search_radius = config_params["DSET_CREATE"]["search_radius"]
 sub_dset_mem_size = config_params["DSET_CREATE"]["sub_dset_mem_size"]
 
 test_dset_frac = config_params["DSET_CREATE"]["test_dset_frac"]
+val_dset_frac = config_params["DSET_CREATE"]["val_dset_frac"]
 lin_rticks = config_params["EVAL_MODEL"]["lin_rticks"]
 ##################################################################################################################
 create_directory(pickled_path)
@@ -94,6 +96,39 @@ def det_halo_splits(mem_arr, mem_lim):
             split_idxs.append(i)
             curr_size = 0
     return split_idxs
+
+def assign_halo_dset(halo_nptl):
+    if not 0 <= val_dset_frac < 1 or not 0 <= test_dset_frac < 1 or (val_dset_frac + test_dset_frac) >= 1:
+        raise ValueError("val_dset_frac and test_dset_frac must be in [0, 1) and sum to < 1.")
+
+    rng = np.random.default_rng(random_seed)
+    total_halos = halo_nptl.shape[0]
+
+    # Get sorted indices by halo size
+    sorted_indices = np.argsort(halo_nptl)
+
+    # Shuffle within size groups for balanced distribution
+    group_size = max(10, total_halos // 50)  # Choose a group size (tune as needed)
+    grouped_indices = [
+        rng.permutation(sorted_indices[i:i+group_size])
+        for i in range(0, total_halos, group_size)
+    ]
+
+    shuffled_indices = np.concatenate(grouped_indices)
+    
+    # Assign halos to test, val, train
+    n_test = int(test_dset_frac * total_halos)
+    n_val = int(val_dset_frac * total_halos)
+
+    test_idx = shuffled_indices[:n_test]
+    val_idx = shuffled_indices[n_test:n_test + n_val]
+    train_idx = shuffled_indices[n_test + n_val:]
+
+    return {
+        'train_idx': np.sort(train_idx),
+        'val_idx': np.sort(val_idx),
+        'test_idx': np.sort(test_idx)
+    }
             
 def init_search(use_prim_tree, halo_positions, halo_r200m, search_rad, find_mass = False, find_ptl_indices = False):
     if use_prim_tree:
@@ -350,11 +385,11 @@ with timed("Generating Datasets for " + curr_sparta_file):
                 print("check sparta redshift:",all_sparta_z[p_sparta_snap])   
                 
                 prime_a = 1/(1+input_z)
-                p_rho_m = cosmol.rho_m(input_z)
-                p_hubble_const = cosmol.Hz(input_z) * 0.001 # convert to units km/s/kpc
+                p_rho_m = cosmol.rho_m(input_z) # units of M_sun * h^2 * kpc^-3
+                p_hubble_const = cosmol.Hz(input_z) / 1e3 # convert from km/s/Mpc to units km/s/kpc
                 sim_box_size = dic_sim["box_size"] #units Mpc/h comoving
                 p_box_size = sim_box_size * 10**3 * prime_a #convert to Kpc/h physical
-                little_h = dic_sim["h"]
+                little_h = dic_sim["h"] # units of km/s/Mpc
                 prime_snap_dict = {
                     "ptl_snap":p_snap,
                     "sparta_snap":p_sparta_snap,
@@ -403,9 +438,9 @@ with timed("Generating Datasets for " + curr_sparta_file):
         with timed("Load Complementary Snapshots"):
             if reset_lvl > 1 or len(known_snaps) == 0:
                 for t_dyn_step in all_tdyn_steps:
-                    t_dyn = calc_t_dyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], input_z, little_h)
+                    t_dyn = calc_tdyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], input_z, little_h)
                     print("My Tdyn",t_dyn)
-                    calc_t_dyn_col(cosmol,input_z)
+                    t_dyn = calc_tdyn_col(cosmol,input_z,little_h)
                     c_snap_dict = get_comp_snap_info(t_dyn=t_dyn, t_dyn_step=t_dyn_step, cosmol = cosmol, p_red_shift=input_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
                     c_snap = c_snap_dict["ptl_snap"]
                     c_sparta_snap = c_snap_dict["sparta_snap"]

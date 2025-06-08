@@ -41,7 +41,7 @@ sim = test_sims[0][0]
 
 comb_model_sims = get_combined_name(model_sims) 
         
-model_name = get_model_name(model_type, model_sims, hpo_done=config_params["OPTIMIZE"]["hpo"], opt_param_dict=config_params["OPTIMIZE"])    
+model_name = get_model_name(model_type, model_sims)    
 model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"
 gen_plot_save_loc = model_fldr_loc + "plots/"
 
@@ -110,7 +110,7 @@ while len(used_numbers) < 25:
 
         num_new_ptls = curr_ptl_pos.shape[0]
         
-        if num_new_ptls > 1000:
+        if num_new_ptls > 2000:
             used_numbers.add(num)
         else:
             continue

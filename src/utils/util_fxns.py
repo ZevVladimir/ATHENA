@@ -70,6 +70,7 @@ def load_joblib(path):
     else:
         raise FileNotFoundError
 
+#TODO check if save_pickle/save_data is checked to actually save it
 def load_ptl_param(sparta_name, param_name, snap, snap_path):
     # save to folder containing pickled data to be accessed easily later
     file_path = pickled_path + str(snap) + "_" + str(sparta_name) + "/" + param_name + "_" + str(snap) + ".pickle" 

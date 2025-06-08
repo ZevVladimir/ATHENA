@@ -763,8 +763,12 @@ def plot_halo_slice(ptl_pos, labels, halo_pos, halo_r200m, save_loc, search_rad=
     axs[2].set_xlabel(r"$x [h^{-1}kpc]$", fontsize=axisfontsize)
 
     # Adjust tick parameters and set aspect ratio
-    for ax in axs:
-        ax.tick_params(axis='both', which='major', labelsize=tickfontsize, direction="in", length=3, width=1.5)
+    for i,ax in enumerate(axs):
+        if i == 0:
+            use_labelleft = True
+        else:
+            use_labelleft = False
+        ax.tick_params(axis='both', which='major', labelsize=tickfontsize, labelleft = use_labelleft, direction="in", length=3, width=1.5)
         ax.set_aspect('equal')
 
     # Add colorbar
@@ -776,16 +780,16 @@ def plot_halo_slice(ptl_pos, labels, halo_pos, halo_r200m, save_loc, search_rad=
     plt.savefig(f"{save_loc}{title}_halo_dist.pdf", dpi=500)
     plt.close(fig)
 
-def plt_cust_ke_line(b,bins,linewidth):
+def plt_cust_ke_line(ax, b,bins,linewidth):
     for i in range(bins.shape[0]-1):
         x1 = bins[i]
         x2 = bins[i+1]
         y1 = b[i]
         y2 = b[i]
         if i == 0:
-            plt.plot([x1,x2],[y1,y2],lw=linewidth, color="cyan", label="Bin-by-bin Fit Cut")
+            ax.plot([x1,x2],[y1,y2],lw=linewidth, color="cyan", label="Bin-by-bin Fit Cut")
         else:
-            plt.plot([x1,x2],[y1,y2],lw=linewidth, color="cyan")
+            ax.plot([x1,x2],[y1,y2],lw=linewidth, color="cyan")
             
 def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut, plot_loc, title, plot_lin_too = False, cust_line_dict = None):
     m_pos = feat_dict["m_pos"]
@@ -851,65 +855,62 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
                 ax.tick_params('y', labelleft=False, colors="white", direction="in")
 
             hist_args = dict(bins=nbins, vmin=(log_vmin if norm == "log" else lin_vmin), vmax=vmax,
-                            cmap=magma_cmap, range=(x_range, y_range), norm=(norm if norm == "log" else None))
+                            cmap=magma_cmap, range=(x_range, y_range), norm=(norm if norm == "log" else None), rasterized=True)
 
             # Orb vr > 0
-            plt.sca(ax1)
-            plt.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], **hist_args)
-            plt.plot(x, y12, lw=line_width, color="g", label="Fast Cut")
-            plt.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
+            h1 = ax1.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], **hist_args)
+            ax1.plot(x, y12, lw=line_width, color="g", label="Fast Cut")
+            ax1.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
             if cust_line_dict is not None:
-                plt_cust_ke_line(b=cust_line_dict["orb_vr_pos"]["b"], bins=bins, linewidth=line_width)
-            plt.text(0.05, 3.6, r"Orbiting Particles $v_r>0$" + "\nAccording to SPARTA",
+                plt_cust_ke_line(ax=ax1,b=cust_line_dict["orb_vr_pos"]["b"], bins=bins, linewidth=line_width)
+            ax1.text(0.05, 3.6, r"Orbiting Particles $v_r>0$" + "\nAccording to SPARTA",
                     fontsize=txt_fntsize, weight="bold", bbox=dict(facecolor='w', alpha=0.75))
             ax1.set_ylabel(r'$\ln(v^2/v_{200m}^2)$', fontsize=axis_fntsize)
-            ax1.set_xlabel(r'$r/R_{200m}$', fontsize=axis_fntsize)
-            plt.xlim(0, 2)
+            if row_idx == (nrows - 1):
+                ax1.set_xlabel(r'$r/R_{200m}$', fontsize=axis_fntsize)
+            ax1.set_xlim(0, 2)
 
             # Inf vr > 0
-            plt.sca(ax2)
-            plt.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], **hist_args)
-            plt.plot(x, y12, lw=line_width, color="g", label="Fast Cut")
-            plt.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
+            ax2.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], **hist_args)
+            ax2.plot(x, y12, lw=line_width, color="g", label="Fast Cut")
+            ax2.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
             if cust_line_dict is not None:
-                plt_cust_ke_line(b=cust_line_dict["inf_vr_pos"]["b"], bins=bins, linewidth=line_width)
-            plt.text(0.05, 3.6, r"Infalling Particles $v_r>0$" + "\nAccording to SPARTA",
+                plt_cust_ke_line(ax=ax2,b=cust_line_dict["inf_vr_pos"]["b"], bins=bins, linewidth=line_width)
+            ax2.text(0.05, 3.6, r"Infalling Particles $v_r>0$" + "\nAccording to SPARTA",
                     fontsize=txt_fntsize, weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-            ax2.set_xlabel(r'$r/R_{200m}$', fontsize=axis_fntsize)
-            plt.xlim(0, 2)
+            if row_idx == (nrows - 1):
+                ax2.set_xlabel(r'$r/R_{200m}$', fontsize=axis_fntsize)
+            ax2.set_xlim(0, 2)
 
             # Orb vr < 0
-            plt.sca(ax3)
-            plt.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], **hist_args)
-            plt.plot(x, y22, lw=line_width, color="g", label="Fast Cut")
-            plt.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
+            ax3.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], **hist_args)
+            ax3.plot(x, y22, lw=line_width, color="g", label="Fast Cut")
+            ax3.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
             if cust_line_dict is not None:
-                plt_cust_ke_line(b=cust_line_dict["orb_vr_neg"]["b"], bins=bins, linewidth=line_width)
-            plt.text(0.05, 3.6, r"Orbiting Particles $v_r<0$" + "\nAccording to SPARTA",
+                plt_cust_ke_line(ax=ax3,b=cust_line_dict["orb_vr_neg"]["b"], bins=bins, linewidth=line_width)
+            ax3.text(0.05, 3.6, r"Orbiting Particles $v_r<0$" + "\nAccording to SPARTA",
                     fontsize=txt_fntsize, weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-            ax3.set_xlabel(r'$r/R_{200m}$', fontsize=axis_fntsize)
-            plt.xlim(0, 2)
+            if row_idx == (nrows - 1):
+                ax3.set_xlabel(r'$r/R_{200m}$', fontsize=axis_fntsize)
+            ax3.set_xlim(0, 2)
 
             # Inf vr < 0
-            plt.sca(ax4)
-            plt.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], **hist_args)
-            plt.plot(x, y22, lw=line_width, color="g", label="Fast Cut")
-            plt.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
+            ax4.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], **hist_args)
+            ax4.plot(x, y22, lw=line_width, color="g", label="Fast Cut")
+            ax4.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
             if cust_line_dict is not None:
-                plt_cust_ke_line(b=cust_line_dict["inf_vr_neg"]["b"], bins=bins, linewidth=line_width)
+                plt_cust_ke_line(ax=ax4,b=cust_line_dict["inf_vr_neg"]["b"], bins=bins, linewidth=line_width)
             if row_idx == 0:
-                plt.legend(loc="lower left", fontsize=legend_fntsize)
-            plt.text(0.05, 3.6, r"Infalling Particles $v_r<0$" + "\nAccording to SPARTA",
+                ax4.legend(loc="lower left", fontsize=legend_fntsize)
+            ax4.text(0.05, 3.6, r"Infalling Particles $v_r<0$" + "\nAccording to SPARTA",
                     fontsize=txt_fntsize, weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-            plt.xlim(0, 2)
-            if row_idx == 0:
-                cbar_log = plt.colorbar()
-                cbar_log.ax.tick_params(labelsize=cbar_tick_fntsize)
-                cbar_log.set_label(r'$N$ (Counts)', fontsize=cbar_label_fntsize)
-            elif row_idx == 1:
-                cbar_lin = plt.colorbar()
-                cbar_lin.ax.tick_params(labelsize=cbar_tick_fntsize)
-                cbar_lin.set_label(r'$N$ (Counts)', fontsize=cbar_label_fntsize)
+            if row_idx == (nrows - 1):
+                ax4.set_xlabel(r'$r/R_{200m}$', fontsize=axis_fntsize)
+            ax4.set_xlim(0, 2)
+            
+            cbar = fig.colorbar(h1[3], cax=plt.subplot(gs[row_idx,-1]), orientation='vertical')
+            cbar.ax.tick_params(labelsize=cbar_tick_fntsize)
+            cbar.set_label(r'$N$ (Counts)', fontsize=cbar_label_fntsize)
 
             for i in range(4):
                 ax = axes[offset + i]
@@ -918,13 +919,18 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
                             weight="bold", bbox=dict(facecolor='w', alpha=0.75))
                     ax.text(0.7, 2.1, "Infalling According\nto Kinetic Energy Cut", fontsize=txt_fntsize, color="b",
                             weight="bold", bbox=dict(facecolor='w', alpha=0.75))
-                ax.tick_params(axis='both', which='both', labelcolor="black", colors="white",
-                            direction="in", labelsize=tick_label_fntsize, length=8, width=2)
+                if row_idx == (nrows - 1):
+                    ax.tick_params(axis='both', which='both', labelcolor="black", colors="white",
+                                direction="in", labelsize=tick_label_fntsize, length=8, width=2)
+                else:
+                    ax.tick_params(axis='both', which='both', labelcolor="black", colors="white",
+                                direction="in", labelsize=tick_label_fntsize, labelbottom=False, length=8, width=2)
+                
 
         if plot_lin_too:
-            plt.savefig(plot_loc + "lin_log_" + title + "sparta_KE_dist_cut.pdf",bbox_inches='tight',dpi=400)    
+            fig.savefig(plot_loc + "lin_log_" + title + "sparta_KE_dist_cut.pdf",dpi=400)    
         else:
-            plt.savefig(plot_loc + "log_" + title + "sparta_KE_dist_cut.pdf",bbox_inches='tight',dpi=400) 
+            fig.savefig(plot_loc + "log_" + title + "sparta_KE_dist_cut.pdf",bbox_inches='tight',dpi=400) 
         
 def plt_KE_dist_grad(feat_dict, fltr_combs, r_r200m, vr, lnv2, nbins, x_range, y_range, r_cut_calib, plot_loc, sim_title="Simulation: Bolshoi 1000Mpc"):
     with timed("KE Dist plot"):
