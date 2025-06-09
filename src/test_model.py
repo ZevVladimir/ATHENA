@@ -157,18 +157,18 @@ if __name__ == "__main__":
                     }
                 if full_dist_plt:
                     ptl_dist_plot_list = [
-                        {"x": "p_r", "y": "p_rv", "split_x": False, "split_y": True, "x_label":"$r/R_{200m}$", "y_label":"$v_r/v_{200m}$","title":"Current Snapshot", "x_ticks":r_ticks, "y_ticks":rv_ticks},
-                        {"x": "p_r", "y": "p_tv", "split_x": False, "split_y": True, "x_label":"$r/R_{200m}$", "y_label":"$v_t/v_{200m}$","title":"", "x_ticks":r_ticks, "y_ticks":tv_ticks},
-                        {"x": "p_rv", "y": "p_tv", "split_x": True, "split_y": True, "x_label":"$v_r/v_{200m}$", "y_label":"","title":"", "x_ticks":rv_ticks, "y_ticks":tv_ticks},
-                        {"x": "c_r", "y": "c_rv", "split_x": False, "split_y": True, "x_label":"$r/R_{200m}$", "y_label":"$v_r/v_{200m}$","title":"Past Snapshot", "x_ticks":r_ticks, "y_ticks":rv_ticks},
+                        {"x": "p_r", "y": "p_rv", "split_x": False, "split_y": True, "x_label":"$r/R_{200m}$", "y_label":"$v_r/v_{200m}$","title":"Current Snapshot", "x_ticks":r_ticks, "y_ticks":rv_ticks, "hide_ytick_labels":False},
+                        {"x": "p_r", "y": "p_tv", "split_x": False, "split_y": True, "x_label":"$r/R_{200m}$", "y_label":"$v_t/v_{200m}$","title":"", "x_ticks":r_ticks, "y_ticks":tv_ticks, "hide_ytick_labels":False},
+                        {"x": "p_rv", "y": "p_tv", "split_x": True, "split_y": True, "x_label":"$v_r/v_{200m}$", "y_label":"","title":"", "x_ticks":rv_ticks, "y_ticks":tv_ticks, "hide_ytick_labels":True},
+                        {"x": "c_r", "y": "c_rv", "split_x": False, "split_y": True, "x_label":"$r/R_{200m}$", "y_label":"$v_r/v_{200m}$","title":"Past Snapshot", "x_ticks":r_ticks, "y_ticks":rv_ticks, "hide_ytick_labels":False},
                     ]
                     gen_ptl_dist_plt(p_act_labels,split_scale_dict,plot_loc,plt_data_dict,ptl_dist_plot_list)
                 if misclass_plt:
                     misclass_plot_list = [
-                        {"x": "p_r", "y": "p_rv", "split_x": False, "split_y": True, "x_label":"$r/R_{200m}$", "y_label":"$v_r/v_{200m}$","title":"Current Snapshot", "x_ticks":r_ticks, "y_ticks":rv_ticks},
-                        {"x": "p_r", "y": "p_tv", "split_x": False, "split_y": True, "x_label":"$r/R_{200m}$", "y_label":"$v_t/v_{200m}$","title":"", "x_ticks":r_ticks, "y_ticks":tv_ticks},
-                        {"x": "p_rv", "y": "p_tv", "split_x": True, "split_y": True, "x_label":"$v_r/v_{200m}$", "y_label":"","title":"", "x_ticks":rv_ticks, "y_ticks":tv_ticks},
-                        {"x": "c_r", "y": "c_rv", "split_x": False, "split_y": True, "x_label":"$r/R_{200m}$", "y_label":"$v_r/v_{200m}$","title":"Past Snapshot", "x_ticks":r_ticks, "y_ticks":rv_ticks},
+                        {"x": "p_r", "y": "p_rv", "split_x": False, "split_y": True, "x_label":"$r/R_{200m}$", "y_label":"$v_r/v_{200m}$","title":"Current Snapshot", "x_ticks":r_ticks, "y_ticks":rv_ticks, "hide_ytick_labels":False},
+                        {"x": "p_r", "y": "p_tv", "split_x": False, "split_y": True, "x_label":"$r/R_{200m}$", "y_label":"$v_t/v_{200m}$","title":"", "x_ticks":r_ticks, "y_ticks":tv_ticks, "hide_ytick_labels":False},
+                        {"x": "p_rv", "y": "p_tv", "split_x": True, "split_y": True, "x_label":"$v_r/v_{200m}$", "y_label":"","title":"", "x_ticks":rv_ticks, "y_ticks":tv_ticks, "hide_ytick_labels":True},
+                        {"x": "c_r", "y": "c_rv", "split_x": False, "split_y": True, "x_label":"$r/R_{200m}$", "y_label":"$v_r/v_{200m}$","title":"Past Snapshot", "x_ticks":r_ticks, "y_ticks":rv_ticks, "hide_ytick_labels":False},
                     ]
                     gen_missclass_dist_plt(p_act_labels, preds, split_scale_dict, plot_loc, model_info, dset_name, plt_data_dict, misclass_plot_list)
                 del data 

@@ -260,7 +260,8 @@ def gen_ptl_dist_col(x_param, y_param, act_labels, split_scale_dict, ptl_lim_dic
 # Then pass in plot_combos a list of dictionaries of the keys to the data_dict of what you want plotted (left to right order for plotting)
 # and whether there should be splits in the scales (boolean value for "split_x" and "split_y") and any labels/titles
 # Example entry in the list, pass empty strings if you don't wish for labels or titles to be shown. By default x labels are only shown on the bottom row and y labels for every one: 
-# {"x": "p_r", "y": "p_rv", "split_x": False, "split_y": True, "x_label":"$r/R_{200m}$", "y_label":"$v_r/v_{200m}$","title":"Current Snapshot", "x_ticks"=[0,0.5,1,2,3,4], "y_ticks"=[-12,-6,-3,-2,-1,0,1,2,3,6,12]}
+# {"x": "p_r", "y": "p_rv", "split_x": False, "split_y": True, "x_label":"$r/R_{200m}$", "y_label":"$v_r/v_{200m}$","title":"Current Snapshot", "x_ticks":[0,0.5,1,2,3,4], "y_ticks":[-12,-6,-3,-2,-1,0,1,2,3,6,12], "hide_ytick_labels":False}
+# hide_xtick_labels is not provided as each column has the same x axis so it assumed only the bottom panel will have tick labels
 # For the ticks include both lin and log and positive and negative if that is what you wish to display
 def gen_ptl_dist_plt(act_labels, split_scale_dict, save_loc, data_dict = {}, plot_combo_list = [], \
     ptl_lim_dict = {"act_min_ptl":10,"set_ptl":0,"scale_min_ptl":1e-4,"max_frac_ptl":3.5,"min_frac_ptl":-3.5}, save_title=""):
@@ -318,10 +319,10 @@ def gen_ptl_dist_plt(act_labels, split_scale_dict, save_loc, data_dict = {}, plo
                 text_inf = ""
                 text_orb = ""
                 text_frac = ""
-            all_plt_list.append(imshow_plot(fig.add_subplot(gs[1,i]),all_fhist,y_label=plot_combo["y_label"],text=text_all,title=plot_combo["title"],hide_xtick_labels=True,xticks=plot_combo["x_ticks"],yticks=plot_combo["y_ticks"],ylinthrsh=linthrsh,number="D"+str(i+1),kwargs=plot_kwargs,return_img=True))
-            inf_plt_list.append(imshow_plot(fig.add_subplot(gs[2,i]),inf_fhist,y_label=plot_combo["y_label"],text=text_inf,hide_xtick_labels=True,xticks=plot_combo["x_ticks"],yticks=plot_combo["y_ticks"],ylinthrsh=linthrsh,number="D"+str(i+5),kwargs=plot_kwargs,return_img=True)  )
-            orb_plt_list.append(imshow_plot(fig.add_subplot(gs[3,i]),orb_fhist,y_label=plot_combo["y_label"],text=text_orb,hide_xtick_labels=True,yticks=plot_combo["y_ticks"],ylinthrsh=linthrsh,number="D"+str(i+9),kwargs=plot_kwargs,return_img=True))
-            frac_plt_list.append(imshow_plot(fig.add_subplot(gs[4,i]),hist_frac,x_label=plot_combo["x_label"],y_label=plot_combo["y_label"],text=text_frac, xticks=plot_combo["x_ticks"],yticks=plot_combo["y_ticks"],ylinthrsh=linthrsh,number="D"+str(i+13),kwargs=frac_plot_kwargs,return_img=True))
+            all_plt_list.append(imshow_plot(fig.add_subplot(gs[1,i]),all_fhist,y_label=plot_combo["y_label"],text=text_all,title=plot_combo["title"],hide_xtick_labels=True,hide_ytick_labels=plot_combo["hide_ytick_labels"],xticks=plot_combo["x_ticks"],yticks=plot_combo["y_ticks"],ylinthrsh=linthrsh,number="D"+str(i+1),kwargs=plot_kwargs,return_img=True))
+            inf_plt_list.append(imshow_plot(fig.add_subplot(gs[2,i]),inf_fhist,y_label=plot_combo["y_label"],text=text_inf,hide_xtick_labels=True,hide_ytick_labels=plot_combo["hide_ytick_labels"],xticks=plot_combo["x_ticks"],yticks=plot_combo["y_ticks"],ylinthrsh=linthrsh,number="D"+str(i+5),kwargs=plot_kwargs,return_img=True)  )
+            orb_plt_list.append(imshow_plot(fig.add_subplot(gs[3,i]),orb_fhist,y_label=plot_combo["y_label"],text=text_orb,hide_xtick_labels=True,hide_ytick_labels=plot_combo["hide_ytick_labels"],yticks=plot_combo["y_ticks"],ylinthrsh=linthrsh,number="D"+str(i+9),kwargs=plot_kwargs,return_img=True))
+            frac_plt_list.append(imshow_plot(fig.add_subplot(gs[4,i]),hist_frac,x_label=plot_combo["x_label"],y_label=plot_combo["y_label"],text=text_frac,hide_ytick_labels=plot_combo["hide_ytick_labels"],xticks=plot_combo["x_ticks"],yticks=plot_combo["y_ticks"],ylinthrsh=linthrsh,number="D"+str(i+13),kwargs=frac_plot_kwargs,return_img=True))
         
         # Can just do the all particle arrays since inf/orb will have equal or less
         max_ptl = np.nanmax(np.array(all_max_ptls))
@@ -455,18 +456,16 @@ def gen_missclass_dist_plt(act_labels, pred_labels, split_scale_dict, save_loc, 
             scale_inc_all_fhist, scale_inc_inf_fhist, scale_inc_orb_fhist = gen_missclass_col(x_param, y_param, inc_inf_fltr, inc_orb_fltr, act_labels, split_scale_dict, ptl_lim_dict, plot_combo["split_x"], plot_combo["split_y"])
 
             if i == 0:
-                text_all = "All Particles"
-                text_inf = "Infalling Particles"
-                text_orb = "Orbiting Particles"
-                text_frac = r"$N_{infalling} / N_{orbiting}$"
+                text_all = "All Misclassified"
+                text_inc_inf = "Label: Orbit\nReal: Infall"
+                text_inc_orb = "Label: Infall\nReal: Orbit"
             else:
                 text_all = ""
-                text_inf = ""
-                text_orb = ""
-                text_frac = ""
-            imshow_plot(fig.add_subplot(gs[1,i]),scale_inc_all_fhist,y_label=plot_combo["y_label"],hide_xtick_labels=True,text="All Misclassified",xticks=plot_combo["x_ticks"],yticks=plot_combo["y_ticks"],ylinthrsh=linthrsh,number="S"+str(i+1),kwargs=scale_miss_class_args, title=plot_combo["title"])
-            imshow_plot(fig.add_subplot(gs[2,i]),scale_inc_inf_fhist,hide_xtick_labels=True,y_label=plot_combo["y_label"],text="Label: Orbit\nReal: Infall",xticks=plot_combo["x_ticks"],yticks=plot_combo["y_ticks"],ylinthrsh=linthrsh,number="S"+str(i+5),kwargs=scale_miss_class_args)
-            imshow_plot(fig.add_subplot(gs[3,i]),scale_inc_orb_fhist,x_label=plot_combo["x_label"],y_label=plot_combo["y_label"],text="Label: Infall\nReal: Orbit",xticks=plot_combo["x_ticks"],yticks=plot_combo["y_ticks"],ylinthrsh=linthrsh,number="S"+str(i+9),kwargs=scale_miss_class_args)
+                text_inc_inf = ""
+                text_inc_orb = ""
+            imshow_plot(fig.add_subplot(gs[1,i]),scale_inc_all_fhist,y_label=plot_combo["y_label"],hide_xtick_labels=True,hide_ytick_labels=plot_combo["hide_ytick_labels"],text=text_all,xticks=plot_combo["x_ticks"],yticks=plot_combo["y_ticks"],ylinthrsh=linthrsh,number="S"+str(i+1),kwargs=scale_miss_class_args, title=plot_combo["title"])
+            imshow_plot(fig.add_subplot(gs[2,i]),scale_inc_inf_fhist,hide_xtick_labels=True,hide_ytick_labels=plot_combo["hide_ytick_labels"],y_label=plot_combo["y_label"],text=text_inc_inf,xticks=plot_combo["x_ticks"],yticks=plot_combo["y_ticks"],ylinthrsh=linthrsh,number="S"+str(i+5),kwargs=scale_miss_class_args)
+            imshow_plot(fig.add_subplot(gs[3,i]),scale_inc_orb_fhist,hide_ytick_labels=plot_combo["hide_ytick_labels"],x_label=plot_combo["x_label"],y_label=plot_combo["y_label"],text=text_inc_orb,xticks=plot_combo["x_ticks"],yticks=plot_combo["y_ticks"],ylinthrsh=linthrsh,number="S"+str(i+9),kwargs=scale_miss_class_args)
         
         color_bar = plt.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=ptl_lim_dict["inc_min_ptl"], vmax=1),cmap=magma_cmap), cax=plt.subplot(gs[1:,-1]))
         color_bar.set_label(r"$N_{\mathrm{bin, inc}} / N_{\mathrm{bin, tot}}$",fontsize=22)
