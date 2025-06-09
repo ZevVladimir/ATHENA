@@ -11,8 +11,8 @@ import pandas as pd
 import psutil
 import argparse
 
-from src.utils.util_fxns import load_SPARTA_data, load_ptl_param, get_comp_snap_info, create_directory, load_pickle, save_pickle, load_config
-from src.utils.calc_fxns import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_tdyn, calc_rho, calc_halo_mem, calc_tdyn_col
+from src.utils.util_fxns import load_SPARTA_data, load_ptl_param, get_comp_snap_info, create_directory, load_pickle, save_pickle, load_config, get_past_z
+from src.utils.calc_fxns import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_rho, calc_halo_mem, calc_tdyn
 from src.utils.prfl_fxns import create_mass_prf, compare_prfs
 from utils.util_fxns import timed, clean_dir, find_closest_z_snap, get_num_snaps, split_sparta_hdf5_name
 ##################################################################################################################
@@ -437,11 +437,10 @@ with timed("Generating Datasets for " + curr_sparta_file):
             
         with timed("Load Complementary Snapshots"):
             if reset_lvl > 1 or len(known_snaps) == 0:
-                for t_dyn_step in all_tdyn_steps:
-                    t_dyn = calc_tdyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], input_z, little_h)
-                    print("My Tdyn",t_dyn)
-                    t_dyn = calc_tdyn_col(cosmol,input_z,little_h)
-                    c_snap_dict = get_comp_snap_info(t_dyn=t_dyn, t_dyn_step=t_dyn_step, cosmol = cosmol, p_red_shift=input_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
+                for tdyn_step in all_tdyn_steps:                    
+                    past_z = get_past_z(cosmol, input_z, tdyn_step=tdyn_step)
+                    c_snap_dict = get_comp_snap_info(cosmol = cosmol, past_z=past_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
+                    
                     c_snap = c_snap_dict["ptl_snap"]
                     c_sparta_snap = c_snap_dict["sparta_snap"]
                     comp_z = c_snap_dict["red_shift"]
@@ -454,7 +453,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         "ptl_snap":c_snap,
                         "sparta_snap":c_sparta_snap,
                         "red_shift":comp_z,
-                        "t_dyn_step":t_dyn_step,
+                        "t_dyn_step":tdyn_step,
                         "scale_factor": comp_a,
                         "hubble_const": c_hubble_const,
                         "box_size": c_box_size,
@@ -462,21 +461,21 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         "rho_m":c_rho_m
                     }
                     all_ptl_snap_list.append(c_snap)
-                    all_snap_info["comp_" + str(t_dyn_step) + "_tdstp_snap_info"] = c_snap_dict
+                    all_snap_info["comp_" + str(tdyn_step) + "_tdstp_snap_info"] = c_snap_dict
             else:
                 for key, c_snap_dict in dset_params["all_snap_info"].items():
                     if key == "prime_snap_info":
                         continue
                     c_snap = c_snap_dict["ptl_snap"]
                     c_sparta_snap = c_snap_dict["sparta_snap"]
-                    t_dyn_step = c_snap_dict["t_dyn_step"],
+                    tdyn_step = c_snap_dict["t_dyn_step"],
                     comp_z = c_snap_dict["red_shift"]
                     comp_a = c_snap_dict["scale_factor"]
                     c_hubble_const = c_snap_dict["hubble_const"]
                     c_box_size = c_snap_dict["box_size"]
                     all_ptl_snap_list.append(c_snap)
 
-                    all_snap_info["comp_" + str(t_dyn_step[0]) + "_tdstp_snap_info"] = c_snap_dict
+                    all_snap_info["comp_" + str(tdyn_step[0]) + "_tdstp_snap_info"] = c_snap_dict
         if len(all_tdyn_steps) > 0:
             c_halos_status = sparta_params[sparta_param_names[3]][:,c_sparta_snap]
 
@@ -783,4 +782,5 @@ with timed("Generating Datasets for " + curr_sparta_file):
                 ptl_idx += p_test_nptls
                 if debug_mem == 1:
                     print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
+
                 

@@ -9,7 +9,7 @@ from colossus.lss.peaks import peakHeight
 from colossus.halo.mass_so import M_to_R
 from matplotlib.legend_handler import HandlerTuple
 
-from .util_fxns import load_SPARTA_data, load_pickle, load_config, get_comp_snap_info, timed, load_sparta_mass_prf
+from .util_fxns import load_SPARTA_data, load_pickle, load_config, get_comp_snap_info, timed, load_sparta_mass_prf, get_past_z
 from .calc_fxns import calc_rho, calc_mass_acc_rate, calc_tdyn
 from .ML_fxns import split_sparta_hdf5_name
 from .util_fxns import parse_ranges, set_cosmology
@@ -721,8 +721,8 @@ def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol,split_scale_dict,pl
                 all_sparta_z = dic_sim['snap_z']
                 little_h = dic_sim["h"]
                 
-                t_dyn = calc_tdyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]], curr_z, little_h)
-                c_snap_dict = get_comp_snap_info(t_dyn=t_dyn, t_dyn_step=1, cosmol = cosmol, p_red_shift=curr_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
+                past_z = get_past_z(cosmol, curr_z, tdyn_step=1)
+                c_snap_dict = get_comp_snap_info(cosmol = cosmol, past_z=past_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
                 c_sparta_snap = c_snap_dict["sparta_snap"]
             c_halos_r200m = sparta_params[sparta_param_names[0]][:,c_sparta_snap]
             c_halos_r200m = c_halos_r200m[curr_idxs]

@@ -14,6 +14,7 @@ import ast
 import configparser
 from pygadgetreader import readheader
 from colossus.cosmology import cosmology
+from colossus.halo import mass_so
 from colossus.lss import peaks
 import time
 from contextlib import contextmanager
@@ -141,31 +142,34 @@ def load_RSTAR_data(rockstar_loc, param_list, curr_z):
 
     return param_data 
 
-def get_comp_snap_info(t_dyn, t_dyn_step, cosmol, p_red_shift, all_sparta_z, snap_dir_format, snap_format, snap_path):
+# Using dynamical time find the time tdyn_step dynamical times ago and convert that to redshift
+def get_past_z(cosmol, init_z, tdyn_step, mass_def = "200m"):
+    tdyn = mass_so.dynamicalTime(init_z,mass_def,"crossing")
+    curr_time = cosmol.age(init_z)
+    past_time = curr_time - (tdyn_step * tdyn)
+    
+    past_z = cosmol.age(past_time,inverse=True)
+    return past_z
+
+def get_comp_snap_info(cosmol, past_z, all_sparta_z, snap_dir_format, snap_format, snap_path):
     c_snap_dict = {}
-    # calculate one dynamical time ago and set that as the comparison snap
-    curr_time = cosmol.age(p_red_shift)
-    past_time = curr_time - (t_dyn_step * t_dyn)
-    c_snap = find_closest_snap(past_time, cosmol, snap_path, snap_dir_format, snap_format)
+    
+    c_snap, idx = find_closest_z_snap(past_z,snap_path,snap_dir_format,snap_format)
     
     c_snap_dict["ptl_snap"] = c_snap
-    
-    # switch to comparison snap
-    c_snap_path = snap_path + "/snapdir_" + snap_dir_format.format(c_snap) + "/snapshot_" + snap_format.format(c_snap)
-        
+
     # get constants from pygadgetreader
-    c_red_shift = readheader(c_snap_path, 'redshift')
-    c_sparta_snap = np.abs(all_sparta_z - c_red_shift).argmin()
+    c_sparta_snap = np.abs(all_sparta_z - past_z).argmin()
     c_snap_dict["sparta_snap"] = c_sparta_snap
     
-    print("Complementary snapshot:", c_snap, "Complementary redshift:", c_red_shift)
+    print("Complementary snapshot:", c_snap, "Complementary redshift:", past_z)
     print("Corresponding SPARTA loc:", c_sparta_snap, "SPARTA redshift:",all_sparta_z[c_sparta_snap])
 
-    c_scale_factor = 1/(1+c_red_shift)
-    c_rho_m = cosmol.rho_m(c_red_shift)
-    c_hubble_const = cosmol.Hz(c_red_shift) * 0.001 # convert to units km/s/kpc
+    c_scale_factor = 1/(1+past_z)
+    c_rho_m = cosmol.rho_m(past_z)
+    c_hubble_const = cosmol.Hz(past_z) * 0.001 # convert to units km/s/kpc
     
-    c_snap_dict["red_shift"] = c_red_shift
+    c_snap_dict["red_shift"] = past_z
     c_snap_dict["scale_factor"] = c_scale_factor
     c_snap_dict["rho_m"] = c_rho_m
     c_snap_dict["hubble_const"] = c_hubble_const
@@ -415,7 +419,6 @@ def count_n_ptls_used(sims):
             df = pd.read_hdf(ML_dset_path + sim + "/" + "Test" + "/halo_info/" + file)
             print("File " + str(i) + ":",df["Halo_n"].values.sum())
         
-
 # Returns an inputted dataframe with only the halos that fit within the inputted ranges of nus (peak height)
 def filter_df_with_nus(df,nus,halo_first,halo_n, nu_splits):    
     # First masks which halos are within the inputted nu ranges
