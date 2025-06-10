@@ -6,7 +6,7 @@ import argparse
 
 from src.utils.ML_fxns import setup_client, get_combined_name, get_model_name, extract_snaps
 from src.utils.ke_cut_fxns import load_ke_data, fast_ke_predictor
-from src.utils.util_fxns import set_cosmology, create_directory, save_pickle, load_pickle, load_config, load_SPARTA_data, split_sparta_hdf5_name
+from src.utils.util_fxns import create_directory, save_pickle, load_pickle, load_config, load_SPARTA_data, split_sparta_hdf5_name
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
