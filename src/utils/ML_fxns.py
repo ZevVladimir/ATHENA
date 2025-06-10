@@ -157,17 +157,14 @@ def get_combined_name(model_sims):
         split_string = sim.split('_')
         snap_list = extract_snaps(sim)
         
-        r_patt = r'(\d+-\d+|\d+)r'
-        r_match = re.search(r_patt,split_string[3])
-
-        
-        v_patt = r'(\d+-\d+|\d+)v'
-        v_match = re.search(v_patt, split_string[4])
-
-
         cond_string = split_string[0] + split_string[1] + split_string[2] + "s" 
         cond_string = cond_string + "_".join(str(x) for x in snap_list)
         # can add these for more information per name
+        # r_patt = r'(\d+-\d+|\d+)r'
+        # r_match = re.search(r_patt,split_string[3])
+
+        # v_patt = r'(\d+-\d+|\d+)v'
+        # v_match = re.search(v_patt, split_string[4])
         #+ "r" + r_match.group(1) + "v" + v_match.group(1) + "s" + split_string[5]
         
         combined_name += cond_string

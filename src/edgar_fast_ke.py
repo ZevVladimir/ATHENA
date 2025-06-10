@@ -20,7 +20,7 @@ args = parser.parse_args()
 config_params = load_config(args.config)
 
 path_to_models = config_params["PATHS"]["path_to_models"]
-debug_plt_path = config_params["PATHS"]["debug_plt_path"]
+save_plt_path = config_params["PATHS"]["save_plt_path"]
 
 SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 
@@ -256,7 +256,7 @@ if __name__ == "__main__":
 
         # Generic prediction function I wrote feel free to replace with yours since I don't think mine matches OASIS since I don't use bound radii and only R200m
         ############################################################################################################################################################
-        fast_mask_orb, preds_fast_ke = fast_ke_predictor(ke_param_dict, r_test, vr_test, lnv2_test, r_cut_calib)
+        fast_mask_orb, preds_fast_ke = fast_ke_predictor(ke_param_dict, r_test, vr_test, lnv2_test, r_cut_pred)
         ############################################################################################################################################################
              
         bin_indices = np.digitize(r_test, bins) - 1  # subtract 1 to make bins zero-indexed
@@ -291,6 +291,6 @@ if __name__ == "__main__":
         ax.set_ylim(0,1)
         ax.tick_params(axis='both', labelsize=tick_fntsize, length=6,width=2, direction="in")
         
-        fig.savefig(debug_plt_path + test_comb_name + "_forb_by_rad.pdf",dpi=400)
+        fig.savefig(save_plt_path + test_comb_name + "_forb_by_rad.pdf",dpi=400)
         
             
