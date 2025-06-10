@@ -18,7 +18,6 @@ config_params = load_config(os.getcwd() + "/config.ini")
 rand_seed = config_params["MISC"]["random_seed"]
 curr_sparta_file = config_params["SPARTA_DATA"]["curr_sparta_file"]
 debug_indiv_dens_prf = config_params["MISC"]["debug_indiv_dens_prf"]
-pickle_data = config_params["MISC"]["pickle_data"]
 
 snap_path = config_params["SNAP_DATA"]["snap_path"]
 

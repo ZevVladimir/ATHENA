@@ -18,6 +18,7 @@ from colossus.halo import mass_so
 from colossus.lss import peaks
 import time
 from contextlib import contextmanager
+from colossus.utils import constants
 
 from .calc_fxns import calc_scal_pos_weight
 
@@ -47,7 +48,7 @@ ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 
 SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 
-pickle_data = config_params["MISC"]["pickle_data"]
+save_intermediate_data = config_params["MISC"]["save_intermediate_data"]
 ##################################################################################################################
 
 def save_pickle(data, path):
@@ -71,8 +72,7 @@ def load_joblib(path):
     else:
         raise FileNotFoundError
 
-#TODO check if save_pickle/save_data is checked to actually save it
-def load_ptl_param(sparta_name, param_name, snap, snap_path):
+def load_ptl_param(sparta_name, param_name, snap, snap_path, save_data=False):
     # save to folder containing pickled data to be accessed easily later
     file_path = pickled_path + str(snap) + "_" + str(sparta_name) + "/" + param_name + "_" + str(snap) + ".pickle" 
     create_directory(pickled_path + str(snap) +  "_" + str(sparta_name) + "/")
@@ -82,11 +82,12 @@ def load_ptl_param(sparta_name, param_name, snap, snap_path):
         ptl_param = load_joblib(file_path)
     except FileNotFoundError:
         ptl_param = readsnap(snap_path, param_name, 'dm')
-        save_joblib(ptl_param,file_path)
+        if save_data:
+            save_joblib(ptl_param,file_path)
 
     return ptl_param
 
-def load_SPARTA_data(sparta_HDF5_path, param_path_list, sparta_name, pickle_data=False):
+def load_SPARTA_data(sparta_HDF5_path, param_path_list, sparta_name, save_data=False):
     create_directory(pickled_path + str(sparta_name) + "/")
     
     reload_sparta = False
@@ -105,7 +106,7 @@ def load_SPARTA_data(sparta_HDF5_path, param_path_list, sparta_name, pickle_data
                 reload_sparta = True
         
             param = reduce(lambda dct, key: dct[key], param_path, sparta_output)
-            if pickle_data:
+            if save_data:
                 save_joblib(param,pickled_path + str(sparta_name) +  "/" + save_name + ".pickle")
 
         param_dict[save_name] = param
@@ -145,9 +146,20 @@ def load_RSTAR_data(rockstar_loc, param_list, curr_z):
 # Using dynamical time find the time tdyn_step dynamical times ago and convert that to redshift
 def get_past_z(cosmol, init_z, tdyn_step, mass_def = "200m"):
     tdyn = mass_so.dynamicalTime(init_z,mass_def,"crossing")
+    
     curr_time = cosmol.age(init_z)
     past_time = curr_time - (tdyn_step * tdyn)
-    
+    past_z = cosmol.age(past_time,inverse=True)
+    return past_z
+
+def alt_get_past_z(cosmol, halo_r200m, init_z, tdyn_step, little_h, mass_def = "200m"):
+    G = constants.G
+    halo_m200m = mass_so.R_to_M(halo_r200m, init_z, mass_def)
+    curr_v200m = np.sqrt((G * halo_m200m)/halo_r200m)
+    tdyn = ((2*halo_r200m)/curr_v200m) * little_h
+
+    curr_time = cosmol.age(init_z)
+    past_time = curr_time - (tdyn_step * tdyn)
     past_z = cosmol.age(past_time,inverse=True)
     return past_z
 
@@ -162,7 +174,9 @@ def get_comp_snap_info(cosmol, past_z, all_sparta_z, snap_dir_format, snap_forma
     c_sparta_snap = np.abs(all_sparta_z - past_z).argmin()
     c_snap_dict["sparta_snap"] = c_sparta_snap
     
-    print("Complementary snapshot:", c_snap, "Complementary redshift:", past_z)
+    snap_z = readheader(snap_path + "snapdir_" + snap_dir_format.format(c_snap) + "/snapshot_" + snap_format.format(c_snap), 'redshift')
+    
+    print("Complementary snapshot:", c_snap, "Complementary redshift:", snap_z)
     print("Corresponding SPARTA loc:", c_sparta_snap, "SPARTA redshift:",all_sparta_z[c_sparta_snap])
 
     c_scale_factor = 1/(1+past_z)
@@ -192,7 +206,7 @@ def load_sim_mass_pz(sim,config_params):
     
     param_paths = [["simulation","particle_mass"]]
             
-    sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, pickle_data=pickle_data)
+    sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, save_data=save_intermediate_data)
     ptl_mass = sparta_params[sparta_param_names[0]]
     
     return ptl_mass, p_red_shift
@@ -221,7 +235,7 @@ def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"      
         
         param_paths = [["simulation","particle_mass"],["anl_prf","M_all"],["anl_prf","M_1halo"],["halos","R200m"],["config","anl_prf","r_bins_lin"]]
-        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, pickle_data=pickle_data)
+        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, save_data=save_intermediate_data)
         ptl_mass = sparta_params[sparta_param_names[0]]
 
         mass_prf_all_list.append(sparta_params[sparta_param_names[1]][use_idxs,p_sparta_snap,:])

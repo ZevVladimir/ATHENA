@@ -16,7 +16,7 @@ config_params = load_config(os.getcwd() + "/config.ini")
 ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 path_to_models = config_params["PATHS"]["path_to_models"]
 
-pickle_data = config_params["MISC"]["pickle_data"]
+save_intermediate_data = config_params["MISC"]["save_intermediate_data"]
 
 snap_path = config_params["SNAP_DATA"]["snap_path"]
 SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
@@ -94,13 +94,13 @@ if __name__ == "__main__":
                 p_sparta_snap = dset_params["all_snap_info"]["prime_snap_info"]["sparta_snap"]
                 all_tdyn_steps = dset_params["t_dyn_steps"]
 
-            halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_SPARTA_data(sparta_HDF5_path,sparta_search_name, p_scale_factor, p_snap, p_sparta_snap, pickle_data=pickle_data)
+            halos_pos, halos_r200m, halos_id, halos_status, halos_last_snap, parent_id, ptl_mass = load_SPARTA_data(sparta_HDF5_path,sparta_search_name, p_scale_factor, p_snap, p_sparta_snap, save_data=save_intermediate_data)
 
             p_snap_path = snap_path + "snapdir_" + snap_dir_format.format(p_snap) + "/snapshot_" + snap_format.format(p_snap)
 
-            ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(p_snap), p_snap_path) * 10**3 * p_scale_factor # kpc/h
-            ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(p_snap), p_snap_path) # km/s
-            ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(p_snap), p_snap_path)       
+            ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(p_snap), p_snap_path, save_data=save_intermediate_data) * 10**3 * p_scale_factor # kpc/h
+            ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(p_snap), p_snap_path, save_data=save_intermediate_data) # km/s
+            ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(p_snap), p_snap_path, save_data=save_intermediate_data)       
 
             halo_files = []
             halo_dfs = []

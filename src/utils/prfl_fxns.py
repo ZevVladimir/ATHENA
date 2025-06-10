@@ -20,7 +20,7 @@ config_dict = load_config(os.getcwd() + "/config.ini")
 rand_seed = config_dict["MISC"]["random_seed"]
 curr_sparta_file = config_dict["SPARTA_DATA"]["curr_sparta_file"]
 debug_indiv_dens_prf = config_dict["MISC"]["debug_indiv_dens_prf"]
-pickle_data = config_dict["MISC"]["pickle_data"]
+save_intermediate_data = config_dict["MISC"]["save_intermediate_data"]
 
 snap_path = config_dict["SNAP_DATA"]["snap_path"]
 
@@ -680,7 +680,7 @@ def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol,split_scale_dict,pl
                 
         # Load the halo's positions and radii
         param_paths = [["halos","R200m"]]
-        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, pickle_data=pickle_data)
+        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, save_data=save_intermediate_data)
         p_halos_r200m = sparta_params[sparta_param_names[0]][:,p_sparta_snap]
 
         p_halos_r200m = p_halos_r200m[curr_idxs]

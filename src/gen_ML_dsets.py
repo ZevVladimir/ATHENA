@@ -41,7 +41,7 @@ debug_indiv_dens_prf = config_params["MISC"]["debug_indiv_dens_prf"]
 sim_cosmol = config_params["MISC"]["sim_cosmol"]
 reset_lvl = config_params["MISC"]["reset_search"]
 mp_chunk_size = config_params["MISC"]["mp_chunk_size"]
-pickle_data = config_params["MISC"]["pickle_data"]
+save_intermediate_data = config_params["MISC"]["save_intermediate_data"]
 
 snap_dir_format = config_params["SNAP_DATA"]["snap_dir_format"]
 snap_format = config_params["SNAP_DATA"]["snap_format"]
@@ -255,7 +255,7 @@ def halo_loop(ptl_idx, curr_iter, num_iter, indices, halo_splits, snap_dict, use
             # Load the halo information for the ids within this range
             param_paths = [["halos","R200m"],["halos","position"],["halos","ptl_oct_first"],["halos","ptl_oct_n"],["halos","velocity"],["tcr_ptl","res_oct","last_pericenter_snap"],\
                 ["tcr_ptl","res_oct","n_pericenter"],["tcr_ptl","res_oct","tracer_id"],["tcr_ptl","res_oct","n_is_lower_limit"],["anl_prf","M_all"],["anl_prf","M_1halo"],["config","anl_prf","r_bins_lin"]]
-            sparta_params, sparta_param_names = load_SPARTA_data(sparta_HDF5_path, param_paths, sparta_search_name ,pickle_data=pickle_data)
+            sparta_params, sparta_param_names = load_SPARTA_data(sparta_HDF5_path, param_paths, sparta_search_name ,save_data=save_intermediate_data)
 
             use_halos_r200m = sparta_params[sparta_param_names[0]][use_indices,curr_sparta_snap]
             use_halos_pos = sparta_params[sparta_param_names[1]][use_indices,curr_sparta_snap] * 10**3 * curr_a
@@ -369,8 +369,8 @@ with timed("Generating Datasets for " + curr_sparta_file):
         with timed("Primary Snapshot Information Load"):
             if reset_lvl > 1:
                 prime_snap_dict = {}
-                p_snap, input_z = find_closest_z_snap(input_z,snap_path,snap_dir_format,snap_format)
-                print("Snapshot number found:", p_snap, "Closest redshift found:", input_z)
+                p_snap, prim_z = find_closest_z_snap(input_z,snap_path,snap_dir_format,snap_format)
+                print("Snapshot number found:", p_snap, "Closest redshift found:", prim_z)
                 
                 with h5py.File(sparta_HDF5_path,"r") as f:
                     dic_sim = {}
@@ -379,21 +379,21 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         dic_sim[f] = grp_sim.attrs[f]
                     
                 all_sparta_z = dic_sim['snap_z']
-                p_sparta_snap = np.abs(all_sparta_z - input_z).argmin()
+                p_sparta_snap = np.abs(all_sparta_z - prim_z).argmin()
                 
                 print("corresponding SPARTA snap num:", p_sparta_snap)
                 print("check sparta redshift:",all_sparta_z[p_sparta_snap])   
                 
-                prime_a = 1/(1+input_z)
-                p_rho_m = cosmol.rho_m(input_z) # units of M_sun * h^2 * kpc^-3
-                p_hubble_const = cosmol.Hz(input_z) / 1e3 # convert from km/s/Mpc to units km/s/kpc
+                prime_a = 1/(1+prim_z)
+                p_rho_m = cosmol.rho_m(prim_z) # units of M_sun * h^2 * kpc^-3
+                p_hubble_const = cosmol.Hz(prim_z) / 1e3 # convert from km/s/Mpc to units km/s/kpc
                 sim_box_size = dic_sim["box_size"] #units Mpc/h comoving
                 p_box_size = sim_box_size * 10**3 * prime_a #convert to Kpc/h physical
                 little_h = dic_sim["h"] # units of km/s/Mpc
                 prime_snap_dict = {
                     "ptl_snap":p_snap,
                     "sparta_snap":p_sparta_snap,
-                    "red_shift":input_z,
+                    "red_shift":prim_z,
                     "scale_factor": prime_a,
                     "hubble_const": p_hubble_const,
                     "box_size": p_box_size,
@@ -403,7 +403,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
             else:
                 prime_snap_dict = dset_params["all_snap_info"]["prime_snap_info"]
                 p_snap = dset_params["all_snap_info"]["prime_snap_info"]["ptl_snap"]
-                input_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"]
+                prim_z = dset_params["all_snap_info"]["prime_snap_info"]["red_shift"]
                 p_sparta_snap = dset_params["all_snap_info"]["prime_snap_info"]["sparta_snap"]
                 prime_a = dset_params["all_snap_info"]["prime_snap_info"]["scale_factor"]
                 p_hubble_const = dset_params["all_snap_info"]["prime_snap_info"]["hubble_const"]
@@ -419,14 +419,14 @@ with timed("Generating Datasets for " + curr_sparta_file):
 
         # load all information needed for the primary snap
         with timed("p_snap ptl load"):
-            p_ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(p_snap), p_snap_path) 
-            p_ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(p_snap), p_snap_path) # km/s
-            p_ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(p_snap), p_snap_path) * 10**3 * prime_a # kpc/h
+            p_ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(p_snap), p_snap_path, save_data=save_intermediate_data) 
+            p_ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(p_snap), p_snap_path, save_data=save_intermediate_data) # km/s
+            p_ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(p_snap), p_snap_path, save_data=save_intermediate_data) * 10**3 * prime_a # kpc/h
         
         with timed("p_snap SPARTA load"):
             param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"],["simulation","particle_mass"]]
                 
-            sparta_params, sparta_param_names = load_SPARTA_data(sparta_HDF5_path, param_paths, curr_sparta_file, pickle_data=pickle_data)
+            sparta_params, sparta_param_names = load_SPARTA_data(sparta_HDF5_path, param_paths, curr_sparta_file, save_data=save_intermediate_data)
 
             p_halos_pos = sparta_params[sparta_param_names[0]][:,p_sparta_snap,:] * 10**3 * prime_a # convert to kpc/h
             p_halos_r200m = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
@@ -437,8 +437,15 @@ with timed("Generating Datasets for " + curr_sparta_file):
             
         with timed("Load Complementary Snapshots"):
             if reset_lvl > 1 or len(known_snaps) == 0:
-                for tdyn_step in all_tdyn_steps:                    
-                    past_z = get_past_z(cosmol, input_z, tdyn_step=tdyn_step)
+                for tdyn_step in all_tdyn_steps:
+                    tdyn = calc_tdyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]],prim_z,little_h)
+                    curr_time = cosmol.age(prim_z)
+                    past_time = curr_time - (tdyn * 1)
+                    past_z = cosmol.age(past_time,inverse=True)
+                    print("Calculated past redshift formula 0.5 tdyn:",past_z)
+                                        
+                    past_z = get_past_z(cosmol, prim_z, tdyn_step=tdyn_step)
+                    print("Calculated past redshift colossus 1 tdyn:",past_z)
                     c_snap_dict = get_comp_snap_info(cosmol = cosmol, past_z=past_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
                     
                     c_snap = c_snap_dict["ptl_snap"]
@@ -490,7 +497,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                 p_ptl_tree = load_pickle(save_location + "p_ptl_tree.pickle")
         else:
             p_ptl_tree = KDTree(data = p_ptls_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size) # construct search trees for primary snap
-            if pickle_data:
+            if save_intermediate_data:
                 save_pickle(p_ptl_tree,save_location + "p_ptl_tree.pickle")
 
         if os.path.isfile(save_location + "num_ptls.pickle") and os.path.isfile(save_location + "match_halo_idxs.pickle") and reset_lvl < 2:
@@ -636,15 +643,15 @@ with timed("Generating Datasets for " + curr_sparta_file):
             if i > 0:
                 # load particle data for the comparison snap
                 with timed("c_snap ptl load"):
-                    curr_ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(curr_ptl_snap), curr_snap_path) 
-                    curr_ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(curr_ptl_snap), curr_snap_path) # km/s
-                    curr_ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(curr_ptl_snap), curr_snap_path) * 10**3 * curr_a # kpc/h
+                    curr_ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(curr_ptl_snap), curr_snap_path, save_data=save_intermediate_data) 
+                    curr_ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(curr_ptl_snap), curr_snap_path, save_data=save_intermediate_data) # km/s
+                    curr_ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(curr_ptl_snap), curr_snap_path, save_data=save_intermediate_data) * 10**3 * curr_a # kpc/h
             
                 if os.path.isfile(save_location + str(curr_ptl_snap) + "_ptl_tree.pickle") and reset_lvl < 2:
                     curr_ptl_tree = load_pickle(save_location + str(curr_ptl_snap) + "_ptl_tree.pickle")
                 else:
                     curr_ptl_tree = KDTree(data = curr_ptls_pos, leafsize = 3, balanced_tree = False, boxsize = curr_box_size)
-                    if pickle_data:
+                    if save_intermediate_data:
                         save_pickle(curr_ptl_tree, save_location +  str(curr_ptl_snap) + "_ptl_tree.pickle")        
     
             train_num_iter = len(curr_train_halo_splits)

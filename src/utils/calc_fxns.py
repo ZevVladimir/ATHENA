@@ -156,12 +156,12 @@ def calc_tang_vel(rv, phys_v_comp, rhat):
     return tv
 
 # Calculate the dynamical time based on 200m 
-def calc_tdyn(halo_r200m, red_shift, little_h):
-    halo_m200m = mass_so.R_to_M(halo_r200m, red_shift, "200m")
+def calc_tdyn(halo_r200m, curr_z, little_h):
+    halo_m200m = mass_so.R_to_M(halo_r200m, curr_z, "200m")
     curr_v200m = calc_v200m(halo_m200m, halo_r200m)
-    t_dyn = (2*halo_r200m)/curr_v200m
- 
-    return t_dyn * little_h
+    tdyn = (2*halo_r200m)/curr_v200m * little_h
+
+    return tdyn 
 
 def calc_tdyn_col(cosmol,curr_z,little_h):
     rho_c = cosmol.rho_c(curr_z)

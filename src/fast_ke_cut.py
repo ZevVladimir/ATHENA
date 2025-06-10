@@ -15,8 +15,6 @@ ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 path_to_models = config_params["PATHS"]["path_to_models"]
 rockstar_ctlgs_path = config_params["PATHS"]["rockstar_ctlgs_path"]
 
-pickle_data = config_params["MISC"]["pickle_data"]
-
 SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 
 features = config_params["TRAIN_MODEL"]["features"]

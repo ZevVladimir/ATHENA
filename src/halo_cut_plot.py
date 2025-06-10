@@ -18,7 +18,7 @@ SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 path_to_models = config_params["PATHS"]["path_to_models"]
 
-pickle_data = config_params["MISC"]["pickle_data"]
+save_intermediate_data = config_params["MISC"]["save_intermediate_data"]
 
 curr_sparta_file = config_params["SPARTA_DATA"]["curr_sparta_file"]
 snap_dir_format = config_params["SNAP_DATA"]["snap_dir_format"]
@@ -69,7 +69,7 @@ with open(ML_dset_path + sim + "/dset_params.pickle", "rb") as file:
 curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
 
 param_paths = [["halos","position"],["halos","R200m"],["halos","id"],["halos","status"],["halos","last_snap"],["simulation","particle_mass"]]
-sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, curr_sparta_file, pickle_data=pickle_data)
+sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, curr_sparta_file, save_data=save_intermediate_data)
 
 halos_pos = sparta_params[sparta_param_names[0]][:,p_sparta_snap,:] * 10**3 * p_scale_factor # convert to kpc/h
 halos_r200m = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
@@ -80,9 +80,9 @@ ptl_mass = sparta_params[sparta_param_names[5]]
 
 p_snap_path = snap_path + "snapdir_" + snap_dir_format.format(p_ptl_snap) + "/snapshot_" + snap_format.format(p_ptl_snap)
 
-ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(p_ptl_snap), p_snap_path) 
-ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(p_ptl_snap), p_snap_path) # km/s
-ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(p_ptl_snap), p_snap_path) * 10**3 * p_scale_factor # kpc/h
+ptls_pid = load_ptl_param(curr_sparta_file, "pid", str(p_ptl_snap), p_snap_path, save_data=save_intermediate_data) 
+ptls_vel = load_ptl_param(curr_sparta_file, "vel", str(p_ptl_snap), p_snap_path, save_data=save_intermediate_data) # km/s
+ptls_pos = load_ptl_param(curr_sparta_file, "pos", str(p_ptl_snap), p_snap_path, save_data=save_intermediate_data) * 10**3 * p_scale_factor # kpc/h
 
 if os.path.isfile(ML_dset_path + sim + "/p_ptl_tree.pickle"):
     with open(ML_dset_path + sim + "/p_ptl_tree.pickle", "rb") as pickle_file:
