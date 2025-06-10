@@ -1,52 +1,31 @@
 import numpy as np
 from scipy.optimize import curve_fit, minimize
 import os
-import pandas as pd
+import matplotlib.pyplot as plt
 import argparse
 
-from src.utils.ML_fxns import setup_client, get_combined_name, get_feature_labels, get_model_name, extract_snaps
+from src.utils.ML_fxns import setup_client, get_combined_name, get_model_name, extract_snaps
 from src.utils.ke_cut_fxns import load_ke_data, fast_ke_predictor
-from src.utils.prfl_fxns import paper_dens_prf_plt
-from src.utils.util_fxns import set_cosmology, depair_np, parse_ranges, create_directory, timed, save_pickle, load_pickle, load_config, load_sparta_mass_prf
-from src.utils.vis_fxns import plt_SPARTA_KE_dist, plt_KE_dist_grad
+from src.utils.util_fxns import set_cosmology, create_directory, save_pickle, load_pickle, load_config, load_SPARTA_data, split_sparta_hdf5_name
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
     '--config',
     type=str,
-    default=os.getcwd() + "/config.ini", 
+    default=os.getcwd() + "/config_edgar.ini", 
     help='Path to config file (default: config.ini)'
 )
 
 args = parser.parse_args()
 config_params = load_config(args.config)
 
-ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 path_to_models = config_params["PATHS"]["path_to_models"]
-rockstar_ctlgs_path = config_params["PATHS"]["rockstar_ctlgs_path"]
+debug_plt_path = config_params["PATHS"]["debug_plt_path"]
 
 SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 
-features = config_params["TRAIN_MODEL"]["features"]
-target_column = config_params["TRAIN_MODEL"]["target_column"]
-
-eval_datasets = config_params["EVAL_MODEL"]["eval_datasets"]
-
 sim_cosmol = config_params["MISC"]["sim_cosmol"]
 save_intermediate_data = config_params["MISC"]["save_intermediate_data"]
-
-plt_nu_splits = parse_ranges(config_params["EVAL_MODEL"]["plt_nu_splits"])
-plt_macc_splits = parse_ranges(config_params["EVAL_MODEL"]["plt_macc_splits"])
-
-linthrsh = config_params["EVAL_MODEL"]["linthrsh"]
-lin_nbin = config_params["EVAL_MODEL"]["lin_nbin"]
-log_nbin = config_params["EVAL_MODEL"]["log_nbin"]
-lin_rvticks = config_params["EVAL_MODEL"]["lin_rvticks"]
-log_rvticks = config_params["EVAL_MODEL"]["log_rvticks"]
-lin_tvticks = config_params["EVAL_MODEL"]["lin_tvticks"]
-log_tvticks = config_params["EVAL_MODEL"]["log_tvticks"]
-lin_rticks = config_params["EVAL_MODEL"]["lin_rticks"]
-log_rticks = config_params["EVAL_MODEL"]["log_rticks"]
 
 fast_ke_calib_sims = config_params["KE_CUT"]["fast_ke_calib_sims"]
 n_points = config_params["KE_CUT"]["n_points"]
@@ -214,25 +193,29 @@ def calibrate_finder(
     return (m_pos, b_pos), (m_neg, b_neg)
     
 if __name__ == "__main__":
+    #Sets up Dask client
     client = setup_client()
     
+    # Combine all the simulations into one name so that models can be differentiated
     comb_model_sims = get_combined_name(fast_ke_calib_sims) 
     
+    # We load from any of the SPARTA files the bins (but should just be logarithmic bins so feel free to remove this and use your own binning)
+    curr_sparta_file = fast_ke_calib_sims[0]
+    sparta_name, sparta_search_name = split_sparta_hdf5_name(curr_sparta_file)
+    curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
+    param_paths = [["config","anl_prf","r_bins_lin"]]
+    sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, save_data=save_intermediate_data)
+    bins = sparta_params[sparta_param_names[0]]
+    bins = np.insert(bins, 0, 0)
+    
+    # Name the model and save where it should go
     model_type = "kinetic_energy_cut"
     model_name = get_model_name(model_type, fast_ke_calib_sims)    
     model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"  
     create_directory(model_fldr_loc)
-        
-    dset_params = load_pickle(ML_dset_path + fast_ke_calib_sims[0] + "/dset_params.pickle")
-    sim_cosmol = dset_params["cosmology"]
-    all_tdyn_steps = dset_params["t_dyn_steps"]
-    
-    feature_columns = get_feature_labels(features,all_tdyn_steps)
-    snap_list = extract_snaps(fast_ke_calib_sims[0])
-    cosmol = set_cosmology(sim_cosmol)
     
     ####################################################################################################################################################################################################################################
-    
+    # Load in the pickle of the parameters otherwise do the fitting and save the parameters
     if os.path.exists(model_fldr_loc + "ke_fastparams_dict.pickle"):
         ke_param_dict = load_pickle(model_fldr_loc + "ke_fastparams_dict.pickle")
         m_pos = ke_param_dict["m_pos"]
@@ -250,107 +233,64 @@ if __name__ == "__main__":
         }
         save_pickle(ke_param_dict, model_fldr_loc + "ke_fastparams_dict.pickle")
     
-    print("\nCalibration Params")
+    print("Calibration Params")
     print(m_pos,b_pos,m_neg,b_neg)
     
-    for curr_test_sims in ke_test_sims:
+    for curr_test_sims in  ke_test_sims:
         test_comb_name = get_combined_name(curr_test_sims) 
-        dset_name = eval_datasets[0]
-        plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
+        plot_loc = model_fldr_loc + test_comb_name + "/plots/"
         create_directory(plot_loc)
         
-        r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client, curr_test_sims,sim_cosmol,snap_list)
+        ############################################################################################################################################################
+        # I would suggest replacing the next few lines with your loading method
+        # But you just need the radius, radial velocity, physical velocity as expected
         
-        r_r200m = my_data["p_Scaled_radii"].compute().to_numpy()
-        vr = my_data["p_Radial_vel"].compute().to_numpy()
-        vt = my_data["p_Tangential_vel"].compute().to_numpy()
-        vphys = my_data["p_phys_vel"].compute().to_numpy()
-        sparta_labels = my_data["Orbit_infall"].compute().to_numpy()
-        hipids = my_data["HIPIDS"].compute().to_numpy()
-        all_pids, ptl_halo_idxs = depair_np(hipids)
-        lnv2 = np.log(vphys**2)
+        snap_list = extract_snaps(fast_ke_calib_sims[0])
+        r_samp, vr_samp, lnv2_samp, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client, curr_test_sims, sim_cosmol, snap_list)
         
-        sparta_orb = np.where(sparta_labels == 1)[0]
-        sparta_inf = np.where(sparta_labels == 0)[0]
+        r_test = my_data["p_Scaled_radii"].compute().to_numpy()
+        vr_test = my_data["p_Radial_vel"].compute().to_numpy()
+        vphys_test = my_data["p_phys_vel"].compute().to_numpy()
+        lnv2_test = np.log(vphys_test**2)
+        ############################################################################################################################################################
 
-        mask_vr_neg = (vr < 0)
-        mask_vr_pos = ~mask_vr_neg
-        
-        fltr_combs = {
-        "mask_vr_pos": mask_vr_pos,
-        "mask_vr_neg": mask_vr_neg,
-        "orb_vr_neg": np.intersect1d(sparta_orb, np.where(mask_vr_neg)[0]),
-        "orb_vr_pos": np.intersect1d(sparta_orb, np.where(mask_vr_pos)[0]),
-        "inf_vr_neg": np.intersect1d(sparta_inf, np.where(mask_vr_neg)[0]),
-        "inf_vr_pos": np.intersect1d(sparta_inf, np.where(mask_vr_pos)[0]),
-        }
-        
-        # Look for particles vr>0 that are above the phase space line (infalling) that SPARTA says should be below (orbiting)
-        wrong_vr_pos_orb = (lnv2[fltr_combs["orb_vr_pos"]] > (m_pos * r_r200m[fltr_combs["orb_vr_pos"]] + b_pos)) & (r_r200m[fltr_combs["orb_vr_pos"]] < r_cut_pred)
-        # Look for particles vr>0 that are below the phase space line (orbiting) that SPARTA says should be above (infalling)
-        wrong_vr_pos_inf = (lnv2[fltr_combs["inf_vr_pos"]] < (m_pos * r_r200m[fltr_combs["inf_vr_pos"]] + b_pos)) & (r_r200m[fltr_combs["inf_vr_pos"]] < r_cut_pred)
+        # Generic prediction function I wrote feel free to replace with yours since I don't think mine matches OASIS since I don't use bound radii and only R200m
+        ############################################################################################################################################################
+        fast_mask_orb, preds_fast_ke = fast_ke_predictor(ke_param_dict, r_test, vr_test, lnv2_test, r_cut_calib)
+        ############################################################################################################################################################
+             
+        bin_indices = np.digitize(r_test, bins) - 1  # subtract 1 to make bins zero-indexed
 
-        # Look for particles vr<0 that are above the phase space line (infalling) that SPARTA says should be below (orbiting)
-        wrong_vr_neg_orb = (lnv2[fltr_combs["orb_vr_neg"]] > (m_neg * r_r200m[fltr_combs["orb_vr_neg"]] + b_neg)) & (r_r200m[fltr_combs["orb_vr_neg"]] < r_cut_pred)
-        # Look for particles vr<0 that are below the phase space line (orbiting) that SPARTA says should be above (infalling)
-        wrong_vr_neg_inf = (lnv2[fltr_combs["inf_vr_neg"]] < (m_neg * r_r200m[fltr_combs["inf_vr_neg"]] + b_neg)) & (r_r200m[fltr_combs["inf_vr_neg"]] < r_cut_pred)
+        # Initialize counters
+        num_bins = len(bins) - 1
 
-        #total num wrong ptls
-        wrong_vr_pos_total = wrong_vr_pos_orb.sum() + wrong_vr_pos_inf.sum()
-        wrong_vr_neg_total = wrong_vr_neg_orb.sum() + wrong_vr_neg_inf.sum()
-
-        wrong_inf_total = wrong_vr_pos_inf.sum() + wrong_vr_neg_inf.sum()
-        wrong_orb_total = wrong_vr_pos_orb.sum() + wrong_vr_neg_orb.sum()
-
-        num_vr_neg = mask_vr_neg.sum()
-        num_vr_pos = mask_vr_pos.sum()
-        
-        print("Fraction of negative radial velocity particles incorrectly classified:", wrong_vr_neg_total / num_vr_neg)
-        print("Fraction of positive radial velocity particles incorrectly classified:", wrong_vr_pos_total / num_vr_pos)
-        print("Fraction of infalling particles incorrectly classified:", wrong_inf_total / sparta_inf.shape[0])
-        print("Fraction of orbiting particles incorrectly classified:", wrong_orb_total / sparta_orb.shape[0])
-
-        split_scale_dict = {
-                "linthrsh":linthrsh, 
-                "lin_nbin":lin_nbin,
-                "log_nbin":log_nbin,
-                "lin_rvticks":lin_rvticks,
-                "log_rvticks":log_rvticks,
-                "lin_tvticks":lin_tvticks,
-                "log_tvticks":log_tvticks,
-                "lin_rticks":lin_rticks,
-                "log_rticks":log_rticks,
-        }
-
-        nbins = 200   
-        
-        x_range = (0, 3)
-        y_range = (-2, 2.5)
-
-        halo_first = halo_df["Halo_first"].values
-        all_idxs = halo_df["Halo_indices"].values
-        # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
-        sim_splits = np.where(halo_first == 0)[0]
-        
-        #TODO replace with loading bins from SPARTA
-        act_mass_prf_all, act_mass_prf_orb, all_masses, bins = load_sparta_mass_prf(sim_splits,all_idxs,curr_test_sims)
-
-        plt_SPARTA_KE_dist(ke_param_dict, fltr_combs, bins, r_r200m, lnv2, perc, width, r_cut_calib, plot_loc, title="only_fast_", plot_lin_too=True)
-        plt_KE_dist_grad(ke_param_dict, fltr_combs, r_r200m, vr, lnv2, nbins, x_range, y_range, r_cut_calib, plot_loc)      
-        
-    ####################################################################################################################################################################################################################################
-
-        with timed("Density profile plot"):
-            r_r200m = my_data["p_Scaled_radii"]
-            vr = my_data["p_Radial_vel"]
-            vphys = my_data["p_phys_vel"]
-            lnv2 = np.log(vphys**2)
+        fast_ke_orbiting_counts = np.zeros(num_bins)
+        fast_ke_infalling_counts = np.zeros(num_bins)
+    
+        # For each bin find how many orbiting and how many infalling particles are there according to the fast ke cut    
+        for i in range(num_bins):
+            in_bin = bin_indices == i
+            fast_ke_orbiting_counts[i] = np.sum(preds_fast_ke[in_bin] == 1)
+            fast_ke_infalling_counts[i] = np.sum(preds_fast_ke[in_bin] == 0)
             
-            mask_orb, ke_cut_preds = fast_ke_predictor(ke_param_dict,r_r200m.values.compute(),vr.values.compute(),lnv2.values.compute(),r_cut_pred)
-            
-            X = my_data[feature_columns]
-            y = my_data[target_column]
-            
-            paper_dens_prf_plt(X, y, pd.DataFrame(ke_cut_preds), halo_df, curr_test_sims, sim_cosmol, split_scale_dict, plot_loc, split_by_nu=True, split_by_macc=True)
+        # Calculate the ratio for each bin
+        with np.errstate(divide='ignore', invalid='ignore'):
+            fast_ke_ratio = np.where(fast_ke_infalling_counts > 0, fast_ke_orbiting_counts / (fast_ke_infalling_counts + fast_ke_orbiting_counts), np.nan)
 
+        # Plot the ratio
+        fig, ax = plt.subplots(1, figsize=(10,5))
+        ax.plot(bins[1:], fast_ke_ratio, label='Fast KE Cut Classification')
+    
+        legend_fntsize = 14
+        axis_fntsize = 18
+        tick_fntsize = 14
+        ax.legend(fontsize=legend_fntsize, loc="upper right")
+        ax.set_xlabel(r"$r/R_{\rm 200m}$",fontsize=axis_fntsize)
+        ax.set_ylabel(r"$N_{\rm orb}/N_{\rm tot}$",fontsize=axis_fntsize)
+        ax.set_xlim(0,3)
+        ax.set_ylim(0,1)
+        ax.tick_params(axis='both', labelsize=tick_fntsize, length=6,width=2, direction="in")
+        
+        fig.savefig(debug_plt_path + test_comb_name + "_forb_by_rad.pdf",dpi=400)
+        
             

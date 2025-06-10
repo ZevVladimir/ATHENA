@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import pickle
+import argparse
 
 from src.utils.ML_fxns import setup_client, get_combined_name, extract_snaps, get_feature_labels
 from src.utils.util_fxns import create_directory, load_pickle, load_config, load_pickle, timed, load_sparta_mass_prf
@@ -9,7 +10,16 @@ from src.utils.calc_fxns import calc_rho
 from src.utils.util_fxns import set_cosmology, parse_ranges
 from src.utils.prfl_fxns import create_stack_mass_prf, filter_prf, compare_split_prfs_ke
 
-config_params = load_config(os.getcwd() + "/config.ini")
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    '--config',
+    type=str,
+    default=os.getcwd() + "/config.ini", 
+    help='Path to config file (default: config.ini)'
+)
+
+args = parser.parse_args()
+config_params = load_config(args.config)
 
 ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 path_to_models = config_params["PATHS"]["path_to_models"]

@@ -147,13 +147,13 @@ def load_ke_data(client, curr_test_sims, sim_cosmol, snap_list):
         # Load the particle information
         data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,sim_cosmol,prime_snap=snap_list[0])
         samp_data = halo_select(curr_test_sims,data)
-    r = samp_data["p_Scaled_radii"]
-    vr = samp_data["p_Radial_vel"]
-    vphys = samp_data["p_phys_vel"]
-    lnv2 = np.log(vphys**2)
+    r_samp = samp_data["p_Scaled_radii"]
+    vr_samp = samp_data["p_Radial_vel"]
+    vphys_samp = samp_data["p_phys_vel"]
+    lnv2_samp = np.log(vphys_samp**2)
     sparta_labels = samp_data["Orbit_infall"]
     
-    return r, vr, lnv2, sparta_labels, samp_data, data, halo_df
+    return r_samp, vr_samp, lnv2_samp, sparta_labels, samp_data, data, halo_df
 
 # r200m_cut is the farthest radius (r/r200m) that a particle can be orbiting
 def fast_ke_predictor(fast_param_dict, r_r200m, vr, lnv2, r200m_cut):

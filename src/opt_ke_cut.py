@@ -5,6 +5,7 @@ from scipy.optimize import minimize
 import os
 import pickle
 from sparta_tools import sparta
+import argparse
 
 from src.utils.ML_fxns import setup_client, get_combined_name, get_feature_labels, extract_snaps
 from src.utils.util_fxns import create_directory, load_pickle, load_config, save_pickle, load_pickle, timed, load_sparta_mass_prf, load_SPARTA_data
@@ -14,7 +15,16 @@ from src.utils.calc_fxns import calc_rho, calc_mass_acc_rate
 from src.utils.prfl_fxns import create_stack_mass_prf, filter_prf, compare_split_prfs
 from src.utils.util_fxns import set_cosmology, conv_halo_id_spid,reform_dset_dfs, parse_ranges, split_sparta_hdf5_name
 
-config_params = load_config(os.getcwd() + "/config.ini")
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    '--config',
+    type=str,
+    default=os.getcwd() + "/config.ini", 
+    help='Path to config file (default: config.ini)'
+)
+
+args = parser.parse_args()
+config_params = load_config(args.config)
 
 ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 path_to_models = config_params["PATHS"]["path_to_models"]
