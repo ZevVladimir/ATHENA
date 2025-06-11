@@ -20,7 +20,6 @@ SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 features = config_params["TRAIN_MODEL"]["features"]
 target_column = config_params["TRAIN_MODEL"]["target_column"]
 
-eval_datasets = config_params["EVAL_MODEL"]["eval_datasets"]
 save_intermediate_data = config_params["MISC"]["save_intermediate_data"]
 
 plt_nu_splits = parse_ranges(config_params["EVAL_MODEL"]["plt_nu_splits"])
@@ -36,6 +35,7 @@ log_tvticks = config_params["EVAL_MODEL"]["log_tvticks"]
 lin_rticks = config_params["EVAL_MODEL"]["lin_rticks"]
 log_rticks = config_params["EVAL_MODEL"]["log_rticks"]
 
+ke_test_dsets = config_params["KE_CUT"]["ke_test_dsets"]
 fast_ke_calib_sims = config_params["KE_CUT"]["fast_ke_calib_sims"]
 n_points = config_params["KE_CUT"]["n_points"]
 perc = config_params["KE_CUT"]["perc"]
@@ -156,7 +156,7 @@ def calibrate_finder(
         [0.2, 0.5]
     """
     # MODIFY this line if needed ======================
-    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,fast_ke_calib_sims,all_sim_cosmol_list,snap_list)
+    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,fast_ke_calib_sims,all_sim_cosmol_list,snap_list,"Full")
 
     # =================================================
 
@@ -241,107 +241,106 @@ if __name__ == "__main__":
     print("\n")
     
     for curr_test_sims in ke_test_sims:
-        test_comb_name = get_combined_name(curr_test_sims) 
-        dset_name = eval_datasets[0]
-        plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
-        create_directory(plot_loc)
-        
-        r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client, curr_test_sims,all_sim_cosmol_list,snap_list)
-        
-        r_r200m = my_data["p_Scaled_radii"].compute().to_numpy()
-        vr = my_data["p_Radial_vel"].compute().to_numpy()
-        vt = my_data["p_Tangential_vel"].compute().to_numpy()
-        vphys = my_data["p_phys_vel"].compute().to_numpy()
-        sparta_labels = my_data["Orbit_infall"].compute().to_numpy()
-        hipids = my_data["HIPIDS"].compute().to_numpy()
-        all_pids, ptl_halo_idxs = depair_np(hipids)
-        lnv2 = np.log(vphys**2)
-        
-        sparta_orb = np.where(sparta_labels == 1)[0]
-        sparta_inf = np.where(sparta_labels == 0)[0]
+        for dset_name in ke_test_dsets:
+            test_comb_name = get_combined_name(curr_test_sims) 
 
-        mask_vr_neg = (vr < 0)
-        mask_vr_pos = ~mask_vr_neg
-        
-        fltr_combs = {
-        "mask_vr_pos": mask_vr_pos,
-        "mask_vr_neg": mask_vr_neg,
-        "orb_vr_neg": np.intersect1d(sparta_orb, np.where(mask_vr_neg)[0]),
-        "orb_vr_pos": np.intersect1d(sparta_orb, np.where(mask_vr_pos)[0]),
-        "inf_vr_neg": np.intersect1d(sparta_inf, np.where(mask_vr_neg)[0]),
-        "inf_vr_pos": np.intersect1d(sparta_inf, np.where(mask_vr_pos)[0]),
-        }
-
-        # Look for particles vr>0 that are above the phase space line (infalling) that SPARTA says should be below (orbiting)
-        wrong_vr_pos_orb = (lnv2[fltr_combs["orb_vr_pos"]] > (m_pos * r_r200m[fltr_combs["orb_vr_pos"]] + b_pos)) & (r_r200m[fltr_combs["orb_vr_pos"]] < r_cut_pred)
-        # Look for particles vr>0 that are below the phase space line (orbiting) that SPARTA says should be above (infalling)
-        wrong_vr_pos_inf = (lnv2[fltr_combs["inf_vr_pos"]] < (m_pos * r_r200m[fltr_combs["inf_vr_pos"]] + b_pos)) & (r_r200m[fltr_combs["inf_vr_pos"]] < r_cut_pred)
-
-        # Look for particles vr<0 that are above the phase space line (infalling) that SPARTA says should be below (orbiting)
-        wrong_vr_neg_orb = (lnv2[fltr_combs["orb_vr_neg"]] > (m_neg * r_r200m[fltr_combs["orb_vr_neg"]] + b_neg)) & (r_r200m[fltr_combs["orb_vr_neg"]] < r_cut_pred)
-        # Look for particles vr<0 that are below the phase space line (orbiting) that SPARTA says should be above (infalling)
-        wrong_vr_neg_inf = (lnv2[fltr_combs["inf_vr_neg"]] < (m_neg * r_r200m[fltr_combs["inf_vr_neg"]] + b_neg)) & (r_r200m[fltr_combs["inf_vr_neg"]] < r_cut_pred)
-
-        #total num wrong ptls
-        wrong_vr_pos_total = wrong_vr_pos_orb.sum() + wrong_vr_pos_inf.sum()
-        wrong_vr_neg_total = wrong_vr_neg_orb.sum() + wrong_vr_neg_inf.sum()
-
-        wrong_inf_total = wrong_vr_pos_inf.sum() + wrong_vr_neg_inf.sum()
-        wrong_orb_total = wrong_vr_pos_orb.sum() + wrong_vr_neg_orb.sum()
-
-        num_vr_neg = mask_vr_neg.sum()
-        num_vr_pos = mask_vr_pos.sum()
-        
-        print("Fraction of negative radial velocity particles incorrectly classified:", wrong_vr_neg_total / num_vr_neg)
-        print("Fraction of positive radial velocity particles incorrectly classified:", wrong_vr_pos_total / num_vr_pos)
-        print("Fraction of infalling particles incorrectly classified:", wrong_inf_total / sparta_inf.shape[0])
-        print("Fraction of orbiting particles incorrectly classified:", wrong_orb_total / sparta_orb.shape[0])
-
-        split_scale_dict = {
-                "linthrsh":linthrsh, 
-                "lin_nbin":lin_nbin,
-                "log_nbin":log_nbin,
-                "lin_rvticks":lin_rvticks,
-                "log_rvticks":log_rvticks,
-                "lin_tvticks":lin_tvticks,
-                "log_tvticks":log_tvticks,
-                "lin_rticks":lin_rticks,
-                "log_rticks":log_rticks,
-        }
-
-        nbins = 200   
-        
-        x_range = (0, 3)
-        y_range = (-2, 2.5)
-
-        halo_first = halo_df["Halo_first"].values
-        all_idxs = halo_df["Halo_indices"].values
-        # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
-        sim_splits = np.where(halo_first == 0)[0]
-        
-        curr_sparta_file = fast_ke_calib_sims[0]
-        sparta_name, sparta_search_name = split_sparta_hdf5_name(curr_sparta_file)
-        curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
-        param_paths = [["config","anl_prf","r_bins_lin"]]
-        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, save_data=save_intermediate_data)
-        bins = sparta_params[sparta_param_names[0]]
-
-        plt_SPARTA_KE_dist(ke_param_dict, fltr_combs, bins, r_r200m, lnv2, perc, width, r_cut_calib, plot_loc, title="only_fast_", plot_lin_too=True)
-        plt_KE_dist_grad(ke_param_dict, fltr_combs, r_r200m, vr, lnv2, nbins, x_range, y_range, r_cut_calib, plot_loc)      
-        
-    ####################################################################################################################################################################################################################################
-
-        with timed("Density profile plot"):
-            r_r200m = my_data["p_Scaled_radii"]
-            vr = my_data["p_Radial_vel"]
-            vphys = my_data["p_phys_vel"]
+            plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
+            create_directory(plot_loc)
+            
+            r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client, curr_test_sims,all_sim_cosmol_list,snap_list,dset_name)
+            
+            r_r200m = my_data["p_Scaled_radii"].compute().to_numpy()
+            vr = my_data["p_Radial_vel"].compute().to_numpy()
+            vt = my_data["p_Tangential_vel"].compute().to_numpy()
+            vphys = my_data["p_phys_vel"].compute().to_numpy()
+            sparta_labels = my_data["Orbit_infall"].compute().to_numpy()
+            hipids = my_data["HIPIDS"].compute().to_numpy()
+            all_pids, ptl_halo_idxs = depair_np(hipids)
             lnv2 = np.log(vphys**2)
             
-            mask_orb, ke_cut_preds = fast_ke_predictor(ke_param_dict,r_r200m.values.compute(),vr.values.compute(),lnv2.values.compute(),r_cut_pred)
-            
-            X = my_data[feature_columns]
-            y = my_data[target_column]
-            
-            paper_dens_prf_plt(X, y, pd.DataFrame(ke_cut_preds), halo_df, curr_test_sims, all_sim_cosmol_list, split_scale_dict, plot_loc, split_by_nu=True, split_by_macc=True)
+            sparta_orb = np.where(sparta_labels == 1)[0]
+            sparta_inf = np.where(sparta_labels == 0)[0]
 
+            mask_vr_neg = (vr < 0)
+            mask_vr_pos = ~mask_vr_neg
             
+            fltr_combs = {
+            "mask_vr_pos": mask_vr_pos,
+            "mask_vr_neg": mask_vr_neg,
+            "orb_vr_neg": np.intersect1d(sparta_orb, np.where(mask_vr_neg)[0]),
+            "orb_vr_pos": np.intersect1d(sparta_orb, np.where(mask_vr_pos)[0]),
+            "inf_vr_neg": np.intersect1d(sparta_inf, np.where(mask_vr_neg)[0]),
+            "inf_vr_pos": np.intersect1d(sparta_inf, np.where(mask_vr_pos)[0]),
+            }
+
+            # Look for particles vr>0 that are above the phase space line (infalling) that SPARTA says should be below (orbiting)
+            wrong_vr_pos_orb = (lnv2[fltr_combs["orb_vr_pos"]] > (m_pos * r_r200m[fltr_combs["orb_vr_pos"]] + b_pos)) & (r_r200m[fltr_combs["orb_vr_pos"]] < r_cut_pred)
+            # Look for particles vr>0 that are below the phase space line (orbiting) that SPARTA says should be above (infalling)
+            wrong_vr_pos_inf = (lnv2[fltr_combs["inf_vr_pos"]] < (m_pos * r_r200m[fltr_combs["inf_vr_pos"]] + b_pos)) & (r_r200m[fltr_combs["inf_vr_pos"]] < r_cut_pred)
+
+            # Look for particles vr<0 that are above the phase space line (infalling) that SPARTA says should be below (orbiting)
+            wrong_vr_neg_orb = (lnv2[fltr_combs["orb_vr_neg"]] > (m_neg * r_r200m[fltr_combs["orb_vr_neg"]] + b_neg)) & (r_r200m[fltr_combs["orb_vr_neg"]] < r_cut_pred)
+            # Look for particles vr<0 that are below the phase space line (orbiting) that SPARTA says should be above (infalling)
+            wrong_vr_neg_inf = (lnv2[fltr_combs["inf_vr_neg"]] < (m_neg * r_r200m[fltr_combs["inf_vr_neg"]] + b_neg)) & (r_r200m[fltr_combs["inf_vr_neg"]] < r_cut_pred)
+
+            #total num wrong ptls
+            wrong_vr_pos_total = wrong_vr_pos_orb.sum() + wrong_vr_pos_inf.sum()
+            wrong_vr_neg_total = wrong_vr_neg_orb.sum() + wrong_vr_neg_inf.sum()
+
+            wrong_inf_total = wrong_vr_pos_inf.sum() + wrong_vr_neg_inf.sum()
+            wrong_orb_total = wrong_vr_pos_orb.sum() + wrong_vr_neg_orb.sum()
+
+            num_vr_neg = mask_vr_neg.sum()
+            num_vr_pos = mask_vr_pos.sum()
+            
+            print("Fraction of negative radial velocity particles incorrectly classified:", wrong_vr_neg_total / num_vr_neg)
+            print("Fraction of positive radial velocity particles incorrectly classified:", wrong_vr_pos_total / num_vr_pos)
+            print("Fraction of infalling particles incorrectly classified:", wrong_inf_total / sparta_inf.shape[0])
+            print("Fraction of orbiting particles incorrectly classified:", wrong_orb_total / sparta_orb.shape[0])
+
+            split_scale_dict = {
+                    "linthrsh":linthrsh, 
+                    "lin_nbin":lin_nbin,
+                    "log_nbin":log_nbin,
+                    "lin_rvticks":lin_rvticks,
+                    "log_rvticks":log_rvticks,
+                    "lin_tvticks":lin_tvticks,
+                    "log_tvticks":log_tvticks,
+                    "lin_rticks":lin_rticks,
+                    "log_rticks":log_rticks,
+            }
+
+            nbins = 200   
+            
+            x_range = (0, 3)
+            y_range = (-2, 2.5)
+
+            halo_first = halo_df["Halo_first"].values
+            all_idxs = halo_df["Halo_indices"].values
+            # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
+            sim_splits = np.where(halo_first == 0)[0]
+            
+            curr_sparta_file = fast_ke_calib_sims[0]
+            sparta_name, sparta_search_name = split_sparta_hdf5_name(curr_sparta_file)
+            curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
+            param_paths = [["config","anl_prf","r_bins_lin"]]
+            sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, save_data=save_intermediate_data)
+            bins = sparta_params[sparta_param_names[0]]
+
+            plt_SPARTA_KE_dist(ke_param_dict, fltr_combs, bins, r_r200m, lnv2, perc, width, r_cut_calib, plot_loc, title="only_fast_", plot_lin_too=True)
+            plt_KE_dist_grad(ke_param_dict, fltr_combs, r_r200m, vr, lnv2, nbins, x_range, y_range, r_cut_calib, plot_loc)      
+            
+        ####################################################################################################################################################################################################################################
+
+            with timed("Density profile plot"):
+                r_r200m = my_data["p_Scaled_radii"]
+                vr = my_data["p_Radial_vel"]
+                vphys = my_data["p_phys_vel"]
+                lnv2 = np.log(vphys**2)
+                
+                mask_orb, ke_cut_preds = fast_ke_predictor(ke_param_dict,r_r200m.values.compute(),vr.values.compute(),lnv2.values.compute(),r_cut_pred)
+                
+                X = my_data[feature_columns]
+                y = my_data[target_column]
+                
+                paper_dens_prf_plt(X, y, pd.DataFrame(ke_cut_preds), halo_df, curr_test_sims, all_sim_cosmol_list, split_scale_dict, plot_loc, split_by_nu=True, split_by_macc=True)

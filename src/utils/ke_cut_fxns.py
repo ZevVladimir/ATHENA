@@ -14,7 +14,6 @@ SPARTA_output_path = config_dict["SPARTA_DATA"]["sparta_output_path"]
 rockstar_ctlgs_path = config_dict["PATHS"]["rockstar_ctlgs_path"]
 
 test_sims = config_dict["EVAL_MODEL"]["test_sims"]
-eval_datasets = config_dict["EVAL_MODEL"]["eval_datasets"]
 
 plt_nu_splits = config_dict["EVAL_MODEL"]["plt_nu_splits"]
 plt_nu_splits = parse_ranges(plt_nu_splits)
@@ -127,10 +126,7 @@ def halo_select(sims, ptl_data):
     subset_df = ptl_data.compute().loc[all_row_idxs]        
     return subset_df
 
-def load_ke_data(client, curr_test_sims, sim_cosmol_list, snap_list):
-    # Loop through and/or for Train/Test/All datasets and evaluate the model
-    dset_name = eval_datasets[0]
-
+def load_ke_data(client, curr_test_sims, sim_cosmol_list, snap_list, dset_name):
     with timed("Loading data"):             
         # Load the halo information
         halo_dfs = []

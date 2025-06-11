@@ -17,7 +17,7 @@ model_sims = config_params["TRAIN_MODEL"]["model_sims"]
 model_type = config_params["TRAIN_MODEL"]["model_type"]
 
 test_sims = config_params["EVAL_MODEL"]["test_sims"]
-eval_datasets = config_params["EVAL_MODEL"]["eval_datasets"]
+eval_test_dsets = config_params["EVAL_MODEL"]["eval_test_dsets"]
 
 if __name__ == '__main__':
     client = setup_client()
@@ -45,7 +45,7 @@ if __name__ == '__main__':
             feature_columns = get_feature_labels(features,all_tdyn_steps_list[0])
             test_comb_name = get_combined_name(curr_test_sims) 
             
-            for dset_name in eval_datasets:
+            for dset_name in eval_test_dsets:
                 plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
                 create_directory(plot_loc)
                 all_snaps = extract_snaps(curr_test_sims[0])

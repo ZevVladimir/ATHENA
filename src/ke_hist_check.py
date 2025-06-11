@@ -19,7 +19,7 @@ save_intermediate_data = config_params["MISC"]["save_intermediate_data"]
 features = config_params["TRAIN_MODEL"]["features"]
 target_column = config_params["TRAIN_MODEL"]["target_column"]
 
-eval_datasets = config_params["EVAL_MODEL"]["eval_datasets"]
+eval_test_dsets = config_params["EVAL_MODEL"]["eval_test_dsets"]
 plt_nu_splits = parse_ranges(config_params["EVAL_MODEL"]["plt_nu_splits"])
 plt_macc_splits = parse_ranges(config_params["EVAL_MODEL"]["plt_macc_splits"])
 
@@ -59,7 +59,7 @@ if __name__ == "__main__":
     
     for curr_test_sims in ke_test_sims:
         test_comb_name = get_combined_name(curr_test_sims) 
-        dset_name = eval_datasets[0]
+        dset_name = eval_test_dsets[0]
         plot_loc = opt_model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
         create_directory(plot_loc)
         

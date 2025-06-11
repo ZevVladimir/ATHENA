@@ -1,12 +1,7 @@
 import xgboost as xgb
 from xgboost import dask as dxgb
-    
-import time
-from sklearn.metrics import accuracy_score
-import matplotlib.pyplot as plt
 import pickle
 import os
-import numpy as np
 import argparse
 
 from src.utils.util_fxns import create_directory, timed, load_pickle, save_pickle, load_config, load_ML_dsets
@@ -35,13 +30,12 @@ target_column = config_params["TRAIN_MODEL"]["target_column"]
 model_sims = config_params["TRAIN_MODEL"]["model_sims"]
 model_type = config_params["TRAIN_MODEL"]["model_type"]
 file_lim = config_params["TRAIN_MODEL"]["file_lim"]
+ntrees = config_params["TRAIN_MODEL"]["ntrees"]
+n_early_stopping_rounds = config_params["TRAIN_MODEL"]["n_early_stopping_rounds"]
 
 retrain = config_params["MISC"]["retrain_model"]
 
-dens_prf_plt = config_params["EVAL_MODEL"]["dens_prf_plt"]
-misclass_plt = config_params["EVAL_MODEL"]["misclass_plt"]
-fulldist_plt = config_params["EVAL_MODEL"]["fulldist_plt"]
-dens_prf_nu_split = config_params["EVAL_MODEL"]["dens_prf_nu_split"]
+eval_train_dsets = config_params["EVAL_MODEL"]["eval_train_dsets"]
 
 if __name__ == "__main__":        
     client = setup_client()
@@ -87,15 +81,28 @@ if __name__ == "__main__":
     else:
         with timed("Loading Datasets"):
             train_data,scale_pos_weight = load_ML_dsets(client,model_sims,"Train",all_sim_cosmol_list,prime_snap=all_snaps[0],file_lim=file_lim,filter_nu=False)
-            
+                
             X_train = train_data[feature_columns]
             y_train = train_data[target_column]
 
             create_directory(model_fldr_loc)
             create_directory(gen_plot_save_loc)
             
-            # Construct the DaskDMatrix used for training
+            # Construct the DaskDMatrix used for evaluatin the model
             dtrain = xgb.dask.DaskDMatrix(client, X_train, y_train)
+            
+            eval_list = []
+            for dset in eval_train_dsets:
+                train_data,scale_pos_weight = load_ML_dsets(client,model_sims,dset,all_sim_cosmol_list,prime_snap=all_snaps[0],file_lim=file_lim,filter_nu=False)
+                
+                X_train = train_data[feature_columns]
+                y_train = train_data[target_column]
+
+                create_directory(model_fldr_loc)
+                create_directory(gen_plot_save_loc)
+                
+                # Construct the DaskDMatrix used for evaluatin the model
+                eval_list.append((dset,xgb.dask.DaskDMatrix(client, X_train, y_train)))
         
         if 'Training Info' in model_info: 
             params = model_info.get('Training Info',{}).get('Training Params')
@@ -115,17 +122,15 @@ if __name__ == "__main__":
                 'Training Params': params}
 
         # Train and save the model
-        #TODO make params selectable params?
-        num_trees = 100
         with timed("Trained Model"):
             print("Starting train using params:", params)
             output = dxgb.train(
                 client,
                 params,
                 dtrain,
-                num_boost_round=num_trees,
-                evals=[(dtrain, 'train')],
-                early_stopping_rounds=10, 
+                num_boost_round=ntrees,
+                evals=eval_list,
+                early_stopping_rounds=n_early_stopping_rounds, 
                 )
             bst = output["booster"]
             history = output["history"]

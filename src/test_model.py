@@ -32,7 +32,7 @@ features = config_params["TRAIN_MODEL"]["features"]
 target_column = config_params["TRAIN_MODEL"]["target_column"]
 
 test_sims = config_params["EVAL_MODEL"]["test_sims"]
-eval_datasets = config_params["EVAL_MODEL"]["eval_datasets"]
+eval_test_dsets = config_params["EVAL_MODEL"]["eval_test_dsets"]
 dens_prf_plt = config_params["EVAL_MODEL"]["dens_prf_plt"]
 misclass_plt = config_params["EVAL_MODEL"]["misclass_plt"]
 full_dist_plt = config_params["EVAL_MODEL"]["fulldist_plt"]
@@ -89,7 +89,7 @@ if __name__ == "__main__":
         feature_columns = get_feature_labels(features,all_tdyn_steps_list[0])
         
         # Loop through and/or for Train/Test/All datasets and evaluate the model
-        for dset_name in eval_datasets:
+        for dset_name in eval_test_dsets:
             with timed("Model Evaluation on " + dset_name + "_" + test_comb_name): 
                 plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
                 create_directory(plot_loc)
