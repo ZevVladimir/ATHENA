@@ -10,7 +10,7 @@ from colossus.halo.mass_so import M_to_R
 from matplotlib.legend_handler import HandlerTuple
 
 from .util_fxns import load_SPARTA_data, load_pickle, load_config, get_comp_snap_info, timed, load_sparta_mass_prf, get_past_z
-from .calc_fxns import calc_rho, calc_mass_acc_rate, calc_tdyn
+from .calc_fxns import calc_rho, calc_mass_acc_rate
 from .ML_fxns import split_sparta_hdf5_name
 from .util_fxns import parse_ranges, set_cosmology
 
@@ -565,7 +565,7 @@ def compare_split_prfs_ke(plt_splits, n_lines, opt_orb_prfs, opt_inf_prfs, fast_
 
 # Creates the density profiles seen throughout the paper.
 # 3 panels for all, orbiting, and infalling profiles with options to be split by nu or by mass accretion rate
-def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol,split_scale_dict,plot_save_loc,split_by_nu=False,split_by_macc=False):
+def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol,split_scale_dict,plot_save_loc,split_by_nu=False,split_by_macc=False,prf_name_0="ML Model",prf_name_1="SPARTA"):
     halo_first = halo_df["Halo_first"].values
     halo_n = halo_df["Halo_n"].values
     all_idxs = halo_df["Halo_indices"].values
@@ -702,7 +702,7 @@ def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol,split_scale_dict,pl
                     nu_inf_prf_lst.append(filter_prf(calc_dens_prf_inf,act_dens_prf_inf,min_disp_halos,fltr))
                 else:
                     plt_nu_splits.remove(nu_split)
-            compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),nu_all_prf_lst,nu_orb_prf_lst,nu_inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="nu_dens_med_",prf_func=np.nanmedian, prf_name_0="ML Model", prf_name_1="SPARTA")
+            compare_split_prfs(plt_nu_splits,len(cpy_plt_nu_splits),nu_all_prf_lst,nu_orb_prf_lst,nu_inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title="nu_dens_med_",prf_func=np.nanmedian, prf_name_0=prf_name_0, prf_name_1=prf_name_1)
         if split_by_macc and dset_params["t_dyn_steps"]:
             all_tdyn_steps = dset_params["t_dyn_steps"]
             if all_tdyn_steps[0] == 1:
@@ -749,7 +749,7 @@ def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol,split_scale_dict,pl
                     plt_macc_splits.remove(macc_split)
 
             
-            compare_split_prfs(plt_macc_splits,len(cpy_plt_macc_splits),macc_all_prf_lst,macc_orb_prf_lst,macc_inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title= "macc_dens_", split_name="\Gamma", prf_name_0="ML Model", prf_name_1="SPARTA")
+            compare_split_prfs(plt_macc_splits,len(cpy_plt_macc_splits),macc_all_prf_lst,macc_orb_prf_lst,macc_inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title= "macc_dens_", split_name="\Gamma", prf_name_0=prf_name_0, prf_name_1=prf_name_1)
         if not split_by_nu and not split_by_macc:
             all_prf_lst = filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos)
             orb_prf_lst = filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos)

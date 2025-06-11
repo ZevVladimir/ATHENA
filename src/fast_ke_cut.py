@@ -6,7 +6,7 @@ import pandas as pd
 from src.utils.ML_fxns import setup_client, get_combined_name, get_feature_labels, get_model_name, extract_snaps
 from src.utils.ke_cut_fxns import load_ke_data, fast_ke_predictor
 from src.utils.prfl_fxns import paper_dens_prf_plt
-from src.utils.util_fxns import set_cosmology, depair_np, parse_ranges, create_directory, timed, save_pickle, load_pickle, load_config, load_sparta_mass_prf
+from src.utils.util_fxns import set_cosmology, depair_np, parse_ranges, create_directory, timed, save_pickle, load_pickle, load_config, load_SPARTA_data, split_sparta_hdf5_name
 from src.utils.vis_fxns import plt_SPARTA_KE_dist, plt_KE_dist_grad
 
 config_params = load_config(os.getcwd() + "/config.ini")
@@ -324,7 +324,12 @@ if __name__ == "__main__":
         # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
         sim_splits = np.where(halo_first == 0)[0]
         
-        act_mass_prf_all, act_mass_prf_orb, all_masses, bins = load_sparta_mass_prf(sim_splits,all_idxs,curr_test_sims)
+        curr_sparta_file = fast_ke_calib_sims[0]
+        sparta_name, sparta_search_name = split_sparta_hdf5_name(curr_sparta_file)
+        curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + curr_sparta_file + ".hdf5"
+        param_paths = [["config","anl_prf","r_bins_lin"]]
+        sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, save_data=save_intermediate_data)
+        bins = sparta_params[sparta_param_names[0]]
 
         plt_SPARTA_KE_dist(ke_param_dict, fltr_combs, bins, r_r200m, lnv2, perc, width, r_cut_calib, plot_loc, title="only_fast_", plot_lin_too=True)
         plt_KE_dist_grad(ke_param_dict, fltr_combs, r_r200m, vr, lnv2, nbins, x_range, y_range, r_cut_calib, plot_loc)      
