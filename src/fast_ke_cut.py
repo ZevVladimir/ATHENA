@@ -6,7 +6,7 @@ import pandas as pd
 from src.utils.ML_fxns import setup_client, get_combined_name, get_feature_labels, get_model_name, extract_snaps
 from src.utils.ke_cut_fxns import load_ke_data, fast_ke_predictor
 from src.utils.prfl_fxns import paper_dens_prf_plt
-from src.utils.util_fxns import set_cosmology, depair_np, parse_ranges, create_directory, timed, save_pickle, load_pickle, load_config, load_SPARTA_data, split_sparta_hdf5_name
+from src.utils.util_fxns import set_cosmology, depair_np, parse_ranges, create_directory, timed, save_pickle, load_pickle, load_config, load_SPARTA_data, split_sparta_hdf5_name, load_all_sim_cosmols, load_all_tdyn_steps
 from src.utils.vis_fxns import plt_SPARTA_KE_dist, plt_KE_dist_grad
 
 config_params = load_config(os.getcwd() + "/config.ini")
@@ -21,8 +21,7 @@ features = config_params["TRAIN_MODEL"]["features"]
 target_column = config_params["TRAIN_MODEL"]["target_column"]
 
 eval_datasets = config_params["EVAL_MODEL"]["eval_datasets"]
-
-sim_cosmol = config_params["MISC"]["sim_cosmol"]
+save_intermediate_data = config_params["MISC"]["save_intermediate_data"]
 
 plt_nu_splits = parse_ranges(config_params["EVAL_MODEL"]["plt_nu_splits"])
 plt_macc_splits = parse_ranges(config_params["EVAL_MODEL"]["plt_macc_splits"])
@@ -157,7 +156,7 @@ def calibrate_finder(
         [0.2, 0.5]
     """
     # MODIFY this line if needed ======================
-    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,fast_ke_calib_sims,sim_cosmol,snap_list)
+    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,fast_ke_calib_sims,all_sim_cosmol_list,snap_list)
 
     # =================================================
 
@@ -212,15 +211,11 @@ if __name__ == "__main__":
     model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"  
     create_directory(model_fldr_loc)
     
+    all_sim_cosmol_list = load_all_sim_cosmols(ke_test_sims)
+    all_tdyn_steps_list = load_all_tdyn_steps(ke_test_sims)
     
-        
-    dset_params = load_pickle(ML_dset_path + fast_ke_calib_sims[0] + "/dset_params.pickle")
-    sim_cosmol = dset_params["cosmology"]
-    all_tdyn_steps = dset_params["t_dyn_steps"]
-    
-    feature_columns = get_feature_labels(features,all_tdyn_steps)
+    feature_columns = get_feature_labels(features,all_tdyn_steps_list[0])
     snap_list = extract_snaps(fast_ke_calib_sims[0])
-    cosmol = set_cosmology(sim_cosmol)
     
     ####################################################################################################################################################################################################################################
     
@@ -251,7 +246,7 @@ if __name__ == "__main__":
         plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
         create_directory(plot_loc)
         
-        r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client, curr_test_sims,sim_cosmol,snap_list)
+        r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client, curr_test_sims,all_sim_cosmol_list,snap_list)
         
         r_r200m = my_data["p_Scaled_radii"].compute().to_numpy()
         vr = my_data["p_Radial_vel"].compute().to_numpy()
@@ -347,6 +342,6 @@ if __name__ == "__main__":
             X = my_data[feature_columns]
             y = my_data[target_column]
             
-            paper_dens_prf_plt(X, y, pd.DataFrame(ke_cut_preds), halo_df, curr_test_sims, sim_cosmol, split_scale_dict, plot_loc, split_by_nu=True, split_by_macc=True)
+            paper_dens_prf_plt(X, y, pd.DataFrame(ke_cut_preds), halo_df, curr_test_sims, all_sim_cosmol_list, split_scale_dict, plot_loc, split_by_nu=True, split_by_macc=True)
 
             

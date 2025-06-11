@@ -5,7 +5,7 @@ import pandas as pd
 import argparse
 
 from src.utils.ML_fxns import setup_client, get_combined_name, get_model_name, extract_snaps, make_preds, get_feature_labels
-from src.utils.util_fxns import create_directory, timed, load_pickle, save_pickle, load_config, load_ML_dsets,reform_dset_dfs
+from src.utils.util_fxns import create_directory, timed, load_pickle, save_pickle, load_config, load_ML_dsets,reform_dset_dfs, load_all_sim_cosmols, load_all_tdyn_steps
 from src.utils.prfl_fxns import paper_dens_prf_plt
 from src.utils.vis_fxns import gen_ptl_dist_plt, gen_missclass_dist_plt
 ##################################################################################################################
@@ -54,8 +54,6 @@ log_rticks = config_params["EVAL_MODEL"]["log_rticks"]
 if __name__ == "__main__":    
     client = setup_client()
     dset_params = load_pickle(ML_dset_path + model_sims[0] + "/dset_params.pickle")
-    all_tdyn_steps = dset_params["t_dyn_steps"]
-    feature_columns = get_feature_labels(features,all_tdyn_steps)
 
     comb_model_sims = get_combined_name(model_sims) 
         
@@ -84,16 +82,15 @@ if __name__ == "__main__":
     # Loop through each set of test sims in the user inputted list
     for curr_test_sims in test_sims:
         test_comb_name = get_combined_name(curr_test_sims) 
-            
-        #TODO check that the right sims and datasets are chosen
-        print("Testing on:", curr_test_sims)
+        
+        all_sim_cosmol_list = load_all_sim_cosmols(curr_test_sims)
+        all_tdyn_steps_list = load_all_tdyn_steps(curr_test_sims)
+
+        feature_columns = get_feature_labels(features,all_tdyn_steps_list[0])
+        
         # Loop through and/or for Train/Test/All datasets and evaluate the model
         for dset_name in eval_datasets:
-            with timed("Model Evaluation on " + dset_name + " dataset"): 
-                #TODO Manage to deal with different cosmologies for each sim  
-                dset_params = load_pickle(ML_dset_path + curr_test_sims[0] + "/dset_params.pickle")
-                sim_cosmol = dset_params["cosmology"]
-
+            with timed("Model Evaluation on " + dset_name + "_" + test_comb_name): 
                 plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
                 create_directory(plot_loc)
 
@@ -112,7 +109,7 @@ if __name__ == "__main__":
                 
                 # Load the particle information
                 all_snaps = extract_snaps(model_sims[0])
-                data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,sim_cosmol,all_snaps[0])
+                data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,all_sim_cosmol_list,all_snaps[0])
 
                 X = data[feature_columns]
                 y = data[target_column]
@@ -140,14 +137,14 @@ if __name__ == "__main__":
                 with timed(f"Predictions for {y.size.compute():.3e} particles"):
                     preds = make_preds(client, bst, X)
                 if dens_prf_plt:
-                    paper_dens_prf_plt(X, y, preds, halo_df, curr_test_sims, sim_cosmol, split_scale_dict, plot_loc, split_by_nu=dens_prf_nu_split, split_by_macc=dens_prf_macc_split)
+                    paper_dens_prf_plt(X, y, preds, halo_df, curr_test_sims, all_sim_cosmol_list, split_scale_dict, plot_loc, split_by_nu=dens_prf_nu_split, split_by_macc=dens_prf_macc_split)
                 if full_dist_plt or misclass_plt:
                     p_act_labels=y.compute().values.flatten()
                     p_r=X["p_Scaled_radii"].values.compute()
                     p_rv=X["p_Radial_vel"].values.compute()
                     p_tv=X["p_Tangential_vel"].values.compute()
-                    c_r=X[str(all_tdyn_steps[0]) + "_Scaled_radii"].values.compute()
-                    c_rv=X[str(all_tdyn_steps[0]) +"_Radial_vel"].values.compute()
+                    c_r=X[str(all_tdyn_steps_list[0][0]) + "_Scaled_radii"].values.compute()
+                    c_rv=X[str(all_tdyn_steps_list[0][0]) +"_Radial_vel"].values.compute()
                     plt_data_dict = {
                         "p_r":p_r,
                         "p_rv":p_rv,

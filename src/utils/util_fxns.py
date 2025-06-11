@@ -258,11 +258,11 @@ def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         return mass_prf_all,mass_prf_1halo,all_masses,bins
 
 # Loads all the data for the inputted list of simulations into one dataframe. Finds the scale position weight for the dataset and any adjusted weighting for it if desired
-def load_ML_dsets(client, sims, dset_name, sim_cosmol, prime_snap, file_lim=0, filter_nu=False, nu_splits=None):
+def load_ML_dsets(client, sims, dset_name, sim_cosmol_list, prime_snap, file_lim=0, filter_nu=False, nu_splits=None):
     dask_dfs = []
     all_scal_pos_weight = []
         
-    for sim in sims:
+    for i,sim in enumerate(sims):
         with open(ML_dset_path + sim + "/dset_params.pickle","rb") as f:
             dset_params = pickle.load(f)
         # Get mass and redshift for this simulation
@@ -277,7 +277,7 @@ def load_ML_dsets(client, sims, dset_name, sim_cosmol, prime_snap, file_lim=0, f
         for dataset in datasets:
             with timed(f"Reformed {dataset} Dataset: {sim}"): 
                 dataset_path = f"{ML_dset_path}{sim}/{dataset}"
-                ptl_ddf,sim_scal_pos_weight = reform_dsets_nested(client,ptl_mass,use_z,max_mem,sim_cosmol,dataset_path,prime_snap,file_lim=file_lim,filter_nu=filter_nu,nu_splits=nu_splits)  
+                ptl_ddf,sim_scal_pos_weight = reform_dsets_nested(client,ptl_mass,use_z,max_mem,sim_cosmol_list[i],dataset_path,prime_snap,file_lim=file_lim,filter_nu=filter_nu,nu_splits=nu_splits)  
                 all_scal_pos_weight.append(sim_scal_pos_weight)
                 dask_dfs.append(ptl_ddf)
                     
@@ -564,3 +564,18 @@ def reform_dsets_nested(client, ptl_mass, use_z, max_mem, sim_cosmol, folder_pat
 
     return combine_results(results, client)
 
+def load_all_sim_cosmols(curr_sims):
+    all_sim_cosmol_list = []
+    for sim in curr_sims:
+        dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
+        all_sim_cosmol_list.append(dset_params["cosmology"])
+    
+    return all_sim_cosmol_list
+
+def load_all_tdyn_steps(curr_sims):
+    all_tdyn_steps_list = []
+    for sim in curr_sims:
+        dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
+        all_tdyn_steps_list.append(dset_params["t_dyn_steps"])
+    
+    return all_tdyn_steps_list

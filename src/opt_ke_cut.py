@@ -6,7 +6,7 @@ import pandas as pd
 from sparta_tools import sparta
 
 from src.utils.ML_fxns import setup_client, get_combined_name, get_feature_labels, extract_snaps
-from src.utils.util_fxns import create_directory, load_pickle, load_config, save_pickle, load_pickle, timed, load_sparta_mass_prf, set_cosmology, parse_ranges, split_sparta_hdf5_name, load_SPARTA_data
+from src.utils.util_fxns import create_directory, load_pickle, load_config, save_pickle, load_pickle, timed, parse_ranges, split_sparta_hdf5_name, load_SPARTA_data, load_all_sim_cosmols, load_all_tdyn_steps
 from src.utils.ke_cut_fxns import load_ke_data, opt_ke_predictor
 from src.utils.vis_fxns import plt_SPARTA_KE_dist
 from src.utils.prfl_fxns import paper_dens_prf_plt
@@ -124,13 +124,11 @@ if __name__ == "__main__":
         )
     
     for curr_test_sims in ke_test_sims:
-        dset_params = load_pickle(ML_dset_path + curr_test_sims[0] + "/dset_params.pickle")
-        sim_cosmol = dset_params["cosmology"]
-        all_tdyn_steps = dset_params["t_dyn_steps"]
+        all_sim_cosmol_list = load_all_sim_cosmols(curr_test_sims)
+        all_tdyn_steps_list = load_all_tdyn_steps(curr_test_sims)
         
-        feature_columns = get_feature_labels(features,all_tdyn_steps)
+        feature_columns = get_feature_labels(features,all_tdyn_steps_list[0])
         snap_list = extract_snaps(opt_ke_calib_sims[0])
-        cosmol = set_cosmology(sim_cosmol)
         
         test_comb_name = get_combined_name(curr_test_sims) 
         dset_name = eval_datasets[0]
@@ -149,7 +147,7 @@ if __name__ == "__main__":
             opt_param_dict = load_pickle(opt_model_fldr_loc + "ke_optparams_dict.pickle")
             
             with timed("Loading Testing Data"):
-                r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=curr_test_sims,sim_cosmol=sim_cosmol,snap_list=snap_list)
+                r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=curr_test_sims,sim_cosmol_list=all_sim_cosmol_list,snap_list=snap_list)
                 r_test = my_data["p_Scaled_radii"].compute().to_numpy()
                 vr_test = my_data["p_Radial_vel"].compute().to_numpy()
                 vphys_test = my_data["p_phys_vel"].compute().to_numpy()
@@ -167,7 +165,7 @@ if __name__ == "__main__":
         else:        
             with timed("Optimizing phase-space cut"):
                 with timed("Loading Fitting Data"):
-                    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=opt_ke_calib_sims,sim_cosmol=sim_cosmol,snap_list=snap_list)
+                    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=opt_ke_calib_sims,sim_cosmol_list=all_sim_cosmol_list,snap_list=snap_list)
                     
                     # We use the full dataset since for our custom fitting it does not only specific halos (?)
                     r_fit = my_data["p_Scaled_radii"].compute().to_numpy()
@@ -244,6 +242,6 @@ if __name__ == "__main__":
         preds_opt_ke = opt_ke_predictor(opt_param_dict, bins, r_test, vr_test, lnv2_test, r_cut_pred)
         X = my_data[feature_columns]
         y = my_data[target_column]
-        paper_dens_prf_plt(X, y, pd.DataFrame(preds_opt_ke), halo_df, curr_test_sims, sim_cosmol, split_scale_dict, plot_loc, split_by_nu=dens_prf_nu_split, split_by_macc=dens_prf_macc_split, prf_name_0="Optimized KE cut")
+        paper_dens_prf_plt(X, y, pd.DataFrame(preds_opt_ke), halo_df, curr_test_sims, all_sim_cosmol_list, split_scale_dict, plot_loc, split_by_nu=dens_prf_nu_split, split_by_macc=dens_prf_macc_split, prf_name_0="Optimized KE cut")
 
             

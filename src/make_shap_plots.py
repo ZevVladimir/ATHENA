@@ -1,10 +1,9 @@
 import os
 import matplotlib.pyplot as plt
 import xgboost as xgb
-
 import shap
 
-from src.utils.util_fxns import create_directory, timed, load_config, load_pickle, load_ML_dsets
+from src.utils.util_fxns import create_directory, timed, load_config, load_pickle, load_ML_dsets, load_all_sim_cosmols, load_all_tdyn_steps
 from src.utils.ML_fxns import setup_client, get_combined_name, make_preds, shap_with_filter, get_model_name, extract_snaps, get_feature_labels
 
 config_params = load_config(os.getcwd() + "/config.ini")
@@ -29,11 +28,6 @@ if __name__ == '__main__':
         model_name = get_model_name(model_type, model_sims)    
         model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"
         model_save_loc = model_fldr_loc + model_name + ".json"
-        
-        dset_params = load_pickle(ML_dset_path + model_sims[0] + "/dset_params.pickle")
-        sim_cosmol = dset_params["cosmology"]
-        all_tdyn_steps = dset_params["t_dyn_steps"]
-        feature_columns = get_feature_labels(features,all_tdyn_steps)
 
         # Try loading the model if it can't be thats an error!
         try:
@@ -45,12 +39,17 @@ if __name__ == '__main__':
             print("Couldn't load Booster Located at: " + model_save_loc)
         
         for curr_test_sims in test_sims:
+            all_sim_cosmol_list = load_all_sim_cosmols(curr_test_sims)
+            all_tdyn_steps_list = load_all_tdyn_steps(curr_test_sims)
+
+            feature_columns = get_feature_labels(features,all_tdyn_steps_list[0])
             test_comb_name = get_combined_name(curr_test_sims) 
+            
             for dset_name in eval_datasets:
                 plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
                 create_directory(plot_loc)
-                all_snaps = extract_snaps(model_sims[0])
-                data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,sim_cosmol,all_snaps[0])
+                all_snaps = extract_snaps(curr_test_sims[0])
+                data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,all_sim_cosmol_list,all_snaps[0])
                 
                 X_df = data[feature_columns]
                 y_df = data[target_column]
@@ -71,8 +70,7 @@ if __name__ == '__main__':
             if isinstance(expected_value, list):
                 expected_value = expected_value[1]
             print(f"Explainer expected value: {expected_value}")
-
-            
+      
             no_second_dict = {
                 'X_filter': {
                     "1_Scaled_radii": ('==',"nan"),
@@ -80,8 +78,7 @@ if __name__ == '__main__':
                 'label_filter': {
                 }
             }
-            
-    
+        
             all_ptl_explnr, all_ptl_shap, all_ptl_X = shap_with_filter(explainer,X_df,y_df,preds,col_names=new_columns,max_size=5000)
             no_sec_explnr, no_sec_shap, no_sec_X = shap_with_filter(explainer,X_df,y_df,preds,fltr_dic=no_second_dict,col_names=new_columns,max_size=5000)
             

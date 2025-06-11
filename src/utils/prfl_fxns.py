@@ -565,14 +565,12 @@ def compare_split_prfs_ke(plt_splits, n_lines, opt_orb_prfs, opt_inf_prfs, fast_
 
 # Creates the density profiles seen throughout the paper.
 # 3 panels for all, orbiting, and infalling profiles with options to be split by nu or by mass accretion rate
-def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol,split_scale_dict,plot_save_loc,split_by_nu=False,split_by_macc=False,prf_name_0="ML Model",prf_name_1="SPARTA"):
+def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol_list,split_scale_dict,plot_save_loc,split_by_nu=False,split_by_macc=False,prf_name_0="ML Model",prf_name_1="SPARTA"):
     halo_first = halo_df["Halo_first"].values
     halo_n = halo_df["Halo_n"].values
     all_idxs = halo_df["Halo_indices"].values
     
     lin_rticks = split_scale_dict["lin_rticks"]
-
-    cosmol = set_cosmology(sim_cosmol)
 
     all_z = []
     all_rhom = []
@@ -720,6 +718,8 @@ def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol,split_scale_dict,pl
                     
                 all_sparta_z = dic_sim['snap_z']
                 little_h = dic_sim["h"]
+                
+                cosmol = set_cosmology(sim_cosmol_list[i])
                 
                 past_z = get_past_z(cosmol, curr_z, tdyn_step=1)
                 c_snap_dict = get_comp_snap_info(cosmol = cosmol, past_z=past_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)

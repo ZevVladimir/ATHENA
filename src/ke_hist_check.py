@@ -5,7 +5,7 @@ import os
 from src.utils.ML_fxns import setup_client, get_combined_name, extract_snaps, get_feature_labels, filter_df
 from src.utils.util_fxns import create_directory, load_pickle, load_config, load_pickle, timed, load_SPARTA_data, load_ML_dsets
 from src.utils.ke_cut_fxns import fast_ke_predictor, opt_ke_predictor
-from src.utils.util_fxns import set_cosmology, parse_ranges, split_sparta_hdf5_name
+from src.utils.util_fxns import parse_ranges, split_sparta_hdf5_name, load_all_sim_cosmols, load_all_tdyn_steps
 
 config_params = load_config(os.getcwd() + "/config.ini")
 
@@ -50,13 +50,6 @@ if __name__ == "__main__":
     fast_model_fldr_loc = path_to_models + comb_fast_model_sims + "/" + model_type + "/"
     opt_model_fldr_loc = path_to_models + comb_opt_model_sims + "/" + model_type + "/"    
     
-    dset_params = load_pickle(ML_dset_path + fast_ke_calib_sims[0] + "/dset_params.pickle")
-    sim_cosmol = dset_params["cosmology"]
-    all_tdyn_steps = dset_params["t_dyn_steps"]
-    
-    feature_columns = get_feature_labels(features,all_tdyn_steps)
-    snap_list = extract_snaps(fast_ke_calib_sims[0])
-    cosmol = set_cosmology(sim_cosmol)
     
     if os.path.isfile(opt_model_fldr_loc + "ke_optparams_dict.pickle"):
         print("Loading parameters from saved file")
@@ -69,12 +62,16 @@ if __name__ == "__main__":
         dset_name = eval_datasets[0]
         plot_loc = opt_model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
         create_directory(plot_loc)
+        
+        all_sim_cosmol_list = load_all_sim_cosmols(curr_test_sims)
+        all_tdyn_steps_list = load_all_tdyn_steps(curr_test_sims)
+        snap_list = extract_snaps(curr_test_sims[0])
+        
         with timed("Histogram Creation"):
             # Get the redshifts for each simulation's primary snapshot
-
             test_comb_name = get_combined_name(curr_test_sims) 
             
-            data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,sim_cosmol,snap_list[0])
+            data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,all_sim_cosmol_list,snap_list[0])
             
             columns_to_keep = [col for col in data.columns if col != target_column[0]]
             X_df = data[columns_to_keep]

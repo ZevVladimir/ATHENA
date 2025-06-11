@@ -127,7 +127,7 @@ def halo_select(sims, ptl_data):
     subset_df = ptl_data.compute().loc[all_row_idxs]        
     return subset_df
 
-def load_ke_data(client, curr_test_sims, sim_cosmol, snap_list):
+def load_ke_data(client, curr_test_sims, sim_cosmol_list, snap_list):
     # Loop through and/or for Train/Test/All datasets and evaluate the model
     dset_name = eval_datasets[0]
 
@@ -145,7 +145,7 @@ def load_ke_data(client, curr_test_sims, sim_cosmol, snap_list):
         halo_df = pd.concat(halo_dfs)
         
         # Load the particle information
-        data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,sim_cosmol,prime_snap=snap_list[0])
+        data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,sim_cosmol_list,prime_snap=snap_list[0])
         samp_data = halo_select(curr_test_sims,data)
     r = samp_data["p_Scaled_radii"]
     vr = samp_data["p_Radial_vel"]
