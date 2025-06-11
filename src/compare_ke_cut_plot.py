@@ -50,8 +50,8 @@ if __name__ == "__main__":
     
     for curr_test_sims in ke_test_sims:
         for dset_name in ke_test_dsets:
-            all_sim_cosmol_list = load_all_sim_cosmols(ke_test_sims)
-            all_tdyn_steps_list = load_all_tdyn_steps(ke_test_sims)
+            all_sim_cosmol_list = load_all_sim_cosmols(curr_test_sims)
+            all_tdyn_steps_list = load_all_tdyn_steps(curr_test_sims)
             
             test_comb_name = get_combined_name(curr_test_sims) 
 
@@ -129,8 +129,8 @@ if __name__ == "__main__":
                 
                 preds_opt_ke = opt_ke_predictor(opt_param_dict, bins, r_test, vr_test, lnv2_test, r_cut_calib)
                 
-                opt_calc_mass_prf_all, opt_calc_mass_prf_orb, opt_calc_mass_prf_inf, opt_calc_nus, opt_calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds_opt_ke, prf_bins=bins, use_mp=True, all_z=all_z)
-                fast_calc_mass_prf_all, fast_calc_mass_prf_orb, fast_calc_mass_prf_inf, fast_calc_nus, fast_calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds_fast_ke, prf_bins=bins, use_mp=True, all_z=all_z)
+                opt_calc_mass_prf_all, opt_calc_mass_prf_orb, opt_calc_mass_prf_inf, opt_calc_nus, opt_calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds_opt_ke, prf_bins=bins, sim_cosmol_list=all_sim_cosmol_list, use_mp=True, all_z=all_z)
+                fast_calc_mass_prf_all, fast_calc_mass_prf_orb, fast_calc_mass_prf_inf, fast_calc_nus, fast_calc_r200m = create_stack_mass_prf(sim_splits,radii=r_test, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds_fast_ke, prf_bins=bins, sim_cosmol_list=all_sim_cosmol_list, use_mp=True, all_z=all_z)
 
                 # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
                 opt_small_halo_fltr = np.isnan(opt_calc_r200m)

@@ -15,6 +15,7 @@ config_params = load_config(os.getcwd() + "/config.ini")
 
 ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 path_to_models = config_params["PATHS"]["path_to_models"]
+snap_path = config_params["SNAP_DATA"]["snap_path"]
 SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 
 reset_opt_ke_calib = config_params["MISC"]["reset_opt_ke_calib"]
@@ -201,7 +202,7 @@ if __name__ == "__main__":
                     save_pickle(opt_param_dict,opt_model_fldr_loc+"ke_optparams_dict.pickle")
                     
                     # if the testing simulations are the same as the model simulations we don't need to reload the data
-                    if sorted(curr_test_sims) == sorted(opt_ke_calib_sims):
+                    if sorted(curr_test_sims) == sorted(opt_ke_calib_sims) and sorted(ke_test_dsets) == "Full":
                         print("Using fitting simulations for testing")
                         r_test = r_fit
                         vr_test = vr_fit
@@ -210,7 +211,7 @@ if __name__ == "__main__":
                         lnv2_test = lnv2_fit
                     else:
                         with timed("Loading Testing Data"):
-                            r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=curr_test_sims,dset_name=dset_name)
+                            r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=curr_test_sims,sim_cosmol_list=all_sim_cosmol_list,snap_list=snap_list,dset_name=dset_name)
                             r_test = my_data["p_Scaled_radii"].compute().to_numpy()
                             vr_test = my_data["p_Radial_vel"].compute().to_numpy()
                             vphys_test = my_data["p_phys_vel"].compute().to_numpy()
@@ -243,6 +244,7 @@ if __name__ == "__main__":
             preds_opt_ke = opt_ke_predictor(opt_param_dict, bins, r_test, vr_test, lnv2_test, r_cut_pred)
             X = my_data[feature_columns]
             y = my_data[target_column]
-            paper_dens_prf_plt(X, y, pd.DataFrame(preds_opt_ke), halo_df, curr_test_sims, all_sim_cosmol_list, split_scale_dict, plot_loc, split_by_nu=dens_prf_nu_split, split_by_macc=dens_prf_macc_split, prf_name_0="Optimized KE cut")
+
+            paper_dens_prf_plt(X, y, pd.DataFrame(preds_opt_ke), halo_df, curr_test_sims, all_sim_cosmol_list, split_scale_dict, plot_loc, snap_path, split_by_nu=dens_prf_nu_split, split_by_macc=dens_prf_macc_split, prf_name_0="Optimized KE cut")
 
             

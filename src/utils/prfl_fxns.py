@@ -16,25 +16,23 @@ from .util_fxns import parse_ranges, set_cosmology
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
-config_dict = load_config(os.getcwd() + "/config.ini")
-rand_seed = config_dict["MISC"]["random_seed"]
-curr_sparta_file = config_dict["SPARTA_DATA"]["curr_sparta_file"]
-debug_indiv_dens_prf = config_dict["MISC"]["debug_indiv_dens_prf"]
-save_intermediate_data = config_dict["MISC"]["save_intermediate_data"]
+config_params = load_config(os.getcwd() + "/config.ini")
+rand_seed = config_params["MISC"]["random_seed"]
+debug_indiv_dens_prf = config_params["MISC"]["debug_indiv_dens_prf"]
+save_intermediate_data = config_params["MISC"]["save_intermediate_data"]
 
-snap_path = config_dict["SNAP_DATA"]["snap_path"]
+SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
+pickled_path = config_params["PATHS"]["pickled_path"]
+ML_dset_path = config_params["PATHS"]["ml_dset_path"]
+debug_plt_path = config_params["PATHS"]["debug_plt_path"]
 
-SPARTA_output_path = config_dict["SPARTA_DATA"]["sparta_output_path"]
-pickled_path = config_dict["PATHS"]["pickled_path"]
-ML_dset_path = config_dict["PATHS"]["ml_dset_path"]
-debug_plt_path = config_dict["PATHS"]["debug_plt_path"]
-
-plt_nu_splits = config_dict["EVAL_MODEL"]["plt_nu_splits"]
+plt_nu_splits = config_params["EVAL_MODEL"]["plt_nu_splits"]
 plt_nu_splits = parse_ranges(plt_nu_splits)
 
-plt_macc_splits = config_dict["EVAL_MODEL"]["plt_macc_splits"]
+plt_macc_splits = config_params["EVAL_MODEL"]["plt_macc_splits"]
 plt_macc_splits = parse_ranges(plt_macc_splits)
-min_halo_nu_bin = config_dict["EVAL_MODEL"]["min_halo_nu_bin"]
+min_halo_nu_bin = config_params["EVAL_MODEL"]["min_halo_nu_bin"]
+
 
 # Get the mass of the next bin of a profile
 def update_mass_prf(calc_prf, radii, idx, start_bin, end_bin, mass):
@@ -365,7 +363,7 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
         fig.savefig(save_location + title + "prfl_rat.pdf",bbox_inches='tight',dpi=300)
 
 # Creates a stacked mass profile for an entire dataset by generating mass profiles for each halo and combining them
-def create_stack_mass_prf(splits, radii, halo_first, halo_n, mass, orbit_assn, prf_bins, use_mp = True, all_z = []):
+def create_stack_mass_prf(splits, radii, halo_first, halo_n, mass, orbit_assn, prf_bins, sim_cosmol_list, use_mp = True, all_z = []):
     calc_mass_prf_orb_lst = []
     calc_mass_prf_inf_lst = []
     calc_mass_prf_all_lst = []
@@ -373,6 +371,7 @@ def create_stack_mass_prf(splits, radii, halo_first, halo_n, mass, orbit_assn, p
     calc_r200m_lst = []
     
     for i in range(splits.size):
+        cosmol = set_cosmology(sim_cosmol_list[i])
         if i < splits.size - 1:
             curr_num_halos = halo_n[splits[i]:splits[i+1]].shape[0]
         else:
@@ -565,7 +564,7 @@ def compare_split_prfs_ke(plt_splits, n_lines, opt_orb_prfs, opt_inf_prfs, fast_
 
 # Creates the density profiles seen throughout the paper.
 # 3 panels for all, orbiting, and infalling profiles with options to be split by nu or by mass accretion rate
-def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol_list,split_scale_dict,plot_save_loc,split_by_nu=False,split_by_macc=False,prf_name_0="ML Model",prf_name_1="SPARTA"):
+def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol_list,split_scale_dict,plot_save_loc,snap_path,split_by_nu=False,split_by_macc=False,prf_name_0="ML Model",prf_name_1="SPARTA"):
     halo_first = halo_df["Halo_first"].values
     halo_n = halo_df["Halo_n"].values
     all_idxs = halo_df["Halo_indices"].values
@@ -610,8 +609,8 @@ def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol_list,split_scale_di
     
     # Create mass profiles from the model's predictions
     prime_radii = X["p_Scaled_radii"].values.compute()
-    calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=prime_radii, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, use_mp=True, all_z=all_z)
-    my_mass_prf_all, my_mass_prf_orb, my_mass_prf_inf, my_nus, my_r200m = create_stack_mass_prf(sim_splits,radii=prime_radii, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=y.compute().values.flatten(), prf_bins=bins, use_mp=True, all_z=all_z)
+    calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=prime_radii, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, sim_cosmol_list=sim_cosmol_list, use_mp=True, all_z=all_z)
+    my_mass_prf_all, my_mass_prf_orb, my_mass_prf_inf, my_nus, my_r200m = create_stack_mass_prf(sim_splits,radii=prime_radii, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=y.compute().values.flatten(), prf_bins=bins, sim_cosmol_list=sim_cosmol_list, use_mp=True, all_z=all_z)
     
     # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
     small_halo_fltr = np.isnan(calc_r200m)
@@ -662,6 +661,7 @@ def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol_list,split_scale_di
     past_halos_r200m_list = []
     
     for i,sim in enumerate(use_sims):
+        cosmol = set_cosmology(sim_cosmol_list[i])
         if i < len(use_sims) - 1:
             curr_idxs = all_idxs[sim_splits[i]:sim_splits[i+1]]
         else:
@@ -709,20 +709,21 @@ def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol_list,split_scale_di
                 c_sparta_snap = dset_params["all_snap_info"]["comp_"+str(all_tdyn_steps[0]) + "_tdstp_snap_info"]["sparta_snap"][()]
             else:
                 # If the prior secondary snap is not 1 dynamical time ago get that information
-                
                 with h5py.File(curr_sparta_HDF5_path,"r") as f:
                     dic_sim = {}
                     grp_sim = f['simulation']
                     for f in grp_sim.attrs:
                         dic_sim[f] = grp_sim.attrs[f]
-                    
+
                 all_sparta_z = dic_sim['snap_z']
-                little_h = dic_sim["h"]
-                
-                cosmol = set_cosmology(sim_cosmol_list[i])
                 
                 past_z = get_past_z(cosmol, curr_z, tdyn_step=1)
+                
+                sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
+
+                snap_path = snap_path + sparta_name + "/"
                 c_snap_dict = get_comp_snap_info(cosmol = cosmol, past_z=past_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
+
                 c_sparta_snap = c_snap_dict["sparta_snap"]
             c_halos_r200m = sparta_params[sparta_param_names[0]][:,c_sparta_snap]
             c_halos_r200m = c_halos_r200m[curr_idxs]
@@ -750,6 +751,7 @@ def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol_list,split_scale_di
 
             
             compare_split_prfs(plt_macc_splits,len(cpy_plt_macc_splits),macc_all_prf_lst,macc_orb_prf_lst,macc_inf_prf_lst,bins[1:],lin_rticks,plot_save_loc,title= "macc_dens_", split_name="\Gamma", prf_name_0=prf_name_0, prf_name_1=prf_name_1)
+
         if not split_by_nu and not split_by_macc:
             all_prf_lst = filter_prf(calc_dens_prf_all,act_dens_prf_all,min_disp_halos)
             orb_prf_lst = filter_prf(calc_dens_prf_orb,act_dens_prf_orb,min_disp_halos)

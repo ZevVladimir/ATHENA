@@ -181,22 +181,22 @@ if __name__ == "__main__":
             ax[0,3].set_ylabel("Number of Counts")
             ax[0,3].set_title("SPARTA: Infalling Fast: Orbiting")
             
-            ax[1,0].hist(orb_agree["1_Scaled_radii"],nbins)
+            ax[1,0].hist(orb_agree[str(all_tdyn_steps_list[0][0])+"_Scaled_radii"],nbins)
             ax[1,0].set_xlabel(r"Past Radii $r/R_{\mathrm{200m}}$")
             ax[1,0].set_ylabel("Number of Counts")
             ax[1,0].set_title("Orbiting Particles Same Classification")
             
-            ax[1,1].hist(inf_agree["1_Scaled_radii"],nbins)
+            ax[1,1].hist(inf_agree[str(all_tdyn_steps_list[0][0])+"_Scaled_radii"],nbins)
             ax[1,1].set_xlabel(r"Past Radii $r/R_{\mathrm{200m}}$")
             ax[1,1].set_ylabel("Number of Counts")
             ax[1,1].set_title("Infalling Particles Same Classification")
             
-            ax[1,2].hist(orb_disagree["1_Scaled_radii"],nbins)
+            ax[1,2].hist(orb_disagree[str(all_tdyn_steps_list[0][0])+"_Scaled_radii"],nbins)
             ax[1,2].set_xlabel(r"Past Radii $r/R_{\mathrm{200m}}$")
             ax[1,2].set_ylabel("Number of Counts")
             ax[1,2].set_title("SPARTA: Orbiting Fast: Infalling")
             
-            ax[1,3].hist(inf_disagree["1_Scaled_radii"],nbins)
+            ax[1,3].hist(inf_disagree[str(all_tdyn_steps_list[0][0])+"_Scaled_radii"],nbins)
             ax[1,3].set_xlabel(r"Past Radii $r/R_{\mathrm{200m}}$")
             ax[1,3].set_ylabel("Number of Counts")
             ax[1,3].set_title("SPARTA: Infalling Fast: Orbiting")

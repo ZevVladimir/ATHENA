@@ -23,6 +23,7 @@ config_params = load_config(args.config)
 
 ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 path_to_models = config_params["PATHS"]["path_to_models"]
+snap_path = config_params["SNAP_DATA"]["snap_path"]
 
 use_gpu = config_params["DASK_CLIENT"]["use_gpu"]
 
@@ -137,7 +138,7 @@ if __name__ == "__main__":
                 with timed(f"Predictions for {y.size.compute():.3e} particles"):
                     preds = make_preds(client, bst, X)
                 if dens_prf_plt:
-                    paper_dens_prf_plt(X, y, preds, halo_df, curr_test_sims, all_sim_cosmol_list, split_scale_dict, plot_loc, split_by_nu=dens_prf_nu_split, split_by_macc=dens_prf_macc_split)
+                    paper_dens_prf_plt(X, y, preds, halo_df, curr_test_sims, all_sim_cosmol_list, split_scale_dict, plot_loc, snap_path, split_by_nu=dens_prf_nu_split, split_by_macc=dens_prf_macc_split)
                 if full_dist_plt or misclass_plt:
                     p_act_labels=y.compute().values.flatten()
                     p_r=X["p_Scaled_radii"].values.compute()

@@ -25,6 +25,7 @@ path_to_models = config_params["PATHS"]["path_to_models"]
 
 test_dset_frac = config_params["DSET_CREATE"]["test_dset_frac"]
 
+eval_train_dsets = config_params["TRAIN_MODEL"]["eval_train_dsets"]
 features = config_params["TRAIN_MODEL"]["features"]
 target_column = config_params["TRAIN_MODEL"]["target_column"]
 model_sims = config_params["TRAIN_MODEL"]["model_sims"]
@@ -34,8 +35,6 @@ ntrees = config_params["TRAIN_MODEL"]["ntrees"]
 n_early_stopping_rounds = config_params["TRAIN_MODEL"]["n_early_stopping_rounds"]
 
 retrain = config_params["MISC"]["retrain_model"]
-
-eval_train_dsets = config_params["EVAL_MODEL"]["eval_train_dsets"]
 
 if __name__ == "__main__":        
     client = setup_client()
@@ -80,7 +79,7 @@ if __name__ == "__main__":
         print("Loaded Booster")
     else:
         with timed("Loading Datasets"):
-            train_data,scale_pos_weight = load_ML_dsets(client,model_sims,"Train",all_sim_cosmol_list,prime_snap=all_snaps[0],file_lim=file_lim,filter_nu=False)
+            train_data,train_scale_pos_weight = load_ML_dsets(client,model_sims,"Train",all_sim_cosmol_list,prime_snap=all_snaps[0],file_lim=file_lim,filter_nu=False)
                 
             X_train = train_data[feature_columns]
             y_train = train_data[target_column]
@@ -93,24 +92,21 @@ if __name__ == "__main__":
             
             eval_list = []
             for dset in eval_train_dsets:
-                train_data,scale_pos_weight = load_ML_dsets(client,model_sims,dset,all_sim_cosmol_list,prime_snap=all_snaps[0],file_lim=file_lim,filter_nu=False)
+                curr_data,curr_scale_pos_weight = load_ML_dsets(client,model_sims,dset,all_sim_cosmol_list,prime_snap=all_snaps[0],file_lim=file_lim,filter_nu=False)
                 
-                X_train = train_data[feature_columns]
-                y_train = train_data[target_column]
-
-                create_directory(model_fldr_loc)
-                create_directory(gen_plot_save_loc)
+                curr_X = curr_data[feature_columns]
+                curr_y = curr_data[target_column]
                 
                 # Construct the DaskDMatrix used for evaluatin the model
-                eval_list.append((dset,xgb.dask.DaskDMatrix(client, X_train, y_train)))
-        
+                eval_list.append((xgb.dask.DaskDMatrix(client, curr_X, curr_y),dset))
+
         if 'Training Info' in model_info: 
             params = model_info.get('Training Info',{}).get('Training Params')
         else:
             params = {
                 "verbosity": 1,
                 "tree_method": "hist",
-                "scale_pos_weight":scale_pos_weight,
+                "scale_pos_weight":train_scale_pos_weight,
                 "max_depth":4,
                 "device": "cuda",
                 "subsample": 0.5,

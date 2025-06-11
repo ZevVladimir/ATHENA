@@ -14,6 +14,7 @@ config_params = load_config(os.getcwd() + "/config.ini")
 ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 path_to_models = config_params["PATHS"]["path_to_models"]
 rockstar_ctlgs_path = config_params["PATHS"]["rockstar_ctlgs_path"]
+snap_path = config_params["SNAP_DATA"]["snap_path"]
 
 SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 
@@ -157,7 +158,7 @@ def calibrate_finder(
         [0.2, 0.5]
     """
     # MODIFY this line if needed ======================
-    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,fast_ke_calib_sims,all_sim_cosmol_list,snap_list,"Full")
+    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,fast_ke_calib_sims,calib_sim_cosmol_list,snap_list,"Full")
 
     # =================================================
 
@@ -211,13 +212,8 @@ if __name__ == "__main__":
     model_name = get_model_name(model_type, fast_ke_calib_sims)    
     model_fldr_loc = path_to_models + comb_model_sims + "/" + model_type + "/"  
     create_directory(model_fldr_loc)
-    
-    all_sim_cosmol_list = load_all_sim_cosmols(ke_test_sims)
-    all_tdyn_steps_list = load_all_tdyn_steps(ke_test_sims)
-    
-    feature_columns = get_feature_labels(features,all_tdyn_steps_list[0])
+    calib_sim_cosmol_list = load_all_sim_cosmols(fast_ke_calib_sims)
     snap_list = extract_snaps(fast_ke_calib_sims[0])
-    
     ####################################################################################################################################################################################################################################
     
     if os.path.exists(model_fldr_loc + "ke_fastparams_dict.pickle") and reset_fast_ke_calib == 0:
@@ -242,13 +238,19 @@ if __name__ == "__main__":
     print("\n")
     
     for curr_test_sims in ke_test_sims:
+        curr_sim_cosmol_list = load_all_sim_cosmols(curr_test_sims)
+        all_tdyn_steps_list = load_all_tdyn_steps(curr_test_sims)
+        
+        feature_columns = get_feature_labels(features,all_tdyn_steps_list[0])
+        snap_list = extract_snaps(curr_test_sims[0])
+        
         for dset_name in ke_test_dsets:
             test_comb_name = get_combined_name(curr_test_sims) 
 
             plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
             create_directory(plot_loc)
             
-            r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client, curr_test_sims,all_sim_cosmol_list,snap_list,dset_name)
+            r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client, curr_test_sims,curr_sim_cosmol_list,snap_list,dset_name)
             
             r_r200m = my_data["p_Scaled_radii"].compute().to_numpy()
             vr = my_data["p_Radial_vel"].compute().to_numpy()
@@ -344,4 +346,4 @@ if __name__ == "__main__":
                 X = my_data[feature_columns]
                 y = my_data[target_column]
                 
-                paper_dens_prf_plt(X, y, pd.DataFrame(ke_cut_preds), halo_df, curr_test_sims, all_sim_cosmol_list, split_scale_dict, plot_loc, split_by_nu=True, split_by_macc=True)
+                paper_dens_prf_plt(X, y, pd.DataFrame(ke_cut_preds), halo_df, curr_test_sims, curr_sim_cosmol_list, split_scale_dict, plot_loc, snap_path, split_by_nu=True, split_by_macc=True)
