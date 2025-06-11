@@ -17,6 +17,7 @@ ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 path_to_models = config_params["PATHS"]["path_to_models"]
 SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 
+reset_opt_ke_calib = config_params["MISC"]["reset_opt_ke_calib"]
 save_intermediate_data = config_params["MISC"]["save_intermediate_data"]
 
 plt_nu_splits = parse_ranges(config_params["EVAL_MODEL"]["plt_nu_splits"])
@@ -142,7 +143,7 @@ if __name__ == "__main__":
             bins = sparta_params[sparta_param_names[0]]
             bins = np.insert(bins, 0, 0)
             
-            if os.path.isfile(opt_model_fldr_loc + "ke_optparams_dict.pickle"):
+            if os.path.isfile(opt_model_fldr_loc + "ke_optparams_dict.pickle") and reset_opt_ke_calib == 0:
                 print("Loading parameters from saved file")
                 opt_param_dict = load_pickle(opt_model_fldr_loc + "ke_optparams_dict.pickle")
                 

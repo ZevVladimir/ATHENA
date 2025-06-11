@@ -20,6 +20,7 @@ SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 features = config_params["TRAIN_MODEL"]["features"]
 target_column = config_params["TRAIN_MODEL"]["target_column"]
 
+reset_fast_ke_calib = config_params["MISC"]["reset_fast_ke_calib"]
 save_intermediate_data = config_params["MISC"]["save_intermediate_data"]
 
 plt_nu_splits = parse_ranges(config_params["EVAL_MODEL"]["plt_nu_splits"])
@@ -219,7 +220,7 @@ if __name__ == "__main__":
     
     ####################################################################################################################################################################################################################################
     
-    if os.path.exists(model_fldr_loc + "ke_fastparams_dict.pickle"):
+    if os.path.exists(model_fldr_loc + "ke_fastparams_dict.pickle") and reset_fast_ke_calib == 0:
         ke_param_dict = load_pickle(model_fldr_loc + "ke_fastparams_dict.pickle")
         m_pos = ke_param_dict["m_pos"]
         b_pos = ke_param_dict["b_pos"]

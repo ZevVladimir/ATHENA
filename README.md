@@ -110,20 +110,6 @@ The name of the folder where each model is saved is slightly complicated in orde
 
 /*path_path_to_models*/\<combined and shortened name of simulations\>/*model_type*/
 
-If *tree_err* is enabled plots will be created that show the accuracy of the model depending on the number of trees used as well as how fast predictions are made with the number of trees.
-
-<details>
-<summary>Optimization of Model (WIP)</summary>
-
-#TODO make the name change optional and instead encourage manually changing the model's name
-If you use some of the additional optimization methods the path can be changed as they include information about the optimization parameters in the name to automatically differentiate the models. 
-
-There are some elements within the code intended to provide ways to tune the dataset to optimize the accuracy of the model. We found that these ended up being unecessary for our data to train an accurate model. These might be potentially fully fleshed out and integrated in the future.
-
-#TODO finish this section
-
-</details>
-
 ### Running the code: train_model.py
 
 After the \[TRAIN_MODEL\] parameters are set (and potentially \[MISC\] and \[DASK_CLIENT\] parameters as well) you are ready to create the datasets. This is done by simply running the python code: `python3 ./src/train_model.py`
