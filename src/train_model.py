@@ -34,7 +34,6 @@ features = config_params["TRAIN_MODEL"]["features"]
 target_column = config_params["TRAIN_MODEL"]["target_column"]
 model_sims = config_params["TRAIN_MODEL"]["model_sims"]
 model_type = config_params["TRAIN_MODEL"]["model_type"]
-tree_err = config_params["TRAIN_MODEL"]["tree_err"]
 file_lim = config_params["TRAIN_MODEL"]["file_lim"]
 
 retrain = config_params["MISC"]["retrain_model"]
@@ -44,37 +43,14 @@ misclass_plt = config_params["EVAL_MODEL"]["misclass_plt"]
 fulldist_plt = config_params["EVAL_MODEL"]["fulldist_plt"]
 dens_prf_nu_split = config_params["EVAL_MODEL"]["dens_prf_nu_split"]
 
-def evaluate_accuracy_and_speed(model, dtest, max_trees):
-    accuracies = []
-    times = []
-    
-    for num_trees in range(1, max_trees + 1):
-        # Start the timer
-        start_time = time.time()
-        
-        # Make predictions using the first 'num_trees' trees
-        preds = model.predict(dtest, iteration_range=(0,num_trees))
-        
-        # End the timer and calculate time taken
-        elapsed_time = time.time() - start_time
-        
-        # Convert probabilities to binary class predictions
-        preds = np.round(preds)
-        
-        # Calculate accuracy
-        accuracy = accuracy_score(y_test, preds)
-        
-        # Append results
-        accuracies.append(accuracy)
-        times.append(elapsed_time)
-    
-    return accuracies, times
-
 if __name__ == "__main__":        
     client = setup_client()
     
-    dset_params = load_pickle(ML_dset_path + model_sims[0] + "/dset_params.pickle")
-    sim_cosmol = dset_params["cosmology"]
+    all_sim_cosmol_list = []
+    for sim in model_sims:
+        dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
+        all_sim_cosmol_list.append(dset_params["cosmology"])
+
     all_tdyn_steps = dset_params["t_dyn_steps"]
     feature_columns = get_feature_labels(features,all_tdyn_steps)
     all_snaps = extract_snaps(model_sims[0])
@@ -110,13 +86,7 @@ if __name__ == "__main__":
         print("Loaded Booster")
     else:
         with timed("Loading Datasets"):
-            train_data,scale_pos_weight = load_ML_dsets(client,model_sims,"Train",sim_cosmol,prime_snap=all_snaps[0],file_lim=file_lim,filter_nu=False)
-            # We want to use the full testing dataset regardless
-            test_data,scale_pos_weight = load_ML_dsets(client,model_sims,"Test",sim_cosmol,prime_snap=all_snaps[0],file_lim=0,filter_nu=False)
-                
-            X_test = test_data[feature_columns]
-            y_test = test_data[target_column]
-            print("Calculated Scale Position Weight:",scale_pos_weight)
+            train_data,scale_pos_weight = load_ML_dsets(client,model_sims,"Train",all_sim_cosmol_list,prime_snap=all_snaps[0],file_lim=file_lim,filter_nu=False)
             
             X_train = train_data[feature_columns]
             y_train = train_data[target_column]
@@ -126,7 +96,6 @@ if __name__ == "__main__":
             
             # Construct the DaskDMatrix used for training
             dtrain = xgb.dask.DaskDMatrix(client, X_train, y_train)
-            dtest = xgb.dask.DaskDMatrix(client, X_test, y_test)
         
         if 'Training Info' in model_info: 
             params = model_info.get('Training Info',{}).get('Training Params')
@@ -155,66 +124,12 @@ if __name__ == "__main__":
                 params,
                 dtrain,
                 num_boost_round=num_trees,
-                evals=[(dtrain, 'train'), (dtest, 'test')],
+                evals=[(dtrain, 'train')],
                 early_stopping_rounds=10, 
                 )
             bst = output["booster"]
             history = output["history"]
             bst.save_model(model_save_loc)
             save_pickle(model_info,model_fldr_loc + "model_info.pickle")
-            
-        if tree_err:
-            with timed("Evaluate Tree Error"):
-                #TODO see if it is possible to save the history
-                # Get accuracy at each boosting round
-                # Extract training and validation error (1 - accuracy) at each round
-                train_errors = history['train']['error']
-                test_errors = history['test']['error']
-
-                # Calculate accuracies
-                train_accuracies = [1 - error for error in train_errors]
-                test_accuracies = [1 - error for error in test_errors]
-
-                # Plot or analyze accuracy vs. number of trees (boosting rounds)
-                plt.plot(range(len(train_accuracies)), train_accuracies, label='Train Accuracy')
-                plt.plot(range(len(test_accuracies)), test_accuracies, label='Test Accuracy')
-                plt.xlabel('Number of Trees')
-                plt.ylabel('Accuracy')
-                plt.legend()
-                plt.savefig(gen_plot_save_loc + "train_test_acc.pdf")
-
-                # You can also inspect the final accuracy after training
-                final_train_accuracy = train_accuracies[-1]
-                final_test_accuracy = test_accuracies[-1]
-                print(f"Final train accuracy: {final_train_accuracy}")
-                print(f"Final test accuracy: {final_test_accuracy}")
-                
-                
-                X_test_local = X_test.compute()
-                y_test_local = y_test.compute()
-                dtest = xgb.DMatrix(X_test_local, label=y_test_local)
-
-                accuracies, times = evaluate_accuracy_and_speed(bst, dtest, max_trees=num_trees)
-
-                # Plot accuracy vs number of trees
-                plt.figure(figsize=(12, 6))
-
-                # Subplot for accuracy
-                plt.subplot(1, 2, 1)
-                plt.plot(range(1, 101), accuracies, label='Test Accuracy', color='blue')
-                plt.xlabel('Number of Trees')
-                plt.ylabel('Accuracy')
-                plt.legend()
-
-                # Subplot for time
-                plt.subplot(1, 2, 2)
-                plt.plot(range(1, 101), times, label='Prediction Time', color='red')
-                plt.xlabel('Number of Trees')
-                plt.ylabel('Time (seconds)')
-                plt.legend()
-
-                plt.tight_layout()
-                plt.savefig(gen_plot_save_loc + "tree_time_acc.pdf")
-
     
     client.close()
