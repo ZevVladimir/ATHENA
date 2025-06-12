@@ -721,8 +721,8 @@ def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol_list,split_scale_di
                 
                 sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
 
-                snap_path = snap_path + sparta_name + "/"
-                c_snap_dict = get_comp_snap_info(cosmol = cosmol, past_z=past_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
+                curr_snap_path = snap_path + sparta_name + "/"
+                c_snap_dict = get_comp_snap_info(cosmol = cosmol, past_z=past_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=curr_snap_path)
 
                 c_sparta_snap = c_snap_dict["sparta_snap"]
             c_halos_r200m = sparta_params[sparta_param_names[0]][:,c_sparta_snap]

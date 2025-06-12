@@ -4,7 +4,7 @@ import pickle
 import os
 import argparse
 
-from src.utils.util_fxns import create_directory, timed, load_pickle, save_pickle, load_config, load_ML_dsets
+from src.utils.util_fxns import create_directory, timed, load_pickle, save_pickle, load_config, load_ML_dsets, load_all_sim_cosmols, load_all_tdyn_steps
 from src.utils.ML_fxns import setup_client, get_combined_name, extract_snaps, get_model_name, get_feature_labels
 
 ##################################################################################################################
@@ -39,13 +39,10 @@ retrain = config_params["MISC"]["retrain_model"]
 if __name__ == "__main__":        
     client = setup_client()
     
-    all_sim_cosmol_list = []
-    for sim in model_sims:
-        dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
-        all_sim_cosmol_list.append(dset_params["cosmology"])
+    all_sim_cosmol_list = load_all_sim_cosmols(model_sims)
+    all_tdyn_steps_list = load_all_tdyn_steps(model_sims)
 
-    all_tdyn_steps = dset_params["t_dyn_steps"]
-    feature_columns = get_feature_labels(features,all_tdyn_steps)
+    feature_columns = get_feature_labels(features,all_tdyn_steps_list[0])
     all_snaps = extract_snaps(model_sims[0])
     
     comb_model_sims = get_combined_name(model_sims) 
@@ -111,7 +108,7 @@ if __name__ == "__main__":
                 "device": "cuda",
                 "subsample": 0.5,
                 'objective': 'binary:logistic',
-                'eval_metric': 'error',
+                'eval_metric': 'binary:logistic',
                 }
             model_info['Training Info']={
                 'Fraction of Training Data Used': test_dset_frac,

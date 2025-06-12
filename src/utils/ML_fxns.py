@@ -97,8 +97,8 @@ def setup_client():
     return client
 
 # Make predictions using the model. Requires the inputs to be a dask dataframe. Can either return the predictions still as a dask dataframe or as a numpy array
-def make_preds(client, bst, X, dask = False, threshold = 0.5):
-    if dask:
+def make_preds(client, bst, X, ret_dask = False, threshold = 0.5):
+    if ret_dask:
         preds = dxgb.predict(client,bst,X)
         preds = preds.map_partitions(lambda df: (df >= threshold).astype(int))
         return preds

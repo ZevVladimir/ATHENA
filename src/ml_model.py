@@ -3,79 +3,103 @@ from xgboost import dask as dxgb
 import numpy as np
 import os
 
+from src.utils.util_fxns import timed
+
 class MLModel:
-    def __init__(self, model_name="", model_params=None, ntrees=100, early_stopping_rounds=10):
+    def __init__(self, model_name="", model_params=None, ntrees=100, early_stopping_rounds=10, verbosity = 1, model_dir=""):
         self.model_params = model_params or {
                 "verbosity": 1,
                 "tree_method": "hist",
                 "max_depth":4,
                 "subsample": 0.5,
                 'objective': 'binary:logistic',
-                'eval_metric': 'error',
             }
         self.model = None
         self.trained = False
         self.ntrees = ntrees
+        self.verbosity = verbosity
         self.model_name = model_name
         self.early_stopping_rounds = early_stopping_rounds
+        self.model_dir = model_dir
+        self.use_dask = False
         
     def set_scale_pos_weight(self,scale_pos_weight):
         self.model_params["scale_pos_weight"] = scale_pos_weight
 
     def set_ntrees(self, ntrees):
         self.ntrees = ntrees
+    
+    def comb_model_sim_str(self,model_sims):
+        train_sims = ""
+        for i,sim in enumerate(model_sims):
+            if i != len(model_sims) - 1:
+                train_sims += sim + ", "
+            else:
+                train_sims += sim
+        return train_sims
         
-    def train(self, X_train, y_train, adtnl_evals=None):
-        evals = [(X_train,y_train)]
-        if adtnl_evals is not None:
-            evals.extend(adtnl_evals)
-            
-        self.model = xgb.XGBClassifier(**self.model_params)
+    def train(self, dtrain, model_sims, evals=None):
+        self.sims_trained_on = self.comb_model_sim_str(model_sims)
+    
+        with timed("Training model:"):
+            if evals == None:
+                self.model = xgb.train(
+                    self.model_params,
+                    dtrain,
+                    num_boost_round=self.ntrees,
+                    verbose_eval=self.verbosity,
+                )
+            else:
+                evals_result = {}
+                self.model = xgb.train(
+                    self.model_params,
+                    dtrain,
+                    num_boost_round=self.ntrees,
+                    evals=evals,
+                    early_stopping_rounds= self.early_stopping_rounds,
+                    evals_result=evals_result,
+                    verbose_eval=self.verbosity,
+                )
 
-        evals_result = {}
-        self.model.fit(
-            X_train,
-            y_train,
-            eval_set=evals,
-            early_stopping_rounds= self.early_stopping_rounds,
-            eval_metric=self.model_params.get("eval_metric", "logloss"),
-            verbose=False,
-            callbacks=[xgb.callback.EvaluationMonitor()],
-            evals_result=evals_result
-        )
-
-        self.history = evals_result
-        self.trained = True
+                self.history = evals_result
+            self.trained = True
         
     def dask_train(self, client, dtrain, adtnl_evals):
-        evals = [(dtrain, 'train')]
-        if adtnl_evals is not None:
-            evals.extend(adtnl_evals)
-        output = dxgb.train(
-            client,
-            self.model_params,
-            dtrain,
-            num_boost_round=self.ntrees,
-            evals=evals,
-            early_stopping_rounds=self.early_stopping_rounds, 
-        )
-        self.model = output["booster"]
-        self.history = output["history"]
-        self.trained = True
+        self.use_dask = True
+        with timed("Training model:"):
+            evals = [(dtrain, 'train')]
+            if adtnl_evals is not None:
+                evals.extend(adtnl_evals)
+            output = dxgb.train(
+                client,
+                self.model_params,
+                dtrain,
+                num_boost_round=self.ntrees,
+                evals=evals,
+                early_stopping_rounds=self.early_stopping_rounds, 
+            )
+            self.model = output["booster"]
+            self.history = output["history"]
+            self.trained = True
 
-    def predict(self, X):
+    def predict(self, X, class_thrshld = 0.5, client=None):
         if not self.trained:
             raise RuntimeError("Model is not trained yet.")
         
-        if isinstance(self.model, xgb.XGBClassifier):
-            # sklearn API: direct predict
-            return self.model.predict(X)
-        
-        elif isinstance(self.model, xgb.Booster):
-            # Booster object (from dask_train)
-            # Use inplace_predict for efficiency if possible
+        if self.use_dask and client is not None:
+            try:
+                preds = dxgb.predict(client,self.model,X)
+                preds = preds.map_partitions(lambda df: (df >= class_thrshld).astype(int))
+                return preds
+            except AttributeError:
+                preds = dxgb.inplace_predict(client, self.model, X).compute()
+                preds = (preds >= class_thrshld).astype(np.int8)
+    
+            return preds
+        elif self.use_dask is False:
             try:
                 preds = self.model.inplace_predict(X)
+                preds = (preds >= class_thrshld).astype(np.int8)
             except AttributeError:
                 # fallback to DMatrix + predict if inplace_predict not available
                 dmatrix = xgb.DMatrix(X)
@@ -87,6 +111,7 @@ class MLModel:
 
     def accuracy(self, X, y_true):
         y_pred = self.predict(X)
+
         return np.mean(y_pred == y_true)
 
     def get_feature_importance(self, importance_type="gain"):
