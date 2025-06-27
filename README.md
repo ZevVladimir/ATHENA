@@ -10,7 +10,7 @@ You need the particle data from a GADGET simulation and the .hdf5 output file fr
 - pygadgetreader needs to be cloned and installed from this repository: https://github.com/jveitchmichaelis/pygadgetreader
 - SPARTA needs to be cloned and installed from this repository: https://bdiemer.bitbucket.io/sparta/ 
 - For dask packages that make use of CUDA you can find alternative ways to install at: https://docs.rapids.ai/install/ 
-    - Requires Python 3.10, 3.11, or 3.12
+    - Currently requires Python 3.10, 3.11, or 3.12
 
 ## Creating the Datasets
 
@@ -29,7 +29,7 @@ To see an example of snapshot data formatting look at a simulatio in the snaps/ 
 
 A SPARTA output file for the cbol_l0063_n0256 simulation is provided in this repo
 
-- The halo data is expected to be supplidd from the .hdf5 output file from SPARTA
+- The halo data is expected to be supplied from the .hdf5 output file from SPARTA
 - The path to this file should be indicated with the *SPARTA_output_path* parameter
 - The file's name should be provided with the *curr_sparta_file* parameter
 - SPARTA should be run with at least the provided parameters so that all information is present

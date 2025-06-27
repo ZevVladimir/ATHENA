@@ -31,36 +31,22 @@ log_tvticks = config_dict["EVAL_MODEL"]["log_tvticks"]
 lin_rticks = config_dict["EVAL_MODEL"]["lin_rticks"]
 log_rticks = config_dict["EVAL_MODEL"]["log_rticks"]
 
-    
-def halo_select(sims, ptl_data):
-    curr_tot_nptl = 0
+#TODO do some extra checking that this is right especially with different datasets and loading the right number of particles
+def halo_select(sims, ptl_data, dset_name):
     curr_halo_start = 0
     all_row_idxs = []
-    hipids = ptl_data["HIPIDS"].compute().to_numpy()
-    all_pids, ptl_halo_idxs = depair_np(hipids)
+    
     # For each simulation we will search through the largest halos and determine if they dominate their region and only choose those ones
     for i,sim in enumerate(sims):
         # Get the numnber of particles per halo and use this to sort the halos such that the largest is first
         n_ptls = load_pickle(ML_dset_path + sim + "/num_ptls.pickle")   
         match_halo_idxs = load_pickle(ML_dset_path + sim + "/match_halo_idxs.pickle")    
-  
-        total_num_halos = match_halo_idxs.shape[0]
         
         # Load information about the simulation
         dset_params = load_pickle(ML_dset_path + sim + "/dset_params.pickle")
-        test_halos_ratio = dset_params["test_halos_ratio"]
         p_box_size = dset_params["all_snap_info"]["prime_snap_info"]["box_size"][()]
         p_scale_factor = dset_params["all_snap_info"]["prime_snap_info"]["scale_factor"][()]
         
-        # split all indices into train and test groups
-        split_pnt = int((1-test_halos_ratio) * total_num_halos)
-        test_idxs = match_halo_idxs[split_pnt:]
-        test_num_ptls = n_ptls[split_pnt:]
-
-        # need to sort indices otherwise sparta.load breaks...      
-        test_idxs_inds = test_idxs.argsort()
-        test_idxs = test_idxs[test_idxs_inds]
-        test_num_ptls = test_num_ptls[test_idxs_inds]
         
         sparta_name, sparta_search_name = split_sparta_hdf5_name(sim)
         
@@ -76,21 +62,24 @@ def halo_select(sims, ptl_data):
         halos_pos = sparta_params[sparta_param_names[0]][:,p_sparta_snap,:] * 10**3 * p_scale_factor # convert to kpc/h physical
         halos_r200m = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
         
+        if dset_name == "Full":    
+            train_halo_dfs = (reform_dset_dfs(ML_dset_path + sim + "/" + "Train" + "/halo_info/"))
+            val_halo_dfs = (reform_dset_dfs(ML_dset_path + sim + "/" + "Val" + "/halo_info/"))
+            test_halo_dfs = (reform_dset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/"))
+            halo_df = pd.concat([train_halo_dfs,val_halo_dfs,test_halo_dfs]).reset_index(drop=True)
+        else:
+            halo_df = (reform_dset_dfs(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
         
-        halo_ddf = reform_dset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
-        curr_idxs = halo_ddf["Halo_indices"].values
-        halo_first = halo_ddf["Halo_first"].values
-        halo_n = halo_ddf["Halo_n"].values
-
+        curr_idxs = halo_df["Halo_indices"].values
+        halo_first = halo_df["Halo_first"].values
+        halo_n = halo_df["Halo_n"].values
+    
         curr_halo_start = curr_halo_start + np.sum(halo_n) # always increment even if this halo isn't going to be counted
         
         max_nhalo = 500
         
-        order_halo = np.argsort(test_num_ptls)[::-1]
-        n_ptls = test_num_ptls[order_halo]
-        if order_halo.shape[0] < max_nhalo:
-            max_nhalo = order_halo.shape[0]
-                
+        order_halo = np.argsort(halo_n)[::-1]
+
         # Load which particles belong to which halo and then sort them corresponding to the size of the halos again
         curr_idxs = curr_idxs[order_halo]
         halo_n = halo_n[order_halo]
@@ -100,7 +89,7 @@ def halo_select(sims, ptl_data):
         use_halo_r200m = halos_r200m[curr_idxs]
         # Construct a search tree of halo positions
         curr_halo_tree = KDTree(data = use_halo_pos, leafsize = 3, balanced_tree = False, boxsize = p_box_size)
-        
+
         # For each massive halo search the area around the halo to determine if there are any halos that are more than 20% the size of this halo
         for i in range(max_nhalo):
             curr_halo_indices = curr_halo_tree.query_ball_point(use_halo_pos[i], r = 2 * use_halo_r200m[i])
@@ -118,31 +107,33 @@ def halo_select(sims, ptl_data):
                     halo_first[i] + halo_n[i]
                 ))
                 all_row_idxs.extend(row_indices)
-                curr_tot_nptl += np.sum(halo_n)
-                
-            # Once we have 10,000,000 particles we are done
-            # if curr_tot_nptl > 1000000:
-            #     break
-    subset_df = ptl_data.compute().loc[all_row_idxs]        
+
+    subset_df = ptl_data.compute().iloc[all_row_idxs]        
     return subset_df
 
 def load_ke_data(client, curr_test_sims, sim_cosmol_list, snap_list, dset_name):
     with timed("Loading data"):             
         # Load the halo information
-        halo_dfs = []
+        halo_dfs_list = []
         if dset_name == "Full":    
             for sim in curr_test_sims:
-                halo_dfs.append(reform_dset_dfs(ML_dset_path + sim + "/" + "Train" + "/halo_info/"))
-                halo_dfs.append(reform_dset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/"))
+                train_halo_df = reform_dset_dfs(ML_dset_path + sim + "/" + "Train" + "/halo_info/")
+                val_halo_df = reform_dset_dfs(ML_dset_path + sim + "/" + "Val" + "/halo_info/")
+                val_halo_df["Halo_first"] += train_halo_df["Halo_n"].sum()
+                test_halo_df = reform_dset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
+                test_halo_df["Halo_first"] += train_halo_df["Halo_n"].sum() + val_halo_df["Halo_n"].sum()
+                halo_dfs_list.append(train_halo_df)
+                halo_dfs_list.append(val_halo_df)
+                halo_dfs_list.append(test_halo_df)
         else:
             for sim in curr_test_sims:
-                halo_dfs.append(reform_dset_dfs(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
+                halo_dfs_list.append(reform_dset_dfs(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
 
-        halo_df = pd.concat(halo_dfs)
+        halo_df = pd.concat(halo_dfs_list)
         
         # Load the particle information
         data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,sim_cosmol_list,prime_snap=snap_list[0])
-        samp_data = halo_select(curr_test_sims,data)
+        samp_data = halo_select(curr_test_sims,data,dset_name)
     r = samp_data["p_Scaled_radii"]
     vr = samp_data["p_Radial_vel"]
     vphys = samp_data["p_phys_vel"]

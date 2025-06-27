@@ -2,6 +2,7 @@ import xgboost as xgb
 from xgboost import dask as dxgb
 import numpy as np
 import os
+import matplotlib.pyplot as plt
 
 from src.utils.util_fxns import timed
 
@@ -38,7 +39,7 @@ class MLModel:
                 train_sims += sim
         return train_sims
         
-    def train(self, dtrain, model_sims, evals=None):
+    def train(self, dtrain, model_sims, evals=None, save_model=True):
         self.sims_trained_on = self.comb_model_sim_str(model_sims)
     
         with timed("Training model:"):
@@ -63,21 +64,33 @@ class MLModel:
 
                 self.history = evals_result
             self.trained = True
+            
+            if save_model:
+                self.save_model(self.model_dir)
         
-    def dask_train(self, client, dtrain, adtnl_evals):
+    def dask_train(self, client, dtrain, model_sims, evals=None):
+        self.sims_trained_on = self.comb_model_sim_str(model_sims)
         self.use_dask = True
         with timed("Training model:"):
-            evals = [(dtrain, 'train')]
-            if adtnl_evals is not None:
-                evals.extend(adtnl_evals)
-            output = dxgb.train(
-                client,
-                self.model_params,
-                dtrain,
-                num_boost_round=self.ntrees,
-                evals=evals,
-                early_stopping_rounds=self.early_stopping_rounds, 
-            )
+            if evals == None:
+                output = dxgb.train(
+                    client,
+                    self.model_params,
+                    dtrain,
+                    num_boost_round=self.ntrees,
+                    verbose_eval=self.verbosity,
+                )
+            else:
+                output = dxgb.train(
+                    client,
+                    self.model_params,
+                    dtrain,
+                    num_boost_round=self.ntrees,
+                    evals=evals,
+                    early_stopping_rounds= self.early_stopping_rounds,
+                    verbose_eval=self.verbosity,
+                )
+
             self.model = output["booster"]
             self.history = output["history"]
             self.trained = True
@@ -109,18 +122,16 @@ class MLModel:
         else:
             raise TypeError(f"Unrecognized model type: {type(self.model)}")
 
-    def accuracy(self, X, y_true):
-        y_pred = self.predict(X)
-
-        return np.mean(y_pred == y_true)
-
-    def get_feature_importance(self, importance_type="gain"):
-        if not self.trained:
-            raise RuntimeError("Model must be trained to retrieve feature importances.")
-        return self.model.get_booster().get_score(importance_type=importance_type)
+    def full_save(self):
+        self.save_model(self.model_dir)
+        self.save_config(self.model_dir)
 
     def save_model(self, filepath):
-        self.model.save_model(filepath + self.model_name + ".json")        
+        print(self.model_name)
+        self.model.save_model(os.path.join(filepath,self.model_name + self.sims_trained_on + ".json"))
+        
+    def save_config(self, filepath):
+        self.model.save_config(os.path.join(filepath,"config.json"))        
         
     def load_model(self, filepath):
         if os.path.isfile(filepath):

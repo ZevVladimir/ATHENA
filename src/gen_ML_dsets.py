@@ -374,12 +374,10 @@ with timed("Generating Datasets for " + curr_sparta_file):
             if len(known_snaps) > 0:
                 save_location = os.path.join(ML_dset_path, curr_sparta_file + "_" + "_".join(str(x) for x in known_snaps)) + "/"
                 dset_params = load_pickle(os.path.join(save_location, "dset_params.pickle"))
+                sim_cosmol = dset_params["cosmology"]
             else:
                 raise ValueError("To load the correct parameter file, provide the known snapshots. If the snapshots are unknown, set reset_lvl > 1.")
-
-
-        if reset_lvl <= 1:
-            sim_cosmol = dset_params["cosmology"]
+            
         if sim_cosmol == "planck13-nbody":
             cosmol = cosmology.setCosmology('planck13-nbody',{'flat': True, 'H0': 67.0, 'Om0': 0.32, 'Ob0': 0.0491, 'sigma8': 0.834, 'ns': 0.9624, 'relspecies': False})
         else:
@@ -459,15 +457,9 @@ with timed("Generating Datasets for " + curr_sparta_file):
             
         with timed("Load Complementary Snapshots"):
             if reset_lvl > 1 or len(known_snaps) == 0:
-                for tdyn_step in all_tdyn_steps:
-                    tdyn = calc_tdyn(p_halos_r200m[np.where(p_halos_r200m > 0)[0][0]],prim_z,little_h)
-                    curr_time = cosmol.age(prim_z)
-                    past_time = curr_time - (tdyn * 1)
-                    past_z = cosmol.age(past_time,inverse=True)
-                    print("Calculated past redshift formula 0.5 tdyn:",past_z)
-                                        
+                for tdyn_step in all_tdyn_steps:                                        
                     past_z = get_past_z(cosmol, prim_z, tdyn_step=tdyn_step)
-                    print("Calculated past redshift colossus 1 tdyn:",past_z)
+                    print("Calculated past redshift colossus " + str(tdyn_step) + " tdyn:",past_z)
                     c_snap_dict = get_comp_snap_info(cosmol = cosmol, past_z=past_z, all_sparta_z=all_sparta_z,snap_dir_format=snap_dir_format,snap_format=snap_format,snap_path=snap_path)
                     
                     c_snap = c_snap_dict["ptl_snap"]

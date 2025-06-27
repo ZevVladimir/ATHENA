@@ -269,7 +269,7 @@ def load_ML_dsets(client, sims, dset_name, sim_cosmol_list, prime_snap, file_lim
         max_mem = int(np.floor(dset_params["HDF5 Mem Size"] / 2))
         
         if dset_name == "Full":
-            datasets = ["Train", "Test"]
+            datasets = ["Train", "Val", "Test"]
         else:
             datasets = [dset_name]
 

@@ -330,8 +330,8 @@ if __name__ == "__main__":
             sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, save_data=save_intermediate_data)
             bins = sparta_params[sparta_param_names[0]]
 
-            plt_SPARTA_KE_dist(ke_param_dict, fltr_combs, bins, r_r200m, lnv2, perc, width, r_cut_calib, plot_loc, title="only_fast_", plot_lin_too=True)
-            plt_KE_dist_grad(ke_param_dict, fltr_combs, r_r200m, vr, lnv2, nbins, x_range, y_range, r_cut_calib, plot_loc)      
+            # plt_SPARTA_KE_dist(ke_param_dict, fltr_combs, bins, r_r200m, lnv2, perc, width, r_cut_calib, plot_loc, title="only_fast_", plot_lin_too=True)
+            # plt_KE_dist_grad(ke_param_dict, fltr_combs, r_r200m, vr, lnv2, nbins, x_range, y_range, r_cut_calib, plot_loc)      
             
         ####################################################################################################################################################################################################################################
 

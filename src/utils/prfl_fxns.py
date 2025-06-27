@@ -371,6 +371,8 @@ def create_stack_mass_prf(splits, radii, halo_first, halo_n, mass, orbit_assn, p
     calc_r200m_lst = []
     
     for i in range(splits.size):
+        print(splits.size)
+        print(sim_cosmol_list)
         cosmol = set_cosmology(sim_cosmol_list[i])
         if i < splits.size - 1:
             curr_num_halos = halo_n[splits[i]:splits[i+1]].shape[0]

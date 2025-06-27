@@ -108,7 +108,6 @@ if __name__ == "__main__":
                 "device": "cuda",
                 "subsample": 0.5,
                 'objective': 'binary:logistic',
-                'eval_metric': 'binary:logistic',
                 }
             model_info['Training Info']={
                 'Fraction of Training Data Used': test_dset_frac,
