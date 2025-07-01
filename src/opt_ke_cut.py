@@ -4,6 +4,7 @@ from scipy.optimize import minimize
 import os
 import pandas as pd
 from sparta_tools import sparta
+import argparse
 
 from src.utils.ML_fxns import setup_client, get_combined_name, get_feature_labels, extract_snaps
 from src.utils.util_fxns import create_directory, load_pickle, load_config, save_pickle, load_pickle, timed, parse_ranges, split_sparta_hdf5_name, load_SPARTA_data, load_all_sim_cosmols, load_all_tdyn_steps
@@ -11,7 +12,16 @@ from src.utils.ke_cut_fxns import load_ke_data, opt_ke_predictor
 from src.utils.vis_fxns import plt_SPARTA_KE_dist
 from src.utils.prfl_fxns import paper_dens_prf_plt
 
-config_params = load_config(os.getcwd() + "/config.ini")
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    '--config',
+    type=str,
+    default=os.getcwd() + "/config.ini", 
+    help='Path to config file (default: config.ini)'
+)
+
+args = parser.parse_args()
+config_params = load_config(args.config)
 
 ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 path_to_models = config_params["PATHS"]["path_to_models"]

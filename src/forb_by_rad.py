@@ -2,13 +2,23 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import xgboost as xgb
+import argparse
 
 from src.utils.ML_fxns import setup_client, get_combined_name, make_preds, get_model_name, extract_snaps, get_feature_labels
 from src.utils.util_fxns import create_directory, load_pickle, load_config, load_pickle, timed, load_SPARTA_data, load_ML_dsets, load_all_sim_cosmols, load_all_tdyn_steps
 from src.utils.ke_cut_fxns import fast_ke_predictor, opt_ke_predictor
 from src.utils.util_fxns import set_cosmology, parse_ranges, split_sparta_hdf5_name
 
-config_params = load_config(os.getcwd() + "/config.ini")
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    '--config',
+    type=str,
+    default=os.getcwd() + "/config.ini", 
+    help='Path to config file (default: config.ini)'
+)
+
+args = parser.parse_args()
+config_params = load_config(args.config)
 
 ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 path_to_models = config_params["PATHS"]["path_to_models"]

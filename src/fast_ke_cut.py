@@ -2,6 +2,7 @@ import numpy as np
 from scipy.optimize import curve_fit, minimize
 import os
 import pandas as pd
+import argparse
 
 from src.utils.ML_fxns import setup_client, get_combined_name, get_feature_labels, get_model_name, extract_snaps
 from src.utils.ke_cut_fxns import load_ke_data, fast_ke_predictor
@@ -9,7 +10,16 @@ from src.utils.prfl_fxns import paper_dens_prf_plt
 from src.utils.util_fxns import set_cosmology, depair_np, parse_ranges, create_directory, timed, save_pickle, load_pickle, load_config, load_SPARTA_data, split_sparta_hdf5_name, load_all_sim_cosmols, load_all_tdyn_steps
 from src.utils.vis_fxns import plt_SPARTA_KE_dist, plt_KE_dist_grad
 
-config_params = load_config(os.getcwd() + "/config.ini")
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    '--config',
+    type=str,
+    default=os.getcwd() + "/config.ini", 
+    help='Path to config file (default: config.ini)'
+)
+
+args = parser.parse_args()
+config_params = load_config(args.config)
 
 ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 path_to_models = config_params["PATHS"]["path_to_models"]
