@@ -94,23 +94,24 @@ if __name__ == "__main__":
             with timed("Model Evaluation on " + dset_name + "_" + test_comb_name): 
                 plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
                 create_directory(plot_loc)
-
+                #TODO condense reform_dset_dfs call
                 # Load the halo information
                 halo_files = []
                 halo_dfs = []
                 if dset_name == "Full":    
                     for sim in curr_test_sims:
-                        halo_dfs.append(reform_dset_dfs(ML_dset_path + sim + "/" + "Train" + "/halo_info/"))
-                        halo_dfs.append(reform_dset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/"))
+                        halo_dfs.append(reform_dset_dfs([ML_dset_path + sim + "/" + "Train" + "/halo_info/"]))
+                        halo_dfs.append(reform_dset_dfs([ML_dset_path + sim + "/" + "Val" + "/halo_info/"]))
+                        halo_dfs.append(reform_dset_dfs([ML_dset_path + sim + "/" + "Test" + "/halo_info/"]))
                 else:
                     for sim in curr_test_sims:
-                        halo_dfs.append(reform_dset_dfs(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
+                        halo_dfs.append(reform_dset_dfs([ML_dset_path + sim + "/" + dset_name + "/halo_info/"]))
 
                 halo_df = pd.concat(halo_dfs)
                 
                 # Load the particle information
                 all_snaps = extract_snaps(model_sims[0])
-                data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,all_sim_cosmol_list,all_snaps[0])
+                data,scale_pos_weight = load_ML_dsets(curr_test_sims,dset_name,all_sim_cosmol_list,all_snaps[0])
 
                 X = data[feature_columns]
                 y = data[target_column]

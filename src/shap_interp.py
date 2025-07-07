@@ -59,7 +59,7 @@ if __name__ == '__main__':
                 plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
                 create_directory(plot_loc)
                 all_snaps = extract_snaps(curr_test_sims[0])
-                data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,all_sim_cosmol_list,all_snaps[0])
+                data,scale_pos_weight = load_ML_dsets(curr_test_sims,dset_name,all_sim_cosmol_list,all_snaps[0])
                 
                 X_df = data[feature_columns]
                 y_df = data[target_column]

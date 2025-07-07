@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from colossus.lss.peaks import peakHeight
 from colossus.halo.mass_so import M_to_R
 from matplotlib.legend_handler import HandlerTuple
+import argparse
 
 from .util_fxns import load_SPARTA_data, load_pickle, load_config, get_comp_snap_info, timed, load_sparta_mass_prf, get_past_z
 from .calc_fxns import calc_rho, calc_mass_acc_rate
@@ -16,7 +17,16 @@ from .util_fxns import parse_ranges, set_cosmology
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
-config_params = load_config(os.getcwd() + "/config.ini")
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    '--config',
+    type=str,
+    default=os.getcwd() + "/config.ini", 
+    help='Path to config file (default: config.ini)'
+)
+
+args = parser.parse_args()
+config_params = load_config(args.config)
 rand_seed = config_params["MISC"]["random_seed"]
 debug_indiv_dens_prf = config_params["MISC"]["debug_indiv_dens_prf"]
 save_intermediate_data = config_params["MISC"]["save_intermediate_data"]

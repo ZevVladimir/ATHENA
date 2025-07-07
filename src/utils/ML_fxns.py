@@ -1,7 +1,7 @@
 import dask.dataframe as dd
 from dask.distributed import Client
 from xgboost import dask as dxgb
-
+import argparse
 import numpy as np
 import os
 import pickle
@@ -14,7 +14,16 @@ from .util_fxns import split_sparta_hdf5_name, timed, parse_ranges
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
-config_params = load_config(os.getcwd() + "/config.ini")
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    '--config',
+    type=str,
+    default=os.getcwd() + "/config.ini", 
+    help='Path to config file (default: config.ini)'
+)
+
+args = parser.parse_args()
+config_params = load_config(args.config)
 rand_seed = config_params["MISC"]["random_seed"]
 curr_sparta_file = config_params["SPARTA_DATA"]["curr_sparta_file"]
 debug_indiv_dens_prf = config_params["MISC"]["debug_indiv_dens_prf"]
@@ -61,6 +70,7 @@ def get_CUDA_cluster():
     client = Client(cluster)
     return client
 
+#TODO don't have use_gpu and on_zaratan loaded in this file
 def setup_client():
     if use_gpu:
         mp.set_start_method("spawn")

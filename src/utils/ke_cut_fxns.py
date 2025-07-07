@@ -2,34 +2,44 @@ import os
 import pandas as pd
 import numpy as np
 from scipy.spatial import KDTree
+import argparse
 
 from .ML_fxns import split_sparta_hdf5_name
 from .util_fxns import load_pickle, load_SPARTA_data, load_config, load_ML_dsets
 from .util_fxns import reform_dset_dfs, parse_ranges, depair_np, timed
 
-config_dict = load_config(os.getcwd() + "/config.ini")
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    '--config',
+    type=str,
+    default=os.getcwd() + "/config.ini", 
+    help='Path to config file (default: config.ini)'
+)
 
-ML_dset_path = config_dict["PATHS"]["ml_dset_path"]
-SPARTA_output_path = config_dict["SPARTA_DATA"]["sparta_output_path"]
-rockstar_ctlgs_path = config_dict["PATHS"]["rockstar_ctlgs_path"]
+args = parser.parse_args()
+config_params = load_config(args.config)
 
-test_sims = config_dict["EVAL_MODEL"]["test_sims"]
+ML_dset_path = config_params["PATHS"]["ml_dset_path"]
+SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
+rockstar_ctlgs_path = config_params["PATHS"]["rockstar_ctlgs_path"]
 
-plt_nu_splits = config_dict["EVAL_MODEL"]["plt_nu_splits"]
+test_sims = config_params["EVAL_MODEL"]["test_sims"]
+
+plt_nu_splits = config_params["EVAL_MODEL"]["plt_nu_splits"]
 plt_nu_splits = parse_ranges(plt_nu_splits)
 
-plt_macc_splits = config_dict["EVAL_MODEL"]["plt_macc_splits"]
+plt_macc_splits = config_params["EVAL_MODEL"]["plt_macc_splits"]
 plt_macc_splits = parse_ranges(plt_macc_splits)
 
-linthrsh = config_dict["EVAL_MODEL"]["linthrsh"]
-lin_nbin = config_dict["EVAL_MODEL"]["lin_nbin"]
-log_nbin = config_dict["EVAL_MODEL"]["log_nbin"]
-lin_rvticks = config_dict["EVAL_MODEL"]["lin_rvticks"]
-log_rvticks = config_dict["EVAL_MODEL"]["log_rvticks"]
-lin_tvticks = config_dict["EVAL_MODEL"]["lin_tvticks"]
-log_tvticks = config_dict["EVAL_MODEL"]["log_tvticks"]
-lin_rticks = config_dict["EVAL_MODEL"]["lin_rticks"]
-log_rticks = config_dict["EVAL_MODEL"]["log_rticks"]
+linthrsh = config_params["EVAL_MODEL"]["linthrsh"]
+lin_nbin = config_params["EVAL_MODEL"]["lin_nbin"]
+log_nbin = config_params["EVAL_MODEL"]["log_nbin"]
+lin_rvticks = config_params["EVAL_MODEL"]["lin_rvticks"]
+log_rvticks = config_params["EVAL_MODEL"]["log_rvticks"]
+lin_tvticks = config_params["EVAL_MODEL"]["lin_tvticks"]
+log_tvticks = config_params["EVAL_MODEL"]["log_tvticks"]
+lin_rticks = config_params["EVAL_MODEL"]["lin_rticks"]
+log_rticks = config_params["EVAL_MODEL"]["log_rticks"]
 
 #TODO do some extra checking that this is right especially with different datasets and loading the right number of particles
 def halo_select(sims, ptl_data, dset_name):
@@ -61,14 +71,14 @@ def halo_select(sims, ptl_data, dset_name):
 
         halos_pos = sparta_params[sparta_param_names[0]][:,p_sparta_snap,:] * 10**3 * p_scale_factor # convert to kpc/h physical
         halos_r200m = sparta_params[sparta_param_names[1]][:,p_sparta_snap]
-        
+        #TODO condense reform_dset_dfs call
         if dset_name == "Full":    
-            train_halo_dfs = (reform_dset_dfs(ML_dset_path + sim + "/" + "Train" + "/halo_info/"))
-            val_halo_dfs = (reform_dset_dfs(ML_dset_path + sim + "/" + "Val" + "/halo_info/"))
-            test_halo_dfs = (reform_dset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/"))
+            train_halo_dfs = (reform_dset_dfs([ML_dset_path + sim + "/" + "Train" + "/halo_info/"]))
+            val_halo_dfs = (reform_dset_dfs([ML_dset_path + sim + "/" + "Val" + "/halo_info/"]))
+            test_halo_dfs = (reform_dset_dfs([ML_dset_path + sim + "/" + "Test" + "/halo_info/"]))
             halo_df = pd.concat([train_halo_dfs,val_halo_dfs,test_halo_dfs]).reset_index(drop=True)
         else:
-            halo_df = (reform_dset_dfs(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
+            halo_df = (reform_dset_dfs([ML_dset_path + sim + "/" + dset_name + "/halo_info/"]))
         
         curr_idxs = halo_df["Halo_indices"].values
         halo_first = halo_df["Halo_first"].values
@@ -116,23 +126,24 @@ def load_ke_data(client, curr_test_sims, sim_cosmol_list, snap_list, dset_name):
         # Load the halo information
         halo_dfs_list = []
         if dset_name == "Full":    
+            #TODO condense reform_dset_dfs call
             for sim in curr_test_sims:
-                train_halo_df = reform_dset_dfs(ML_dset_path + sim + "/" + "Train" + "/halo_info/")
-                val_halo_df = reform_dset_dfs(ML_dset_path + sim + "/" + "Val" + "/halo_info/")
+                train_halo_df = reform_dset_dfs([ML_dset_path + sim + "/" + "Train" + "/halo_info/"])
+                val_halo_df = reform_dset_dfs([ML_dset_path + sim + "/" + "Val" + "/halo_info/"])
                 val_halo_df["Halo_first"] += train_halo_df["Halo_n"].sum()
-                test_halo_df = reform_dset_dfs(ML_dset_path + sim + "/" + "Test" + "/halo_info/")
+                test_halo_df = reform_dset_dfs([ML_dset_path + sim + "/" + "Test" + "/halo_info/"])
                 test_halo_df["Halo_first"] += train_halo_df["Halo_n"].sum() + val_halo_df["Halo_n"].sum()
                 halo_dfs_list.append(train_halo_df)
                 halo_dfs_list.append(val_halo_df)
                 halo_dfs_list.append(test_halo_df)
         else:
             for sim in curr_test_sims:
-                halo_dfs_list.append(reform_dset_dfs(ML_dset_path + sim + "/" + dset_name + "/halo_info/"))
+                halo_dfs_list.append(reform_dset_dfs([ML_dset_path + sim + "/" + dset_name + "/halo_info/"]))
 
         halo_df = pd.concat(halo_dfs_list)
         
         # Load the particle information
-        data,scale_pos_weight = load_ML_dsets(client,curr_test_sims,dset_name,sim_cosmol_list,prime_snap=snap_list[0])
+        data,scale_pos_weight = load_ML_dsets(curr_test_sims,dset_name,sim_cosmol_list,prime_snap=snap_list[0])
         samp_data = halo_select(curr_test_sims,data,dset_name)
     r = samp_data["p_Scaled_radii"]
     vr = samp_data["p_Radial_vel"]

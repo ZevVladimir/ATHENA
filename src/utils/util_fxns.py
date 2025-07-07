@@ -19,8 +19,8 @@ from colossus.lss import peaks
 import time
 from contextlib import contextmanager
 from colossus.utils import constants
-
-from .calc_fxns import calc_scal_pos_weight
+import argparse
+from .calc_fxns import calc_scal_pos_weight, dask_calc_scal_pos_weight
 
 def parse_value(value):
     """Convert value to appropriate type (list, int, float, bool, str)."""
@@ -41,7 +41,16 @@ def load_config(file_path):
     return config_dict
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
-config_params = load_config(os.getcwd() + "/config.ini")
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    '--config',
+    type=str,
+    default=os.getcwd() + "/config.ini", 
+    help='Path to config file (default: config.ini)'
+)
+
+args = parser.parse_args()
+config_params = load_config(args.config)
 
 pickled_path = config_params["PATHS"]["pickled_path"]
 ML_dset_path = config_params["PATHS"]["ml_dset_path"]
@@ -60,7 +69,7 @@ def load_pickle(path):
         with open(path, "rb") as pickle_file:
             return pickle.load(pickle_file)
     else:
-        raise FileNotFoundError
+        raise FileNotFoundError(f"Pickle file not found at path: {path}")
     
 # joblib is better for large np arrays
 def save_joblib(data, path):
@@ -70,7 +79,7 @@ def load_joblib(path):
     if os.path.isfile(path):
         return joblib.load(path)
     else:
-        raise FileNotFoundError
+        raise FileNotFoundError(f"joblib file not found at path: {path}")
 
 def load_ptl_param(sparta_name, param_name, snap, snap_path, save_data=False):
     # save to folder containing pickled data to be accessed easily later
@@ -257,35 +266,75 @@ def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         return mass_prf_all,mass_prf_1halo,all_masses,bins
 
 # Loads all the data for the inputted list of simulations into one dataframe. Finds the scale position weight for the dataset and any adjusted weighting for it if desired
-def load_ML_dsets(client, sims, dset_name, sim_cosmol_list, prime_snap, file_lim=0, filter_nu=False, nu_splits=None):
-    dask_dfs = []
-    all_scal_pos_weight = []
+def load_ML_dsets(sims, dset_name, sim_cosmol_list, prime_snap, file_lim=0, filter_nu=False, nu_splits=None):
+    all_ddfs = []
+    all_halo_file_paths = []
+    all_snap_fldrs = []
+    all_ptl_mass = []
+    all_z = []
+    
+    if dset_name == "Full":
+        datasets = ["Train", "Val", "Test"]
+    else:
+        datasets = [dset_name]
         
     for i,sim in enumerate(sims):
+        all_snap_fldrs = []
+        curr_snap_file_paths = []
+        for dset_name in datasets:
+            folder_path = f"{ML_dset_path}{sim}/{dset_name}"
+            snap_n_files = len(os.listdir(folder_path + "/ptl_info/" + str(prime_snap)+"/"))
+            n_files = snap_n_files
+
+            if file_lim > 0:
+                n_files = np.min([snap_n_files,file_lim]) 
+                
+            for snap_fldr in os.listdir(folder_path + "/ptl_info/"):
+                if os.path.isdir(os.path.join(folder_path + "/ptl_info/", snap_fldr)):
+                    all_snap_fldrs.append(snap_fldr)
+            
+            # Since they are just numbers we can first sort them and then sort them in descending order (primary snaps should always be the largest value)
+            all_snap_fldrs.sort()
+            all_snap_fldrs.reverse()
+
+            for file_idx in range(n_files):
+                curr_snap_ddfs = []
+                for snap_fldr in all_snap_fldrs:
+                    curr_snap_file_paths.append(f"{folder_path}/ptl_info/{snap_fldr}/ptl_{file_idx}.h5")
+                    
+                curr_snap_ddfs = [dd.read_hdf(path,"/*").reset_index(drop=True) for path in curr_snap_file_paths] 
+                all_ddfs.append(dd.concat(curr_snap_ddfs,axis=1))
+            
+            all_halo_file_paths.append(f"{folder_path}/halo_info/")
+            
         with open(ML_dset_path + sim + "/dset_params.pickle","rb") as f:
             dset_params = pickle.load(f)
         # Get mass and redshift for this simulation
         ptl_mass, use_z = load_sim_mass_pz(sim,dset_params)
-        max_mem = int(np.floor(dset_params["HDF5 Mem Size"] / 2))
+        all_ptl_mass.append(ptl_mass)
+        all_z.append(use_z)
         
-        if dset_name == "Full":
-            datasets = ["Train", "Val", "Test"]
-        else:
-            datasets = [dset_name]
+    halo_df = reform_dset_dfs(all_halo_file_paths)
+        
+    # reset indices for halo_first halo_n indexing
+    halo_df["Halo_first"] = halo_df["Halo_first"] - halo_df["Halo_first"][0]        
+        
+    all_ptl_ddfs = dd.concat(all_ddfs)
 
-        for dataset in datasets:
-            with timed(f"Reformed {dataset} Dataset: {sim}"): 
-                dataset_path = f"{ML_dset_path}{sim}/{dataset}"
-                ptl_ddf,sim_scal_pos_weight = reform_dsets_nested(client,ptl_mass,use_z,max_mem,sim_cosmol_list[i],dataset_path,prime_snap,file_lim=file_lim,filter_nu=filter_nu,nu_splits=nu_splits)  
-                all_scal_pos_weight.append(sim_scal_pos_weight)
-                dask_dfs.append(ptl_ddf)
-                    
-    all_scal_pos_weight = np.average(np.concatenate([np.array(sublist).flatten() for sublist in all_scal_pos_weight]))
-    act_scale_pos_weight = np.average(all_scal_pos_weight)
-
-    all_dask_dfs = dd.concat(dask_dfs)
+     # Filter by nu and/or by radius
+    if filter_nu:
+        nus_all = []
+        for sim_cosmol in sim_cosmol_list:
+            cosmol = set_cosmology(sim_cosmol)
+            nus = np.array(peaks.peakHeight((halo_df["Halo_n"][:] * ptl_mass), use_z))
+            nus_all.append(nus)
+        nus_all = np.stack(nus_all, axis=0)
+        
+        all_ptl_ddfs, upd_halo_n, upd_halo_first = filter_df_with_nus(all_ptl_ddfs, nus_all, halo_df["Halo_first"], halo_df["Halo_n"], nu_splits)
     
-    return all_dask_dfs,act_scale_pos_weight
+    avg_scal_pos_weight = dask_calc_scal_pos_weight(all_ptl_ddfs)
+    
+    return all_ptl_ddfs, avg_scal_pos_weight
 
 @contextmanager
 def timed(txt):
@@ -455,19 +504,15 @@ def split_orb_inf(data, labels):
     return infall, orbit
 
 # Goes through a folder where a dataset's hdf5 files are stored and reforms them into one pandas dataframe (in order)
-def reform_dset_dfs(folder_path):
-    hdf5_files = []
-    for f in os.listdir(folder_path):
-        if f.endswith('.h5'):
-            hdf5_files.append(f)
-    hdf5_files.sort()
-
-    dfs = []
-    for file in hdf5_files:
-        file_path = os.path.join(folder_path, file)
-        df = pd.read_hdf(file_path) 
-        dfs.append(df) 
-    return pd.concat(dfs, ignore_index=True)
+def reform_dset_dfs(all_folder_path):
+    all_dfs = []
+    for folder_path in all_folder_path:
+        hdf5_files = sorted(f for f in os.listdir(folder_path) if f.endswith('.h5'))
+        for file in hdf5_files:
+            file_path = os.path.join(folder_path, file)
+            df = pd.read_hdf(file_path)
+            all_dfs.append(df)
+    return pd.concat(all_dfs, ignore_index=True)
     
 # Split a dataframe so that each one is below an inputted maximum memory size
 def split_dataframe(df, max_size):
@@ -481,87 +526,6 @@ def split_dataframe(df, max_size):
         split_dfs.append(df.iloc[i:i + chunk_size])
 
     return split_dfs
-
-# Function to process a file in a dataset's folder: combines them all, performs any desired filtering, calculates weights if desired, and calculates scaled position weight
-# Also splits the dataframe into smaller dataframes based of inputted maximum memory size
-def process_file(folder_path, file_index, ptl_mass, use_z, max_mem, sim_cosmol, filter_nu, nu_splits):
-    @delayed
-    def delayed_task():
-        cosmol = set_cosmology(sim_cosmol)
-        # Get all the snap folders being used
-        all_snap_fldrs = []
-        for snap_fldr in os.listdir(folder_path + "/ptl_info/"):
-            if os.path.isdir(os.path.join(folder_path + "/ptl_info/", snap_fldr)):
-                all_snap_fldrs.append(snap_fldr)
-        
-        # Since they are just numbers we can first sort them and then sort them in descending order (primary snaps should always be the largest value)
-        all_snap_fldrs.sort()
-        all_snap_fldrs.reverse()
-        
-        # Stack column wise all the snapshots for each particle file
-        ptl_df_list = []
-        for snap_fldr in all_snap_fldrs:
-            ptl_path = f"{folder_path}/ptl_info/{snap_fldr}/ptl_{file_index}.h5"
-            ptl_df_list.append(pd.read_hdf(ptl_path))
-        ptl_df = pd.concat(ptl_df_list,axis=1)
-
-        halo_path = f"{folder_path}/halo_info/halo_{file_index}.h5"
-        halo_df = pd.read_hdf(halo_path)
-
-        # reset indices for halo_first halo_n indexing
-        halo_df["Halo_first"] = halo_df["Halo_first"] - halo_df["Halo_first"][0]
-        
-        # Calculate peak heights for each halo
-        nus = np.array(peaks.peakHeight((halo_df["Halo_n"][:] * ptl_mass), use_z))
-        
-        # Filter by nu and/or by radius
-        if filter_nu:
-            ptl_df, upd_halo_n, upd_halo_first = filter_df_with_nus(ptl_df, nus, halo_df["Halo_first"], halo_df["Halo_n"], nu_splits)
-
-        # Calculate scale position weight
-        scal_pos_weight = calc_scal_pos_weight(ptl_df)
-
-        # If the dataframe is too large split it up
-        if ptl_df.memory_usage(index=True).sum() > max_mem:
-            ptl_dfs = split_dataframe(ptl_df, max_mem)
-        else:
-            ptl_dfs = [ptl_df]
-        
-        return ptl_dfs,scal_pos_weight
-    return delayed_task()
-
-# Combines the results of the processing of each file in the folder into one dataframe for the data and list for the scale position weights and an array of weights if desired
-def combine_results(results, client):
-    # Unpack the results
-    ddfs,scal_pos_weights = [], []
-    
-    for res in results:
-        ddfs.extend(res[0])
-        scal_pos_weights.append(res[1]) # We append since scale position weight is just a number
-            
-    all_ddfs = dd.concat([dd.from_delayed(client.scatter(df)) for df in ddfs])
-
-    return all_ddfs, scal_pos_weights
-
-# Combines all the files in a dataset's folder into one dask dataframe and a list for the scale position weights and an array of weights if desired 
-def reform_dsets_nested(client, ptl_mass, use_z, max_mem, sim_cosmol, folder_path, prime_snap, file_lim=0, filter_nu=None, nu_splits=None):
-    snap_n_files = len(os.listdir(folder_path + "/ptl_info/" + str(prime_snap)+"/"))
-    n_files = snap_n_files
-
-    if file_lim > 0:
-        n_files = np.min([snap_n_files,file_lim]) 
-
-    delayed_results = []
-    for file_index in range(n_files):
-        # Create delayed tasks for each file
-        delayed_results.append(process_file(
-                folder_path, file_index, ptl_mass, use_z,
-                max_mem, sim_cosmol, filter_nu, nu_splits))
-    
-    # Compute the results in parallel
-    results = client.compute(delayed_results, sync=True)
-
-    return combine_results(results, client)
 
 def load_all_sim_cosmols(curr_sims):
     all_sim_cosmol_list = []
