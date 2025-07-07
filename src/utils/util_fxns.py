@@ -269,7 +269,6 @@ def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
 def load_ML_dsets(sims, dset_name, sim_cosmol_list, prime_snap, file_lim=0, filter_nu=False, nu_splits=None):
     all_ddfs = []
     all_halo_file_paths = []
-    all_snap_fldrs = []
     all_ptl_mass = []
     all_z = []
     
@@ -278,10 +277,9 @@ def load_ML_dsets(sims, dset_name, sim_cosmol_list, prime_snap, file_lim=0, filt
     else:
         datasets = [dset_name]
         
-    for i,sim in enumerate(sims):
-        all_snap_fldrs = []
-        curr_snap_file_paths = []
+    for i,sim in enumerate(sims):        
         for dset_name in datasets:
+            all_snap_fldrs = []
             folder_path = f"{ML_dset_path}{sim}/{dset_name}"
             snap_n_files = len(os.listdir(folder_path + "/ptl_info/" + str(prime_snap)+"/"))
             n_files = snap_n_files
@@ -299,6 +297,7 @@ def load_ML_dsets(sims, dset_name, sim_cosmol_list, prime_snap, file_lim=0, filt
 
             for file_idx in range(n_files):
                 curr_snap_ddfs = []
+                curr_snap_file_paths = []
                 for snap_fldr in all_snap_fldrs:
                     curr_snap_file_paths.append(f"{folder_path}/ptl_info/{snap_fldr}/ptl_{file_idx}.h5")
                     
@@ -317,8 +316,8 @@ def load_ML_dsets(sims, dset_name, sim_cosmol_list, prime_snap, file_lim=0, filt
     halo_df = reform_dset_dfs(all_halo_file_paths)
         
     # reset indices for halo_first halo_n indexing
-    halo_df["Halo_first"] = halo_df["Halo_first"] - halo_df["Halo_first"][0]        
-        
+    halo_df["Halo_first"] = halo_df["Halo_first"] - halo_df["Halo_first"][0]       
+    
     all_ptl_ddfs = dd.concat(all_ddfs)
 
      # Filter by nu and/or by radius
