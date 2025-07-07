@@ -337,14 +337,17 @@ def load_ML_dsets(sims, dset_name, sim_cosmol_list, prime_snap, file_lim=0, filt
     return all_ptl_ddfs, avg_scal_pos_weight
 
 @contextmanager
-def timed(txt):
+def timed(txt, client=None):
     print("Starting: " + txt)
     t0 = time.time()
+    if client is not None:
+        print_worker_memory(client)
     yield
     t1 = time.time()
     time_s = t1 - t0
     time_min = time_s / 60
-    
+    if client is not None:
+        print_worker_memory(client)
     print("Finished: %s time: %.5fs, %.2f min\n" % (txt, time_s, time_min))
     
 def create_directory(path):
