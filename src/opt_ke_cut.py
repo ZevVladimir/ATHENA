@@ -5,10 +5,11 @@ import os
 import pandas as pd
 from sparta_tools import sparta
 import argparse
+import dask.array as da
 
 from src.utils.ML_fxns import setup_client, get_combined_name, get_feature_labels, extract_snaps
 from src.utils.util_fxns import create_directory, load_pickle, load_config, save_pickle, load_pickle, timed, parse_ranges, split_sparta_hdf5_name, load_SPARTA_data, load_all_sim_cosmols, load_all_tdyn_steps
-from src.utils.ke_cut_fxns import load_ke_data, opt_ke_predictor
+from src.utils.ke_cut_fxns import load_ke_data, opt_ke_predictor, dask_opt_ke_predictor
 from src.utils.vis_fxns import plt_SPARTA_KE_dist
 from src.utils.prfl_fxns import paper_dens_prf_plt
 
@@ -70,18 +71,25 @@ def overlap_loss(params, lnv2_bin, sparta_labels_bin):
     return abs(misclass_orb - misclass_inf)
 
 def opt_func(bins, r, lnv2, sparta_labels, def_b, plot_loc = "", title = ""):
+    r = r.to_dask_array(lengths=True)
+    lnv2 = lnv2.to_dask_array(lengths=True)
+    sparta_labels = sparta_labels.to_dask_array(lengths=True)
+    
     # Assign bin indices based on radius
-    bin_indices = np.digitize(r, bins) - 1  
+    bin_indices = da.digitize(r, bins) - 1
+    bin_indices = bin_indices.persist()  
 
     intercepts = []
     for i in range(bins.shape[0]-1):
-        mask = bin_indices == i
-        if np.sum(mask) == 0:
+        mask = (bin_indices == i)
+        
+        ptls_in_bin = mask.sum().compute()
+        if ptls_in_bin == 0:
             intercepts.append(def_b)
             continue  # Skip empty bins
         
-        lnv2_bin = lnv2[mask]
-        sparta_labels_bin = sparta_labels[mask]
+        lnv2_bin = lnv2[mask].compute()
+        sparta_labels_bin = sparta_labels[mask].compute()
 
         # Optimize
         initial_guess = [np.max(lnv2_bin)]
@@ -159,45 +167,26 @@ if __name__ == "__main__":
                 opt_param_dict = load_pickle(opt_model_fldr_loc + "ke_optparams_dict.pickle")
                 
                 with timed("Loading Testing Data"):
-                    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=curr_test_sims,sim_cosmol_list=all_sim_cosmol_list,snap_list=snap_list,dset_name=dset_name)
-                    r_test = my_data["p_Scaled_radii"].compute().to_numpy()
-                    vr_test = my_data["p_Radial_vel"].compute().to_numpy()
-                    vphys_test = my_data["p_phys_vel"].compute().to_numpy()
-                    sparta_labels_test = my_data["Orbit_infall"].compute().to_numpy()
-                    lnv2_test = np.log(vphys_test**2)
-                    
-                    halo_first = halo_df["Halo_first"].values
-                    halo_n = halo_df["Halo_n"].values
-                    all_idxs = halo_df["Halo_indices"].values
-                    # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
-                    sim_splits = np.where(halo_first == 0)[0]
-                
-                    sparta_orb = np.where(sparta_labels_test == 1)[0]
-                    sparta_inf = np.where(sparta_labels_test == 0)[0]
+                    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(curr_test_sims=curr_test_sims,sim_cosmol_list=all_sim_cosmol_list,snap_list=snap_list,dset_name=dset_name)
+                    r_test = my_data["p_Scaled_radii"]
+                    vr_test = my_data["p_Radial_vel"]
+                    vphys_test = my_data["p_phys_vel"]
+                    sparta_labels_test = my_data["Orbit_infall"]
+                    lnv2_test = np.log(vphys_test**2)               
             else:        
                 with timed("Optimizing phase-space cut"):
                     with timed("Loading Fitting Data"):
-                        r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=opt_ke_calib_sims,sim_cosmol_list=all_sim_cosmol_list,snap_list=snap_list,dset_name="Full")
+                        r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(curr_test_sims=opt_ke_calib_sims,sim_cosmol_list=all_sim_cosmol_list,snap_list=snap_list,dset_name="Full")
                         
                         # We use the full dataset since for our custom fitting it does not only specific halos (?)
-                        r_fit = my_data["p_Scaled_radii"].compute().to_numpy()
-                        vr_fit = my_data["p_Radial_vel"].compute().to_numpy()
-                        vphys_fit = my_data["p_phys_vel"].compute().to_numpy()
-                        sparta_labels_fit = my_data["Orbit_infall"].compute().to_numpy()
+                        r_fit = my_data["p_Scaled_radii"]
+                        vr_fit = my_data["p_Radial_vel"]
+                        vphys_fit = my_data["p_phys_vel"]
+                        sparta_labels_fit = my_data["Orbit_infall"]
                         lnv2_fit = np.log(vphys_fit**2)
-                        
-                        halo_first = halo_df["Halo_first"].values
-                        halo_n = halo_df["Halo_n"].values
-                        all_idxs = halo_df["Halo_indices"].values
-                        # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
-                        sim_splits = np.where(halo_first == 0)[0]
-                    
-                        sparta_orb = np.where(sparta_labels_fit == 1)[0]
-                        sparta_inf = np.where(sparta_labels_fit == 0)[0]
 
                         mask_vr_neg = (vr_fit < 0)
-                        mask_vr_pos = ~mask_vr_neg
-                        mask_r = r_fit < r_cut_calib                  
+                        mask_vr_pos = (vr_fit > 0)                
                     
                     vr_pos = opt_func(bins, r_fit[mask_vr_pos], lnv2_fit[mask_vr_pos], sparta_labels_fit[mask_vr_pos], ke_param_dict["b_pos"], plot_loc = plot_loc, title = "pos")
                     vr_neg = opt_func(bins, r_fit[mask_vr_neg], lnv2_fit[mask_vr_neg], sparta_labels_fit[mask_vr_neg], ke_param_dict["b_neg"], plot_loc = plot_loc, title = "neg")
@@ -221,40 +210,35 @@ if __name__ == "__main__":
                         lnv2_test = lnv2_fit
                     else:
                         with timed("Loading Testing Data"):
-                            r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,curr_test_sims=curr_test_sims,sim_cosmol_list=all_sim_cosmol_list,snap_list=snap_list,dset_name=dset_name)
-                            r_test = my_data["p_Scaled_radii"].compute().to_numpy()
-                            vr_test = my_data["p_Radial_vel"].compute().to_numpy()
-                            vphys_test = my_data["p_phys_vel"].compute().to_numpy()
-                            sparta_labels_test = my_data["Orbit_infall"].compute().to_numpy()
+                            r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(curr_test_sims=curr_test_sims,sim_cosmol_list=all_sim_cosmol_list,snap_list=snap_list,dset_name=dset_name)
+                            r_test = my_data["p_Scaled_radii"]
+                            vr_test = my_data["p_Radial_vel"]
+                            vphys_test = my_data["p_phys_vel"]
+                            sparta_labels_test = my_data["Orbit_infall"]
                             lnv2_test = np.log(vphys_test**2)
-                            
-                    halo_first = halo_df["Halo_first"].values
-                    halo_n = halo_df["Halo_n"].values
-                    all_idxs = halo_df["Halo_indices"].values
-                    # Know where each simulation's data starts in the stacked dataset based on when the indexing starts from 0 again
-                    sim_splits = np.where(halo_first == 0)[0]
-                
-                    sparta_orb = np.where(sparta_labels_test == 1)[0]
-                    sparta_inf = np.where(sparta_labels_test == 0)[0]     
+
             
-            mask_vr_neg = (vr_test < 0)
-            mask_vr_pos = ~mask_vr_neg
-            mask_r = r_test < r_cut_calib
+            mask_orb = sparta_labels_test == 1
+            mask_inf = sparta_labels_test == 0
+            
+            mask_vr_neg = vr_test < 0
+            mask_vr_pos = vr_test > 0
                 
             fltr_combs = {
-                "orb_vr_neg": np.intersect1d(sparta_orb, np.where(mask_vr_neg)[0]),
-                "orb_vr_pos": np.intersect1d(sparta_orb, np.where(mask_vr_pos)[0]),
-                "inf_vr_neg": np.intersect1d(sparta_inf, np.where(mask_vr_neg)[0]),
-                "inf_vr_pos": np.intersect1d(sparta_inf, np.where(mask_vr_pos)[0]),
+                "orb_vr_neg": mask_orb & mask_vr_neg,
+                "orb_vr_pos": mask_orb & mask_vr_pos,
+                "inf_vr_neg": mask_inf & mask_vr_neg,
+                "inf_vr_pos": mask_inf & mask_vr_pos,
             } 
-            
-            plt_SPARTA_KE_dist(ke_param_dict, fltr_combs, bins, r_test, lnv2_test, perc = perc, width = width, r_cut = r_cut_calib, plot_loc = plot_loc, title = "bin_fit_", plot_lin_too=True, cust_line_dict = opt_param_dict)
+
+            # plt_SPARTA_KE_dist(ke_param_dict, fltr_combs, bins, r_test, lnv2_test, perc = perc, width = width, r_cut = r_cut_calib, plot_loc = plot_loc, title = "bin_fit_", plot_lin_too=True, cust_line_dict = opt_param_dict)
 
         #######################################################################################################################################    
-            preds_opt_ke = opt_ke_predictor(opt_param_dict, bins, r_test, vr_test, lnv2_test, r_cut_pred)
+            dask_preds_opt_ke = dask_opt_ke_predictor(opt_param_dict, bins, r_test, vr_test, lnv2_test, r_cut_pred)
+            
             X = my_data[feature_columns]
             y = my_data[target_column]
 
-            paper_dens_prf_plt(X, y, pd.DataFrame(preds_opt_ke), halo_df, curr_test_sims, all_sim_cosmol_list, split_scale_dict, plot_loc, snap_path, split_by_nu=dens_prf_nu_split, split_by_macc=dens_prf_macc_split, prf_name_0="Optimized KE cut")
+            paper_dens_prf_plt(X, y, pd.DataFrame(dask_preds_opt_ke.compute()), halo_df, curr_test_sims, all_sim_cosmol_list, split_scale_dict, plot_loc, snap_path, split_by_nu=dens_prf_nu_split, split_by_macc=dens_prf_macc_split, prf_name_0="Optimized KE cut")
 
             

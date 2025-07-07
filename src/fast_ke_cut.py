@@ -168,7 +168,7 @@ def calibrate_finder(
         [0.2, 0.5]
     """
     # MODIFY this line if needed ======================
-    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client,fast_ke_calib_sims,calib_sim_cosmol_list,snap_list,"Full")
+    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(fast_ke_calib_sims,calib_sim_cosmol_list,snap_list,"Full")
 
     # =================================================
 
@@ -260,7 +260,7 @@ if __name__ == "__main__":
             plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
             create_directory(plot_loc)
             
-            r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(client, curr_test_sims,curr_sim_cosmol_list,snap_list,dset_name)
+            r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(curr_test_sims,curr_sim_cosmol_list,snap_list,dset_name)
             
             r_r200m = my_data["p_Scaled_radii"].values.compute()
             vr = my_data["p_Radial_vel"].values.compute()

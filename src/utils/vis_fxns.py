@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Circle
 import scipy.ndimage as ndimage
+import dask.dataframe as dd
+import dask.array as da
 
 from .util_fxns import timed, split_orb_inf
 
@@ -704,30 +706,39 @@ def plt_cust_ke_line(ax, b,bins,linewidth):
         else:
             ax.plot([x1,x2],[y1,y2],lw=linewidth, color="cyan")
             
-def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut, plot_loc, title, plot_lin_too = False, cust_line_dict = None):
+def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut, plot_loc, title, plot_lin_too = False, cust_line_dict = None):   
+    hist1_r = r[fltr_combs["orb_vr_pos"]]
+    hist1_lnv2 = lnv2[fltr_combs["orb_vr_pos"]]
+    hist2_r = r[fltr_combs["inf_vr_pos"]]
+    hist2_lnv2 = lnv2[fltr_combs["inf_vr_pos"]]
+    hist3_r = r[fltr_combs["orb_vr_neg"]]
+    hist3_lnv2 = lnv2[fltr_combs["orb_vr_neg"]]
+    hist4_r = r[fltr_combs["inf_vr_neg"]]
+    hist4_lnv2 = lnv2[fltr_combs["inf_vr_neg"]]
+
     m_pos = feat_dict["m_pos"]
     b_pos = feat_dict["b_pos"]
     m_neg = feat_dict["m_neg"]
     b_neg = feat_dict["b_neg"]
     
-    x = np.linspace(0, 3, 1000)
+    x_range = (0, 3)
+    y_range = (-7, 5)
+    
+    x = np.linspace(x_range[0], x_range[1], 1000)
     y12 = m_pos * x + b_pos
     y22 = m_neg * x + b_neg
 
-    nbins = 200   
-    
-    x_range = (0, 3)
-    y_range = (-7, 5)
+    nbins = 200      
 
-    hist1, xedges, yedges = np.histogram2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], bins=nbins, range=(x_range, y_range))
-    hist2, _, _ = np.histogram2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], bins=nbins, range=(x_range, y_range))
-    hist3, _, _ = np.histogram2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], bins=nbins, range=(x_range, y_range))
-    hist4, _, _ = np.histogram2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], bins=nbins, range=(x_range, y_range))
+    hist1_dask, _, _ = da.histogram2d(hist1_r.to_dask_array(lengths=True), hist1_lnv2.to_dask_array(lengths=True), bins = nbins, range = (x_range, y_range))
+    hist2_dask, _, _ = da.histogram2d(hist2_r.to_dask_array(lengths=True), hist2_lnv2.to_dask_array(lengths=True), bins = nbins, range = (x_range, y_range))
+    hist3_dask, _, _ = da.histogram2d(hist3_r.to_dask_array(lengths=True), hist3_lnv2.to_dask_array(lengths=True), bins = nbins, range = (x_range, y_range))
+    hist4_dask, _, _ = da.histogram2d(hist4_r.to_dask_array(lengths=True), hist4_lnv2.to_dask_array(lengths=True), bins = nbins, range = (x_range, y_range))
 
     # Combine the histograms to determine the maximum density for consistent color scaling
-    combined_hist = np.maximum.reduce([hist1, hist2, hist3, hist4])
+    combined_hist = np.maximum.reduce([da.max(hist1_dask).compute(), da.max(hist2_dask).compute(), da.max(hist3_dask).compute(), da.max(hist4_dask).compute()])
     vmax=combined_hist.max()
-    
+
     lin_vmin = 0
     log_vmin = 1
 
@@ -767,11 +778,11 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
             for ax in [ax2, ax3, ax4]:
                 ax.tick_params('y', labelleft=False, colors="white", direction="in")
 
-            hist_args = dict(bins=nbins, vmin=(log_vmin if norm == "log" else lin_vmin), vmax=vmax,
-                            cmap=magma_cmap, range=(x_range, y_range), norm=(norm if norm == "log" else None), rasterized=True)
-
+            norm_obj = plt.Normalize(vmin=lin_vmin, vmax=vmax) if norm != "log" else mpl.colors.LogNorm(vmin=log_vmin, vmax=vmax)
+            extent = [x_range[0],x_range[1],y_range[0],y_range[1]]
+            
             # Orb vr > 0
-            h1 = ax1.hist2d(r[fltr_combs["orb_vr_pos"]], lnv2[fltr_combs["orb_vr_pos"]], **hist_args)
+            im1 = ax1.imshow(hist1_dask.compute().T, origin="lower", cmap=magma_cmap, norm=norm_obj, aspect='auto', rasterized=True, extent = extent)
             ax1.plot(x, y12, lw=line_width, color="g", label="Fast Cut")
             ax1.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
             if cust_line_dict is not None:
@@ -784,7 +795,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
             ax1.set_xlim(0, 2)
 
             # Inf vr > 0
-            ax2.hist2d(r[fltr_combs["inf_vr_pos"]], lnv2[fltr_combs["inf_vr_pos"]], **hist_args)
+            im2 = ax2.imshow(hist2_dask.compute().T, origin="lower", cmap=magma_cmap, norm=norm_obj, aspect='auto', rasterized=True, extent = extent)
             ax2.plot(x, y12, lw=line_width, color="g", label="Fast Cut")
             ax2.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
             if cust_line_dict is not None:
@@ -796,7 +807,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
             ax2.set_xlim(0, 2)
 
             # Orb vr < 0
-            ax3.hist2d(r[fltr_combs["orb_vr_neg"]], lnv2[fltr_combs["orb_vr_neg"]], **hist_args)
+            im3 = ax3.imshow(hist3_dask.compute().T, origin="lower", cmap=magma_cmap, norm=norm_obj, aspect='auto', rasterized=True, extent = extent)
             ax3.plot(x, y22, lw=line_width, color="g", label="Fast Cut")
             ax3.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
             if cust_line_dict is not None:
@@ -808,7 +819,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
             ax3.set_xlim(0, 2)
 
             # Inf vr < 0
-            ax4.hist2d(r[fltr_combs["inf_vr_neg"]], lnv2[fltr_combs["inf_vr_neg"]], **hist_args)
+            im4 = ax4.imshow(hist4_dask.compute().T, origin="lower", cmap=magma_cmap, norm=norm_obj, aspect='auto', rasterized=True, extent = extent)
             ax4.plot(x, y22, lw=line_width, color="g", label="Fast Cut")
             ax4.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
             if cust_line_dict is not None:
@@ -821,7 +832,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
                 ax4.set_xlabel(r'$r/R_{200m}$', fontsize=axis_fntsize)
             ax4.set_xlim(0, 2)
             
-            cbar = fig.colorbar(h1[3], cax=plt.subplot(gs[row_idx,-1]), orientation='vertical')
+            cbar = fig.colorbar(im1, cax=plt.subplot(gs[row_idx,-1]), orientation='vertical')
             cbar.ax.tick_params(labelsize=cbar_tick_fntsize)
             cbar.set_label(r'$N$ (Counts)', fontsize=cbar_label_fntsize)
 
