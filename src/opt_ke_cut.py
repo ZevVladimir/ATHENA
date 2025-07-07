@@ -8,7 +8,7 @@ import argparse
 import dask.array as da
 
 from src.utils.ML_fxns import setup_client, get_combined_name, get_feature_labels, extract_snaps
-from src.utils.util_fxns import create_directory, load_pickle, load_config, save_pickle, load_pickle, timed, parse_ranges, split_sparta_hdf5_name, load_SPARTA_data, load_all_sim_cosmols, load_all_tdyn_steps
+from src.utils.util_fxns import create_directory, load_pickle, load_config, save_pickle, load_pickle, timed, parse_ranges, split_sparta_hdf5_name, load_SPARTA_data, load_all_sim_cosmols, load_all_tdyn_steps, periodic_monitor
 from src.utils.ke_cut_fxns import load_ke_data, opt_ke_predictor, dask_opt_ke_predictor
 from src.utils.vis_fxns import plt_SPARTA_KE_dist
 from src.utils.prfl_fxns import paper_dens_prf_plt
@@ -29,6 +29,7 @@ path_to_models = config_params["PATHS"]["path_to_models"]
 snap_path = config_params["SNAP_DATA"]["snap_path"]
 SPARTA_output_path = config_params["SPARTA_DATA"]["sparta_output_path"]
 
+debug_mem = config_params["MISC"]["debug_mem"]
 reset_opt_ke_calib = config_params["MISC"]["reset_opt_ke_calib"]
 save_intermediate_data = config_params["MISC"]["save_intermediate_data"]
 
@@ -114,7 +115,8 @@ def opt_func(bins, r, lnv2, sparta_labels, def_b, plot_loc = "", title = ""):
 if __name__ == "__main__":
     client = setup_client()
     model_type = "kinetic_energy_cut"
-    
+    if debug_mem:
+        periodic_monitor(client)
     comb_fast_model_sims = get_combined_name(fast_ke_calib_sims) 
     comb_opt_model_sims = get_combined_name(opt_ke_calib_sims)   
      

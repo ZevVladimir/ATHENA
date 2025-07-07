@@ -20,6 +20,7 @@ import time
 from contextlib import contextmanager
 from colossus.utils import constants
 import argparse
+import threading
 from .calc_fxns import calc_scal_pos_weight, dask_calc_scal_pos_weight
 
 def parse_value(value):
@@ -541,3 +542,25 @@ def load_all_tdyn_steps(curr_sims):
         all_tdyn_steps_list.append(dset_params["t_dyn_steps"])
     
     return all_tdyn_steps_list
+
+def print_worker_memory(client):
+    scheduler_info = client.scheduler_info()
+    workers = scheduler_info.get('workers', {})
+    print("\n=== Dask Worker Memory Usage ===")
+    for address, info in workers.items():
+        mem_used = info.get('metrics', {}).get('memory', None)
+        mem_limit = info.get('memory_limit', None)
+        if mem_used is not None and mem_limit is not None:
+            usage_gb = mem_used / 1e9
+            limit_gb = mem_limit / 1e9
+            print(f"Worker {address} — {usage_gb:.2f} GB / {limit_gb:.2f} GB used")
+        else:
+            print(f"Worker {address} — memory info not available")
+    print("=================================\n")
+
+
+def periodic_monitor(client,interval=600):  
+    while True:
+        print_worker_memory(client)
+        time.sleep(interval)
+
