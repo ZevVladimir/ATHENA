@@ -301,9 +301,20 @@ def load_ML_dsets(sims, dset_name, sim_cosmol_list, prime_snap, file_lim=0, filt
                 curr_snap_file_paths = []
                 for snap_fldr in all_snap_fldrs:
                     curr_snap_file_paths.append(f"{folder_path}/ptl_info/{snap_fldr}/ptl_{file_idx}.parquet")
-                    
-                curr_snap_ddfs = [dd.read_parquet(path).reset_index(drop=True) for path in curr_snap_file_paths] 
-                all_ddfs.append(dd.concat(curr_snap_ddfs,axis=1))
+
+                # Read all Dask DataFrames and ensure they have the same number of rows and known divisions
+                curr_snap_ddfs = []
+                for path in curr_snap_file_paths:
+                    ddf = dd.read_parquet(path).reset_index(drop=True)
+                    # ddf = ddf.repartition(npartitions=1)
+                    ddf = ddf.assign(_row=ddf.index)
+                    ddf = ddf.set_index('_row', sorted=True, drop=True)
+                    curr_snap_ddfs.append(ddf)
+                # Check all divisions are identical
+                divisions_set = set(tuple(ddf.divisions) for ddf in curr_snap_ddfs)
+                if len(divisions_set) != 1:
+                    raise ValueError(f"Not all Dask DataFrames have identical divisions for axis=1 concat: {divisions_set}")
+                all_ddfs.append(dd.concat(curr_snap_ddfs, axis=1))
             
             all_halo_file_paths.append(f"{folder_path}/halo_info/")
             

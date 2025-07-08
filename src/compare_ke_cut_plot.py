@@ -77,7 +77,7 @@ if __name__ == "__main__":
                 opt_param_dict = load_pickle(opt_model_fldr_loc + "ke_optparams_dict.pickle")
                 
                 with timed("Loading Testing Data"):
-                    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(curr_test_sims=curr_test_sims,sim_cosmol_list=all_sim_cosmol_list,snap_list=snap_list, dset_name=dset_name)
+                    r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(curr_sims=curr_test_sims,sim_cosmol_list=all_sim_cosmol_list,snap_list=snap_list, dset_name=dset_name)
                     r_test = my_data["p_Scaled_radii"].compute().to_numpy()
                     vr_test = my_data["p_Radial_vel"].compute().to_numpy()
                     vphys_test = my_data["p_phys_vel"].compute().to_numpy()

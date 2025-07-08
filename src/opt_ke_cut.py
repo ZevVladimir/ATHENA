@@ -73,7 +73,7 @@ def overlap_loss(params, lnv2_bin, sparta_labels_bin):
     # Loss is the absolute difference between the two misclassification counts
     return abs(misclass_orb - misclass_inf)
 
-def optimize_bin(i, bin_indices, r, lnv2, sparta_labels, def_b):
+def optimize_bin(i, bin_indices, lnv2, sparta_labels, def_b):
     mask = (bin_indices == i)
 
     ptls_in_bin = mask.sum()
@@ -116,9 +116,10 @@ def opt_func(bins, r, lnv2, sparta_labels, def_b, title = ""):
     
     # Assign bin indices based on radius
     bin_indices = da.digitize(r, bins) - 1
+
     bin_indices = bin_indices.persist()  
-    
-    tasks = [delayed(optimize_bin)(i, bin_indices, r, lnv2, sparta_labels, def_b) for i in range(bins.shape[0]-1)]
+
+    tasks = [delayed(optimize_bin)(i, bin_indices, lnv2, sparta_labels, def_b) for i in range(bins.shape[0]-1)]
     intercepts = compute(*tasks)
         
     return {"b":intercepts}
@@ -173,7 +174,7 @@ if __name__ == "__main__":
                 all_sim_cosmol_list = load_all_sim_cosmols(opt_ke_calib_sims)
                 all_tdyn_steps_list = load_all_tdyn_steps(opt_ke_calib_sims)
                 
-                r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(curr_test_sims=opt_ke_calib_sims,sim_cosmol_list=all_sim_cosmol_list,snap_list=snap_list,dset_name="Full")
+                r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(curr_sims=opt_ke_calib_sims,sim_cosmol_list=all_sim_cosmol_list,snap_list=snap_list,dset_name="Full")
                 
                 # We use the full dataset since for our custom fitting it does not only specific halos (?)
                 r_fit = my_data["p_Scaled_radii"]
@@ -228,7 +229,7 @@ if __name__ == "__main__":
                 lnv2_test = lnv2_fit
                      
             with timed("Loading Testing Data"):
-                r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(curr_test_sims=curr_test_sims,sim_cosmol_list=all_sim_cosmol_list,snap_list=snap_list,dset_name=dset_name)
+                r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(curr_sims=curr_test_sims,sim_cosmol_list=all_sim_cosmol_list,snap_list=snap_list,dset_name=dset_name)
                 r_test = my_data["p_Scaled_radii"]
                 vr_test = my_data["p_Radial_vel"]
                 vphys_test = my_data["p_phys_vel"]
