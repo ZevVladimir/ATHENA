@@ -72,38 +72,38 @@ def get_CUDA_cluster():
 
 #TODO don't have use_gpu and on_zaratan loaded in this file
 def setup_client():
-    if use_gpu:
-        mp.set_start_method("spawn")
-
-    if on_zaratan:            
+    with timed("Setup Dask Client"):
         if use_gpu:
-            initialize(local_directory = "/home/zvladimi/scratch/ATHENA/dask_logs/")
-        else:
-            if 'SLURM_CPUS_PER_TASK' in os.environ:
-                cpus_per_task = int(os.environ['SLURM_CPUS_PER_TASK'])
+            mp.set_start_method("spawn")
+
+        if on_zaratan:            
+            if use_gpu:
+                initialize(local_directory = "/home/zvladimi/scratch/ATHENA/dask_logs/")
             else:
-                print("SLURM_CPUS_PER_TASK is not defined.")
-            initialize(nthreads = cpus_per_task, local_directory = "/home/zvladimi/scratch/ATHENA/dask_logs/")
+                if 'SLURM_CPUS_PER_TASK' in os.environ:
+                    cpus_per_task = int(os.environ['SLURM_CPUS_PER_TASK'])
+                else:
+                    print("SLURM_CPUS_PER_TASK is not defined.")
+                initialize(nthreads = cpus_per_task, local_directory = "/home/zvladimi/scratch/ATHENA/dask_logs/")
+                
+            client = Client()
+            host = client.run_on_scheduler(socket.gethostname)
+            port = client.scheduler_info()['services']['dashboard']
+            login_node_address = "zvladimi@login.zaratan.umd.edu" # Change this to the address/domain of your login node
 
-        print("Initialized")
-        client = Client()
-        host = client.run_on_scheduler(socket.gethostname)
-        port = client.scheduler_info()['services']['dashboard']
-        login_node_address = "zvladimi@login.zaratan.umd.edu" # Change this to the address/domain of your login node
-
-        logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}")
-    else:
-        if use_gpu:
-            client = get_CUDA_cluster()
+            logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}")
         else:
-            tot_ncpus = mp.cpu_count()
-            n_workers = int(np.floor(tot_ncpus / dask_task_ncpus))
-            cluster = LocalCluster(
-                n_workers=n_workers,
-                threads_per_worker=dask_task_ncpus,
-                memory_limit='5GB'  
-            )
-            client = Client(cluster)
+            if use_gpu:
+                client = get_CUDA_cluster()
+            else:
+                tot_ncpus = mp.cpu_count()
+                n_workers = int(np.floor(tot_ncpus / dask_task_ncpus))
+                cluster = LocalCluster(
+                    n_workers=n_workers,
+                    threads_per_worker=dask_task_ncpus,
+                    memory_limit='5GB'  
+                )
+                client = Client(cluster)
     return client
 
 # Make predictions using the model. Requires the inputs to be a dask dataframe. Can either return the predictions still as a dask dataframe or as a numpy array
@@ -214,7 +214,6 @@ def filter_ddf(X, y = None, preds = None, fltr_dic = None, col_names = None, max
             if "label_filter" in fltr_dic:
                 for feature, value in fltr_dic["label_filter"].items():
                     if feature == "sparta":
-                        print(y)
                         if isinstance(y, (dd.DataFrame, pd.DataFrame)):
                             y = y["Orbit_infall"]      
                         condition = y == value

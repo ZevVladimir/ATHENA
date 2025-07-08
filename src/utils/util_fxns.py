@@ -300,9 +300,9 @@ def load_ML_dsets(sims, dset_name, sim_cosmol_list, prime_snap, file_lim=0, filt
                 curr_snap_ddfs = []
                 curr_snap_file_paths = []
                 for snap_fldr in all_snap_fldrs:
-                    curr_snap_file_paths.append(f"{folder_path}/ptl_info/{snap_fldr}/ptl_{file_idx}.h5")
+                    curr_snap_file_paths.append(f"{folder_path}/ptl_info/{snap_fldr}/ptl_{file_idx}.parquet")
                     
-                curr_snap_ddfs = [dd.read_hdf(path,"/*").reset_index(drop=True) for path in curr_snap_file_paths] 
+                curr_snap_ddfs = [dd.read_parquet(path).reset_index(drop=True) for path in curr_snap_file_paths] 
                 all_ddfs.append(dd.concat(curr_snap_ddfs,axis=1))
             
             all_halo_file_paths.append(f"{folder_path}/halo_info/")

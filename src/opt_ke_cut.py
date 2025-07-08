@@ -6,6 +6,8 @@ import pandas as pd
 from sparta_tools import sparta
 import argparse
 import dask.array as da
+from dask import delayed, compute
+from dask.base import is_dask_collection
 
 from src.utils.ML_fxns import setup_client, get_combined_name, get_feature_labels, extract_snaps
 from src.utils.util_fxns import create_directory, load_pickle, load_config, save_pickle, load_pickle, timed, parse_ranges, split_sparta_hdf5_name, load_SPARTA_data, load_all_sim_cosmols, load_all_tdyn_steps, print_worker_memory
@@ -71,6 +73,42 @@ def overlap_loss(params, lnv2_bin, sparta_labels_bin):
     # Loss is the absolute difference between the two misclassification counts
     return abs(misclass_orb - misclass_inf)
 
+def optimize_bin(i, bin_indices, r, lnv2, sparta_labels, def_b):
+    mask = (bin_indices == i)
+
+    ptls_in_bin = mask.sum()
+    
+    if is_dask_collection(ptls_in_bin):
+        ptls_in_bin = ptls_in_bin.compute()
+    
+    if ptls_in_bin == 0:
+        return def_b
+    
+    lnv2_bin = lnv2[mask]
+    if is_dask_collection(lnv2_bin):
+        lnv2_bin = lnv2_bin.compute()   
+    
+    sparta_labels_bin = sparta_labels[mask]
+    if is_dask_collection(sparta_labels_bin):
+        sparta_labels_bin = sparta_labels_bin.compute() 
+    
+    initial_guess = [np.max(lnv2_bin)]
+    result_max = minimize(overlap_loss, initial_guess, args=(lnv2_bin, sparta_labels_bin), method="Nelder-Mead")
+    
+    initial_guess = [np.mean(lnv2_bin)]
+    result_mean = minimize(overlap_loss, initial_guess, args=(lnv2_bin, sparta_labels_bin), method="Nelder-Mead")
+    
+    if result_mean.fun < result_max.fun:
+        result = result_mean
+    else:
+        result = result_max
+        
+    calc_b = result.x[0]
+    if np.isnan(calc_b):
+        print(f"Warning: NaN value encountered in bin {i}. Using default value {def_b}.")
+        calc_b = def_b
+    return calc_b
+
 def opt_func(bins, r, lnv2, sparta_labels, def_b, title = ""):
     r = r.to_dask_array(lengths=True)
     lnv2 = lnv2.to_dask_array(lengths=True)
@@ -79,35 +117,9 @@ def opt_func(bins, r, lnv2, sparta_labels, def_b, title = ""):
     # Assign bin indices based on radius
     bin_indices = da.digitize(r, bins) - 1
     bin_indices = bin_indices.persist()  
-
-    intercepts = []
-    for i in range(bins.shape[0]-1):
-        print_worker_memory(client)
-        mask = (bin_indices == i)
-        
-        ptls_in_bin = mask.sum().compute()
-        if ptls_in_bin == 0:
-            intercepts.append(def_b)
-            continue  # Skip empty bins
-        
-        lnv2_bin = lnv2[mask].compute()
-        sparta_labels_bin = sparta_labels[mask].compute()
-
-        # Optimize
-        initial_guess = [np.max(lnv2_bin)]
-        result_max = minimize(overlap_loss, initial_guess, args=(lnv2_bin, sparta_labels_bin), method="Nelder-Mead")
-        
-        initial_guess = [np.mean(lnv2_bin)]
-        result_mean = minimize(overlap_loss, initial_guess, args=(lnv2_bin, sparta_labels_bin), method="Nelder-Mead")
-        
-        if result_mean.fun < result_max.fun:
-            result = result_mean
-        else:
-            result = result_max
-        
-        calc_b = result.x[0]
-            
-        intercepts.append(calc_b)
+    
+    tasks = [delayed(optimize_bin)(i, bin_indices, r, lnv2, sparta_labels, def_b) for i in range(bins.shape[0]-1)]
+    intercepts = compute(*tasks)
         
     return {"b":intercepts}
     
@@ -140,10 +152,11 @@ if __name__ == "__main__":
         raise FileNotFoundError(
             f"Fast KE cut parameter file not found at {param_path}. Please run the fast_ke_cut.py to generate it."
         )
-    
-    print("datset params")
-    print_worker_memory(client)    
-    
+
+    if debug_mem:
+        print("dataset params")
+        print_worker_memory(client)
+
     with timed("SPARTA load",client):
         sparta_name, sparta_search_name = split_sparta_hdf5_name(opt_ke_calib_sims[0])
         curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5" 
@@ -172,8 +185,14 @@ if __name__ == "__main__":
                 mask_vr_neg = (vr_fit < 0)
                 mask_vr_pos = (vr_fit > 0)                
             
+            if debug_mem:
+                print_worker_memory(client)
             vr_pos = opt_func(bins, r_fit[mask_vr_pos], lnv2_fit[mask_vr_pos], sparta_labels_fit[mask_vr_pos], ke_param_dict["b_pos"], title = "pos")
+            if debug_mem:
+                print_worker_memory(client)
             vr_neg = opt_func(bins, r_fit[mask_vr_neg], lnv2_fit[mask_vr_neg], sparta_labels_fit[mask_vr_neg], ke_param_dict["b_neg"], title = "neg")
+            if debug_mem:
+                print_worker_memory(client)
         
             opt_param_dict = {
                 "orb_vr_pos": vr_pos,

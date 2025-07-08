@@ -314,11 +314,6 @@ def halo_loop(ptl_idx, curr_iter, num_iter, indices, halo_splits, snap_dict, use
                 
             for i in range(curr_num_halos):
                 if np.where(curr_ptl_indices[i] >= ptls_pid.shape[0])[0].shape[0]>0:
-                    print(use_halos_pos[i])
-                    print(use_halos_r200m[i])
-                    print(curr_ptl_indices[i])
-                    print(curr_ptl_indices[i][np.where(curr_ptl_indices[i] >= ptls_pid.shape[0])[0]])
-                    print(ptls_pid.shape[0])
                     curr_ptl_indices[i] = np.delete(curr_ptl_indices[i],np.where(curr_ptl_indices[i] > ptls_pid.shape[0])[0])
                 
             with mp.Pool(processes=num_processes) as p:
@@ -697,7 +692,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         "Halo_indices":use_indices,
                         "Halo_R200m":use_halos_r200m,
                     })
-                    halo_df.to_hdf(save_location + "Train/halo_info/halo_" + str(j+train_start_pnt) + ".h5", key='data', mode='w',format='table')  
+                    halo_df.to_parquet(save_location + "Train/halo_info/halo_" + str(j+train_start_pnt) + ".parquet")  
 
                     ptl_df = pd.DataFrame({
                         "HIPIDS":train_p_HIPIDs,
@@ -713,7 +708,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         halo_splits=curr_train_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=False, ptls_pid=curr_ptls_pid, ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels)
                     
                     # We load the comparison HIPIDs to deal with cases where the present snap data got completed before the past snap data
-                    curr_train_p_HIPIDs = pd.read_hdf(save_location + "Train/ptl_info/" + str(p_snap) + "/ptl_" + str(j) + ".h5", key='data', columns=['HIPIDS'])
+                    curr_train_p_HIPIDs = pd.read_parquet(save_location + "Train/ptl_info/" + str(p_snap) + "/ptl_" + str(j) + ".parquet")["HIPIDS"]
                     match_hipid_idx = np.intersect1d(curr_train_p_HIPIDs, c_HIPIDs, return_indices=True)
 
                     p_train_nptls = curr_train_p_HIPIDs.shape[0]
@@ -738,7 +733,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         str(all_tdyn_steps[i-1]) + "_Tangential_vel":save_tang_vel,
                         str(all_tdyn_steps[i-1]) + "_phys_vel":save_phys_vel
                     })
-                ptl_df.to_hdf(save_location + "Train/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+train_start_pnt) + ".h5", key='data', mode='w',format='table')  
+                ptl_df.to_parquet(save_location + "Train/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+train_start_pnt) + ".parquet")  
                 ptl_idx += p_train_nptls
                 if debug_mem == 1:
                     print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
@@ -765,7 +760,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         "Halo_indices":use_indices,
                         "Halo_R200m":use_halos_r200m,
                     })
-                    halo_df.to_hdf(save_location + "Test/halo_info/halo_" + str(j+test_start_pnt) + ".h5", key='data', mode='w',format='table')  
+                    halo_df.to_parquet(save_location + "Test/halo_info/halo_" + str(j+test_start_pnt) + ".parquet")  
 
                     ptl_df = pd.DataFrame({
                         "HIPIDS":test_p_HIPIDs,
@@ -781,7 +776,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     c_HIPIDs, c_rad_vel, c_tang_vel, c_scale_rad, c_phys_vel = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=test_num_iter, indices=test_idxs, \
                         halo_splits=curr_test_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=False, ptls_pid=curr_ptls_pid, ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels,name="Test")
 
-                    curr_test_p_HIPIDs = pd.read_hdf(save_location + "Test/ptl_info/" + str(p_snap) + "/ptl_" + str(j) + ".h5", key='data', columns=['HIPIDS'])
+                    curr_test_p_HIPIDs = pd.read_parquet(save_location + "Test/ptl_info/" + str(p_snap) + "/ptl_" + str(j) + ".parquet")["HIPIDS"]
                     match_hipid_idx = np.intersect1d(curr_test_p_HIPIDs, c_HIPIDs, return_indices=True)
                     
                     p_test_nptls = curr_test_p_HIPIDs.shape[0]
@@ -807,7 +802,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         str(all_tdyn_steps[i-1]) + "_phys_vel":save_phys_vel
                     })
                 
-                ptl_df.to_hdf(save_location + "Test/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+test_start_pnt) + ".h5", key='data', mode='w',format='table')  
+                ptl_df.to_parquet(save_location + "Test/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+test_start_pnt) + ".parquet")  
                 ptl_idx += p_test_nptls
                 if debug_mem == 1:
                     print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
@@ -833,7 +828,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         "Halo_indices":use_indices,
                         "Halo_R200m":use_halos_r200m,
                     })
-                    halo_df.to_hdf(save_location + "Val/halo_info/halo_" + str(j+val_start_pnt) + ".h5", key='data', mode='w',format='table')  
+                    halo_df.to_parquet(save_location + "Val/halo_info/halo_" + str(j+val_start_pnt) + ".parquet")  
 
                     ptl_df = pd.DataFrame({
                         "HIPIDS":val_p_HIPIDs,
@@ -849,7 +844,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     c_HIPIDs, c_rad_vel, c_tang_vel, c_scale_rad, c_phys_vel = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=val_num_iter, indices=val_idxs, \
                         halo_splits=curr_val_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=False, ptls_pid=curr_ptls_pid, ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels,name="Val")
 
-                    curr_val_p_HIPIDs = pd.read_hdf(save_location + "Val/ptl_info/" + str(p_snap) + "/ptl_" + str(j) + ".h5", key='data', columns=['HIPIDS'])
+                    curr_val_p_HIPIDs = pd.read_parquet(save_location + "Val/ptl_info/" + str(p_snap) + "/ptl_" + str(j) + ".parquet")["HIPIDS"]
                     match_hipid_idx = np.intersect1d(curr_val_p_HIPIDs, c_HIPIDs, return_indices=True)
                     
                     p_val_nptls = curr_val_p_HIPIDs.shape[0]
@@ -875,7 +870,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         str(all_tdyn_steps[i-1]) + "_phys_vel":save_phys_vel
                     })
                 
-                ptl_df.to_hdf(save_location + "Val/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+val_start_pnt) + ".h5", key='data', mode='w',format='table')  
+                ptl_df.to_parquet(save_location + "Val/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+val_start_pnt) + ".parquet")  
                 ptl_idx += p_val_nptls
                 if debug_mem == 1:
                     print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")

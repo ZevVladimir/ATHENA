@@ -60,16 +60,13 @@ def calc_radius(halo_x, halo_y, halo_z, particle_x, particle_y, particle_z, box_
 
 # Calculates density within sphere of given radius with given mass and calculating volume at each particle's radius
 # Also can scale by rho_m if supplied
-def calc_rho(masses, bins, r200m, sim_splits, rho_m = None,print_test=False):
+def calc_rho(masses, bins, r200m, sim_splits, rho_m = None):
     rho = np.zeros_like(masses)
     
     if r200m.size == 1:
         V = (bins * r200m)**3 * 4.0 * np.pi / 3.0
         dV = V[1:] - V[:-1]
         dM = masses[1:] - masses[:-1]
-        # if print_test:
-        #     print(dV)
-        #     print(dM)
         rho[0] = masses[0] / V[0]
         rho[1:] = dM / dV
     else:
@@ -163,14 +160,14 @@ def calc_tdyn(halo_r200m, curr_z, little_h):
 
     return tdyn 
 
-def calc_tdyn_col(cosmol,curr_z,little_h):
+def calc_tdyn_col(cosmol,curr_z):
     rho_c = cosmol.rho_c(curr_z)
     rho_m = cosmol.rho_m(curr_z)
     rho_200m = 200 * rho_m
     t_hubb = (1/cosmol.Hz(curr_z)) * 1e3 
     
     t_dyn_def = np.power(2,(3/2)) * t_hubb * np.power((rho_200m / rho_c),(-1/2))
-    print("Colossus Tdyn",t_dyn_def)
+
     return t_dyn_def
 
 def calc_mass_acc_rate(curr_r200m, past_r200m, curr_z, past_z):
