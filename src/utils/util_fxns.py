@@ -277,17 +277,22 @@ def load_ML_dsets(sims, dset_name, sim_cosmol_list, prime_snap, file_lim=0, filt
         datasets = ["Train", "Val", "Test"]
     else:
         datasets = [dset_name]
-        
-    for i,sim in enumerate(sims):        
+
+    # For each simulation we are loading
+    for sim in sims:        
+        # For each dataset for the simulation we are loading
         for dset_name in datasets:
             all_snap_fldrs = []
             folder_path = f"{ML_dset_path}{sim}/{dset_name}"
+            
+            # Determine how many files we will load
             snap_n_files = len(os.listdir(folder_path + "/ptl_info/" + str(prime_snap)+"/"))
             n_files = snap_n_files
 
             if file_lim > 0:
                 n_files = np.min([snap_n_files,file_lim]) 
-                
+            
+            # Get all the paths to the snapshots in this folder
             for snap_fldr in os.listdir(folder_path + "/ptl_info/"):
                 if os.path.isdir(os.path.join(folder_path + "/ptl_info/", snap_fldr)):
                     all_snap_fldrs.append(snap_fldr)
@@ -296,25 +301,24 @@ def load_ML_dsets(sims, dset_name, sim_cosmol_list, prime_snap, file_lim=0, filt
             all_snap_fldrs.sort()
             all_snap_fldrs.reverse()
 
+            # Then we will load all the particle dataframes for each snapshot
             for file_idx in range(n_files):
-                curr_snap_ddfs = []
+                curr_snap_pdfs = []
                 curr_snap_file_paths = []
                 for snap_fldr in all_snap_fldrs:
                     curr_snap_file_paths.append(f"{folder_path}/ptl_info/{snap_fldr}/ptl_{file_idx}.parquet")
 
                 # Read all Dask DataFrames and ensure they have the same number of rows and known divisions
-                curr_snap_ddfs = []
+                curr_snap_pdfs = []
                 for path in curr_snap_file_paths:
-                    ddf = dd.read_parquet(path).reset_index(drop=True)
-                    # ddf = ddf.repartition(npartitions=1)
-                    ddf = ddf.assign(_row=ddf.index)
-                    ddf = ddf.set_index('_row', sorted=True, drop=True)
-                    curr_snap_ddfs.append(ddf)
-                # Check all divisions are identical
-                divisions_set = set(tuple(ddf.divisions) for ddf in curr_snap_ddfs)
-                if len(divisions_set) != 1:
-                    raise ValueError(f"Not all Dask DataFrames have identical divisions for axis=1 concat: {divisions_set}")
-                all_ddfs.append(dd.concat(curr_snap_ddfs, axis=1))
+                    pdf = dd.read_parquet(path).reset_index(drop=True).compute()
+                    curr_snap_pdfs.append(pdf)
+
+                concat_pdf = pd.concat(curr_snap_pdfs, axis=1)
+                concat_ddf = dd.from_pandas(concat_pdf, npartitions=1)  # or choose npartitions as needed
+
+                all_ddfs.append(concat_ddf)
+
             
             all_halo_file_paths.append(f"{folder_path}/halo_info/")
             
