@@ -303,19 +303,19 @@ def load_ML_dsets(sims, dset_name, sim_cosmol_list, prime_snap, file_lim=0, filt
 
             # Then we will load all the particle dataframes for each snapshot
             for file_idx in range(n_files):
-                curr_snap_pdfs = []
+                curr_snap_ddfs = []
                 curr_snap_file_paths = []
                 for snap_fldr in all_snap_fldrs:
                     curr_snap_file_paths.append(f"{folder_path}/ptl_info/{snap_fldr}/ptl_{file_idx}.parquet")
 
                 # Read all Dask DataFrames and ensure they have the same number of rows and known divisions
-                curr_snap_pdfs = []
+                curr_snap_ddfs = []
                 for path in curr_snap_file_paths:
-                    pdf = dd.read_parquet(path).reset_index(drop=True).compute()
-                    curr_snap_pdfs.append(pdf)
-
-                concat_pdf = pd.concat(curr_snap_pdfs, axis=1)
-                concat_ddf = dd.from_pandas(concat_pdf, npartitions=1)  # or choose npartitions as needed
+                    ddf = dd.read_parquet(path).reset_index(drop=True)
+                    ddf.repartition(npartitions=1000)  
+                    curr_snap_ddfs.append(ddf)
+                print(curr_snap_ddfs)
+                concat_ddf = dd.concat(curr_snap_ddfs, axis=1, ignore_unknown_divisions=True)             
 
                 all_ddfs.append(concat_ddf)
 

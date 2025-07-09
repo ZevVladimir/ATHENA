@@ -692,7 +692,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         "Halo_indices":use_indices,
                         "Halo_R200m":use_halos_r200m,
                     })
-                    halo_df.to_parquet(save_location + "Train/halo_info/halo_" + str(j+train_start_pnt) + ".parquet")  
+                    halo_df.to_parquet(save_location + "Train/halo_info/halo_" + str(j+train_start_pnt) + ".parquet",index=True)  
 
                     ptl_df = pd.DataFrame({
                         "HIPIDS":train_p_HIPIDs,
@@ -733,7 +733,8 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         str(all_tdyn_steps[i-1]) + "_Tangential_vel":save_tang_vel,
                         str(all_tdyn_steps[i-1]) + "_phys_vel":save_phys_vel
                     })
-                ptl_df.to_parquet(save_location + "Train/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+train_start_pnt) + ".parquet")  
+                ptl_df = ptl_df.sort_index()
+                ptl_df.to_parquet(save_location + "Train/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+train_start_pnt) + ".parquet",index=True)  
                 ptl_idx += p_train_nptls
                 if debug_mem == 1:
                     print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
@@ -760,7 +761,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         "Halo_indices":use_indices,
                         "Halo_R200m":use_halos_r200m,
                     })
-                    halo_df.to_parquet(save_location + "Test/halo_info/halo_" + str(j+test_start_pnt) + ".parquet")  
+                    halo_df.to_parquet(save_location + "Test/halo_info/halo_" + str(j+test_start_pnt) + ".parquet",index=True)  
 
                     ptl_df = pd.DataFrame({
                         "HIPIDS":test_p_HIPIDs,
@@ -801,8 +802,8 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         str(all_tdyn_steps[i-1]) + "_Tangential_vel":save_tang_vel,
                         str(all_tdyn_steps[i-1]) + "_phys_vel":save_phys_vel
                     })
-                
-                ptl_df.to_parquet(save_location + "Test/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+test_start_pnt) + ".parquet")  
+                ptl_df = ptl_df.sort_index()
+                ptl_df.to_parquet(save_location + "Test/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+test_start_pnt) + ".parquet",index=True)  
                 ptl_idx += p_test_nptls
                 if debug_mem == 1:
                     print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
@@ -828,7 +829,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         "Halo_indices":use_indices,
                         "Halo_R200m":use_halos_r200m,
                     })
-                    halo_df.to_parquet(save_location + "Val/halo_info/halo_" + str(j+val_start_pnt) + ".parquet")  
+                    halo_df.to_parquet(save_location + "Val/halo_info/halo_" + str(j+val_start_pnt) + ".parquet",index=True)  
 
                     ptl_df = pd.DataFrame({
                         "HIPIDS":val_p_HIPIDs,
@@ -870,7 +871,8 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         str(all_tdyn_steps[i-1]) + "_phys_vel":save_phys_vel
                     })
                 
-                ptl_df.to_parquet(save_location + "Val/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+val_start_pnt) + ".parquet")  
+                ptl_df = ptl_df.sort_index()
+                ptl_df.to_parquet(save_location + "Val/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+val_start_pnt) + ".parquet",index=True)  
                 ptl_idx += p_val_nptls
                 if debug_mem == 1:
                     print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
