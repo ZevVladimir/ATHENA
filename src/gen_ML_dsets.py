@@ -78,7 +78,7 @@ def find_start_pnt(directory):
     for filename in os.listdir(directory):
         match = number_pattern.search(filename)
         if match:
-            number = int(match.group(1)) + 1
+            number = int(match.group(1)) # Extract the number from the filename
             if number > max_number:
                 max_number = number
                 
@@ -571,10 +571,10 @@ with timed("Generating Datasets for " + curr_sparta_file):
         tot_nptl_train = np.sum(train_nptls)
         tot_nptl_test = np.sum(test_nptls)
         tot_nptl_val = np.sum(val_nptls)
-        
-        train_halo_mem = calc_halo_mem(train_nptls)
-        test_halo_mem = calc_halo_mem(test_nptls)
-        val_halo_mem = calc_halo_mem(val_nptls)
+
+        train_halo_mem = calc_halo_mem(train_nptls, len(all_tdyn_steps)+1)
+        test_halo_mem = calc_halo_mem(test_nptls, len(all_tdyn_steps)+1)
+        val_halo_mem = calc_halo_mem(val_nptls, len(all_tdyn_steps)+1)
 
         train_halo_splits = det_halo_splits(train_halo_mem, sub_dset_mem_size)
         test_halo_splits = det_halo_splits(test_halo_mem, sub_dset_mem_size)
@@ -606,29 +606,26 @@ with timed("Generating Datasets for " + curr_sparta_file):
         create_directory(save_location + "Test/halo_info/")
         create_directory(save_location + "Val/halo_info/")
         
+        if reset_lvl > 0: # At any level of reset we delete the calculated info for particles
+            clean_dir(save_location + "Train/ptl_info/")
+            clean_dir(save_location + "Test/ptl_info/")
+            clean_dir(save_location + "Val/ptl_info/")
+            train_start_pnt=0
+            test_start_pnt=0
+            val_start_pnt=0
+            curr_train_halo_splits = train_halo_splits.copy()
+            curr_test_halo_splits = test_halo_splits.copy()
+            curr_val_halo_splits = val_halo_splits.copy()
+        else: #Otherwise check to see where we were and then continue the calculations from there.
+            train_start_pnt = find_start_pnt(save_location + "Train/ptl_info/")
+            test_start_pnt = find_start_pnt(save_location + "Test/ptl_info/")
+            val_start_pnt = find_start_pnt(save_location + "Val/ptl_info/")
+            curr_train_halo_splits = train_halo_splits[train_start_pnt:]
+            curr_test_halo_splits = test_halo_splits[test_start_pnt:]
+            curr_val_halo_splits = val_halo_splits[val_start_pnt:]
+        
         for i,curr_ptl_snap in enumerate(all_ptl_snap_list):
-            ptl_idx = 0
-            
-            create_directory(save_location + "Train/ptl_info/"+str(curr_ptl_snap)+"/")
-            create_directory(save_location + "Test/ptl_info/"+str(curr_ptl_snap)+"/")
-            create_directory(save_location + "Val/ptl_info/"+str(curr_ptl_snap)+"/")
-            if reset_lvl > 0: # At any level of reset we delete the calculated info for particles
-                clean_dir(save_location + "Train/ptl_info/"+str(curr_ptl_snap)+"/")
-                clean_dir(save_location + "Test/ptl_info/"+str(curr_ptl_snap)+"/")
-                clean_dir(save_location + "Val/ptl_info/"+str(curr_ptl_snap)+"/")
-                train_start_pnt=0
-                test_start_pnt=0
-                val_start_pnt=0
-                curr_train_halo_splits = train_halo_splits.copy()
-                curr_test_halo_splits = test_halo_splits.copy()
-                curr_val_halo_splits = val_halo_splits.copy()
-            else: #Otherwise check to see where we were and then continue the calculations from there.
-                train_start_pnt = find_start_pnt(save_location + "Train/ptl_info/"+str(curr_ptl_snap)+"/")
-                test_start_pnt = find_start_pnt(save_location + "Test/ptl_info/"+str(curr_ptl_snap)+"/")
-                val_start_pnt = find_start_pnt(save_location + "Val/ptl_info/"+str(curr_ptl_snap)+"/")
-                curr_train_halo_splits = train_halo_splits[train_start_pnt:]
-                curr_test_halo_splits = test_halo_splits[test_start_pnt:]
-                curr_val_halo_splits = val_halo_splits[val_start_pnt:]
+            ptl_idx = 0            
 
             prnt_halo_splits = curr_train_halo_splits.copy()
             prnt_halo_splits.append(len(train_idxs))        
@@ -708,7 +705,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         halo_splits=curr_train_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=False, ptls_pid=curr_ptls_pid, ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels)
                     
                     # We load the comparison HIPIDs to deal with cases where the present snap data got completed before the past snap data
-                    curr_train_p_HIPIDs = pd.read_parquet(save_location + "Train/ptl_info/" + str(p_snap) + "/ptl_" + str(j) + ".parquet")["HIPIDS"]
+                    curr_train_p_HIPIDs = pd.read_parquet(save_location + "Train/ptl_info/ptl_" + str(j) + ".parquet")["HIPIDS"]
                     match_hipid_idx = np.intersect1d(curr_train_p_HIPIDs, c_HIPIDs, return_indices=True)
 
                     p_train_nptls = curr_train_p_HIPIDs.shape[0]
@@ -733,8 +730,12 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         str(all_tdyn_steps[i-1]) + "_Tangential_vel":save_tang_vel,
                         str(all_tdyn_steps[i-1]) + "_phys_vel":save_phys_vel
                     })
-                ptl_df = ptl_df.sort_index()
-                ptl_df.to_parquet(save_location + "Train/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+train_start_pnt) + ".parquet",index=True)  
+
+                    full_ptl_df = pd.read_parquet(save_location + "Train/ptl_info/ptl_" + str(j) + ".parquet")
+
+                    ptl_df = pd.concat([full_ptl_df, ptl_df], axis=1)
+
+                ptl_df.to_parquet(save_location + "Train/ptl_info/ptl_" + str(j+train_start_pnt) + ".parquet",index=True)
                 ptl_idx += p_train_nptls
                 if debug_mem == 1:
                     print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
@@ -777,7 +778,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     c_HIPIDs, c_rad_vel, c_tang_vel, c_scale_rad, c_phys_vel = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=test_num_iter, indices=test_idxs, \
                         halo_splits=curr_test_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=False, ptls_pid=curr_ptls_pid, ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels,name="Test")
 
-                    curr_test_p_HIPIDs = pd.read_parquet(save_location + "Test/ptl_info/" + str(p_snap) + "/ptl_" + str(j) + ".parquet")["HIPIDS"]
+                    curr_test_p_HIPIDs = pd.read_parquet(save_location + "Test/ptl_info/ptl_" + str(j) + ".parquet")["HIPIDS"]
                     match_hipid_idx = np.intersect1d(curr_test_p_HIPIDs, c_HIPIDs, return_indices=True)
                     
                     p_test_nptls = curr_test_p_HIPIDs.shape[0]
@@ -802,8 +803,11 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         str(all_tdyn_steps[i-1]) + "_Tangential_vel":save_tang_vel,
                         str(all_tdyn_steps[i-1]) + "_phys_vel":save_phys_vel
                     })
-                ptl_df = ptl_df.sort_index()
-                ptl_df.to_parquet(save_location + "Test/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+test_start_pnt) + ".parquet",index=True)  
+                    full_ptl_df = pd.read_parquet(save_location + "Test/ptl_info/ptl_" + str(j) + ".parquet")
+
+                    ptl_df = pd.concat([full_ptl_df, ptl_df], axis=1)
+
+                ptl_df.to_parquet(save_location + "Test/ptl_info/ptl_" + str(j+test_start_pnt) + ".parquet",index=True)  
                 ptl_idx += p_test_nptls
                 if debug_mem == 1:
                     print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
@@ -845,7 +849,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     c_HIPIDs, c_rad_vel, c_tang_vel, c_scale_rad, c_phys_vel = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=val_num_iter, indices=val_idxs, \
                         halo_splits=curr_val_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=False, ptls_pid=curr_ptls_pid, ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels,name="Val")
 
-                    curr_val_p_HIPIDs = pd.read_parquet(save_location + "Val/ptl_info/" + str(p_snap) + "/ptl_" + str(j) + ".parquet")["HIPIDS"]
+                    curr_val_p_HIPIDs = pd.read_parquet(save_location + "Val/ptl_info/ptl_" + str(j) + ".parquet")["HIPIDS"]
                     match_hipid_idx = np.intersect1d(curr_val_p_HIPIDs, c_HIPIDs, return_indices=True)
                     
                     p_val_nptls = curr_val_p_HIPIDs.shape[0]
@@ -870,9 +874,12 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         str(all_tdyn_steps[i-1]) + "_Tangential_vel":save_tang_vel,
                         str(all_tdyn_steps[i-1]) + "_phys_vel":save_phys_vel
                     })
+                    
+                    full_ptl_df = pd.read_parquet(save_location + "Val/ptl_info/ptl_" + str(j) + ".parquet")
+
+                    ptl_df = pd.concat([full_ptl_df, ptl_df], axis=1)
                 
-                ptl_df = ptl_df.sort_index()
-                ptl_df.to_parquet(save_location + "Val/ptl_info/" + str(curr_ptl_snap) + "/ptl_" + str(j+val_start_pnt) + ".parquet",index=True)  
+                ptl_df.to_parquet(save_location + "Val/ptl_info/ptl_" + str(j+val_start_pnt) + ".parquet",index=True)  
                 ptl_idx += p_val_nptls
                 if debug_mem == 1:
                     print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")

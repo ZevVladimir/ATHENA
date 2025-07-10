@@ -282,44 +282,24 @@ def load_ML_dsets(sims, dset_name, sim_cosmol_list, prime_snap, file_lim=0, filt
     for sim in sims:        
         # For each dataset for the simulation we are loading
         for dset_name in datasets:
-            all_snap_fldrs = []
             folder_path = f"{ML_dset_path}{sim}/{dset_name}"
             
             # Determine how many files we will load
-            snap_n_files = len(os.listdir(folder_path + "/ptl_info/" + str(prime_snap)+"/"))
-            n_files = snap_n_files
+            n_files = len(os.listdir(folder_path + "/ptl_info/"))
 
             if file_lim > 0:
-                n_files = np.min([snap_n_files,file_lim]) 
-            
-            # Get all the paths to the snapshots in this folder
-            for snap_fldr in os.listdir(folder_path + "/ptl_info/"):
-                if os.path.isdir(os.path.join(folder_path + "/ptl_info/", snap_fldr)):
-                    all_snap_fldrs.append(snap_fldr)
-            
-            # Since they are just numbers we can first sort them and then sort them in descending order (primary snaps should always be the largest value)
-            all_snap_fldrs.sort()
-            all_snap_fldrs.reverse()
+                n_files = np.min([n_files,file_lim]) 
 
             # Then we will load all the particle dataframes for each snapshot
             for file_idx in range(n_files):
-                curr_snap_ddfs = []
-                curr_snap_file_paths = []
-                for snap_fldr in all_snap_fldrs:
-                    curr_snap_file_paths.append(f"{folder_path}/ptl_info/{snap_fldr}/ptl_{file_idx}.parquet")
+                curr_file_paths = []
+
+                curr_file_paths.append(f"{folder_path}/ptl_info/ptl_{file_idx}.parquet")
 
                 # Read all Dask DataFrames and ensure they have the same number of rows and known divisions
-                curr_snap_ddfs = []
-                for path in curr_snap_file_paths:
-                    ddf = dd.read_parquet(path).reset_index(drop=True)
-                    ddf.repartition(npartitions=1000)  
-                    curr_snap_ddfs.append(ddf)
-                print(curr_snap_ddfs)
-                concat_ddf = dd.concat(curr_snap_ddfs, axis=1, ignore_unknown_divisions=True)             
+                for path in curr_file_paths:
+                    all_ddfs.append(dd.read_parquet(path))
 
-                all_ddfs.append(concat_ddf)
-
-            
             all_halo_file_paths.append(f"{folder_path}/halo_info/")
             
         with open(ML_dset_path + sim + "/dset_params.pickle","rb") as f:
@@ -421,7 +401,6 @@ def find_closest_a_rstar(z,rockstar_loc):
             all_a.append(a_val)
 
     idx = (np.abs(all_a - 1/(1+z))).argmin()
-    print(rockstar_loc + "/hlist_" + str(all_a[idx]) + ".list")
     return rockstar_loc + "/hlist_" + str(all_a[idx]) + ".list"
 
 def find_closest_snap(value, cosmol, snap_loc, snap_dir_format, snap_format):
@@ -525,10 +504,10 @@ def split_orb_inf(data, labels):
 def reform_dset_dfs(all_folder_path):
     all_dfs = []
     for folder_path in all_folder_path:
-        hdf5_files = sorted(f for f in os.listdir(folder_path) if f.endswith('.h5'))
-        for file in hdf5_files:
+        parquet_files = sorted(f for f in os.listdir(folder_path) if f.endswith('.parquet'))
+        for file in parquet_files:
             file_path = os.path.join(folder_path, file)
-            df = pd.read_hdf(file_path)
+            df = pd.read_parquet(file_path)
             all_dfs.append(df)
     return pd.concat(all_dfs, ignore_index=True)
     

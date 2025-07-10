@@ -7,13 +7,14 @@ import numexpr as ne
 G = constants.G # kpc km^2 / M_⊙ / s^2
 
 # How much memory a halo takes up. Needs to be adjusted if outputted parameters are changed
-def calc_halo_mem(n_ptl):
+def calc_halo_mem(n_ptl, n_snap):
     # rad, rad_vel, tang_vel, physical vel each 4bytes
     # HIPIDS is 8 bytes 
     # orbit/infall is one byte
     # Add some headroom for pandas/hdf5 = 32 bytes per particle
-    n_bytes = 32 * n_ptl
-    
+    # Then multiply by the number of snapshots
+    n_bytes = 32 * n_ptl * n_snap
+
     return n_bytes
 
 # Calculate radii of particles relative to a halo and the difference in each coordinate for particles and halos for use in calculating rhat
