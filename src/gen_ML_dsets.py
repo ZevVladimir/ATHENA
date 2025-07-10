@@ -10,6 +10,7 @@ import re
 import pandas as pd
 import psutil
 import argparse
+import pyarrow.parquet as pq
 
 from src.utils.util_fxns import load_SPARTA_data, load_ptl_param, get_comp_snap_info, create_directory, load_pickle, save_pickle, load_config, get_past_z
 from src.utils.calc_fxns import calc_radius, calc_pec_vel, calc_rad_vel, calc_tang_vel, calc_rho, calc_halo_mem, calc_tdyn
@@ -71,17 +72,27 @@ def memory_usage():
     process = psutil.Process(os.getpid())
     return process.memory_info().rss
 
-def find_start_pnt(directory):
+def find_start_pnt(directory, nsnap):
     max_number = 0
-    number_pattern = re.compile(r'(\d+)')
+    number_pattern = re.compile(r'\d+')
     
-    for filename in os.listdir(directory):
+    files = [f for f in os.listdir(directory) if re.search(number_pattern, f)]
+    files.sort(key=lambda f: int(re.search(number_pattern, f).group()))
+
+    for filename in files:
         match = number_pattern.search(filename)
-        if match:
-            number = int(match.group(1)) # Extract the number from the filename
-            if number > max_number:
-                max_number = number
-                
+        file_number = int(match.group())
+        metadata = pq.read_metadata(os.path.join(directory, filename))
+        # If there are not the number of right columns then restart this file
+        ncol = metadata.num_columns
+
+        file_nsnap = (ncol - 2) // 4
+
+        if file_nsnap < nsnap:
+            return file_number
+        else:
+            max_number = file_number + 1
+
     return max_number
 
 def det_halo_splits(mem_arr, mem_lim):
@@ -617,9 +628,9 @@ with timed("Generating Datasets for " + curr_sparta_file):
             curr_test_halo_splits = test_halo_splits.copy()
             curr_val_halo_splits = val_halo_splits.copy()
         else: #Otherwise check to see where we were and then continue the calculations from there.
-            train_start_pnt = find_start_pnt(save_location + "Train/ptl_info/")
-            test_start_pnt = find_start_pnt(save_location + "Test/ptl_info/")
-            val_start_pnt = find_start_pnt(save_location + "Val/ptl_info/")
+            train_start_pnt = find_start_pnt(save_location + "Train/ptl_info/",len(all_tdyn_steps)+1)
+            test_start_pnt = find_start_pnt(save_location + "Test/ptl_info/",len(all_tdyn_steps)+1)
+            val_start_pnt = find_start_pnt(save_location + "Val/ptl_info/",len(all_tdyn_steps)+1)
             curr_train_halo_splits = train_halo_splits[train_start_pnt:]
             curr_test_halo_splits = test_halo_splits[test_start_pnt:]
             curr_val_halo_splits = val_halo_splits[val_start_pnt:]
@@ -689,7 +700,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         "Halo_indices":use_indices,
                         "Halo_R200m":use_halos_r200m,
                     })
-                    halo_df.to_parquet(save_location + "Train/halo_info/halo_" + str(j+train_start_pnt) + ".parquet",index=True)  
+                    halo_df.to_parquet(save_location + "Train/halo_info/halo_" + str(j+train_start_pnt) + ".parquet")  
 
                     ptl_df = pd.DataFrame({
                         "HIPIDS":train_p_HIPIDs,
@@ -731,11 +742,11 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         str(all_tdyn_steps[i-1]) + "_phys_vel":save_phys_vel
                     })
 
-                    full_ptl_df = pd.read_parquet(save_location + "Train/ptl_info/ptl_" + str(j) + ".parquet")
+                    full_ptl_df = pd.read_parquet(save_location + "Train/ptl_info/ptl_" + str(j+train_start_pnt) + ".parquet")
 
                     ptl_df = pd.concat([full_ptl_df, ptl_df], axis=1)
 
-                ptl_df.to_parquet(save_location + "Train/ptl_info/ptl_" + str(j+train_start_pnt) + ".parquet",index=True)
+                ptl_df.to_parquet(save_location + "Train/ptl_info/ptl_" + str(j+train_start_pnt) + ".parquet")
                 ptl_idx += p_train_nptls
                 if debug_mem == 1:
                     print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
@@ -762,7 +773,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         "Halo_indices":use_indices,
                         "Halo_R200m":use_halos_r200m,
                     })
-                    halo_df.to_parquet(save_location + "Test/halo_info/halo_" + str(j+test_start_pnt) + ".parquet",index=True)  
+                    halo_df.to_parquet(save_location + "Test/halo_info/halo_" + str(j+test_start_pnt) + ".parquet")  
 
                     ptl_df = pd.DataFrame({
                         "HIPIDS":test_p_HIPIDs,
@@ -803,11 +814,11 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         str(all_tdyn_steps[i-1]) + "_Tangential_vel":save_tang_vel,
                         str(all_tdyn_steps[i-1]) + "_phys_vel":save_phys_vel
                     })
-                    full_ptl_df = pd.read_parquet(save_location + "Test/ptl_info/ptl_" + str(j) + ".parquet")
+                    full_ptl_df = pd.read_parquet(save_location + "Test/ptl_info/ptl_" + str(j+test_start_pnt) + ".parquet")
 
                     ptl_df = pd.concat([full_ptl_df, ptl_df], axis=1)
 
-                ptl_df.to_parquet(save_location + "Test/ptl_info/ptl_" + str(j+test_start_pnt) + ".parquet",index=True)  
+                ptl_df.to_parquet(save_location + "Test/ptl_info/ptl_" + str(j+test_start_pnt) + ".parquet")  
                 ptl_idx += p_test_nptls
                 if debug_mem == 1:
                     print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
@@ -833,7 +844,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         "Halo_indices":use_indices,
                         "Halo_R200m":use_halos_r200m,
                     })
-                    halo_df.to_parquet(save_location + "Val/halo_info/halo_" + str(j+val_start_pnt) + ".parquet",index=True)  
+                    halo_df.to_parquet(save_location + "Val/halo_info/halo_" + str(j+val_start_pnt) + ".parquet")  
 
                     ptl_df = pd.DataFrame({
                         "HIPIDS":val_p_HIPIDs,
@@ -874,12 +885,12 @@ with timed("Generating Datasets for " + curr_sparta_file):
                         str(all_tdyn_steps[i-1]) + "_Tangential_vel":save_tang_vel,
                         str(all_tdyn_steps[i-1]) + "_phys_vel":save_phys_vel
                     })
-                    
-                    full_ptl_df = pd.read_parquet(save_location + "Val/ptl_info/ptl_" + str(j) + ".parquet")
+
+                    full_ptl_df = pd.read_parquet(save_location + "Val/ptl_info/ptl_" + str(j+val_start_pnt) + ".parquet")
 
                     ptl_df = pd.concat([full_ptl_df, ptl_df], axis=1)
                 
-                ptl_df.to_parquet(save_location + "Val/ptl_info/ptl_" + str(j+val_start_pnt) + ".parquet",index=True)  
+                ptl_df.to_parquet(save_location + "Val/ptl_info/ptl_" + str(j+val_start_pnt) + ".parquet")  
                 ptl_idx += p_val_nptls
                 if debug_mem == 1:
                     print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
