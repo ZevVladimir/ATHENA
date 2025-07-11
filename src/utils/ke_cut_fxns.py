@@ -113,8 +113,7 @@ def halo_select(sims, ptl_data, halo_df, dset_name):
                     halo_first[i] + halo_n[i]
                 ))
                 all_row_idxs.extend(row_indices)
-    
-    print(ptl_data.shape,halo_df["Halo_n"].sum(),np.max(halo_df["Halo_first"].values),np.max(all_row_idxs))
+
     subset_df = ptl_data.iloc[all_row_idxs]        
     return subset_df
 

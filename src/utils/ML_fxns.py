@@ -1,6 +1,7 @@
 import dask.dataframe as dd
 from dask.distributed import Client
 from xgboost import dask as dxgb
+import xgboost as xgb
 import argparse
 import numpy as np
 import os
@@ -111,7 +112,7 @@ def setup_client():
     return client
 
 # Make predictions using the model. Requires the inputs to be a dask dataframe. Can either return the predictions still as a dask dataframe or as a numpy array
-def make_preds(client, bst, X, ret_dask = False, threshold = 0.5):
+def dask_make_preds(client, bst, X, ret_dask = False, threshold = 0.5):
     if ret_dask:
         preds = dxgb.predict(client,bst,X)
         preds = preds.map_partitions(lambda df: (df >= threshold).astype(int))
@@ -120,6 +121,11 @@ def make_preds(client, bst, X, ret_dask = False, threshold = 0.5):
         preds = dxgb.inplace_predict(client, bst, X).compute()
         preds = (preds >= threshold).astype(np.int8)
     
+    return preds
+
+def make_preds(bst, X, threshold = 0.5):
+    preds = bst.predict(xgb.DMatrix(X))
+    preds = (preds >= threshold).astype(np.int8)
     return preds
 
 def extract_snaps(sim_name):
@@ -308,7 +314,7 @@ def filter_df(X, y=None, preds=None, fltr_dic=None, col_names=None, max_size=500
     
 # Can set max_size to 0 to include all the particles
 def shap_with_filter(explainer, X, y, preds, fltr_dic = None, col_names = None, max_size=500):
-    X_fltr,fltr = filter_ddf(X, y, preds, fltr_dic = fltr_dic, col_names = col_names, max_size=max_size)
+    X_fltr,fltr = filter_df(X, y, preds, fltr_dic = fltr_dic, col_names = col_names, max_size=max_size)
     return explainer(X_fltr), explainer.shap_values(X_fltr), X_fltr
     
     

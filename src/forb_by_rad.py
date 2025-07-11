@@ -4,7 +4,7 @@ import os
 import xgboost as xgb
 import argparse
 
-from src.utils.ML_fxns import setup_client, get_combined_name, make_preds, get_model_name, extract_snaps, get_feature_labels
+from src.utils.ML_fxns import get_combined_name, make_preds, get_model_name, extract_snaps, get_feature_labels
 from src.utils.util_fxns import create_directory, load_pickle, load_config, load_pickle, timed, load_SPARTA_data, load_ML_dsets, load_all_sim_cosmols, load_all_tdyn_steps
 from src.utils.ke_cut_fxns import fast_ke_predictor, opt_ke_predictor
 from src.utils.util_fxns import set_cosmology, parse_ranges, split_sparta_hdf5_name
@@ -54,9 +54,7 @@ r_cut_calib = config_params["KE_CUT"]["r_cut_calib"]
 ke_test_sims = config_params["KE_CUT"]["ke_test_sims"]
     
     
-if __name__ == "__main__":
-    client = setup_client()
-    
+if __name__ == "__main__":    
     comb_model_sims = get_combined_name(model_sims) 
         
     model_name = get_model_name(model_type, model_sims)    
@@ -100,17 +98,14 @@ if __name__ == "__main__":
         with timed("Fraction of Orb by Rad Plot Creation"):
             test_comb_name = get_combined_name(curr_test_sims) 
             
-            data,scale_pos_weight = load_ML_dsets(curr_test_sims,dset_name,all_sim_cosmol_list)
+            data,scale_pos_weight,halo_df = load_ML_dsets(curr_test_sims,dset_name,all_sim_cosmol_list)
             
             columns_to_keep = [col for col in data.columns if col != target_column[0]]
             X_df = data[columns_to_keep]
             y_df = data[target_column]
             
             feature_columns = get_feature_labels(features,all_tdyn_steps_list[0])
-            preds_ML = make_preds(client, bst, data[feature_columns])
-                
-            X_df = X_df.to_backend('pandas')
-            y_df = y_df.to_backend('pandas')
+            preds_ML = make_preds(bst, data[feature_columns])
             
             r_test = X_df["p_Scaled_radii"]
             vr_test = X_df["p_Radial_vel"]
@@ -122,7 +117,7 @@ if __name__ == "__main__":
             mask_vr_pos = ~mask_vr_neg
 
             ke_fastparam_dict = load_pickle(fast_model_fldr_loc + "ke_fastparams_dict.pickle")        
-            fast_mask_orb, preds_fast_ke = fast_ke_predictor(ke_fastparam_dict,r_test.compute().to_numpy(),vr_test.compute().to_numpy(),lnv2_test.compute().to_numpy(),r_cut_calib)
+            fast_mask_orb, preds_fast_ke = fast_ke_predictor(ke_fastparam_dict,r_test.values,vr_test.values,lnv2_test.values,r_cut_calib)
             
             sparta_name, sparta_search_name = split_sparta_hdf5_name(curr_test_sims[0])
             curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5" 
@@ -131,12 +126,11 @@ if __name__ == "__main__":
             sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, save_data=save_intermediate_data)
             bins = sparta_params[sparta_param_names[0]]
             bins = np.insert(bins, 0, 0)
-            
-            preds_opt_ke = opt_ke_predictor(opt_param_dict, bins, r_test.compute().to_numpy(), vr_test.compute().to_numpy(), lnv2_test.compute().to_numpy(), r_cut_calib)       
-            
-            y_df = y_df.values.compute().squeeze()
-            X_df = X_df.compute()
-            
+
+            preds_opt_ke = opt_ke_predictor(opt_param_dict, bins, r_test.values, vr_test.values, lnv2_test.values, r_cut_calib)
+
+            y_df = y_df.values
+
             param_path = fast_model_fldr_loc + "ke_fastparams_dict.pickle"
             ke_param_dict = load_pickle(param_path)      
             

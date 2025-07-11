@@ -181,8 +181,7 @@ def get_comp_snap_info(cosmol, past_z, all_sparta_z, snap_dir_format, snap_forma
     # get constants from pygadgetreader
     c_sparta_snap = np.abs(all_sparta_z - past_z).argmin()
     c_snap_dict["sparta_snap"] = c_sparta_snap
-    print(past_z)
-    print(snap_path + "snapdir_" + snap_dir_format.format(c_snap) + "/snapshot_" + snap_format.format(c_snap))
+
     snap_z = readheader(snap_path + "snapdir_" + snap_dir_format.format(c_snap) + "/snapshot_" + snap_format.format(c_snap), 'redshift')
 
     print("Complementary snapshot:", c_snap, "Complementary redshift:", snap_z)

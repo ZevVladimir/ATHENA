@@ -4,7 +4,7 @@ import os
 import pandas as pd
 import argparse
 
-from src.utils.ML_fxns import setup_client, get_combined_name, get_feature_labels, get_model_name, extract_snaps
+from src.utils.ML_fxns import get_combined_name, get_feature_labels, get_model_name, extract_snaps
 from src.utils.ke_cut_fxns import load_ke_data, fast_ke_predictor
 from src.utils.prfl_fxns import paper_dens_prf_plt
 from src.utils.util_fxns import set_cosmology, depair_np, parse_ranges, create_directory, timed, save_pickle, load_pickle, load_config, load_SPARTA_data, split_sparta_hdf5_name, load_all_sim_cosmols, load_all_tdyn_steps
@@ -214,7 +214,6 @@ def calibrate_finder(
     return (m_pos, b_pos), (m_neg, b_neg)
     
 if __name__ == "__main__":
-    client = setup_client()
     
     comb_model_sims = get_combined_name(fast_ke_calib_sims) 
     
@@ -262,29 +261,27 @@ if __name__ == "__main__":
             
             r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(curr_test_sims,curr_sim_cosmol_list,snap_list,dset_name)
             
-            r_r200m = my_data["p_Scaled_radii"].values.compute()
-            vr = my_data["p_Radial_vel"].values.compute()
-            # vt = my_data["p_Tangential_vel"].values.compute()
-            vphys = my_data["p_phys_vel"].values.compute()
-            # sparta_labels = my_data["Orbit_infall"].values.compute()
-            # hipids = my_data["HIPIDS"].values.compute()
-            # all_pids, ptl_halo_idxs = depair_np(hipids)
+            r_r200m = my_data["p_Scaled_radii"].values
+            vr = my_data["p_Radial_vel"].values
+            vphys = my_data["p_phys_vel"].values
+            sparta_labels = my_data["Orbit_infall"].values
+            hipids = my_data["HIPIDS"].values
             lnv2 = np.log(vphys**2)
             
-            # sparta_orb = np.where(sparta_labels == 1)[0]
-            # sparta_inf = np.where(sparta_labels == 0)[0]
+            sparta_orb = np.where(sparta_labels == 1)[0]
+            sparta_inf = np.where(sparta_labels == 0)[0]
 
-            # mask_vr_neg = (vr < 0)
-            # mask_vr_pos = ~mask_vr_neg
+            mask_vr_neg = (vr < 0)
+            mask_vr_pos = ~mask_vr_neg
             
-            # fltr_combs = {
-            # "mask_vr_pos": mask_vr_pos,
-            # "mask_vr_neg": mask_vr_neg,
-            # "orb_vr_neg": np.intersect1d(sparta_orb, np.where(mask_vr_neg)[0]),
-            # "orb_vr_pos": np.intersect1d(sparta_orb, np.where(mask_vr_pos)[0]),
-            # "inf_vr_neg": np.intersect1d(sparta_inf, np.where(mask_vr_neg)[0]),
-            # "inf_vr_pos": np.intersect1d(sparta_inf, np.where(mask_vr_pos)[0]),
-            # }
+            fltr_combs = {
+            "mask_vr_pos": mask_vr_pos,
+            "mask_vr_neg": mask_vr_neg,
+            "orb_vr_neg": np.intersect1d(sparta_orb, np.where(mask_vr_neg)[0]),
+            "orb_vr_pos": np.intersect1d(sparta_orb, np.where(mask_vr_pos)[0]),
+            "inf_vr_neg": np.intersect1d(sparta_inf, np.where(mask_vr_neg)[0]),
+            "inf_vr_pos": np.intersect1d(sparta_inf, np.where(mask_vr_pos)[0]),
+            }
 
             # # Look for particles vr>0 that are above the phase space line (infalling) that SPARTA says should be below (orbiting)
             # wrong_vr_pos_orb = (lnv2[fltr_combs["orb_vr_pos"]] > (m_pos * r_r200m[fltr_combs["orb_vr_pos"]] + b_pos)) & (r_r200m[fltr_combs["orb_vr_pos"]] < r_cut_pred)
@@ -328,15 +325,15 @@ if __name__ == "__main__":
             x_range = (0, 3)
             y_range = (-2, 2.5)
             
-            # curr_sparta_file = fast_ke_calib_sims[0]
-            # sparta_name, sparta_search_name = split_sparta_hdf5_name(curr_sparta_file)
-            # curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
-            # param_paths = [["config","anl_prf","r_bins_lin"]]
-            # sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, save_data=save_intermediate_data)
-            # bins = sparta_params[sparta_param_names[0]]
+            curr_sparta_file = fast_ke_calib_sims[0]
+            sparta_name, sparta_search_name = split_sparta_hdf5_name(curr_sparta_file)
+            curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5"
+            param_paths = [["config","anl_prf","r_bins_lin"]]
+            sparta_params, sparta_param_names = load_SPARTA_data(curr_sparta_HDF5_path, param_paths, sparta_search_name, save_data=save_intermediate_data)
+            bins = sparta_params[sparta_param_names[0]]
 
-            # plt_SPARTA_KE_dist(ke_param_dict, fltr_combs, bins, r_r200m, lnv2, perc, width, r_cut_calib, plot_loc, title="only_fast_", plot_lin_too=True)
-            # plt_KE_dist_grad(ke_param_dict, fltr_combs, r_r200m, vr, lnv2, nbins, x_range, y_range, r_cut_calib, plot_loc)      
+            plt_SPARTA_KE_dist(ke_param_dict, fltr_combs, bins, r_r200m, lnv2, r_cut_calib, plot_loc, title="only_fast_", plot_lin_too=True)
+            plt_KE_dist_grad(ke_param_dict, fltr_combs, r_r200m, vr, lnv2, nbins, x_range, y_range, r_cut_calib, plot_loc)      
             
         ####################################################################################################################################################################################################################################
 

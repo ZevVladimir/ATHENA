@@ -1,5 +1,4 @@
 import xgboost as xgb
-from xgboost import dask as dxgb
 import pickle
 import os
 import argparse
@@ -36,9 +35,7 @@ n_early_stopping_rounds = config_params["TRAIN_MODEL"]["n_early_stopping_rounds"
 
 retrain = config_params["MISC"]["retrain_model"]
 
-if __name__ == "__main__":        
-    client = setup_client()
-    
+if __name__ == "__main__":           
     all_sim_cosmol_list = load_all_sim_cosmols(model_sims)
     all_tdyn_steps_list = load_all_tdyn_steps(model_sims)
 
@@ -76,26 +73,26 @@ if __name__ == "__main__":
         print("Loaded Booster")
     else:
         with timed("Loading Datasets"):
-            train_data,train_scale_pos_weight = load_ML_dsets(model_sims,"Train",all_sim_cosmol_list,file_lim=file_lim,filter_nu=False)
+            train_data,train_scale_pos_weight,train_halo_df = load_ML_dsets(model_sims,"Train",all_sim_cosmol_list,file_lim=file_lim,filter_nu=False)
                 
             X_train = train_data[feature_columns]
             y_train = train_data[target_column]
 
             create_directory(model_fldr_loc)
             create_directory(gen_plot_save_loc)
-            
-            # Construct the DaskDMatrix used for evaluatin the model
-            dtrain = xgb.dask.DaskDMatrix(client, X_train, y_train)
+
+            # Construct the DMatrix used for evaluatin the model
+            dtrain = xgb.DMatrix(X_train, y_train)
             
             eval_list = []
             for dset in eval_train_dsets:
-                curr_data,curr_scale_pos_weight = load_ML_dsets(model_sims,dset,all_sim_cosmol_list,file_lim=file_lim,filter_nu=False)
+                curr_data,curr_scale_pos_weight,eval_halo_df = load_ML_dsets(model_sims,dset,all_sim_cosmol_list,file_lim=file_lim,filter_nu=False)
                 
                 curr_X = curr_data[feature_columns]
                 curr_y = curr_data[target_column]
                 
                 # Construct the DaskDMatrix used for evaluatin the model
-                eval_list.append((xgb.dask.DaskDMatrix(client, curr_X, curr_y),dset))
+                eval_list.append((xgb.DMatrix(curr_X, curr_y),dset))
 
         if 'Training Info' in model_info: 
             params = model_info.get('Training Info',{}).get('Training Params')
@@ -116,17 +113,28 @@ if __name__ == "__main__":
         # Train and save the model
         with timed("Trained Model"):
             print("Starting train using params:", params)
-            output = dxgb.train(
-                client,
-                params,
-                dtrain,
-                num_boost_round=ntrees,
-                evals=eval_list,
-                early_stopping_rounds=n_early_stopping_rounds, 
-                )
-            bst = output["booster"]
-            history = output["history"]
+            if len(eval_list) > 0: 
+                evals_result = {}
+                bst = xgb.train(
+                    params,
+                    dtrain,
+                    num_boost_round=ntrees,
+                    evals=eval_list,
+                    early_stopping_rounds=n_early_stopping_rounds, 
+                    evals_result=evals_result,
+                    )               
+                model_info['Training Info']['Best ntrees'] = bst.best_iteration + 1
+                model_info['Training Info']['Early Stopping Rounds'] = n_early_stopping_rounds
+                model_info['Training Info']['Eval Train Dsets'] = eval_train_dsets
+                save_pickle(evals_result,model_fldr_loc + "evals_result.pickle")
+            else:
+                bst = xgb.train(
+                    params,
+                    dtrain,
+                    num_boost_round=ntrees,
+                    )
+            
             bst.save_model(model_save_loc)
+            
             save_pickle(model_info,model_fldr_loc + "model_info.pickle")
     
-    client.close()

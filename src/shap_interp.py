@@ -5,7 +5,7 @@ import shap
 import argparse
 
 from src.utils.util_fxns import create_directory, timed, load_config, load_pickle, load_ML_dsets, load_all_sim_cosmols, load_all_tdyn_steps
-from src.utils.ML_fxns import setup_client, get_combined_name, make_preds, shap_with_filter, get_model_name, extract_snaps, get_feature_labels
+from src.utils.ML_fxns import get_combined_name, make_preds, shap_with_filter, get_model_name, extract_snaps, get_feature_labels
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -29,9 +29,7 @@ model_type = config_params["TRAIN_MODEL"]["model_type"]
 test_sims = config_params["EVAL_MODEL"]["test_sims"]
 eval_test_dsets = config_params["EVAL_MODEL"]["eval_test_dsets"]
 
-if __name__ == '__main__':
-    client = setup_client()
-    
+if __name__ == '__main__':    
     with timed("Setup"): 
         comb_model_sims = get_combined_name(model_sims) 
         
@@ -59,14 +57,12 @@ if __name__ == '__main__':
                 plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
                 create_directory(plot_loc)
                 all_snaps = extract_snaps(curr_test_sims[0])
-                data,scale_pos_weight = load_ML_dsets(curr_test_sims,dset_name,all_sim_cosmol_list)
+                data,scale_pos_weight,halo_df = load_ML_dsets(curr_test_sims,dset_name,all_sim_cosmol_list)
                 
                 X_df = data[feature_columns]
                 y_df = data[target_column]
                 
-                preds = make_preds(client, bst, X_df, ret_dask = True)
-                X_df = X_df.to_backend('pandas')
-                y_df = y_df.to_backend('pandas')
+                preds = make_preds(bst, X_df)
 
                 new_columns = ["Current $r/R_{\mathrm{200m}}$","Current $v_{\mathrm{r}}/V_{\mathrm{200m}}$","Current $v_{\mathrm{t}}/V_{\mathrm{200m}}$","Past $r/R_{\mathrm{200m}}$","Past $v_{\mathrm{r}}/V_{\mathrm{200m}}$","Past $v_{\mathrm{t}}/V_{\mathrm{200m}}$"]
                 col2num = {col: i for i, col in enumerate(new_columns)}

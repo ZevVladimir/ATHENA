@@ -619,8 +619,8 @@ def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol_list,split_scale_di
     
     # Create mass profiles from the model's predictions
     prime_radii = X["p_Scaled_radii"].values
-    calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=prime_radii, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds.values, prf_bins=bins, sim_cosmol_list=sim_cosmol_list, use_mp=True, all_z=all_z)
-    my_mass_prf_all, my_mass_prf_orb, my_mass_prf_inf, my_nus, my_r200m = create_stack_mass_prf(sim_splits,radii=prime_radii, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=y.values.flatten(), prf_bins=bins, sim_cosmol_list=sim_cosmol_list, use_mp=True, all_z=all_z)
+    calc_mass_prf_all, calc_mass_prf_orb, calc_mass_prf_inf, calc_nus, calc_r200m = create_stack_mass_prf(sim_splits,radii=prime_radii, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=preds, prf_bins=bins, sim_cosmol_list=sim_cosmol_list, use_mp=True, all_z=all_z)
+    my_mass_prf_all, my_mass_prf_orb, my_mass_prf_inf, my_nus, my_r200m = create_stack_mass_prf(sim_splits,radii=prime_radii, halo_first=halo_first, halo_n=halo_n, mass=all_masses, orbit_assn=y, prf_bins=bins, sim_cosmol_list=sim_cosmol_list, use_mp=True, all_z=all_z)
     
     # Halos that get returned with a nan R200m mean that they didn't meet the required number of ptls within R200m and so we need to filter them from our calculated profiles and SPARTA profiles 
     small_halo_fltr = np.isnan(calc_r200m)

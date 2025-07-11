@@ -4,7 +4,7 @@ import os
 import pandas as pd
 import argparse
 
-from src.utils.ML_fxns import setup_client, get_combined_name, get_model_name, extract_snaps, make_preds, get_feature_labels
+from src.utils.ML_fxns import get_combined_name, get_model_name, extract_snaps, make_preds, get_feature_labels
 from src.utils.util_fxns import create_directory, timed, load_pickle, save_pickle, load_config, load_ML_dsets,reform_dset_dfs, load_all_sim_cosmols, load_all_tdyn_steps
 from src.utils.prfl_fxns import paper_dens_prf_plt
 from src.utils.vis_fxns import gen_ptl_dist_plt, gen_missclass_dist_plt
@@ -53,7 +53,6 @@ log_rticks = config_params["EVAL_MODEL"]["log_rticks"]
 ###############################################################################################################
 
 if __name__ == "__main__":    
-    client = setup_client()
     dset_params = load_pickle(ML_dset_path + model_sims[0] + "/dset_params.pickle")
 
     comb_model_sims = get_combined_name(model_sims) 
@@ -94,24 +93,10 @@ if __name__ == "__main__":
             with timed("Model Evaluation on " + dset_name + "_" + test_comb_name): 
                 plot_loc = model_fldr_loc + dset_name + "_" + test_comb_name + "/plots/"
                 create_directory(plot_loc)
-                #TODO condense reform_dset_dfs call
-                # Load the halo information
-                halo_files = []
-                halo_dfs = []
-                if dset_name == "Full":    
-                    for sim in curr_test_sims:
-                        halo_dfs.append(reform_dset_dfs([ML_dset_path + sim + "/" + "Train" + "/halo_info/"]))
-                        halo_dfs.append(reform_dset_dfs([ML_dset_path + sim + "/" + "Val" + "/halo_info/"]))
-                        halo_dfs.append(reform_dset_dfs([ML_dset_path + sim + "/" + "Test" + "/halo_info/"]))
-                else:
-                    for sim in curr_test_sims:
-                        halo_dfs.append(reform_dset_dfs([ML_dset_path + sim + "/" + dset_name + "/halo_info/"]))
 
-                halo_df = pd.concat(halo_dfs)
-                
                 # Load the particle information
                 all_snaps = extract_snaps(model_sims[0])
-                data,scale_pos_weight = load_ML_dsets(curr_test_sims,dset_name,all_sim_cosmol_list)
+                data,scale_pos_weight,halo_df = load_ML_dsets(curr_test_sims,dset_name,all_sim_cosmol_list)
 
                 X = data[feature_columns]
                 y = data[target_column]
@@ -136,17 +121,17 @@ if __name__ == "__main__":
 
                 tv_ticks = split_scale_dict["lin_tvticks"] + split_scale_dict["log_tvticks"]  
                 
-                with timed(f"Predictions for {y.size.compute():.3e} particles"):
-                    preds = make_preds(client, bst, X)
+                with timed(f"Predictions for {y.size:.3e} particles"):
+                    preds = make_preds(bst, X)
                 if dens_prf_plt:
                     paper_dens_prf_plt(X, y, preds, halo_df, curr_test_sims, all_sim_cosmol_list, split_scale_dict, plot_loc, snap_path, split_by_nu=dens_prf_nu_split, split_by_macc=dens_prf_macc_split)
                 if full_dist_plt or misclass_plt:
-                    p_act_labels=y.compute().values.flatten()
-                    p_r=X["p_Scaled_radii"].values.compute()
-                    p_rv=X["p_Radial_vel"].values.compute()
-                    p_tv=X["p_Tangential_vel"].values.compute()
-                    c_r=X[str(all_tdyn_steps_list[0][0]) + "_Scaled_radii"].values.compute()
-                    c_rv=X[str(all_tdyn_steps_list[0][0]) +"_Radial_vel"].values.compute()
+                    p_act_labels=y.values.flatten()
+                    p_r=X["p_Scaled_radii"].values
+                    p_rv=X["p_Radial_vel"].values
+                    p_tv=X["p_Tangential_vel"].values
+                    c_r=X[str(all_tdyn_steps_list[0][0]) + "_Scaled_radii"].values
+                    c_rv=X[str(all_tdyn_steps_list[0][0]) +"_Radial_vel"].values
                     plt_data_dict = {
                         "p_r":p_r,
                         "p_rv":p_rv,
@@ -175,5 +160,3 @@ if __name__ == "__main__":
                 del y
         
         save_pickle(model_info,model_fldr_loc + "model_info.pickle")
-
-    client.close()
