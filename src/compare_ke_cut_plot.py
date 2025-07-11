@@ -3,7 +3,7 @@ import os
 import pickle
 import argparse 
 
-from src.utils.ML_fxns import setup_client, get_combined_name, extract_snaps, get_feature_labels
+from src.utils.ML_fxns import get_combined_name, extract_snaps, get_feature_labels
 from src.utils.util_fxns import create_directory, load_pickle, load_config, load_pickle, timed, load_sparta_mass_prf,load_all_sim_cosmols,load_all_tdyn_steps
 from src.utils.ke_cut_fxns import load_ke_data, fast_ke_predictor, opt_ke_predictor
 from src.utils.calc_fxns import calc_rho
@@ -48,8 +48,6 @@ ke_test_sims = config_params["KE_CUT"]["ke_test_sims"]
     
     
 if __name__ == "__main__":
-    client = setup_client()
-
     model_type = "kinetic_energy_cut"
     
     comb_fast_model_sims = get_combined_name(fast_ke_calib_sims) 
@@ -78,10 +76,10 @@ if __name__ == "__main__":
                 
                 with timed("Loading Testing Data"):
                     r, vr, lnv2, sparta_labels, samp_data, my_data, halo_df = load_ke_data(curr_sims=curr_test_sims,sim_cosmol_list=all_sim_cosmol_list,snap_list=snap_list, dset_name=dset_name)
-                    r_test = my_data["p_Scaled_radii"].compute().to_numpy()
-                    vr_test = my_data["p_Radial_vel"].compute().to_numpy()
-                    vphys_test = my_data["p_phys_vel"].compute().to_numpy()
-                    sparta_labels_test = my_data["Orbit_infall"].compute().to_numpy()
+                    r_test = my_data["p_Scaled_radii"].values
+                    vr_test = my_data["p_Radial_vel"].values
+                    vphys_test = my_data["p_phys_vel"].values
+                    sparta_labels_test = my_data["Orbit_infall"].values
                     lnv2_test = np.log(vphys_test**2)
                     
                     halo_first = halo_df["Halo_first"].values
