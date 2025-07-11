@@ -75,22 +75,26 @@ def setup_client():
     with timed("Setup Dask Client"):
         if use_gpu:
             mp.set_start_method("spawn")
+        
+        dask_tmp_dir = "/home/zvladimi/scratch/ATHENA/dask_logs/dask-scratch-space"
+        os.makedirs(dask_tmp_dir, exist_ok=True)
+        os.environ["DASK_TEMPORARY_DIRECTORY"] = dask_tmp_dir
 
-        if on_zaratan:            
+        if on_zaratan:
             if use_gpu:
-                initialize(local_directory = "/home/zvladimi/scratch/ATHENA/dask_logs/")
+                initialize(local_directory=dask_tmp_dir)
             else:
-                if 'SLURM_CPUS_PER_TASK' in os.environ:
-                    cpus_per_task = int(os.environ['SLURM_CPUS_PER_TASK'])
-                else:
-                    print("SLURM_CPUS_PER_TASK is not defined.")
-                initialize(nthreads = cpus_per_task, local_directory = "/home/zvladimi/scratch/ATHENA/dask_logs/")
-                
+                cpus_per_task = int(os.environ.get('SLURM_CPUS_PER_TASK', 1))
+                initialize(nthreads=cpus_per_task, local_directory=dask_tmp_dir)
+
             client = Client()
+
+            # Ensure the scratch directory exists on each worker
+            client.run(lambda: os.makedirs(dask_tmp_dir, exist_ok=True))
+
             host = client.run_on_scheduler(socket.gethostname)
             port = client.scheduler_info()['services']['dashboard']
-            login_node_address = "zvladimi@login.zaratan.umd.edu" # Change this to the address/domain of your login node
-
+            login_node_address = "zvladimi@login.zaratan.umd.edu"
             logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}")
         else:
             if use_gpu:

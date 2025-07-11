@@ -267,7 +267,7 @@ def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
         return mass_prf_all,mass_prf_1halo,all_masses,bins
 
 # Loads all the data for the inputted list of simulations into one dataframe. Finds the scale position weight for the dataset and any adjusted weighting for it if desired
-def load_ML_dsets(sims, dset_name, sim_cosmol_list, prime_snap, file_lim=0, filter_nu=False, nu_splits=None):
+def dask_load_ML_dsets(sims, dset_name, sim_cosmol_list, file_lim=0, filter_nu=False, nu_splits=None):
     all_ddfs = []
     all_halo_file_paths = []
     all_ptl_mass = []
@@ -282,25 +282,26 @@ def load_ML_dsets(sims, dset_name, sim_cosmol_list, prime_snap, file_lim=0, filt
     for sim in sims:        
         # For each dataset for the simulation we are loading
         for dset_name in datasets:
-            folder_path = f"{ML_dset_path}{sim}/{dset_name}"
-            
-            # Determine how many files we will load
-            n_files = len(os.listdir(folder_path + "/ptl_info/"))
+            with timed("Loading " + sim + " " + dset_name + " data"):
+                folder_path = f"{ML_dset_path}{sim}/{dset_name}"
+                
+                # Determine how many files we will load
+                n_files = len(os.listdir(folder_path + "/ptl_info/"))
 
-            if file_lim > 0:
-                n_files = np.min([n_files,file_lim]) 
+                if file_lim > 0:
+                    n_files = np.min([n_files,file_lim]) 
 
-            # Then we will load all the particle dataframes for each snapshot
-            for file_idx in range(n_files):
-                curr_file_paths = []
+                # Then we will load all the particle dataframes for each snapshot
+                for file_idx in range(n_files):
+                    curr_file_paths = []
 
-                curr_file_paths.append(f"{folder_path}/ptl_info/ptl_{file_idx}.parquet")
+                    curr_file_paths.append(f"{folder_path}/ptl_info/ptl_{file_idx}.parquet")
 
-                # Read all Dask DataFrames and ensure they have the same number of rows and known divisions
-                for path in curr_file_paths:
-                    all_ddfs.append(dd.read_parquet(path))
+                    # Read all Dask DataFrames and ensure they have the same number of rows and known divisions
+                    for path in curr_file_paths:
+                        all_ddfs.append(dd.read_parquet(path))
 
-            all_halo_file_paths.append(f"{folder_path}/halo_info/")
+                all_halo_file_paths.append(f"{folder_path}/halo_info/")
             
         with open(ML_dset_path + sim + "/dset_params.pickle","rb") as f:
             dset_params = pickle.load(f)
@@ -329,7 +330,71 @@ def load_ML_dsets(sims, dset_name, sim_cosmol_list, prime_snap, file_lim=0, filt
     
     avg_scal_pos_weight = dask_calc_scal_pos_weight(all_ptl_ddfs)
     
-    return all_ptl_ddfs, avg_scal_pos_weight
+    return all_ptl_ddfs.reset_index(drop=True), avg_scal_pos_weight
+
+def load_ML_dsets(sims, dset_name, sim_cosmol_list, file_lim=0, filter_nu=False, nu_splits=None):
+    all_dfs = []
+    all_halo_paths = []
+    all_ptl_mass = []
+    all_z = []
+    
+    if dset_name == "Full":
+        datasets = ["Train", "Val", "Test"]
+    else:
+        datasets = [dset_name]
+
+    # For each simulation we are loading
+    for sim in sims:      
+        curr_halo_paths = []  
+        # For each dataset for the simulation we are loading
+        for dset_name in datasets:
+            with timed("Loading " + sim + " " + dset_name + " data"):
+                folder_path = f"{ML_dset_path}{sim}/{dset_name}"
+                
+                # Determine how many files we will load
+                n_files = len(os.listdir(folder_path + "/ptl_info/"))
+
+                if file_lim > 0:
+                    n_files = np.min([n_files,file_lim]) 
+
+                # Then we will load all the particle dataframes for each snapshot
+                for file_idx in range(n_files):
+                    curr_file_paths = []
+
+                    curr_file_paths.append(f"{folder_path}/ptl_info/ptl_{file_idx}.parquet")
+
+                    # Read all Dask DataFrames and ensure they have the same number of rows and known divisions
+                    for path in curr_file_paths:
+                        all_dfs.append(pd.read_parquet(path))
+
+                curr_halo_paths.append(f"{folder_path}/halo_info/")
+        all_halo_paths.append(curr_halo_paths)
+                
+        with open(ML_dset_path + sim + "/dset_params.pickle","rb") as f:
+            dset_params = pickle.load(f)
+        # Get mass and redshift for this simulation
+        ptl_mass, use_z = load_sim_mass_pz(sim,dset_params)
+        all_ptl_mass.append(ptl_mass)
+        all_z.append(use_z)
+
+    all_halo_df = reform_dset_dfs(all_halo_paths) 
+    
+    all_ptl_dfs = pd.concat(all_dfs)
+
+    # Filter by nu and/or by radius
+    if filter_nu:
+        nus_all = []
+        for sim_cosmol in sim_cosmol_list:
+            cosmol = set_cosmology(sim_cosmol)
+            nus = np.array(peaks.peakHeight((all_halo_df["Halo_n"][:] * ptl_mass), use_z))
+            nus_all.append(nus)
+        nus_all = np.stack(nus_all, axis=0)
+        
+        all_ptl_dfs, upd_halo_n, upd_halo_first = filter_df_with_nus(all_ptl_dfs, nus_all, all_halo_df["Halo_first"], all_halo_df["Halo_n"], nu_splits)
+    
+    avg_scal_pos_weight = calc_scal_pos_weight(all_ptl_dfs)
+    
+    return all_ptl_dfs, avg_scal_pos_weight, all_halo_df
 
 @contextmanager
 def timed(txt, client=None):
@@ -500,16 +565,36 @@ def split_orb_inf(data, labels):
     orbit = data[np.where(labels == 1)[0]]
     return infall, orbit
 
-# Goes through a folder where a dataset's hdf5 files are stored and reforms them into one pandas dataframe (in order)
+# Takes in lists of list of paths where each sublist is the halo paths for a simulation (say [path/to/Train/Halo/,path/to/Val/Halo/]) to where halo data is stored and reformats it into one dataframe
+# This is done by correcting each halo_df that is for a simulation to have consistent halo_first values 
 def reform_dset_dfs(all_folder_path):
     all_dfs = []
-    for folder_path in all_folder_path:
-        parquet_files = sorted(f for f in os.listdir(folder_path) if f.endswith('.parquet'))
-        for file in parquet_files:
-            file_path = os.path.join(folder_path, file)
-            df = pd.read_parquet(file_path)
-            all_dfs.append(df)
+    # Use two indices for updating halo first values
+    # We want to update every halo first value in a simulation by the current number of particles in the dataset before the addition of these new dataframes
+    # We do not want to add the number of particles from other dataframes in the same simulation as they are already adjusted for that
+    full_upd_val = 0
+    curr_upd_val = 0
+    for sim_folder_paths in all_folder_path:
+        for i,folder_path in enumerate(sim_folder_paths):      
+            parquet_files = sorted(f for f in os.listdir(folder_path) if f.endswith('.parquet'))
+            for file in parquet_files:
+                file_path = os.path.join(folder_path, file)
+                df = pd.read_parquet(file_path)
+                
+                if i > 0:
+                    # For multiple halo_df files for the same dataset update where the halos start
+                    # Add how many particles there were in total before as well as where the last df started
+                    df["Halo_first"] += full_upd_val
+                    
+                curr_upd_val += df["Halo_n"].sum()
+                
+                all_dfs.append(df)
+            
+            full_upd_val += curr_upd_val
+            curr_upd_val = 0
+        full_upd_val = 0
     return pd.concat(all_dfs, ignore_index=True)
+
     
 # Split a dataframe so that each one is below an inputted maximum memory size
 def split_dataframe(df, max_size):

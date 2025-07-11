@@ -706,7 +706,7 @@ def plt_cust_ke_line(ax, b,bins,linewidth):
         else:
             ax.plot([x1,x2],[y1,y2],lw=linewidth, color="cyan")
             
-def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut, plot_loc, title, plot_lin_too = False, cust_line_dict = None):   
+def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, r_cut, plot_loc, title, plot_lin_too = False, cust_line_dict = None):   
     hist1_r = r[fltr_combs["orb_vr_pos"]]
     hist1_lnv2 = lnv2[fltr_combs["orb_vr_pos"]]
     hist2_r = r[fltr_combs["inf_vr_pos"]]
@@ -730,13 +730,13 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
 
     nbins = 200      
 
-    hist1_dask, _, _ = da.histogram2d(hist1_r.to_dask_array(lengths=True), hist1_lnv2.to_dask_array(lengths=True), bins = nbins, range = (x_range, y_range))
-    hist2_dask, _, _ = da.histogram2d(hist2_r.to_dask_array(lengths=True), hist2_lnv2.to_dask_array(lengths=True), bins = nbins, range = (x_range, y_range))
-    hist3_dask, _, _ = da.histogram2d(hist3_r.to_dask_array(lengths=True), hist3_lnv2.to_dask_array(lengths=True), bins = nbins, range = (x_range, y_range))
-    hist4_dask, _, _ = da.histogram2d(hist4_r.to_dask_array(lengths=True), hist4_lnv2.to_dask_array(lengths=True), bins = nbins, range = (x_range, y_range))
+    hist1, _, _ = np.histogram2d(hist1_r, hist1_lnv2, bins=nbins, range=(x_range, y_range))
+    hist2, _, _ = np.histogram2d(hist2_r, hist2_lnv2, bins=nbins, range=(x_range, y_range))
+    hist3, _, _ = np.histogram2d(hist3_r, hist3_lnv2, bins=nbins, range=(x_range, y_range))
+    hist4, _, _ = np.histogram2d(hist4_r, hist4_lnv2, bins=nbins, range=(x_range, y_range))
 
     # Combine the histograms to determine the maximum density for consistent color scaling
-    combined_hist = np.maximum.reduce([da.max(hist1_dask).compute(), da.max(hist2_dask).compute(), da.max(hist3_dask).compute(), da.max(hist4_dask).compute()])
+    combined_hist = np.maximum.reduce([hist1.max(), hist2.max(), hist3.max(), hist4.max()])
     vmax=combined_hist.max()
 
     lin_vmin = 0
@@ -782,7 +782,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
             extent = [x_range[0],x_range[1],y_range[0],y_range[1]]
             
             # Orb vr > 0
-            im1 = ax1.imshow(hist1_dask.compute().T, origin="lower", cmap=magma_cmap, norm=norm_obj, aspect='auto', rasterized=True, extent = extent)
+            im1 = ax1.imshow(hist1.T, origin="lower", cmap=magma_cmap, norm=norm_obj, aspect='auto', rasterized=True, extent = extent)
             ax1.plot(x, y12, lw=line_width, color="g", label="Fast Cut")
             ax1.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
             if cust_line_dict is not None:
@@ -795,7 +795,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
             ax1.set_xlim(0, 2)
 
             # Inf vr > 0
-            im2 = ax2.imshow(hist2_dask.compute().T, origin="lower", cmap=magma_cmap, norm=norm_obj, aspect='auto', rasterized=True, extent = extent)
+            im2 = ax2.imshow(hist2.T, origin="lower", cmap=magma_cmap, norm=norm_obj, aspect='auto', rasterized=True, extent = extent)
             ax2.plot(x, y12, lw=line_width, color="g", label="Fast Cut")
             ax2.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
             if cust_line_dict is not None:
@@ -807,7 +807,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
             ax2.set_xlim(0, 2)
 
             # Orb vr < 0
-            im3 = ax3.imshow(hist3_dask.compute().T, origin="lower", cmap=magma_cmap, norm=norm_obj, aspect='auto', rasterized=True, extent = extent)
+            im3 = ax3.imshow(hist3.T, origin="lower", cmap=magma_cmap, norm=norm_obj, aspect='auto', rasterized=True, extent = extent)
             ax3.plot(x, y22, lw=line_width, color="g", label="Fast Cut")
             ax3.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
             if cust_line_dict is not None:
@@ -819,7 +819,7 @@ def plt_SPARTA_KE_dist(feat_dict, fltr_combs, bins, r, lnv2, perc, width, r_cut,
             ax3.set_xlim(0, 2)
 
             # Inf vr < 0
-            im4 = ax4.imshow(hist4_dask.compute().T, origin="lower", cmap=magma_cmap, norm=norm_obj, aspect='auto', rasterized=True, extent = extent)
+            im4 = ax4.imshow(hist4.T, origin="lower", cmap=magma_cmap, norm=norm_obj, aspect='auto', rasterized=True, extent = extent)
             ax4.plot(x, y22, lw=line_width, color="g", label="Fast Cut")
             ax4.vlines(x=r_cut, ymin=y_range[0], ymax=y_range[1], lw=line_width, label="Calibration Limit")
             if cust_line_dict is not None:

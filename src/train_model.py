@@ -76,7 +76,7 @@ if __name__ == "__main__":
         print("Loaded Booster")
     else:
         with timed("Loading Datasets"):
-            train_data,train_scale_pos_weight = load_ML_dsets(model_sims,"Train",all_sim_cosmol_list,prime_snap=all_snaps[0],file_lim=file_lim,filter_nu=False)
+            train_data,train_scale_pos_weight = load_ML_dsets(model_sims,"Train",all_sim_cosmol_list,file_lim=file_lim,filter_nu=False)
                 
             X_train = train_data[feature_columns]
             y_train = train_data[target_column]
@@ -89,7 +89,7 @@ if __name__ == "__main__":
             
             eval_list = []
             for dset in eval_train_dsets:
-                curr_data,curr_scale_pos_weight = load_ML_dsets(model_sims,dset,all_sim_cosmol_list,prime_snap=all_snaps[0],file_lim=file_lim,filter_nu=False)
+                curr_data,curr_scale_pos_weight = load_ML_dsets(model_sims,dset,all_sim_cosmol_list,file_lim=file_lim,filter_nu=False)
                 
                 curr_X = curr_data[feature_columns]
                 curr_y = curr_data[target_column]

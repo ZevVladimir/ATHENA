@@ -111,7 +111,7 @@ if __name__ == "__main__":
                 
                 # Load the particle information
                 all_snaps = extract_snaps(model_sims[0])
-                data,scale_pos_weight = load_ML_dsets(curr_test_sims,dset_name,all_sim_cosmol_list,all_snaps[0])
+                data,scale_pos_weight = load_ML_dsets(curr_test_sims,dset_name,all_sim_cosmol_list)
 
                 X = data[feature_columns]
                 y = data[target_column]

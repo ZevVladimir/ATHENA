@@ -1,15 +1,12 @@
-import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import minimize
 import os
 import pandas as pd
-from sparta_tools import sparta
 import argparse
-import dask.array as da
-from dask import delayed, compute
 from dask.base import is_dask_collection
+import multiprocessing as mp
 
-from src.utils.ML_fxns import setup_client, get_combined_name, get_feature_labels, extract_snaps
+from src.utils.ML_fxns import get_combined_name, get_feature_labels, extract_snaps
 from src.utils.util_fxns import create_directory, load_pickle, load_config, save_pickle, load_pickle, timed, parse_ranges, split_sparta_hdf5_name, load_SPARTA_data, load_all_sim_cosmols, load_all_tdyn_steps, print_worker_memory
 from src.utils.ke_cut_fxns import load_ke_data, opt_ke_predictor, dask_opt_ke_predictor
 from src.utils.vis_fxns import plt_SPARTA_KE_dist
@@ -61,6 +58,8 @@ grad_lims = config_params["KE_CUT"]["grad_lims"]
 r_cut_calib = config_params["KE_CUT"]["r_cut_calib"]
 r_cut_pred = config_params["KE_CUT"]["r_cut_pred"]
 ke_test_sims = config_params["KE_CUT"]["ke_test_sims"]
+
+num_processes = mp.cpu_count()
     
 def overlap_loss(params, lnv2_bin, sparta_labels_bin):
     decision_boundary = params[0]
@@ -73,59 +72,46 @@ def overlap_loss(params, lnv2_bin, sparta_labels_bin):
     # Loss is the absolute difference between the two misclassification counts
     return abs(misclass_orb - misclass_inf)
 
-def optimize_bin(i, bin_indices, lnv2, sparta_labels, def_b):
-    mask = (bin_indices == i)
-
-    ptls_in_bin = mask.sum()
-    
-    if is_dask_collection(ptls_in_bin):
-        ptls_in_bin = ptls_in_bin.compute()
-    
+def optimize_bin(i, lnv2_bin, sparta_labels_bin, def_b):
+    ptls_in_bin = len(lnv2_bin)
     if ptls_in_bin == 0:
         return def_b
-    
-    lnv2_bin = lnv2[mask]
-    if is_dask_collection(lnv2_bin):
-        lnv2_bin = lnv2_bin.compute()   
-    
-    sparta_labels_bin = sparta_labels[mask]
-    if is_dask_collection(sparta_labels_bin):
-        sparta_labels_bin = sparta_labels_bin.compute() 
-    
+
     initial_guess = [np.max(lnv2_bin)]
     result_max = minimize(overlap_loss, initial_guess, args=(lnv2_bin, sparta_labels_bin), method="Nelder-Mead")
-    
+
     initial_guess = [np.mean(lnv2_bin)]
     result_mean = minimize(overlap_loss, initial_guess, args=(lnv2_bin, sparta_labels_bin), method="Nelder-Mead")
-    
+
     if result_mean.fun < result_max.fun:
         result = result_mean
     else:
         result = result_max
-        
+
     calc_b = result.x[0]
     if np.isnan(calc_b):
         print(f"Warning: NaN value encountered in bin {i}. Using default value {def_b}.")
         calc_b = def_b
     return calc_b
 
-def opt_func(bins, r, lnv2, sparta_labels, def_b, title = ""):
-    r = r.to_dask_array(lengths=True)
-    lnv2 = lnv2.to_dask_array(lengths=True)
-    sparta_labels = sparta_labels.to_dask_array(lengths=True)
-    
+def opt_func(bins, r, lnv2, sparta_labels, def_b):    
     # Assign bin indices based on radius
-    bin_indices = da.digitize(r, bins) - 1
+    bin_indices = np.digitize(r.values, bins) - 1
 
-    bin_indices = bin_indices.persist()  
+    n_bins = bins.shape[0] - 1
+    tasks = []
+    for i in range(n_bins):
+        mask = bin_indices == i
+        lnv2_bin = lnv2.values[mask]
+        sparta_labels_bin = sparta_labels.values[mask]
+        tasks.append((i, lnv2_bin, sparta_labels_bin, def_b))
 
-    tasks = [delayed(optimize_bin)(i, bin_indices, lnv2, sparta_labels, def_b) for i in range(bins.shape[0]-1)]
-    intercepts = compute(*tasks)
-        
-    return {"b":intercepts}
+    with mp.Pool(processes=num_processes) as p:
+        results = p.starmap(optimize_bin, tasks)
+
+    return {"b": results}
     
 if __name__ == "__main__":
-    client = setup_client()
     model_type = "kinetic_energy_cut"
     comb_fast_model_sims = get_combined_name(fast_ke_calib_sims) 
     comb_opt_model_sims = get_combined_name(opt_ke_calib_sims)   
@@ -153,12 +139,7 @@ if __name__ == "__main__":
         raise FileNotFoundError(
             f"Fast KE cut parameter file not found at {param_path}. Please run the fast_ke_cut.py to generate it."
         )
-
-    if debug_mem:
-        print("dataset params")
-        print_worker_memory(client)
-
-    with timed("SPARTA load",client):
+    with timed("SPARTA load"):
         sparta_name, sparta_search_name = split_sparta_hdf5_name(opt_ke_calib_sims[0])
         curr_sparta_HDF5_path = SPARTA_output_path + sparta_name + "/" + sparta_search_name + ".hdf5" 
         param_paths = [["config","anl_prf","r_bins_lin"]]
@@ -170,7 +151,7 @@ if __name__ == "__main__":
     
     if not os.path.isfile(opt_model_fldr_loc + "ke_optparams_dict.pickle") or reset_opt_ke_calib == 1:
         with timed("Optimizing phase-space cut"):
-            with timed("Loading Fitting Data",client):
+            with timed("Loading Fitting Data"):
                 all_sim_cosmol_list = load_all_sim_cosmols(opt_ke_calib_sims)
                 all_tdyn_steps_list = load_all_tdyn_steps(opt_ke_calib_sims)
                 
@@ -186,14 +167,9 @@ if __name__ == "__main__":
                 mask_vr_neg = (vr_fit < 0)
                 mask_vr_pos = (vr_fit > 0)                
             
-            if debug_mem:
-                print_worker_memory(client)
-            vr_pos = opt_func(bins, r_fit[mask_vr_pos], lnv2_fit[mask_vr_pos], sparta_labels_fit[mask_vr_pos], ke_param_dict["b_pos"], title = "pos")
-            if debug_mem:
-                print_worker_memory(client)
-            vr_neg = opt_func(bins, r_fit[mask_vr_neg], lnv2_fit[mask_vr_neg], sparta_labels_fit[mask_vr_neg], ke_param_dict["b_neg"], title = "neg")
-            if debug_mem:
-                print_worker_memory(client)
+            vr_pos = opt_func(bins, r_fit[mask_vr_pos], lnv2_fit[mask_vr_pos], sparta_labels_fit[mask_vr_pos], ke_param_dict["b_pos"])
+
+            vr_neg = opt_func(bins, r_fit[mask_vr_neg], lnv2_fit[mask_vr_neg], sparta_labels_fit[mask_vr_neg], ke_param_dict["b_neg"])
         
             opt_param_dict = {
                 "orb_vr_pos": vr_pos,
@@ -249,14 +225,14 @@ if __name__ == "__main__":
                 "inf_vr_pos": mask_inf & mask_vr_pos,
             } 
 
-            # plt_SPARTA_KE_dist(ke_param_dict, fltr_combs, bins, r_test, lnv2_test, perc = perc, width = width, r_cut = r_cut_calib, plot_loc = plot_loc, title = "bin_fit_", plot_lin_too=True, cust_line_dict = opt_param_dict)
+            plt_SPARTA_KE_dist(ke_param_dict, fltr_combs, bins, r_test, lnv2_test, r_cut = r_cut_calib, plot_loc = plot_loc, title = "bin_fit_", plot_lin_too=True, cust_line_dict = opt_param_dict)
 
         #######################################################################################################################################    
-            dask_preds_opt_ke = dask_opt_ke_predictor(opt_param_dict, bins, r_test, vr_test, lnv2_test, r_cut_pred)
+            preds_opt_ke = opt_ke_predictor(opt_param_dict, bins, r_test, vr_test, lnv2_test, r_cut_pred)
             
             X = my_data[feature_columns]
             y = my_data[target_column]
 
-            paper_dens_prf_plt(X, y, pd.DataFrame(dask_preds_opt_ke.compute()), halo_df, curr_test_sims, all_sim_cosmol_list, split_scale_dict, plot_loc, snap_path, split_by_nu=dens_prf_nu_split, split_by_macc=dens_prf_macc_split, prf_name_0="Optimized KE cut")
+            paper_dens_prf_plt(X, y, pd.DataFrame(preds_opt_ke), halo_df, curr_test_sims, all_sim_cosmol_list, split_scale_dict, plot_loc, snap_path, split_by_nu=dens_prf_nu_split, split_by_macc=dens_prf_macc_split, prf_name_0="Optimized KE cut")
 
             

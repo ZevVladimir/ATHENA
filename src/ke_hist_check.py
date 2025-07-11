@@ -81,7 +81,7 @@ if __name__ == "__main__":
             # Get the redshifts for each simulation's primary snapshot
             test_comb_name = get_combined_name(curr_test_sims) 
             
-            data,scale_pos_weight = load_ML_dsets(curr_test_sims,dset_name,all_sim_cosmol_list,snap_list[0])
+            data,scale_pos_weight = load_ML_dsets(curr_test_sims,dset_name,all_sim_cosmol_list)
             
             columns_to_keep = [col for col in data.columns if col != target_column[0]]
             X_df = data[columns_to_keep]

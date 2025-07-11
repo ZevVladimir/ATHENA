@@ -72,6 +72,7 @@ def memory_usage():
     process = psutil.Process(os.getpid())
     return process.memory_info().rss
 
+#TODO add extra check/start point of which snap was last completed
 def find_start_pnt(directory, nsnap):
     max_number = 0
     number_pattern = re.compile(r'\d+')
@@ -635,9 +636,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
             curr_test_halo_splits = test_halo_splits[test_start_pnt:]
             curr_val_halo_splits = val_halo_splits[val_start_pnt:]
         
-        for i,curr_ptl_snap in enumerate(all_ptl_snap_list):
-            ptl_idx = 0            
-
+        for i,curr_ptl_snap in enumerate(all_ptl_snap_list):           
             prnt_halo_splits = curr_train_halo_splits.copy()
             prnt_halo_splits.append(len(train_idxs))        
             
@@ -684,16 +683,22 @@ with timed("Generating Datasets for " + curr_sparta_file):
             train_prnt_halo_splits.append(train_idxs.size)
             print("Train Splits")
             print("Num halos in each split:", ", ".join(map(str, np.diff(train_prnt_halo_splits))) + ".", train_num_iter, "splits")
-
+            
+            if train_start_pnt > 0:
+                last_halo_df = pd.read_parquet(save_location + "Train/halo_info/halo_" + str(train_start_pnt-1) + ".parquet")
+                train_ptl_idx = last_halo_df["Halo_first"].values[-1] + last_halo_df["Halo_n"].values[-1]
+            else:
+                train_ptl_idx = 0
+            
             for j in range(train_num_iter):
                 if i == 0:
                     ret_labels = True
-                    train_p_HIPIDs, p_orb_assn, p_rad_vel, p_tang_vel, p_scale_rad, p_phys_vel, p_start_num_ptls, p_use_num_ptls, use_indices, use_halos_r200m = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=train_num_iter, \
+                    train_p_HIPIDs, p_orb_assn, p_rad_vel, p_tang_vel, p_scale_rad, p_phys_vel, p_start_num_ptls, p_use_num_ptls, use_indices, use_halos_r200m = halo_loop(ptl_idx=train_ptl_idx, curr_iter=j, num_iter=train_num_iter, \
                         indices=train_idxs, halo_splits=curr_train_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=True, ptls_pid=curr_ptls_pid, \
                         ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels)
                     
                     p_train_nptls = train_p_HIPIDs.shape[0]
-                    
+            
                     halo_df = pd.DataFrame({
                         "Halo_first":p_start_num_ptls,
                         "Halo_n":p_use_num_ptls,
@@ -712,7 +717,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     })
                 else:                   
                     ret_labels = False
-                    c_HIPIDs, c_rad_vel, c_tang_vel, c_scale_rad, c_phys_vel = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=train_num_iter, indices=train_idxs, \
+                    c_HIPIDs, c_rad_vel, c_tang_vel, c_scale_rad, c_phys_vel = halo_loop(ptl_idx=train_ptl_idx, curr_iter=j, num_iter=train_num_iter, indices=train_idxs, \
                         halo_splits=curr_train_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=False, ptls_pid=curr_ptls_pid, ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels)
                     
                     # We load the comparison HIPIDs to deal with cases where the present snap data got completed before the past snap data
@@ -747,7 +752,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     ptl_df = pd.concat([full_ptl_df, ptl_df], axis=1)
 
                 ptl_df.to_parquet(save_location + "Train/ptl_info/ptl_" + str(j+train_start_pnt) + ".parquet")
-                ptl_idx += p_train_nptls
+                train_ptl_idx += p_train_nptls
                 if debug_mem == 1:
                     print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
                 
@@ -756,12 +761,12 @@ with timed("Generating Datasets for " + curr_sparta_file):
             test_prnt_halo_splits.append(test_idxs.size)
             print("Test Splits")
             print("Num halos in each split:", ", ".join(map(str, np.diff(test_prnt_halo_splits))) + ".", test_num_iter, "splits")
-            ptl_idx = 0
+            test_ptl_idx = 0
             
             for j in range(test_num_iter):
                 if i == 0:
                     ret_labels = True
-                    test_p_HIPIDs, p_orb_assn, p_rad_vel, p_tang_vel, p_scale_rad, p_phys_vel, p_start_num_ptls, p_use_num_ptls, use_indices, use_halos_r200m = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=test_num_iter, \
+                    test_p_HIPIDs, p_orb_assn, p_rad_vel, p_tang_vel, p_scale_rad, p_phys_vel, p_start_num_ptls, p_use_num_ptls, use_indices, use_halos_r200m = halo_loop(ptl_idx=test_ptl_idx, curr_iter=j, num_iter=test_num_iter, \
                         indices=test_idxs, halo_splits=curr_test_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=True, ptls_pid=curr_ptls_pid, \
                         ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels)
                     
@@ -786,7 +791,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                 else:
                     # Access the correct number of particles for this batch 
                     ret_labels = False
-                    c_HIPIDs, c_rad_vel, c_tang_vel, c_scale_rad, c_phys_vel = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=test_num_iter, indices=test_idxs, \
+                    c_HIPIDs, c_rad_vel, c_tang_vel, c_scale_rad, c_phys_vel = halo_loop(ptl_idx=test_ptl_idx, curr_iter=j, num_iter=test_num_iter, indices=test_idxs, \
                         halo_splits=curr_test_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=False, ptls_pid=curr_ptls_pid, ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels,name="Test")
 
                     curr_test_p_HIPIDs = pd.read_parquet(save_location + "Test/ptl_info/ptl_" + str(j) + ".parquet")["HIPIDS"]
@@ -819,7 +824,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     ptl_df = pd.concat([full_ptl_df, ptl_df], axis=1)
 
                 ptl_df.to_parquet(save_location + "Test/ptl_info/ptl_" + str(j+test_start_pnt) + ".parquet")  
-                ptl_idx += p_test_nptls
+                test_ptl_idx += p_test_nptls
                 if debug_mem == 1:
                     print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
 
@@ -828,11 +833,11 @@ with timed("Generating Datasets for " + curr_sparta_file):
             val_prnt_halo_splits.append(val_idxs.size)
             print("Validation Splits")
             print("Num halos in each split:", ", ".join(map(str, np.diff(val_prnt_halo_splits))) + ".", val_num_iter, "splits")
-            ptl_idx = 0
+            val_ptl_idx = 0
             for j in range(val_num_iter):
                 if i == 0:
                     ret_labels = True
-                    val_p_HIPIDs, p_orb_assn, p_rad_vel, p_tang_vel, p_scale_rad, p_phys_vel, p_start_num_ptls, p_use_num_ptls, use_indices, use_halos_r200m = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=val_num_iter, \
+                    val_p_HIPIDs, p_orb_assn, p_rad_vel, p_tang_vel, p_scale_rad, p_phys_vel, p_start_num_ptls, p_use_num_ptls, use_indices, use_halos_r200m = halo_loop(ptl_idx=val_ptl_idx, curr_iter=j, num_iter=val_num_iter, \
                         indices=val_idxs, halo_splits=curr_val_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=True, ptls_pid=curr_ptls_pid, \
                         ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels)
                     
@@ -857,7 +862,7 @@ with timed("Generating Datasets for " + curr_sparta_file):
                 else:
                     # Access the correct number of particles for this batch 
                     ret_labels = False
-                    c_HIPIDs, c_rad_vel, c_tang_vel, c_scale_rad, c_phys_vel = halo_loop(ptl_idx=ptl_idx, curr_iter=j, num_iter=val_num_iter, indices=val_idxs, \
+                    c_HIPIDs, c_rad_vel, c_tang_vel, c_scale_rad, c_phys_vel = halo_loop(ptl_idx=val_ptl_idx, curr_iter=j, num_iter=val_num_iter, indices=val_idxs, \
                         halo_splits=curr_val_halo_splits, snap_dict=curr_snap_dict, use_prim_tree=False, ptls_pid=curr_ptls_pid, ptls_pos=curr_ptls_pos, ptls_vel=curr_ptls_vel, ret_labels=ret_labels,name="Val")
 
                     curr_val_p_HIPIDs = pd.read_parquet(save_location + "Val/ptl_info/ptl_" + str(j) + ".parquet")["HIPIDS"]
@@ -891,6 +896,6 @@ with timed("Generating Datasets for " + curr_sparta_file):
                     ptl_df = pd.concat([full_ptl_df, ptl_df], axis=1)
                 
                 ptl_df.to_parquet(save_location + "Val/ptl_info/ptl_" + str(j+val_start_pnt) + ".parquet")  
-                ptl_idx += p_val_nptls
+                val_ptl_idx += p_val_nptls
                 if debug_mem == 1:
                     print(f"Final memory usage: {memory_usage() / 1024**3:.2f} GB")
