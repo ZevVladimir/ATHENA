@@ -618,6 +618,10 @@ with timed("Generating Datasets for " + curr_sparta_file):
         create_directory(save_location + "Test/halo_info/")
         create_directory(save_location + "Val/halo_info/")
         
+        create_directory(save_location + "Train/ptl_info/")
+        create_directory(save_location + "Test/ptl_info/")
+        create_directory(save_location + "Val/ptl_info/")
+        
         if reset_lvl > 0: # At any level of reset we delete the calculated info for particles
             clean_dir(save_location + "Train/ptl_info/")
             clean_dir(save_location + "Test/ptl_info/")

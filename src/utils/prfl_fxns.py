@@ -157,7 +157,7 @@ def compute_prfs_info(calc_prf, act_prf, prf_func=None):
 
 # Profiles should be a list [calc_prf,act_prf]
 # You can either use the median plots with use_med=True or the average with use_med=False
-def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title, prf_func=np.nanmedian):       
+def compare_prfs(orb_prfs, inf_prfs, bins, lin_rticks, save_location, title, prf_func=np.nanmedian):       
     with timed("Compare Profiles"):     
         # Parameters to tune sizes of plots and fonts
         widths = [1]
@@ -175,23 +175,19 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
         invis_calc, = ax_0.plot([0], [0], color='black', linestyle='-')
         invis_act, = ax_0.plot([0], [0], color='black', linestyle='--')
 
-        calc_all_prfs, act_all_prfs, mid_ratio_all_prf, all_ratio_all_prf = compute_prfs_info(all_prfs[0],all_prfs[1],prf_func)
         calc_orb_prfs, act_orb_prfs, mid_ratio_orb_prf, all_ratio_orb_prf = compute_prfs_info(orb_prfs[0],orb_prfs[1],prf_func)
         calc_inf_prfs, act_inf_prfs, mid_ratio_inf_prf, all_ratio_inf_prf = compute_prfs_info(inf_prfs[0],inf_prfs[1],prf_func)
                     
         # Plot the calculated profiles
-        all_lb, = ax_0.plot(bins, calc_all_prfs, 'r-', label = "All")
         orb_lb, = ax_0.plot(bins, calc_orb_prfs, 'b-', label = "Orbiting")
         inf_lb, = ax_0.plot(bins, calc_inf_prfs, 'g-', label = "Infalling")
         
         # Plot the SPARTA (actual) profiles 
-        ax_0.plot(bins, act_all_prfs, 'r--')
         ax_0.plot(bins, act_orb_prfs, 'b--')
         ax_0.plot(bins, act_inf_prfs, 'g--')
         
-        fig.legend([(invis_calc, invis_act),all_lb,orb_lb,inf_lb], ['Predicted, Actual','All','Orbiting','Infalling'], numpoints=1,handlelength=3,handler_map={tuple: HandlerTuple(ndivide=None)},frameon=False,fontsize=legendfntsize)
+        fig.legend([(invis_calc, invis_act),orb_lb,inf_lb], ['Predicted, Actual','Orbiting','Infalling'], numpoints=1,handlelength=3,handler_map={tuple: HandlerTuple(ndivide=None)},frameon=False,fontsize=legendfntsize)
 
-        ax_1.plot(bins, mid_ratio_all_prf, 'r')
         ax_1.plot(bins, mid_ratio_orb_prf, 'b')
         ax_1.plot(bins, mid_ratio_inf_prf, 'g')
         
@@ -202,7 +198,7 @@ def compare_prfs(all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, 
         ax_0.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
         ax_0.tick_params(axis='x', which='both', labelbottom=False) # we don't want the labels just the tick marks
         
-        fig.legend([(invis_calc, invis_act),all_lb,orb_lb,inf_lb], ['Predicted, Actual','All','Orbiting','Infalling'], numpoints=1,handlelength=3,handler_map={tuple: HandlerTuple(ndivide=None)},frameon=False,fontsize=legendfntsize)
+        fig.legend([(invis_calc, invis_act),orb_lb,inf_lb], ['Predicted, Actual','Orbiting','Infalling'], numpoints=1,handlelength=3,handler_map={tuple: HandlerTuple(ndivide=None)},frameon=False,fontsize=legendfntsize)
 
         ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
         ax_1.set_ylabel(r"$\frac{\rho_{pred}}{\rho_{act}} - 1$", fontsize=axisfntsize)
@@ -264,7 +260,7 @@ def plot_split_prf_and_rat(ax0,ax1,bins,calc_prf,act_prf,prf_func,plt_lines,plt_
 def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, lin_rticks, save_location, title, prf_func=np.nanmedian, split_name="\\nu", prf_name_0 = "ML Model", prf_name_1 = "SPARTA"): 
     with timed("Compare Split Profiles"):
         # Parameters to tune sizes of plots and fonts
-        widths = [1,1,1]
+        widths = [1,1]
         heights = [1,0.5]
         axisfntsize=12
         textfntsize = 10
@@ -275,75 +271,53 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
         fig = plt.figure(constrained_layout=True,figsize=(10,5))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
         
-        all_ax_0 = fig.add_subplot(gs[0,0])
-        all_ax_1 = fig.add_subplot(gs[1,0],sharex=all_ax_0)
-        orb_ax_0 = fig.add_subplot(gs[0,1])
-        orb_ax_1 = fig.add_subplot(gs[1,1],sharex=orb_ax_0)
-        inf_ax_0 = fig.add_subplot(gs[0,2])
-        inf_ax_1 = fig.add_subplot(gs[1,2],sharex=inf_ax_0)
+        orb_ax_0 = fig.add_subplot(gs[0,0])
+        orb_ax_1 = fig.add_subplot(gs[1,0],sharex=orb_ax_0)
+        inf_ax_0 = fig.add_subplot(gs[0,1])
+        inf_ax_1 = fig.add_subplot(gs[1,1],sharex=inf_ax_0)
         
-        all_cmap = plt.cm.Reds
         orb_cmap = plt.cm.Blues
         inf_cmap = plt.cm.Greens
         
-        all_colors, all_plt_lines, all_plt_lbls = create_invis_prf_line(all_ax_0,all_cmap,n_lines,prf_name_0,prf_name_1)
-        orb_colors, orb_plt_lines, orb_plt_lbls = create_invis_prf_line(all_ax_0,orb_cmap,n_lines,prf_name_0,prf_name_1)
-        inf_colors, inf_plt_lines, inf_plt_lbls = create_invis_prf_line(all_ax_0,inf_cmap,n_lines,prf_name_0,prf_name_1)
+        orb_colors, orb_plt_lines, orb_plt_lbls = create_invis_prf_line(orb_ax_0,orb_cmap,n_lines,prf_name_0,prf_name_1)
+        inf_colors, inf_plt_lines, inf_plt_lbls = create_invis_prf_line(orb_ax_0,inf_cmap,n_lines,prf_name_0,prf_name_1)
 
         for i,var_split in enumerate(plt_splits):
-            plot_split_prf_and_rat(all_ax_0, all_ax_1, bins, all_prfs[i][0], all_prfs[i][1], prf_func, all_plt_lines, all_plt_lbls, var_split, split_name, all_colors[i], fill_alpha)
             plot_split_prf_and_rat(orb_ax_0, orb_ax_1, bins, orb_prfs[i][0], orb_prfs[i][1], prf_func, orb_plt_lines, orb_plt_lbls, var_split, split_name, orb_colors[i], fill_alpha)
             plot_split_prf_and_rat(inf_ax_0, inf_ax_1, bins, inf_prfs[i][0], inf_prfs[i][1], prf_func, inf_plt_lines, inf_plt_lbls, var_split, split_name, inf_colors[i], fill_alpha)
             
-        all_ax_0.set_ylabel(r"$\rho / \rho_m$", fontsize=axisfntsize)
-        all_ax_0.set_xscale("log")
-        all_ax_0.set_yscale("log")
-        all_ax_0.set_xlim(0.05,np.max(lin_rticks))
-        all_ax_0.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
-        all_ax_0.tick_params(axis='x', which='both', labelbottom=False) # we don't want the labels just the tick marks
-        all_ax_0.legend(all_plt_lines,all_plt_lbls,fontsize=legendfntsize, loc = "upper right")
-        all_ax_0.text(0.05,0.05, "All Particles", ha="left", va="bottom", transform=all_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
-        
+        orb_ax_0.set_ylabel(r"$\rho / \rho_m$", fontsize=axisfntsize)
         orb_ax_0.set_xscale("log")
         orb_ax_0.set_yscale("log")
         orb_ax_0.set_xlim(0.05,np.max(lin_rticks))
-        orb_ax_0.set_ylim(all_ax_0.get_ylim())
         orb_ax_0.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
         orb_ax_0.tick_params(axis='x', which='both', labelbottom=False) # we don't want the labels just the tick marks
-        orb_ax_0.tick_params(axis='y', which='both', labelleft=False)
         orb_ax_0.legend(orb_plt_lines,orb_plt_lbls,fontsize=legendfntsize, loc = "upper right")
         orb_ax_0.text(0.05,0.05, "Orbiting Particles", ha="left", va="bottom", transform=orb_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
         
         inf_ax_0.set_xscale("log")
         inf_ax_0.set_yscale("log")
         inf_ax_0.set_xlim(0.05,np.max(lin_rticks))
-        inf_ax_0.set_ylim(all_ax_0.get_ylim())
+        inf_ax_0.set_ylim(orb_ax_0.get_ylim())
         inf_ax_0.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
         inf_ax_0.tick_params(axis='x', which='both', labelbottom=False) # we don't want the labels just the tick marks
-        inf_ax_0.tick_params(axis='y', which='both', labelleft=False) 
-        inf_ax_0.legend(inf_plt_lines,inf_plt_lbls,fontsize=legendfntsize, loc = "upper right")
-        inf_ax_0.text(0.05,0.05, "Infalling Particles", ha="left", va="bottom", transform=inf_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
-
-        all_y_min, all_y_max = all_ax_0.get_ylim()
+        inf_ax_0.tick_params(axis='y', which='both', labelleft=False)
+        inf_ax_0.legend(orb_plt_lines,orb_plt_lbls,fontsize=legendfntsize, loc = "upper right")
+        inf_ax_0.text(0.05,0.05, "Infalling Particles", ha="left", va="bottom", transform=orb_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
+        
         orb_y_min, orb_y_max = orb_ax_0.get_ylim()
         inf_y_min, inf_y_max = inf_ax_0.get_ylim()
 
-        global_y_min = min(all_y_min, orb_y_min, inf_y_min)
-        global_y_max = max(all_y_max, orb_y_max, inf_y_max)
+        global_y_min = min(orb_y_min, inf_y_min)
+        global_y_max = max(orb_y_max, inf_y_max)
 
         # Set the same y-axis limits for all axes
-        all_ax_0.set_ylim(0.1, global_y_max)
         orb_ax_0.set_ylim(0.1, global_y_max)
         inf_ax_0.set_ylim(0.1, global_y_max)
         
-        all_ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
-        all_ax_1.set_ylabel(r"$\frac{\rho_{pred}}{\rho_{act}} - 1$", fontsize=axisfntsize)
         orb_ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
+        orb_ax_1.set_ylabel(r"$\frac{\rho_{pred}}{\rho_{act}} - 1$", fontsize=axisfntsize)
         inf_ax_1.set_xlabel(r"$r/R_{200m}$", fontsize=axisfntsize)
-        
-        all_ax_1.set_xlim(0.05,np.max(lin_rticks))
-        all_ax_1.set_ylim(bottom=-0.3,top=0.3)
-        all_ax_1.set_xscale("log")
         
         orb_ax_1.set_xlim(0.05,np.max(lin_rticks))
         orb_ax_1.set_ylim(bottom=-0.3,top=0.3)
@@ -360,12 +334,9 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
             tick_locs.append(0.1)
             tick_locs = sorted(tick_locs)
         strng_ticks = list(map(str, tick_locs))
-
-        all_ax_1.set_xticks(tick_locs,strng_ticks)  
-        all_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
         
         orb_ax_1.set_xticks(tick_locs,strng_ticks)
-        orb_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize, labelleft=False)
+        orb_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
         
         inf_ax_1.set_xticks(tick_locs,strng_ticks)  
         inf_ax_1.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize, labelleft=False)
@@ -643,7 +614,6 @@ def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol_list,split_scale_di
     
     if debug_indiv_dens_prf > 0:
         my_dens_prf_orb = calc_rho(my_mass_prf_orb*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
-        my_dens_prf_all = calc_rho(my_mass_prf_all*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
         my_dens_prf_inf = calc_rho(my_mass_prf_inf*h,bins[1:],my_r200m*h,sim_splits,all_rhom)
     
         ratio = np.where(act_dens_prf_all != 0, calc_dens_prf_all / act_dens_prf_all, np.nan)
@@ -656,16 +626,14 @@ def paper_dens_prf_plt(X,y,preds,halo_df,use_sims,sim_cosmol_list,split_scale_di
         big_halo_loc = np.argsort(diff)[-k:]
     
         for i in range(k):
-            all_prfs = [my_mass_prf_all[big_halo_loc[i]], act_mass_prf_all[big_halo_loc[i]]]
             orb_prfs = [my_mass_prf_orb[big_halo_loc[i]], act_mass_prf_orb[big_halo_loc[i]]]
             inf_prfs = [my_mass_prf_inf[big_halo_loc[i]], act_mass_prf_inf[big_halo_loc[i]]]
-            compare_prfs(all_prfs,orb_prfs,inf_prfs,bins[1:],lin_rticks,debug_plt_path,sim + "_" + str(i)+"_mass",prf_func=None)
+            compare_prfs(orb_prfs,inf_prfs,bins[1:],lin_rticks,debug_plt_path,sim + "_" + str(i)+"_mass",prf_func=None)
 
         for i in range(k):
-            all_prfs = [my_dens_prf_all[big_halo_loc[i]], act_dens_prf_all[big_halo_loc[i]]]
             orb_prfs = [my_dens_prf_orb[big_halo_loc[i]], act_dens_prf_orb[big_halo_loc[i]]]
             inf_prfs = [my_dens_prf_inf[big_halo_loc[i]], act_dens_prf_inf[big_halo_loc[i]]]
-            compare_prfs(all_prfs,orb_prfs,inf_prfs,bins[1:],lin_rticks,debug_plt_path,sim + "_" + str(i)+"_dens",prf_func=None)
+            compare_prfs(orb_prfs,inf_prfs,bins[1:],lin_rticks,debug_plt_path,sim + "_" + str(i)+"_dens",prf_func=None)
             
     curr_halos_r200m_list = []
     past_halos_r200m_list = []

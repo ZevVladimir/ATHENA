@@ -279,7 +279,7 @@ def gen_ptl_dist_plt(act_labels, split_scale_dict, save_loc, data_dict = {}, plo
         cividis_cmap.set_under(color='black')
         cividis_cmap.set_bad(color='black') 
         
-        rdbu_cmap = plt.get_cmap("RdBu")
+        rdbu_cmap = plt.get_cmap("RdBu_r")
         rdbu_cmap.set_under(color='black')
         rdbu_cmap.set_bad(color='black') 
         
