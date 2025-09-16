@@ -7,7 +7,7 @@ from src.utils.ML_fxns import get_combined_name, extract_snaps, get_feature_labe
 from src.utils.util_fxns import create_directory, load_pickle, load_config, load_pickle, timed, load_sparta_mass_prf,load_all_sim_cosmols,load_all_tdyn_steps
 from src.utils.ke_cut_fxns import load_ke_data, fast_ke_predictor, opt_ke_predictor
 from src.utils.calc_fxns import calc_rho
-from src.utils.util_fxns import set_cosmology, parse_ranges
+from src.utils.util_fxns import parse_ranges
 from src.utils.prfl_fxns import create_stack_mass_prf, filter_prf, compare_split_prfs_ke
 
 parser = argparse.ArgumentParser()

@@ -7,7 +7,7 @@ import argparse
 from src.utils.ML_fxns import get_combined_name, make_preds, get_model_name, extract_snaps, get_feature_labels
 from src.utils.util_fxns import create_directory, load_pickle, load_config, load_pickle, timed, load_SPARTA_data, load_ML_dsets, load_all_sim_cosmols, load_all_tdyn_steps
 from src.utils.ke_cut_fxns import fast_ke_predictor, opt_ke_predictor
-from src.utils.util_fxns import set_cosmology, parse_ranges, split_sparta_hdf5_name
+from src.utils.util_fxns import parse_ranges, split_sparta_hdf5_name
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -27,7 +27,7 @@ debug_plt_path = config_params["PATHS"]["debug_plt_path"]
 
 save_intermediate_data = config_params["MISC"]["save_intermediate_data"]
 
-use_gpu = config_params["DASK_CLIENT"]["use_gpu"]
+use_gpu = config_params["ENVIRONMENT"]["use_gpu"]
 
 model_sims = config_params["TRAIN_MODEL"]["model_sims"]
 features = config_params["TRAIN_MODEL"]["features"]

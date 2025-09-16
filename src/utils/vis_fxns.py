@@ -4,8 +4,6 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Circle
 import scipy.ndimage as ndimage
-import dask.dataframe as dd
-import dask.array as da
 
 from .util_fxns import timed, split_orb_inf
 

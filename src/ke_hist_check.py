@@ -3,7 +3,7 @@ import numpy as np
 import os
 import argparse
 
-from src.utils.ML_fxns import setup_client, get_combined_name, extract_snaps, get_feature_labels, filter_df
+from src.utils.ML_fxns import setup_client, get_combined_name, extract_snaps, filter_df
 from src.utils.util_fxns import create_directory, load_pickle, load_config, load_pickle, timed, load_SPARTA_data, load_ML_dsets
 from src.utils.ke_cut_fxns import fast_ke_predictor, opt_ke_predictor
 from src.utils.util_fxns import parse_ranges, split_sparta_hdf5_name, load_all_sim_cosmols, load_all_tdyn_steps

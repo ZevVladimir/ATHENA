@@ -7,7 +7,7 @@ import argparse
 from src.utils.ML_fxns import get_combined_name, get_feature_labels, get_model_name, extract_snaps
 from src.utils.ke_cut_fxns import load_ke_data, fast_ke_predictor
 from src.utils.prfl_fxns import paper_dens_prf_plt
-from src.utils.util_fxns import set_cosmology, depair_np, parse_ranges, create_directory, timed, save_pickle, load_pickle, load_config, load_SPARTA_data, split_sparta_hdf5_name, load_all_sim_cosmols, load_all_tdyn_steps
+from src.utils.util_fxns import parse_ranges, create_directory, timed, save_pickle, load_pickle, load_config, load_SPARTA_data, split_sparta_hdf5_name, load_all_sim_cosmols, load_all_tdyn_steps
 from src.utils.vis_fxns import plt_SPARTA_KE_dist, plt_KE_dist_grad
 
 parser = argparse.ArgumentParser()

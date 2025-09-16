@@ -5,12 +5,10 @@ You need the particle data from a GADGET simulation and the .hdf5 output file fr
 
 ## Python Dependencies
 - I make use of a customized shap fork that is also publicly available at https://github.com/ZevVladimir/shap. This is done to just allow for ease of adjusting different fontsizes as well as adjusting certain features in the plots that I want hidden or not. This should only impact code run in make_shap_plots.py. 
-- We ue Python 3.10.10 and CUDA 12
-- For most of the python packages use the requirements.txt file to install
+- We ue Python 3.10.10 
+- For most of the python packages use the requirements.txt file to install `pip install -r requirements.txt`
 - pygadgetreader needs to be cloned and installed from this repository: https://github.com/jveitchmichaelis/pygadgetreader
-- SPARTA needs to be cloned and installed from this repository: https://bdiemer.bitbucket.io/sparta/ 
-- For dask packages that make use of CUDA you can find alternative ways to install at: https://docs.rapids.ai/install/ 
-    - Currently requires Python 3.10, 3.11, or 3.12
+- SPARTA needs to be cloned and installed from this repository: https://bitbucket.org/bdiemer/sparta/src
 
 ## Creating the Datasets
 
@@ -112,7 +110,7 @@ The name of the folder where each model is saved is slightly complicated in orde
 
 ### Running the code: train_model.py
 
-After the \[TRAIN_MODEL\] parameters are set (and potentially \[MISC\] and \[DASK_CLIENT\] parameters as well) you are ready to create the datasets. This is done by simply running the python code: `python3 ./src/train_model.py`
+After the \[TRAIN_MODEL\] parameters are set (and potentially \[MISC\] and \[ENVIRONMENT\] parameters as well) you are ready to create the datasets. This is done by simply running the python code: `python3 ./src/train_model.py`
 
 <details>
 <summary>Saved Model Information</summary>

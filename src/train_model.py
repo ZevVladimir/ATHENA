@@ -3,8 +3,8 @@ import pickle
 import os
 import argparse
 
-from src.utils.util_fxns import create_directory, timed, load_pickle, save_pickle, load_config, load_ML_dsets, load_all_sim_cosmols, load_all_tdyn_steps
-from src.utils.ML_fxns import setup_client, get_combined_name, extract_snaps, get_model_name, get_feature_labels
+from src.utils.util_fxns import create_directory, timed, save_pickle, load_config, load_ML_dsets, load_all_sim_cosmols, load_all_tdyn_steps
+from src.utils.ML_fxns import get_combined_name, extract_snaps, get_model_name, get_feature_labels
 
 ##################################################################################################################
 # LOAD CONFIG PARAMETERS
@@ -81,7 +81,7 @@ if __name__ == "__main__":
             create_directory(model_fldr_loc)
             create_directory(gen_plot_save_loc)
 
-            # Construct the DMatrix used for evaluatin the model
+            # Construct the DMatrix used for evaluating the model
             dtrain = xgb.DMatrix(X_train, y_train)
             
             eval_list = []
@@ -91,7 +91,7 @@ if __name__ == "__main__":
                 curr_X = curr_data[feature_columns]
                 curr_y = curr_data[target_column]
                 
-                # Construct the DaskDMatrix used for evaluatin the model
+                # Construct the DMatrix used for evaluating the model
                 eval_list.append((xgb.DMatrix(curr_X, curr_y),dset))
 
         if 'Training Info' in model_info: 

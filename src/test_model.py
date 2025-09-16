@@ -1,11 +1,10 @@
 import xgboost as xgb
 import pickle
 import os
-import pandas as pd
 import argparse
 
 from src.utils.ML_fxns import get_combined_name, get_model_name, extract_snaps, make_preds, get_feature_labels
-from src.utils.util_fxns import create_directory, timed, load_pickle, save_pickle, load_config, load_ML_dsets,reform_dset_dfs, load_all_sim_cosmols, load_all_tdyn_steps
+from src.utils.util_fxns import create_directory, timed, load_pickle, save_pickle, load_config, load_ML_dsets, load_all_sim_cosmols, load_all_tdyn_steps
 from src.utils.prfl_fxns import paper_dens_prf_plt
 from src.utils.vis_fxns import gen_ptl_dist_plt, gen_missclass_dist_plt
 ##################################################################################################################
@@ -25,7 +24,7 @@ ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 path_to_models = config_params["PATHS"]["path_to_models"]
 snap_path = config_params["SNAP_DATA"]["snap_path"]
 
-use_gpu = config_params["DASK_CLIENT"]["use_gpu"]
+use_gpu = config_params["ENVIRONMENT"]["use_gpu"]
 
 model_sims = config_params["TRAIN_MODEL"]["model_sims"]
 model_type = config_params["TRAIN_MODEL"]["model_type"]

@@ -1,6 +1,3 @@
-import dask.dataframe as dd
-from dask.distributed import Client
-from xgboost import dask as dxgb
 import xgboost as xgb
 import argparse
 import numpy as np
@@ -8,7 +5,6 @@ import os
 import pickle
 import re
 import pandas as pd
-import multiprocessing as mp
 
 from .util_fxns import load_config
 from .util_fxns import split_sparta_hdf5_name, timed, parse_ranges
@@ -36,9 +32,8 @@ pickled_path = config_params["PATHS"]["pickled_path"]
 ML_dset_path = config_params["PATHS"]["ml_dset_path"]
 debug_plt_path = config_params["PATHS"]["debug_plt_path"]
 
-on_zaratan = config_params["DASK_CLIENT"]["on_zaratan"]
-use_gpu = config_params["DASK_CLIENT"]["use_gpu"]
-dask_task_ncpus = config_params["DASK_CLIENT"]["dask_task_ncpus"]
+on_zaratan = config_params["ENVIRONMENT"]["on_zaratan"]
+use_gpu = config_params["ENVIRONMENT"]["use_gpu"]
 
 file_lim = config_params["TRAIN_MODEL"]["file_lim"]
 
@@ -53,75 +48,6 @@ sim_name, search_name = split_sparta_hdf5_name(curr_sparta_file)
 snap_path = snap_path + sim_name + "/"
 
 ###############################################################################################################
-if on_zaratan:
-    from dask_mpi import initialize
-    from distributed.scheduler import logger
-    import socket
-elif not on_zaratan and not use_gpu:
-    from dask.distributed import LocalCluster
-elif use_gpu:
-    from dask_cuda import LocalCUDACluster
-###############################################################################################################
-
-# Instantiate a dask cluster with GPUs
-def get_CUDA_cluster():
-    cluster = LocalCUDACluster(
-                               device_memory_limit='10GB',
-                               jit_unspill=True)
-    client = Client(cluster)
-    return client
-
-#TODO don't have use_gpu and on_zaratan loaded in this file
-def setup_client():
-    with timed("Setup Dask Client"):
-        if use_gpu:
-            mp.set_start_method("spawn")
-        
-        dask_tmp_dir = "/home/zvladimi/scratch/ATHENA/dask_logs/dask-scratch-space"
-        os.makedirs(dask_tmp_dir, exist_ok=True)
-        os.environ["DASK_TEMPORARY_DIRECTORY"] = dask_tmp_dir
-
-        if on_zaratan:
-            if use_gpu:
-                initialize(local_directory=dask_tmp_dir)
-            else:
-                cpus_per_task = int(os.environ.get('SLURM_CPUS_PER_TASK', 1))
-                initialize(nthreads=cpus_per_task, local_directory=dask_tmp_dir)
-
-            client = Client()
-
-            # Ensure the scratch directory exists on each worker
-            client.run(lambda: os.makedirs(dask_tmp_dir, exist_ok=True))
-
-            host = client.run_on_scheduler(socket.gethostname)
-            port = client.scheduler_info()['services']['dashboard']
-            login_node_address = "zvladimi@login.zaratan.umd.edu"
-            logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}")
-        else:
-            if use_gpu:
-                client = get_CUDA_cluster()
-            else:
-                tot_ncpus = mp.cpu_count()
-                n_workers = int(np.floor(tot_ncpus / dask_task_ncpus))
-                cluster = LocalCluster(
-                    n_workers=n_workers,
-                    threads_per_worker=dask_task_ncpus,
-                    memory_limit='5GB'  
-                )
-                client = Client(cluster)
-    return client
-
-# Make predictions using the model. Requires the inputs to be a dask dataframe. Can either return the predictions still as a dask dataframe or as a numpy array
-def dask_make_preds(client, bst, X, ret_dask = False, threshold = 0.5):
-    if ret_dask:
-        preds = dxgb.predict(client,bst,X)
-        preds = preds.map_partitions(lambda df: (df >= threshold).astype(int))
-        return preds
-    else:
-        preds = dxgb.inplace_predict(client, bst, X).compute()
-        preds = (preds >= threshold).astype(np.int8)
-    
-    return preds
 
 def make_preds(bst, X, threshold = 0.5):
     preds = bst.predict(xgb.DMatrix(X))

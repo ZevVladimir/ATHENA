@@ -1,8 +1,6 @@
-import colossus.cosmology
 import numpy as np
 from colossus.halo import mass_so
 from colossus.utils import constants
-import numexpr as ne
 
 G = constants.G # kpc km^2 / M_⊙ / s^2
 
@@ -200,14 +198,4 @@ def calc_scal_pos_weight(df):
 
     scale_pos_weight = count_negatives / count_positives
     return scale_pos_weight
-
-def dask_calc_scal_pos_weight(ddf):
-    counts = ddf['Orbit_infall'].value_counts().compute()
-    count_negatives = counts.get(0, 0)
-    count_positives = counts.get(1, 0)
-
-    if count_positives == 0:
-        return np.inf  # or handle it as appropriate
-    return count_negatives / count_positives
-
         

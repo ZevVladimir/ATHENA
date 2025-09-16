@@ -6,6 +6,7 @@
 /sparta/
 /__pycache__/
 /.pygadgetreader/
+/pygadgetreader/
 .python-version
 /xgboost_results/
 /pickle_data/

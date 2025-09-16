@@ -5,14 +5,11 @@ import os
 import pandas as pd
 import numpy as np
 import re
-from dask import delayed
-import dask.dataframe as dd
 from pygadgetreader import readsnap, readheader
 from sparta_tools import sparta
 from functools import reduce
 import ast
 import configparser
-from pygadgetreader import readheader
 from colossus.cosmology import cosmology
 from colossus.halo import mass_so
 from colossus.lss import peaks
@@ -20,8 +17,7 @@ import time
 from contextlib import contextmanager
 from colossus.utils import constants
 import argparse
-import threading
-from .calc_fxns import calc_scal_pos_weight, dask_calc_scal_pos_weight
+from .calc_fxns import calc_scal_pos_weight
 
 def parse_value(value):
     """Convert value to appropriate type (list, int, float, bool, str)."""
@@ -265,72 +261,6 @@ def load_sparta_mass_prf(sim_splits,all_idxs,use_sims,ret_r200m=False):
     else:
         return mass_prf_all,mass_prf_1halo,all_masses,bins
 
-# Loads all the data for the inputted list of simulations into one dataframe. Finds the scale position weight for the dataset and any adjusted weighting for it if desired
-def dask_load_ML_dsets(sims, dset_name, sim_cosmol_list, file_lim=0, filter_nu=False, nu_splits=None):
-    all_ddfs = []
-    all_halo_file_paths = []
-    all_ptl_mass = []
-    all_z = []
-    
-    if dset_name == "Full":
-        datasets = ["Train", "Val", "Test"]
-    else:
-        datasets = [dset_name]
-
-    # For each simulation we are loading
-    for sim in sims:        
-        # For each dataset for the simulation we are loading
-        for dset_name in datasets:
-            with timed("Loading " + sim + " " + dset_name + " data"):
-                folder_path = f"{ML_dset_path}{sim}/{dset_name}"
-                
-                # Determine how many files we will load
-                n_files = len(os.listdir(folder_path + "/ptl_info/"))
-
-                if file_lim > 0:
-                    n_files = np.min([n_files,file_lim]) 
-
-                # Then we will load all the particle dataframes for each snapshot
-                for file_idx in range(n_files):
-                    curr_file_paths = []
-
-                    curr_file_paths.append(f"{folder_path}/ptl_info/ptl_{file_idx}.parquet")
-
-                    # Read all Dask DataFrames and ensure they have the same number of rows and known divisions
-                    for path in curr_file_paths:
-                        all_ddfs.append(dd.read_parquet(path))
-
-                all_halo_file_paths.append(f"{folder_path}/halo_info/")
-            
-        with open(ML_dset_path + sim + "/dset_params.pickle","rb") as f:
-            dset_params = pickle.load(f)
-        # Get mass and redshift for this simulation
-        ptl_mass, use_z = load_sim_mass_pz(sim,dset_params)
-        all_ptl_mass.append(ptl_mass)
-        all_z.append(use_z)
-        
-    halo_df = reform_dset_dfs(all_halo_file_paths)
-        
-    # reset indices for halo_first halo_n indexing
-    halo_df["Halo_first"] = halo_df["Halo_first"] - halo_df["Halo_first"][0]       
-    
-    all_ptl_ddfs = dd.concat(all_ddfs)
-
-     # Filter by nu and/or by radius
-    if filter_nu:
-        nus_all = []
-        for sim_cosmol in sim_cosmol_list:
-            cosmol = set_cosmology(sim_cosmol)
-            nus = np.array(peaks.peakHeight((halo_df["Halo_n"][:] * ptl_mass), use_z))
-            nus_all.append(nus)
-        nus_all = np.stack(nus_all, axis=0)
-        
-        all_ptl_ddfs, upd_halo_n, upd_halo_first = filter_df_with_nus(all_ptl_ddfs, nus_all, halo_df["Halo_first"], halo_df["Halo_n"], nu_splits)
-    
-    avg_scal_pos_weight = dask_calc_scal_pos_weight(all_ptl_ddfs)
-    
-    return all_ptl_ddfs.reset_index(drop=True), avg_scal_pos_weight
-
 def load_ML_dsets(sims, dset_name, sim_cosmol_list, file_lim=0, filter_nu=False, nu_splits=None):
     all_dfs = []
     all_halo_paths = []
@@ -362,7 +292,7 @@ def load_ML_dsets(sims, dset_name, sim_cosmol_list, file_lim=0, filter_nu=False,
 
                     curr_file_paths.append(f"{folder_path}/ptl_info/ptl_{file_idx}.parquet")
 
-                    # Read all Dask DataFrames and ensure they have the same number of rows and known divisions
+                    # Read all DataFrames and ensure they have the same number of rows and known divisions
                     for path in curr_file_paths:
                         all_dfs.append(pd.read_parquet(path))
 
@@ -623,25 +553,3 @@ def load_all_tdyn_steps(curr_sims):
         all_tdyn_steps_list.append(dset_params["t_dyn_steps"])
     
     return all_tdyn_steps_list
-
-def print_worker_memory(client):
-    scheduler_info = client.scheduler_info()
-    workers = scheduler_info.get('workers', {})
-    print("\n=== Dask Worker Memory Usage ===")
-    for address, info in workers.items():
-        mem_used = info.get('metrics', {}).get('memory', None)
-        mem_limit = info.get('memory_limit', None)
-        if mem_used is not None and mem_limit is not None:
-            usage_gb = mem_used / 1e9
-            limit_gb = mem_limit / 1e9
-            print(f"Worker {address} — {usage_gb:.2f} GB / {limit_gb:.2f} GB used")
-        else:
-            print(f"Worker {address} — memory info not available")
-    print("=================================\n")
-
-
-def periodic_monitor(client,interval=600):  
-    while True:
-        print_worker_memory(client)
-        time.sleep(interval)
-

@@ -1,13 +1,11 @@
 import os
-import pandas as pd
 import numpy as np
 from scipy.spatial import KDTree
 import argparse
-import dask.array as da
 
 from .ML_fxns import split_sparta_hdf5_name
 from .util_fxns import load_pickle, load_SPARTA_data, load_config, load_ML_dsets
-from .util_fxns import reform_dset_dfs, parse_ranges, depair_np, timed
+from .util_fxns import parse_ranges, timed
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -167,26 +165,4 @@ def opt_ke_predictor(opt_param_dict, bins, r_r200m, vr, lnv2, r200m_cut):
         
             preds_fit_ke[mask_pos] = 1
             preds_fit_ke[mask_neg] = 1
-    return preds_fit_ke
-
-def dask_opt_ke_predictor(opt_param_dict, bins, r_r200m, vr, lnv2, r200m_cut):
-    r_r200m = r_r200m.to_dask_array(lengths=True)
-    vr = vr.to_dask_array(lengths=True)
-    lnv2 = lnv2.to_dask_array(lengths=True)
-    
-    
-    bin_indices = da.digitize(r_r200m, bins) - 1  
-    preds_fit_ke = da.zeros_like(r_r200m,dtype=da.int8)
-    for i in range(bins.shape[0]-1):
-        if bins[i] <= r200m_cut:
-            b_pos = opt_param_dict["inf_vr_pos"]["b"][i]
-            b_neg = opt_param_dict["inf_vr_neg"]["b"][i]
-
-            mask_bin = bin_indices == i
-            mask_pos = mask_bin & (vr > 0) & (lnv2 <= b_pos)
-            mask_neg = mask_bin & (vr < 0) & (lnv2 <= b_neg)
-
-            # da.where to lazily update
-            preds_fit_ke = da.where(mask_pos | mask_neg, 1, preds_fit_ke)
-
     return preds_fit_ke
