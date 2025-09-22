@@ -229,7 +229,7 @@ def plot_split_prf(ax,bins,calc_prf,act_prf,curr_color,plt_lines,plt_lbls,var_sp
     # Plot the SPARTA (actual) profiles 
     ax.plot(bins, act_prf, linestyle='--', color = curr_color)
 
-    return plt_lines, plt_lbls\
+    return plt_lines, plt_lbls
         
 def plot_split_prf_rat(ax, bins, mid_ratio_prf, all_ratio_prf, curr_color, fill_alpha):
     ax.plot(bins, mid_ratio_prf, color = curr_color)
@@ -268,7 +268,7 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
         legendfntsize=8
         fill_alpha = 0.2
             
-        fig = plt.figure(constrained_layout=True,figsize=(10,5))
+        fig = plt.figure(constrained_layout=True,figsize=(7.5,5))
         gs = fig.add_gridspec(len(heights),len(widths),width_ratios = widths, height_ratios = heights, hspace=0, wspace=0)
         
         orb_ax_0 = fig.add_subplot(gs[0,0])
@@ -280,7 +280,7 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
         inf_cmap = plt.cm.Greens
         
         orb_colors, orb_plt_lines, orb_plt_lbls = create_invis_prf_line(orb_ax_0,orb_cmap,n_lines,prf_name_0,prf_name_1)
-        inf_colors, inf_plt_lines, inf_plt_lbls = create_invis_prf_line(orb_ax_0,inf_cmap,n_lines,prf_name_0,prf_name_1)
+        inf_colors, inf_plt_lines, inf_plt_lbls = create_invis_prf_line(inf_ax_0,inf_cmap,n_lines,prf_name_0,prf_name_1)
 
         for i,var_split in enumerate(plt_splits):
             plot_split_prf_and_rat(orb_ax_0, orb_ax_1, bins, orb_prfs[i][0], orb_prfs[i][1], prf_func, orb_plt_lines, orb_plt_lbls, var_split, split_name, orb_colors[i], fill_alpha)
@@ -302,8 +302,8 @@ def compare_split_prfs(plt_splits, n_lines, all_prfs, orb_prfs, inf_prfs, bins, 
         inf_ax_0.tick_params(axis='both',which='both',direction="in",labelsize=tickfntsize)
         inf_ax_0.tick_params(axis='x', which='both', labelbottom=False) # we don't want the labels just the tick marks
         inf_ax_0.tick_params(axis='y', which='both', labelleft=False)
-        inf_ax_0.legend(orb_plt_lines,orb_plt_lbls,fontsize=legendfntsize, loc = "upper right")
-        inf_ax_0.text(0.05,0.05, "Infalling Particles", ha="left", va="bottom", transform=orb_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
+        inf_ax_0.legend(inf_plt_lines,inf_plt_lbls,fontsize=legendfntsize, loc = "upper right")
+        inf_ax_0.text(0.05,0.05, "Infalling Particles", ha="left", va="bottom", transform=inf_ax_0.transAxes, fontsize=textfntsize, bbox={"facecolor":'white',"alpha":0.9,})
         
         orb_y_min, orb_y_max = orb_ax_0.get_ylim()
         inf_y_min, inf_y_max = inf_ax_0.get_ylim()

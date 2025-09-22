@@ -135,6 +135,6 @@ if __name__ == "__main__":
                     )
             
             bst.save_model(model_save_loc)
-            
+            bst.save_config(model_fldr_loc + "model_config.json")
             save_pickle(model_info,model_fldr_loc + "model_info.pickle")
     
