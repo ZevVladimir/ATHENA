@@ -8,7 +8,7 @@ To load the model it is as simple as:
 ```
 import xgboost as xgb
 bst = xgb.Booster()
-bst.load_model("/path/to/model//Users/zvladimi/ATHENA/Paper_model/base_flim1_cboll0063n1024s99_89cboll0125n1024s99_89cboll0250n1024s99_89cboll0500n1024s99_89cboll1000n1024s99_89cboll2000n1024s99_89.json")
+bst.load_model("/path/to/model//Users/zvladimi/ATHENA/Paper_model/base_flim1_cboll0063n1024s99_85cboll0125n1024s99_85cboll0250n1024s99_85cboll0500n1024s99_85cboll1000n1024s99_85cboll2000n1024s99_85.json")
 ```
 
 We also provide the config file from xgboost in the same folder.
