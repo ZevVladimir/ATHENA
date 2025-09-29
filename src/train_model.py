@@ -134,7 +134,6 @@ if __name__ == "__main__":
                     num_boost_round=ntrees,
                     )
             
-            bst.save_model(model_save_loc)
-            bst.save_config(model_fldr_loc + "model_config.json")
+            bst.save_model(model_save_loc) 
             save_pickle(model_info,model_fldr_loc + "model_info.pickle")
     
